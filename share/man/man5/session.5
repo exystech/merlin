@@ -37,6 +37,20 @@ file can be created in any text editor and then made executable:
 editor ~/.session
 chmod +x ~/.session
 .Ed
+.Ss Graphical User Interface
+.Xr display 1
+can be selected as the user's graphical user interface with this executable
+.Pa ~/.session
+script:
+.Bd -literal -offset indent
+#!/bin/sh
+exec display
+.Ed
+.Pp
+.Xr display 1
+will run the
+.Xr displayrc 5
+script on startup, which can be used to start programs.
 .Ss Trianglix
 .Xr trianglix 1
 can be selected as the user's triangle environment with this executable
