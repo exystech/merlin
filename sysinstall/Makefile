@@ -60,13 +60,13 @@ install: all
 	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-group
 
 sysinstall: $(SYSINSTALL_OBJS)
-	$(CC) $(SYSINSTALL_OBJS) -o $@ -lmount
+	$(CC) $(SYSINSTALL_OBJS) -o $@ -lmount -ldisplay
 
 sysmerge: $(SYSMERGE_OBJS)
 	$(CC) $(SYSMERGE_OBJS) -o $@ -lmount
 
 sysupgrade: $(SYSUPGRADE_OBJS)
-	$(CC) $(SYSUPGRADE_OBJS) -o $@ -lmount
+	$(CC) $(SYSUPGRADE_OBJS) -o $@ -lmount -ldisplay
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -std=gnu11 -c $< -o $@

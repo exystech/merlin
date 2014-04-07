@@ -386,6 +386,14 @@ and
 .Pp
 Please note that Sortix is not currently secure as a multi-user system and
 filesystem permissions are not enforced.
+.Ss Graphical User Interface
+You will be asked if you want to enable the graphical user interface.
+If you answer yes, then the system-wide default
+.Xr session 5
+is configured to run
+.Xr display 1
+upon login.
+Otherwise the user's preferred shell will be run upon login.
 .Ss Network Time
 You will be asked if you want to enable the Network Time Protocol client
 .Xr ntpd 8 ,

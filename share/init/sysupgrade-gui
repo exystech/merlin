@@ -1,0 +1,8 @@
+require base no-await
+require local no-await
+
+tty tty1
+need tty
+
+exec display terminal sysupgrade
+exit-code-meaning poweroff-reboot
