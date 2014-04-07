@@ -1,0 +1,77 @@
+.Dd June 11, 2023
+.Dt DISPLAYRC 5
+.Os
+.Sh NAME
+.Nm displayrc
+.Nd startup graphical applications
+.Sh SYNOPSIS
+.Nm ~/.displayrc
+.Nm /etc/displayrc
+.Nm /etc/default/displayrc
+.Sh DESCRIPTION
+.Xr display 1
+runs the
+.Nm
+script to launch the user's startup applications and prepare the desktop
+environment according to the user's preferences.
+.Pp
+.Xr display 1
+continues running after
+.Nm
+finishes running and any launched applications should be run as background
+processes.
+.Pp
+The
+.Nm
+script is found by searching for an executable script in the following paths:
+.Bl -bullet -compact
+.It
+.Pa ~/.displayrc
+.It
+.Pa /etc/displayrc
+.It
+.Pa /etc/default/displayrc
+.El
+.Pp
+.Nm
+is not executed if no script is found.
+.Sh ENVIRONMENT
+.Nm
+is executed with the following environment:
+.Bl -tag -width "DISPLAY_SOCKET"
+.It Ev DISPLAY_SOCKET
+The path of the
+.Xr unix 4 socket
+where
+.Xr display 1
+is listening for connections from applications.
+.El
+.Sh FILES
+.Bl -tag -width "/etc/default/displayrc" -compact
+.It Pa ~/.displayrc
+The user's
+.Nm
+script.
+.It Pa /etc/displayrc
+The system administor provided
+.Nm
+script.
+.It Pa /etc/default/displayrc
+The operating system provided
+.Nm
+script.
+.El
+.Sh EXAMPLES
+Launch a terminal with a text editor, another terminal with the user's default
+shell, and launch the asteroids game.
+.Bd -literal -offset indent
+terminal editor &
+terminal &
+asteroids &
+.Ed
+.Sh SEE ALSO
+.Xr display 1 ,
+.Xr terminal 1 ,
+.Xr profile 5 ,
+.Xr session 5 ,
+.Xr shrc 5

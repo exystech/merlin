@@ -42,5 +42,6 @@ void password(char* buffer,
               size_t buffer_size,
               const char* question);
 bool missing_program(const char* program);
+void gui_shutdown(int code);
 
 #endif

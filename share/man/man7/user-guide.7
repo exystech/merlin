@@ -14,26 +14,34 @@ The installation process is covered in
 Bootable cdrom releases will offer the options of running a live environment,
 installing the operating system, or upgrading an existing installation.
 .Pp
-You will be presented a with standard Unix command line environment upon login or
-booting the live environment.
-.Ss Shutdown
-.Xr init 8
-spawns a session after boot.
-This is
-.Xr login 8
-if the system is booted in multi-user mode.
-This is a root shell if booted in single-user mode.
+You will be presented with a graphical Unix-like command line environment upon
+login or booting the live environment.
+.Ss Desktop Environment
+The
+.Xr display 1
+desktop environment is automatically started when booting the live environment
+or after logging into an installation.
 .Pp
-To power off the computer login as user
-.Sy poweroff
-or run
+The desktop environment can be exited by pressing Control + Alt + Delete,
+which will return to the login screen (in installations) or power off the
+computer (in the live environment).
+.Pp
+A new
+.Xr terminal 1
+can be launched by pressing Control + Alt + F1.
+.Pp
+See
+.Xr display 1
+for all the available keyboard shortcuts.
+.Ss Shutdown
+To power off the computer, run
 .Xr poweroff 8
-after logging in.
-To reboot the computer login as user
-.Sy reboot
-or run
+or login as
+.Sy poweroff .
+To reboot the computter, run
 .Xr reboot 8
-after logging in.
+or login as
+.Sy reboot .
 .Ss Keyboard Layout
 The kernel has a default US keyboard layout compiled into it.
 .Pp
