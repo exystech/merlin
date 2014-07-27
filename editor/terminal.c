@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,6 +16,8 @@
  * terminal.c
  * Terminal handling.
  */
+
+#include <sys/ioctl.h>
 
 #include <assert.h>
 #include <stdbool.h>
@@ -37,9 +39,19 @@ void update_terminal_color(FILE* fp, uint8_t desired_color,
 	uint8_t current_fg = (current->color >> 0) % 16;
 	uint8_t current_bg = (current->color >> 4) % 16;
 	if ( desired_fg != current_fg )
-		fprintf(fp, "\e[%im", desired_fg + (desired_fg < 8 ? 30 : 90-8) );
+	{
+		if ( desired_fg == 7 )
+			fprintf(fp, "\e[39m");
+		else
+			fprintf(fp, "\e[%im", desired_fg + (desired_fg < 8 ? 30 : 90-8));
+	}
 	if ( desired_bg != current_bg )
-		fprintf(fp, "\e[%im", desired_bg + (desired_bg < 8 ? 40 : 100-8) );
+	{
+		if ( desired_bg == 0 ) // Transparent background colors and such.
+			fprintf(fp, "\e[49m");
+		else
+			fprintf(fp, "\e[%im", desired_bg + (desired_bg < 8 ? 40 : 100-8));
+	}
 	current->color = desired_color;
 }
 
@@ -109,7 +121,7 @@ void make_terminal_state(FILE* fp, struct terminal_state* state)
 	memset(state, 0, sizeof(*state));
 
 	struct winsize terminal_size;
-	tcgetwinsize(fileno(fp), &terminal_size);
+	ioctl(fileno(fp), TIOCGWINSZ, &terminal_size);
 	state->width = (int) terminal_size.ws_col;
 	state->height = (int) terminal_size.ws_row;
 	size_t data_length = state->width * state->height;
