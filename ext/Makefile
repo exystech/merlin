@@ -1,34 +1,21 @@
-include ../build-aux/platform.mak
-include ../build-aux/compiler.mak
-include ../build-aux/version.mak
-include ../build-aux/dirs.mak
+PROGRAM=extfs
+PROGRAM_LANG=cpp
+PROGRAM_OBJS=\
+block.o \
+blockgroup.o \
+device.o \
+extfs.o \
+filesystem.o \
+fsmarshall.o \
+fuse.o \
+inode.o \
 
-OPTLEVEL?=$(DEFAULT_OPTLEVEL)
-CXXFLAGS?=$(OPTLEVEL)
+.include <sortix/sys.mk>
+.include <template/dependencies.mk>
+.include <template/program.mk>
 
-CPPFLAGS:=$(CPPFLAGS) -DVERSIONSTR=\"$(VERSION)\"
-CXXFLAGS:=$(CXXFLAGS) -Wall -Wextra -fno-exceptions -fno-rtti
-
-LIBS:=$(LIBS)
-
-ifeq ($(HOST_IS_SORTIX),0)
-  PTHREAD_OPTION:=-pthread
-  LIBS:=$(LIBS) -lfuse
-  CPPFLAGS:=$(CPPFLAGS) -D_FILE_OFFSET_BITS=64
-endif
-
-BINARIES:=extfs
-
-all: $(BINARIES)
-
-.PHONY: all install clean
-
-install: all
-	mkdir -p $(DESTDIR)$(SBINDIR)
-	install $(BINARIES) $(DESTDIR)$(SBINDIR)
-
-extfs: *.cpp *.h
-	$(CXX) $(PTHREAD_OPTION) -std=gnu++11 $(CPPFLAGS) $(CXXFLAGS) *.cpp -o $@ $(LIBS)
-
-clean:
-	rm -f $(BINARIES) *.o
+.ifdef IS_LINUX
+  CXXFLAGS+=-pthread
+  CPPFLAGS+=-D_FILE_OFFSET_BITS=64
+  LDLIBS+=-lfuse
+.endif

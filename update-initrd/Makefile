@@ -1,14 +1,16 @@
-include ../build-aux/platform.mak
-include ../build-aux/dirs.mak
+PROGRAM=update-initrd
+MANPAGE=update-initrd.8
 
-all:
+.PHONY: all clean install install-bin
 
-.PHONY: all install clean
+.include <sortix/sys.mk>
+.include <dirs.mk>
+.include <template/man.mk>
 
 clean:
 
-install: all
+install: install-bin
+
+install-bin:
 	mkdir -p $(DESTDIR)$(SBINDIR)
-	install update-initrd $(DESTDIR)$(SBINDIR)
-	mkdir -p $(DESTDIR)$(MANDIR)/man8
-	cp update-initrd.8 $(DESTDIR)$(MANDIR)/man8/update-initrd.8
+	install $(PROGRAM) $(DESTDIR)$(SBINDIR)

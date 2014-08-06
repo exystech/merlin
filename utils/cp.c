@@ -587,6 +587,8 @@ int main(int argc, char* argv[])
 	}
 
 	// TODO: Actually preserve.
+	// TODO: cp --preserve=timestamps needs to be implemented for tixmake -MD to
+	//       work right on Sortix after installation.
 	(void) preserve_list;
 
 	compact_arguments(&argc, &argv);

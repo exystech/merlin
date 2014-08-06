@@ -46,6 +46,9 @@ The overall process is:
 .It
 Retrieving all the source code.
 .It
+Bootstrapping Sortix make
+.Sq ( tixmake ) .
+.It
 Installing the build tools.
 .It
 Creating a system root with the system headers.
@@ -142,6 +145,46 @@ adding that line to your
 or the applicable file for your shell and system.  Consult your shell
 documentation.  Otherwise type it in all Sortix-related shells before doing
 anything.
+.Ss Sortix Make
+Sortix must be built with its own
+.Xr make 1
+implementation.  You can bootstrap it by running:
+.Bd -literal
+    cd "$SORTIX/make" &&
+    make clean &&
+    make PREFIX="$CROSS_PREFIX" PROGRAM=tixmake &&
+    make PREFIX="$CROSS_PREFIX" PROGRAM=tixmake install
+.Ed
+.Pp
+These commands will build and install Sortix make by the name of
+.Pa tixmake .
+This step is for bootstrap purposes only and we will later build the cross
+.Xr make 1
+actually used to build Sortix.  The program built in this step produces programs
+for your current operating system and not for Sortix.  It is used in the next
+step to make the programs that are used to build Sortix.
+.Pp
+If your system
+.Xr make 1
+is not Sortix make, it will automatically use the portable Makefile.  This
+method requires a reasonably modern system whose
+.Xr make 1
+implementation honors the POSIX 2008 standard and have some common features that
+will appear in the next POSIX revision.
+.Pp
+The
+.Sy PROGRAM=tixmake
+assignment is important as the installed program will be named
+.Pa tixmake
+rather than simply
+.Pa make
+(the default),
+which avoids a conflict with your system
+.Xr make 1
+and allows both to be in the
+.Ev PATH
+at the same time.
+.Pp
 .Ss Build Tools
 You need to install some additional build tools as they are needed to build the
 operating system.  The installed build tools must be in sync with the source
@@ -150,36 +193,51 @@ code as described in
 You can install the build utilities by running:
 .Bd -literal
     cd "$SORTIX" &&
-    make clean-build-tools &&
-    make PREFIX="$CROSS_PREFIX" build-tools &&
-    make PREFIX="$CROSS_PREFIX" install-build-tools
+    tixmake clean-build-tools &&
+    tixmake PREFIX="$CROSS_PREFIX" TARGET=$SORTIX_PLATFORM build-tools &&
+    tixmake PREFIX="$CROSS_PREFIX" TARGET=$SORTIX_PLATFORM install-build-tools
 .Ed
 .Pp
-These tools produce platform independent output so you may wish to install them
-into
-.Pa $HOME/bin
-and
-.Pa $HOME/sbin
-or
-.Pa /usr/local/bin
-and
-.Pa /usr/local/sbin
-or where it suits you in your
-.Ev PATH .
+This builds and installs the build tools for the specified target platform.
+Some of the tools are platform dependent and their installed programs will have
+their names prefixed with the specified target.  For instance, if
+.Ev SORTIX_PLATFORM
+is set to
+.Sy x86_64-sortix ,
+then the freshly build Sortix
+.Xr make 1
+will be named
+.Pa x86_64-sortix-make .
+This program is a cross-make that makes programs for
+.Sy x86_64-sortix ,
+unlike
+.Pa tixmake
+which makes programs for the current operating system.  Sortix will be
+cross-built with the cross-make in the steps below and the
+.Pa tixmake
+program is not relevant again until next time you wish to rebuild the build
+tools.  If the source for for Sortix make is updated, you need to bootstrap a
+new
+.Pa tixmake
+before building the new build tools.
 .Ss System Root with System Headers
 Building the compiler requires the standard library headers being available.
 This can be satisfies by creating a system root with the system headers:
 .Bd -literal
     cd "$SORTIX" &&
-    make distclean &&
-    make sysroot-base-headers HOST=$SORTIX_PLATFORM
+    $SORTIX_PLATFORM-make distclean &&
+    $SORTIX_PLATFORM-make sysroot-base-headers
 .Ed
 .Pp
 This will create a system root at
 .Pa $SORTIX/sysroot .
 The system root directory is always the
 .Pa sysroot
-subdirectory of the main source code directory.
+subdirectory of the main source code directory.  Note how the cross-make built
+in the previous step is used here and not
+.Pa tixmake
+or your system
+.Xr make 1 .
 .Ss Cross-toolchain Dependencies
 You need to install these libraries (and the development packages) before
 building binutils and gcc:
@@ -197,6 +255,8 @@ libmpc
 .El
 .Pp
 Consult the official binutils and gcc documentation for the exact dependencies.
+The cross-toolchain is built using your system
+.Xr make 1 .
 .Ss binutils
 Assuming you extracted the binutils to
 .Pa ~/src/sortix-binutils ,
@@ -242,18 +302,12 @@ With the build tools and cross-compiler in the
 .Ev PATH
 is it now possible to build the operating system as described in
 .Xr development 7
-by setting
-.Ev HOST
-to your value of
-.Sy $SORTIX_PLATFORM .
-This tells the build system you are cross-compiling and it will run the
-appropriate cross-compiler.  For instance, to build an bootable cdrom image
-using a
-.Sy x86_64-sortix
-cross-compiler you can run:
+by using your cross-make.  The cross-make knows the desired platform and will
+use the appropriate cross-compiler.  For instance, to build an bootable cdrom
+image you can run:
 .Bd -literal
     cd "$SORTIX" &&
-    make HOST=x86_64-sortix sortix.iso
+    $SORTIX_PLATFORM-make sortix.iso
 .Ed
 .Pp
 This creates a bootable

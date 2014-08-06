@@ -1,0 +1,60 @@
+.include <sortix/sys.mk>
+
+#.if ${TARGET} != ""
+.ifdef TARGET
+TARGET_PREFIX?=$(TARGET)-
+.else
+TARGET_PREFIX?=
+.endif
+
+PROGRAM=$(TARGET_PREFIX)make
+PROGRAM_OBJS=\
+bstree.o \
+data.o \
+disambiguate.o \
+execute.o \
+import.o \
+make.o \
+rule.o \
+signal.o \
+util.o \
+variable.o \
+
+.include <template/dependencies.mk>
+.include <template/program.mk>
+
+SHAREMKDIR ?= $(DATADIR)/$(TARGET_PREFIX)mk
+
+CPPFLAGS += -DSHAREMKDIR=\"$(SHAREMKDIR)\"
+.ifndef HOST_IS_SORTIX
+CPPFLAGS += -D_GNU_SOURCE
+.endif
+
+clean: clean-makes
+
+.PHONY: clean-makes
+clean-makes:
+	rm -f -- *make
+
+install: install-mk
+
+.PHONY: install-mk
+install-mk:
+	mkdir -p $(DESTDIR)$(SHAREMKDIR)
+	cp -RT mk $(DESTDIR)$(SHAREMKDIR)
+.ifdef HOST
+	echo "BUILD = $(HOST)" > $(DESTDIR)$(SHAREMKDIR)/build.mk
+.elifdef HOST
+	echo "BUILD = $(HOST)" > $(DESTDIR)$(SHAREMKDIR)/build.mk
+.else
+	echo "BUILD = $$($(CC) -dumpmachine)" > $(DESTDIR)$(SHAREMKDIR)/build.mk
+.endif
+.ifdef TARGET
+	echo "HOST = $(TARGET)" > $(DESTDIR)$(SHAREMKDIR)/host.mk
+.elifdef HOST
+	echo "HOST = $(HOST)" > $(DESTDIR)$(SHAREMKDIR)/host.mk
+.elifdef BUILD
+	echo "HOST = $(BUILD)" > $(DESTDIR)$(SHAREMKDIR)/host.mk
+.else
+	echo "HOST = $$($(CC) -dumpmachine)" > $(DESTDIR)$(SHAREMKDIR)/host.mk
+.endif

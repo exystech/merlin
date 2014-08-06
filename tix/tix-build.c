@@ -96,14 +96,12 @@ typedef struct
 	int generation;
 	char* host;
 	char* make;
-	char* makeflags;
 	char* package_dir;
 	char* package_info_path;
 	char* package_name;
 	char* prefix;
 	char* exec_prefix;
 	char* sysroot;
-	char* tar;
 	char* target;
 	char* tmp;
 	string_array_t package_info;
@@ -518,15 +516,9 @@ void Make(metainfo_t* minfo, const char* make_target, const char* destdir,
 	     (die_on_error && fork_and_wait_or_recovery()) )
 	{
 		string_array_t* pkg_info = &minfo->package_info;
-		char* make = strdup(minfo->make);
-		const char* override_make = dictionary_get(pkg_info, "pkg.make.cmd");
+		const char* make = minfo->make;
 		const char* make_extra_args = dictionary_get_def(pkg_info, "pkg.make.args", "");
 		const char* make_extra_vars = dictionary_get_def(pkg_info, "pkg.make.vars", "");
-		if ( override_make )
-		{
-			free(make);
-			make = join_paths(minfo->package_dir, override_make);
-		}
 		SetNeededVariables(minfo);
 		if ( chdir(minfo->build_dir) != 0 )
 			error(1, errno, "chdir: `%s'", minfo->build_dir);
@@ -545,9 +537,7 @@ void Make(metainfo_t* minfo, const char* make_target, const char* destdir,
 			setenv("EXEC_PREFIX", minfo->exec_prefix, 1);
 		else
 			unsetenv("EXEC_PREFIX");
-		if ( minfo->makeflags )
-			setenv("MAKEFLAGS", minfo->makeflags, 1);
-		setenv("MAKE", minfo->make, 1);
+		setenv("MAKE", make, 1);
 		string_array_t env_vars = string_array_make();
 		string_array_append_token_string(&env_vars, make_extra_vars);
 		for ( size_t i = 0; i < env_vars.length; i++ )
@@ -731,7 +721,7 @@ void BuildPackage(metainfo_t* minfo)
 		{
 			const char* cmd_argv[] =
 			{
-				minfo->tar,
+				"tar",
 				"-C", tardir_rel,
 				"--remove-files",
 				"--create",
@@ -840,13 +830,10 @@ int main(int argc, char* argv[])
 	minfo.destination = strdup(".");
 	minfo.host = NULL;
 	char* generation_string = strdup(DEFAULT_GENERATION);
-	minfo.makeflags = strdup_null(getenv_def("MAKEFLAGS", NULL));
-	minfo.make = strdup(getenv_def("MAKE", "make"));
 	minfo.prefix = strdup("");
 	minfo.exec_prefix = NULL;
 	minfo.sysroot = NULL;
 	minfo.target = NULL;
-	minfo.tar = strdup("tar");
 	minfo.tmp = strdup(getenv_def("TMPDIR", "/tmp"));
 	char* start_step_string = strdup("start");
 	char* end_step_string = strdup("end");
@@ -880,14 +867,11 @@ int main(int argc, char* argv[])
 		else if ( GET_OPTION_VARIABLE("--end", &end_step_string) ) { }
 		else if ( GET_OPTION_VARIABLE("--host", &minfo.host) ) { }
 		else if ( GET_OPTION_VARIABLE("--generation", &generation_string) ) { }
-		else if ( GET_OPTION_VARIABLE("--makeflags", &minfo.makeflags) ) { }
-		else if ( GET_OPTION_VARIABLE("--make", &minfo.make) ) { }
 		else if ( GET_OPTION_VARIABLE("--prefix", &minfo.prefix) ) { }
 		else if ( GET_OPTION_VARIABLE("--exec-prefix", &minfo.exec_prefix) ) { }
 		else if ( GET_OPTION_VARIABLE("--start", &start_step_string) ) { }
 		else if ( GET_OPTION_VARIABLE("--sysroot", &minfo.sysroot) ) { }
 		else if ( GET_OPTION_VARIABLE("--target", &minfo.target) ) { }
-		else if ( GET_OPTION_VARIABLE("--tar", &minfo.tar) ) { }
 		else if ( GET_OPTION_VARIABLE("--tmp", &minfo.tmp) ) { }
 		else
 		{
@@ -974,6 +958,32 @@ int main(int argc, char* argv[])
 
 	VerifySourceTixInformation(&minfo);
 	minfo.package_name = strdup(dictionary_get(package_info, "pkg.name"));
+
+/* TODO: Implement pkg.make.standard with an intelligent search:
+
+pkg.make.standard=gnu
+$MAKE (if gmake)
+gmake
+make
+
+pkg.make.standard=tix
+$MAKE (if tixmake)
+$HOST-tixmake
+$HOST-make
+tixmake
+make
+
+pkg.make.standard=posix
+$MAKE
+make
+
+*/
+	const char* make_env = getenv_def("MAKE", "make");
+	const char* override_make = dictionary_get(package_info, "pkg.make.cmd");
+	if ( override_make )
+		minfo.make = join_paths(minfo.package_dir, override_make);
+	else
+		minfo.make = strdup(make_env);
 
 	emit_pkg_config_wrapper(&minfo);
 

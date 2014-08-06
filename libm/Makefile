@@ -1,414 +1,374 @@
-include ../build-aux/platform.mak
-include ../build-aux/compiler.mak
-include ../build-aux/version.mak
-include ../build-aux/dirs.mak
+.include <sortix/sys.mk>
 
-OPTLEVEL?=$(DEFAULT_OPTLEVEL)
-CFLAGS?=$(OPTLEVEL)
+LIBRARY=libm
 
-# TODO: Better detection of the proper subdirectory here!
-ifneq ($(shell echo $(HOST) | grep -E '^i[012346789]*86-'),)
-  ARCH_SUBDIR:=arch/i387
-  ARCH_MACHINE_HEADERS:=$(ARCH_SUBDIR)/machine/npx.h
-endif
-ifneq ($(shell echo $(HOST) | grep -E '^x86_64-'),)
-  ARCH_SUBDIR:=arch/x86_64
-  ARCH_MACHINE_HEADERS:=$(ARCH_SUBDIR)/machine/fpu.h
-endif
-
+.ifdef CPU_IS_X86
+  ARCH_SUBDIR=arch/i387
+  ARCH_MACHINE_HEADERS=$(ARCH_SUBDIR)/machine/npx.h
+.endif
+.ifdef CPU_IS_X64
+  ARCH_SUBDIR=arch/x86_64
+  ARCH_MACHINE_HEADERS=$(ARCH_SUBDIR)/machine/fpu.h
+.endif
 ARCH_MACHINE_HEADERS:=$(ARCH_MACHINE_HEADERS) $(ARCH_SUBDIR)/machine/fenv.h
 
-ARCH_SRCS=\
-e_acos.S \
-e_asin.S \
-e_atan2.S \
-e_expf.S \
-e_exp.S \
-e_fmod.S \
-e_log10f.S \
-e_log10.S \
-e_log2f.S \
-e_log2.S \
-e_logf.S \
-e_log.S \
-e_remainderf.S \
-e_remainder.S \
-e_scalbf.S \
-e_scalb.S \
-e_sqrtf.S \
-e_sqrt.S \
-fabs.S \
-fenv.c \
-flt_rounds.S \
-fpgetmask.S \
-fpgetprec.S \
-fpgetround.S \
-fpgetsticky.S \
-fpsetmask.S \
-fpsetprec.S \
-fpsetround.S \
-fpsetsticky.S \
-lrint.S \
-s_atanf.S \
-s_atan.S \
-s_ceilf.S \
-s_ceil.S \
-s_copysignf.S \
-s_copysign.S \
-s_cosf.S \
-s_cos.S \
-s_finitef.S \
-s_finite.S \
-s_floorf.S \
-s_floor.S \
-s_ilogbf.S \
-s_ilogbl.S \
-s_ilogb.S \
-s_log1pf.S \
-s_log1p.S \
-s_logbf.S \
-s_logbl.S \
-s_logb.S \
-s_rintf.S \
-s_rint.S \
-s_scalbnf.S \
-s_scalbn.S \
-s_significandf.S \
-s_significand.S \
-s_sinf.S \
-s_sin.S \
-s_tanf.S \
-s_tan.S \
+ARCH_OBJS=\
+e_acos.o \
+e_asin.o \
+e_atan2.o \
+e_expf.o \
+e_exp.o \
+e_fmod.o \
+e_log10f.o \
+e_log10.o \
+e_log2f.o \
+e_log2.o \
+e_logf.o \
+e_log.o \
+e_remainderf.o \
+e_remainder.o \
+e_scalbf.o \
+e_scalb.o \
+e_sqrtf.o \
+e_sqrt.o \
+fabs.o \
+fenv.o \
+flt_rounds.o \
+fpgetmask.o \
+fpgetprec.o \
+fpgetround.o \
+fpgetsticky.o \
+fpsetmask.o \
+fpsetprec.o \
+fpsetround.o \
+fpsetsticky.o \
+lrint.o \
+s_atanf.o \
+s_atan.o \
+s_ceilf.o \
+s_ceil.o \
+s_copysignf.o \
+s_copysign.o \
+s_cosf.o \
+s_cos.o \
+s_finitef.o \
+s_finite.o \
+s_floorf.o \
+s_floor.o \
+s_ilogbf.o \
+s_ilogbl.o \
+s_ilogb.o \
+s_log1pf.o \
+s_log1p.o \
+s_logbf.o \
+s_logbl.o \
+s_logb.o \
+s_rintf.o \
+s_rint.o \
+s_scalbnf.o \
+s_scalbn.o \
+s_significandf.o \
+s_significand.o \
+s_sinf.o \
+s_sin.o \
+s_tanf.o \
+s_tan.o \
 
-COMMON_SRCS+=\
-b_exp.c \
-b_log.c \
-b_tgamma.c \
-compat_frexp_ieee754.c \
-compat_ldexp_ieee754.c \
-e_acos.c \
-e_acosf.c \
-e_acosh.c \
-e_acoshf.c \
-e_asin.c \
-e_asinf.c \
-e_atan2.c \
-e_atan2f.c \
-e_atanh.c \
-e_atanhf.c \
-e_cosh.c \
-e_coshf.c \
-e_exp.c \
-e_expf.c \
-e_fmod.c \
-e_fmodf.c \
-e_hypot.c \
-e_hypotf.c \
-e_j0.c \
-e_j0f.c \
-e_j1.c \
-e_j1f.c \
-e_jn.c \
-e_jnf.c \
-e_lgammaf_r.c \
-e_lgamma_r.c \
-e_log10.c \
-e_log10f.c \
-e_log2.c \
-e_log2f.c \
-e_log.c \
-e_logf.c \
-e_pow.c \
-e_powf.c \
-e_remainder.c \
-e_remainderf.c \
-e_rem_pio2.c \
-e_rem_pio2f.c \
-e_scalb.c \
-e_scalbf.c \
-e_sinh.c \
-e_sinhf.c \
-e_sqrt.c \
-e_sqrtf.c \
-fpclassifyd_ieee754.c \
-fpclassifyf_ieee754.c \
-fpclassifyl.c \
-fpclassifyl_ieee754.c \
-isfinited_ieee754.c \
-isfinitef_ieee754.c \
-isfinitel.c \
-isfinitel_ieee754.c \
-isinfd_ieee754.c \
-isinff_ieee754.c \
-isinfl.c \
-isinfl_ieee754.c \
-isnand_ieee754.c \
-isnanf_ieee754.c \
-isnanl.c \
-isnanl_ieee754.c \
-k_cos.c \
-k_cosf.c \
-k_rem_pio2.c \
-k_rem_pio2f.c \
-k_sin.c \
-k_sinf.c \
-k_standard.c \
-k_tan.c \
-k_tanf.c \
-llrint.c \
-llrintf.c \
-llround.c \
-llroundf.c \
-lrint.c \
-lrintf.c \
-lround.c \
-lroundf.c \
-modf_ieee754.c \
-nan.c \
-nanf.c \
-nanl.c \
-s_asinh.c \
-s_asinhf.c \
-s_atan.c \
-s_atanf.c \
-s_cbrt.c \
-s_cbrtf.c \
-s_ceil.c \
-s_ceilf.c \
-s_copysign.c \
-s_copysignf.c \
-s_copysignl.c \
-s_cos.c \
-s_cosf.c \
-s_erf.c \
-s_erff.c \
-s_exp2.c \
-s_exp2f.c \
-s_expm1.c \
-s_expm1f.c \
-s_fabsf.c \
-s_fabsl.c \
-s_fdim.c \
-s_finite.c \
-s_finitef.c \
-s_floor.c \
-s_floorf.c \
-s_fmax.c \
-s_fmaxf.c \
-s_fmaxl.c \
-s_fmin.c \
-s_fminf.c \
-s_fminl.c \
-s_frexp.c \
-s_frexpf.c \
-signbitd_ieee754.c \
-signbitf_ieee754.c \
-signbitl.c \
-s_ilogb.c \
-s_ilogbf.c \
-s_ilogbl.c \
-s_isinff.c \
-s_isnanf.c \
-s_ldexp.c \
-s_ldexpf.c \
-s_lib_version.c \
-s_log1p.c \
-s_log1pf.c \
-s_logb.c \
-s_logbf.c \
-s_logbl.c \
-s_matherr.c \
-s_modf.c \
-s_modff.c \
-s_nextafter.c \
-s_nextafterf.c \
-s_nextafterl.c \
-s_nexttoward.c \
-s_remquo.c \
-s_remquof.c \
-s_rint.c \
-s_rintf.c \
-s_round.c \
-s_roundf.c \
-s_scalbn.c \
-s_scalbnf.c \
-s_scalbnl.c \
-s_signgam.c \
-s_significand.c \
-s_significandf.c \
-s_sin.c \
-s_sinf.c \
-s_tan.c \
-s_tanf.c \
-s_tanh.c \
-s_tanhf.c \
-s_tgammaf.c \
-s_trunc.c \
-s_truncf.c \
-w_acos.c \
-w_acosf.c \
-w_acosh.c \
-w_acoshf.c \
-w_asin.c \
-w_asinf.c \
-w_atan2.c \
-w_atan2f.c \
-w_atanh.c \
-w_atanhf.c \
-w_cosh.c \
-w_coshf.c \
-w_drem.c \
-w_dremf.c \
-w_exp.c \
-w_expf.c \
-w_fmod.c \
-w_fmodf.c \
-w_gamma.c \
-w_gammaf.c \
-w_gammaf_r.c \
-w_gamma_r.c \
-w_hypot.c \
-w_hypotf.c \
-w_j0.c \
-w_j0f.c \
-w_j1.c \
-w_j1f.c \
-w_jn.c \
-w_jnf.c \
-w_lgamma.c \
-w_lgammaf.c \
-w_lgammaf_r.c \
-w_lgamma_r.c \
-w_log10.c \
-w_log10f.c \
-w_log2.c \
-w_log2f.c \
-w_log.c \
-w_logf.c \
-w_pow.c \
-w_powf.c \
-w_remainder.c \
-w_remainderf.c \
-w_scalb.c \
-w_scalbf.c \
-w_sinh.c \
-w_sinhf.c \
-w_sqrt.c \
-w_sqrtf.c \
+COMMON_OBJS+=\
+b_exp.o \
+b_log.o \
+b_tgamma.o \
+compat_frexp_ieee754.o \
+compat_ldexp_ieee754.o \
+e_acos.o \
+e_acosf.o \
+e_acosh.o \
+e_acoshf.o \
+e_asin.o \
+e_asinf.o \
+e_atan2.o \
+e_atan2f.o \
+e_atanh.o \
+e_atanhf.o \
+e_cosh.o \
+e_coshf.o \
+e_exp.o \
+e_expf.o \
+e_fmod.o \
+e_fmodf.o \
+e_hypot.o \
+e_hypotf.o \
+e_j0.o \
+e_j0f.o \
+e_j1.o \
+e_j1f.o \
+e_jn.o \
+e_jnf.o \
+e_lgammaf_r.o \
+e_lgamma_r.o \
+e_log10.o \
+e_log10f.o \
+e_log2.o \
+e_log2f.o \
+e_log.o \
+e_logf.o \
+e_pow.o \
+e_powf.o \
+e_remainder.o \
+e_remainderf.o \
+e_rem_pio2.o \
+e_rem_pio2f.o \
+e_scalb.o \
+e_scalbf.o \
+e_sinh.o \
+e_sinhf.o \
+e_sqrt.o \
+e_sqrtf.o \
+fpclassifyd_ieee754.o \
+fpclassifyf_ieee754.o \
+fpclassifyl.o \
+fpclassifyl_ieee754.o \
+isfinited_ieee754.o \
+isfinitef_ieee754.o \
+isfinitel.o \
+isfinitel_ieee754.o \
+isinfd_ieee754.o \
+isinff_ieee754.o \
+isinfl.o \
+isinfl_ieee754.o \
+isnand_ieee754.o \
+isnanf_ieee754.o \
+isnanl.o \
+isnanl_ieee754.o \
+k_cos.o \
+k_cosf.o \
+k_rem_pio2.o \
+k_rem_pio2f.o \
+k_sin.o \
+k_sinf.o \
+k_standard.o \
+k_tan.o \
+k_tanf.o \
+llrint.o \
+llrintf.o \
+llround.o \
+llroundf.o \
+lrint.o \
+lrintf.o \
+lround.o \
+lroundf.o \
+modf_ieee754.o \
+nan.o \
+nanf.o \
+nanl.o \
+s_asinh.o \
+s_asinhf.o \
+s_atan.o \
+s_atanf.o \
+s_cbrt.o \
+s_cbrtf.o \
+s_ceil.o \
+s_ceilf.o \
+s_copysign.o \
+s_copysignf.o \
+s_copysignl.o \
+s_cos.o \
+s_cosf.o \
+s_erf.o \
+s_erff.o \
+s_exp2.o \
+s_exp2f.o \
+s_expm1.o \
+s_expm1f.o \
+s_fabsf.o \
+s_fabsl.o \
+s_fdim.o \
+s_finite.o \
+s_finitef.o \
+s_floor.o \
+s_floorf.o \
+s_fmax.o \
+s_fmaxf.o \
+s_fmaxl.o \
+s_fmin.o \
+s_fminf.o \
+s_fminl.o \
+s_frexp.o \
+s_frexpf.o \
+signbitd_ieee754.o \
+signbitf_ieee754.o \
+signbitl.o \
+s_ilogb.o \
+s_ilogbf.o \
+s_ilogbl.o \
+s_isinff.o \
+s_isnanf.o \
+s_ldexp.o \
+s_ldexpf.o \
+s_lib_version.o \
+s_log1p.o \
+s_log1pf.o \
+s_logb.o \
+s_logbf.o \
+s_logbl.o \
+s_matherr.o \
+s_modf.o \
+s_modff.o \
+s_nextafter.o \
+s_nextafterf.o \
+s_nextafterl.o \
+s_nexttoward.o \
+s_remquo.o \
+s_remquof.o \
+s_rint.o \
+s_rintf.o \
+s_round.o \
+s_roundf.o \
+s_scalbn.o \
+s_scalbnf.o \
+s_scalbnl.o \
+s_signgam.o \
+s_significand.o \
+s_significandf.o \
+s_sin.o \
+s_sinf.o \
+s_tan.o \
+s_tanf.o \
+s_tanh.o \
+s_tanhf.o \
+s_tgammaf.o \
+s_trunc.o \
+s_truncf.o \
+w_acos.o \
+w_acosf.o \
+w_acosh.o \
+w_acoshf.o \
+w_asin.o \
+w_asinf.o \
+w_atan2.o \
+w_atan2f.o \
+w_atanh.o \
+w_atanhf.o \
+w_cosh.o \
+w_coshf.o \
+w_drem.o \
+w_dremf.o \
+w_exp.o \
+w_expf.o \
+w_fmod.o \
+w_fmodf.o \
+w_gamma.o \
+w_gammaf.o \
+w_gammaf_r.o \
+w_gamma_r.o \
+w_hypot.o \
+w_hypotf.o \
+w_j0.o \
+w_j0f.o \
+w_j1.o \
+w_j1f.o \
+w_jn.o \
+w_jnf.o \
+w_lgamma.o \
+w_lgammaf.o \
+w_lgammaf_r.o \
+w_lgamma_r.o \
+w_log10.o \
+w_log10f.o \
+w_log2.o \
+w_log2f.o \
+w_log.o \
+w_logf.o \
+w_pow.o \
+w_powf.o \
+w_remainder.o \
+w_remainderf.o \
+w_scalb.o \
+w_scalbf.o \
+w_sinh.o \
+w_sinhf.o \
+w_sqrt.o \
+w_sqrtf.o \
 
-COMPLEX_SRCS+=\
-cabs.c \
-cabsf.c \
-cacos.c \
-cacosf.c \
-cacosh.c \
-cacoshf.c \
-carg.c \
-cargf.c \
-casin.c \
-casinf.c \
-casinh.c \
-casinhf.c \
-catan.c \
-catanf.c \
-catanh.c \
-catanhf.c \
-ccos.c \
-ccosf.c \
-ccosh.c \
-ccoshf.c \
-cephes_subr.c \
-cephes_subrf.c \
-cexp.c \
-cexpf.c \
-cimag.c \
-cimagf.c \
-cimagl.c \
-clog.c \
-clogf.c \
-conj.c \
-conjf.c \
-conjl.c \
-cpow.c \
-cpowf.c \
-cproj.c \
-cprojf.c \
-cprojl.c \
-creal.c \
-crealf.c \
-creall.c \
-csin.c \
-csinf.c \
-csinh.c \
-csinhf.c \
-csqrt.c \
-csqrtf.c \
-ctan.c \
-ctanf.c \
-ctanh.c \
-ctanhf.c \
+COMPLEX_OBJS+=\
+cabs.o \
+cabsf.o \
+cacos.o \
+cacosf.o \
+cacosh.o \
+cacoshf.o \
+carg.o \
+cargf.o \
+casin.o \
+casinf.o \
+casinh.o \
+casinhf.o \
+catan.o \
+catanf.o \
+catanh.o \
+catanhf.o \
+ccos.o \
+ccosf.o \
+ccosh.o \
+ccoshf.o \
+cephes_subr.o \
+cephes_subrf.o \
+cexp.o \
+cexpf.o \
+cimag.o \
+cimagf.o \
+cimagl.o \
+clog.o \
+clogf.o \
+conj.o \
+conjf.o \
+conjl.o \
+cpow.o \
+cpowf.o \
+cproj.o \
+cprojf.o \
+cprojl.o \
+creal.o \
+crealf.o \
+creall.o \
+csin.o \
+csinf.o \
+csinh.o \
+csinhf.o \
+csqrt.o \
+csqrtf.o \
+ctan.o \
+ctanf.o \
+ctanh.o \
+ctanhf.o \
 
-CFLAGS:=$(CFLAGS) -std=gnu99 -Wall -Wextra
-CPPFLAGS:=$(CPPFLAGS) -I include -I src -I $(ARCH_SUBDIR)
-
-# TODO: Figure out whether these are the defines that we want to pass.
-CPPFLAGS:=$(CPPFLAGS) -D__is_sortix_libm -D_MULTI_LIBM -D_POSIX_MODE
-
-ARCH_SRCS:=$(addprefix $(ARCH_SUBDIR)/,$(ARCH_SRCS))
-COMMON_SRCS:=$(addprefix src/,$(COMMON_SRCS))
-COMPLEX_SRCS:=$(addprefix complex/,$(COMPLEX_SRCS))
-SRCS:=$(ARCH_SRCS) $(COMMON_SRCS) $(COMPLEX_SRCS)
-
-OBJS:=$(SRCS)
-OBJS:=$(OBJS:.c=.o)
-OBJS:=$(OBJS:.S=.o)
-
-BINS:=libm.a
-
-all: libs
-
-libs: $(BINS)
-
-.PHONY: libs headers clean install install-include-dirs install-headers \
-        install-libm-dirs install-libm install-libs
+LIBRARY_OBJS=
+.for obj in $(ARCH_OBJS)
+LIBRARY_OBJS+:=$(ARCH_SUBDIR)/$(obj)
+.endfor
+.for obj in $(COMMON_OBJS)
+LIBRARY_OBJS+:=src/$(obj)
+.endfor
+.for obj in $(COMPLEX_OBJS)
+LIBRARY_OBJS+:=complex/$(obj)
+.endfor
 
 # TODO: Do not pick up the i387 asm version, it is incorrect
-arch/i387/s_modf.o: src/s_modf.c
+LIBRARY_OBJS:=$(LIBRARY_OBJS:arch/i387/s_modf.o=src/s_modf.o)
 
-#.if (${MACHINE_ARCH} == "i386")
-## XXX this gets miscompiled. There should be a better fix.
-#COPTS.s_tanh.c+= -O0
-#.endif
+CPPFLAGS+=-Isrc -I$(ARCH_SUBDIR)
+CPPFLAGS+=-D__is_sortix_libm -D_MULTI_LIBM -D_POSIX_MODE
 
-headers:
+.include <template/dependencies.mk>
+.include <template/headers.mk>
+.include <template/library.mk>
 
-libm.a: $(OBJS)
-	$(AR) rcs $@ $(OBJS)
+.PHONY: install-headers install-arch-headers
 
-%.o: %.S
-	$(CC) -c $< -o $@ $(CPPFLAGS) $(CFLAGS)
+install-headers: install-arch-headers
 
-%.o: %.c
-	$(CC) -c $< -o $@ $(CPPFLAGS) $(CFLAGS)
-
-clean:
-	rm -f $(BINS) $(OBJS) $(ARCH_SUBDIR)/*.o src/*.o */*.o arch/*/*.o
-
-# Installation into sysroot
-install: install-headers install-libm
-
-install-include-dirs: headers
-	mkdir -p $(DESTDIR)$(INCLUDEDIR)
+install-arch-headers:
 	mkdir -p $(DESTDIR)$(INCLUDEDIR)/machine
-
-install-headers: install-include-dirs headers
-	cp -RTv include $(DESTDIR)$(INCLUDEDIR)
-	cp -v $(ARCH_MACHINE_HEADERS) $(DESTDIR)$(INCLUDEDIR)/machine
-
-install-libs: install-libm
-
-install-libm-dirs:
-	mkdir -p $(DESTDIR)$(LIBDIR)
-
-install-libm: install-libm-dirs libm.a
-	cp -P libm.a $(DESTDIR)$(LIBDIR)
+.for header in $(ARCH_MACHINE_HEADERS)
+	cp --preserve=timestamps $(header) $(DESTDIR)$(INCLUDEDIR)/machine
+.endfor

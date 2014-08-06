@@ -1,26 +1,9 @@
-include ../build-aux/platform.mak
-include ../build-aux/compiler.mak
-include ../build-aux/version.mak
-include ../build-aux/dirs.mak
+SORTIXKERNEL=../kernel
 
-OPTLEVEL?=$(DEFAULT_OPTLEVEL)
-CFLAGS?=$(OPTLEVEL)
+PROGRAM=kblayout-compiler
 
-CFLAGS:=$(CFLAGS) -Wall -Wextra
-CPPFLAGS:=$(CPPFLAGS) -DVERSIONSTR=\"$(VERSION)\"
+.include <sortix/sys.mk>
+.include <template/dependencies.mk>
+.include <template/program.mk>
 
-BINARY=kblayout-compiler
-
-all: $(BINARY)
-
-.PHONY: all install clean
-
-install: all
-	mkdir -p $(DESTDIR)$(BINDIR)
-	install $(BINARY) $(DESTDIR)$(BINDIR)
-
-%: %.c
-	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< -o $@
-
-clean:
-	rm -f $(BINARY) *.o
+CPPFLAGS+=-I$(SORTIXKERNEL)/include -I.

@@ -1,78 +1,61 @@
-SOFTWARE_MEANT_FOR_SORTIX=1
-include ../build-aux/platform.mak
-include ../build-aux/compiler.mak
-include ../build-aux/version.mak
-include ../build-aux/dirs.mak
+.include <sortix/sys.mk>
+.include <dirs.mk>
+.include <template/dependencies.mk>
+.include <template/headers.mk>
 
-# Default values in case the user doesn't override these variables.
-OPTLEVEL?=$(DEFAULT_OPTLEVEL)
-CPPFLAGS?=
-CXXFLAGS?=$(OPTLEVEL)
+CXXFLAGS+=-ffreestanding -fbuiltin
+CPPFLAGS+=-I. -D__is_sortix_kernel
 
-# Base compiler options and definitions.
+# TODO: HACK (?)
+.ifdef PANIC_SHORT
+  CPPFLAGS+=-DPANIC_SHORT
+.endif
 
-CPPFLAGS:=$(CPPFLAGS) -I. -Iinclude -D__is_sortix_kernel
-CXXFLAGS:=$(CXXFLAGS) -Wall -Wextra -ffreestanding -fbuiltin -std=gnu++11 \
-                      -fno-exceptions -fno-rtti
+# TODO: HACK
+.ifdef CPU_IS_X86
+  X86FAMILY=1
+  CPUDIR=$(CPU)
+  CPUOBJS=$(CPUDIR)/boot.o
+.endif
 
-ifeq ($(PANIC_SHORT),1)
-    CPPFLAGS:=$(CPPFLAGS) -DPANIC_SHORT
-endif
-ifdef VERSION
-    CPPFLAGS:=$(CPPFLAGS) -DVERSIONSTR=\"$(VERSION)\"
-endif
+# TODO: HACK
+.ifdef CPU_IS_X64
+  X86FAMILY=1
+  CPUDIR=$(CPU)
+  CXXFLAGS+= -mno-red-zone -mno-mmx -mno-sse -mno-sse2
+  CPUOBJS=$(CPUDIR)/boot.o
+.endif
 
-# Architecture-dependent options and definitions.
+CPUDIR?=.
 
-BOOTOBJS:=
-
-ifeq ($(CPU),x86)
-    X86FAMILY:=1
-    CPUDIR:=$(CPU)
-    CPUOBJS:=$(CPUDIR)/boot.o
-endif
-
-ifeq ($(CPU),x64)
-    X86FAMILY:=1
-    CPUDIR:=$(CPU)
-    CXXFLAGS:=$(CXXFLAGS) -mno-red-zone -mno-mmx -mno-sse -mno-sse2
-    CPUOBJS:=$(CPUDIR)/boot.o
-endif
-
-ifndef CPUDIR
-    CPUDIR=.
-endif
-
-ifdef X86FAMILY
-    CPUOBJS:=$(CPUOBJS) \
-             $(CPUDIR)/memorymanagement.o \
-             x86-family/memorymanagement.o \
-             $(CPUDIR)/interrupt.o \
-             x86-family/interrupt.o \
-             x86-family/ioport.o \
-             x86-family/pic.o \
-             x86-family/gdt.o \
-             x86-family/idt.o \
-             $(CPUDIR)/syscall.o \
-             x86-family/cmos.o \
-             x86-family/time.o \
-             x86-family/pat.o \
-             x86-family/float.o \
-             x86-family/ps2.o \
-             x86-family/x86-family.o
-endif
-
-# Object files that constitute the kernel.
+# TODO: HACK
+.ifdef X86FAMILY
+  CPUOBJS+=\
+           $(CPUDIR)/memorymanagement.o \
+           x86-family/memorymanagement.o \
+           $(CPUDIR)/interrupt.o \
+           x86-family/interrupt.o \
+           x86-family/ioport.o \
+           x86-family/pic.o \
+           x86-family/gdt.o \
+           x86-family/idt.o \
+           $(CPUDIR)/syscall.o \
+           x86-family/cmos.o \
+           x86-family/time.o \
+           x86-family/pat.o \
+           x86-family/float.o \
+           x86-family/ps2.o \
+           x86-family/x86-family.o
+.endif
 
 CRTI_OBJ=$(CPUDIR)/crti.o
-CRTBEGIN_OBJ=$(shell $(CXX) $(CXXFLAGS) -print-file-name=crtbegin.o)
-CRTEND_OBJ=$(shell $(CXX) $(CXXFLAGS) -print-file-name=crtend.o)
+# TODO: It would be nice if these were done lazily, this makefile may be used
+#       before the compiler exists.
+CRTBEGIN_OBJ!=$(CXX) $(CXXFLAGS) -print-file-name=crtbegin.o 2>/dev/null || true
+CRTEND_OBJ!=$(CXX) $(CXXFLAGS) -print-file-name=crtend.o 2>/dev/null || true
 CRTN_OBJ=$(CPUDIR)/crtn.o
 
-LIBS=\
--nostdlib \
--lk \
--lgcc \
+LDLIBS=-nostdlib -lk -lgcc
 
 OBJS=\
 $(CPUOBJS) \
@@ -157,80 +140,56 @@ video.o \
 vnode.o \
 worker.o \
 
-ALLOBJS=\
-$(CRTI_OBJ) \
-$(OBJS) \
-$(CRTN_OBJ) \
-end.o
+ALLOBJS=$(CRTI_OBJ) $(OBJS) $(CRTN_OBJ) end.o
 
 LINK_OBJECTS=\
-$(CRTI_OBJ) $(CRTBEGIN_OBJ) $(OBJS) $(LIBS) $(CRTN_OBJ) $(CRTEND_OBJ) end.o
+$(CRTI_OBJ) $(CRTBEGIN_OBJ) $(OBJS) $(LDLIBS) $(CRTN_OBJ) $(CRTEND_OBJ) end.o
 
-# Rules and recipes for building the kernel.
+.for obj in $(ALLOBJS)
+.  tryinclude "$(obj:.o=.d)"
+.endfor
 
-all: kernel
+.PHONY: all clean install install-kernel
 
-kernel: sortix.bin
+.DEFAULT_GOAL = all
+all: sortix.bin
 
-.PHONY: all kernel headers clean install install-include-dirs install-headers \
-        install-kernel install-kernel-binary
+.ifdef CPU_IS_X86
+sortix.bin: $(ALLOBJS)
+	$(CXX) $(CXXFLAGS) -Wl,-Ttext -Wl,100000 $(LINK_OBJECTS) -o $@
+.endif
 
-headers:
-
-# x64 compilation
-ifeq ($(CPU),x64)
-
+.ifdef CPU_IS_X64
 sortix-x86_64.bin: $(ALLOBJS)
 	$(CXX) $(CXXFLAGS) -Wl,-Ttext -Wl,100000 -Wl,-z -Wl,max-page-size=0x1000 $(LINK_OBJECTS) -o $@
 
 sortix.bin: sortix-x86_64.bin
 	$(OBJCOPY) $< -O elf32-i386-sortix $@
+.endif
 
-endif
+.SUFFIXES: .kblayout .kblayout.bin
 
-# x86 compilation
-ifeq ($(CPU),x86)
-
-sortix.bin: $(ALLOBJS)
-	$(CXX) $(CXXFLAGS) -Wl,-Ttext -Wl,100000 $(LINK_OBJECTS) -o $@
-
-endif
-
-%: %.kblayout
+.kblayout.kblayout.bin:
 	kblayout-compiler --format=sortix-kblayout-1 --compression=none $< -o $@
 
-kb/default-kblayout.h: kb/default-kblayout
+kb/default-kblayout.h: kb/default-kblayout.kblayout.bin
 	carray -cgis --uint8_t --guard=SORTIX_KB_DEFAULT_KBLAYOUT_H --identifier=default_kblayout $< -o $@
 
 vgafont.h: vgafont.f16
 	carray -gis --uint8_t --guard=VGAFONT_H --identifier=vgafont $< -o $@
 
-*.cpp */*.cpp */*/*.cpp: | kb/default-kblayout.h vgafont.h
-
-%.o: %.cpp
-	$(CXX) -c $< -o $@ $(CPPFLAGS) $(CXXFLAGS)
-
-%.o: %.S
-	$(CXX) -c $< -o $@ $(CPPFLAGS) $(CXXFLAGS)
+$(ALLOBJS): kb/default-kblayout.h vgafont.h
 
 clean:
 	rm -f $(ALLOBJS) sortix.bin
-	rm -f *.bin *.out *.tmp
-	rm -f *.o */*.o */*/*.o
-	rm -f kb/default-kblayout kb/default-kblayout.h
-	rm -f vgafont.h
+.ifdef CPU_IS_X64
+	rm -f sortix-x86_64.bin
+.endif
+	rm -f $(ALLOBJS:.o=.d)
+	rm -f kb/default-kblayout.kblayout.bin kb/default-kblayout.h vgafont.h
 
-# Installation into sysroot
-install: install-headers install-kernel
+install: install-kernel
 
-install-include-dirs: headers
-	mkdir -p $(DESTDIR)$(INCLUDEDIR)
-
-install-headers: install-include-dirs headers
-	cp -RTv include $(DESTDIR)$(INCLUDEDIR)
-
-install-kernel: install-kernel-binary
-
-install-kernel-binary: sortix.bin
+install-kernel:
 	mkdir -p $(DESTDIR)$(BOOTDIR)
 	cp sortix.bin $(DESTDIR)$(BOOTDIR)/sortix.bin

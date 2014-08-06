@@ -1,35 +1,20 @@
-include ../build-aux/platform.mak
-include ../build-aux/compiler.mak
-include ../build-aux/version.mak
-include ../build-aux/dirs.mak
-
-OPTLEVEL?=$(DEFAULT_OPTLEVEL)
-CFLAGS?=$(OPTLEVEL)
-
 SORTIXKERNEL=../kernel
 
-CPPFLAGS:=$(CPPFLAGS) -DVERSIONSTR=\"$(VERSION)\" -I$(SORTIXKERNEL)/include -I.
-CFLAGS:=$(CFLAGS) -Wall -Wextra
+PROGRAM=initrdfs mkinitrd
+PROGRAM_BINDIR=$(SBINDIR)
+PROGRAM_OBJS=rules.o serialize.o
+initrdfs_OBJS=$(PROGRAM_OBJS) initrdfs.o
+mkinitrd_OBJS=$(PROGRAM_OBJS) mkinitrd.o
+MANPAGE=$(PROGRAM:=.8)
 
-ifeq ($(HOST_IS_SORTIX),0)
+.include <sortix/sys.mk>
+.include <template/dependencies.mk>
+.include <template/man.mk>
+.include <template/program.mk>
+
+CPPFLAGS+=-I$(SORTIXKERNEL)/include -I.
+
+# TODO: HACK
+.ifndef HOST_IS_SORTIX
   CPPFLAGS+=-D_GNU_SOURCE
-endif
-
-BINARIES=mkinitrd initrdfs
-
-all: $(BINARIES)
-
-.PHONY: all install clean
-
-%: %.c rules.c serialize.c
-	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< rules.c serialize.c -o $@
-
-clean:
-	rm -f $(BINARIES)
-
-install: all
-	mkdir -p $(DESTDIR)$(SBINDIR)
-	install $(BINARIES) $(DESTDIR)$(SBINDIR)
-	mkdir -p $(DESTDIR)$(MANDIR)/man8
-	cp initrdfs.8 $(DESTDIR)$(MANDIR)/man8/initrdfs.8
-	cp mkinitrd.8 $(DESTDIR)$(MANDIR)/man8/mkinitrd.8
+.endif

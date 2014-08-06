@@ -1,16 +1,4 @@
-SOFTWARE_MEANT_FOR_SORTIX=1
-include ../build-aux/platform.mak
-include ../build-aux/compiler.mak
-include ../build-aux/version.mak
-include ../build-aux/dirs.mak
-
-OPTLEVEL?=$(DEFAULT_OPTLEVEL)
-CFLAGS?=$(OPTLEVEL)
-
-CFLAGS:=$(CFLAGS) -Wall -Wextra
-CPPFLAGS:=$(CPPFLAGS) -DVERSIONSTR=\"$(VERSION)\"
-
-BINARIES_EXCEPT_INSTALL:=\
+PROGRAM_EXCEPT_XINSTALL=\
 basename \
 cat \
 chkblayout \
@@ -65,23 +53,18 @@ unmount \
 uptime \
 wc \
 which \
+xinstall \
 yes \
 
-BINARIES=\
-$(BINARIES_EXCEPT_INSTALL) \
-xinstall
+PROGRAM=$(PROGRAM_EXCEPT_XINSTALL) xinstall
 
-all: $(BINARIES)
+.include <sortix/sys.mk>
+.include <template/dependencies.mk>
+.include <template/program.mk>
 
-.PHONY: all install clean
-
-install: all
+install-bin: $(PROGRAM)
 	mkdir -p $(DESTDIR)$(BINDIR)
-	install $(BINARIES_EXCEPT_INSTALL) $(DESTDIR)$(BINDIR)
+.for program in $(PROGRAM_EXCEPT_XINSTALL)
+	install $(program) $(DESTDIR)$(BINDIR)
+.endfor
 	install xinstall $(DESTDIR)$(BINDIR)/install
-
-%: %.c
-	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< -o $@
-
-clean:
-	rm -f $(BINARIES) *.o

@@ -1,8 +1,3 @@
-include ../build-aux/platform.mak
-include ../build-aux/compiler.mak
-include ../build-aux/version.mak
-include ../build-aux/dirs.mak
-
 DOCUMENTS:=\
 cross-compilation-sins \
 obsolete-stuff \
@@ -10,7 +5,10 @@ porting-guide \
 posix-divergence \
 welcome \
 
-all: $(BINARIES)
+.include <sortix/sys.mk>
+.include <dirs.mk>
+
+all:
 
 .PHONY: all install clean
 

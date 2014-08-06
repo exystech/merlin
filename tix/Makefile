@@ -1,19 +1,4 @@
-include ../build-aux/platform.mak
-include ../build-aux/compiler.mak
-include ../build-aux/version.mak
-include ../build-aux/dirs.mak
-
-OPTLEVEL?=$(DEFAULT_OPTLEVEL)
-CFLAGS?=$(OPTLEVEL)
-
-CFLAGS:=$(CFLAGS) -Wall -Wextra
-CPPFLAGS:=$(CPPFLAGS) -DVERSIONSTR=\"$(VERSION)\"
-
-ifeq ($(HOST_IS_SORTIX),0)
-  CPPFLAGS+=-D_GNU_SOURCE
-endif
-
-BINARIES:=\
+PROGRAM=\
 porttix-create \
 srctix-create \
 tix \
@@ -24,22 +9,18 @@ tix-execpatch \
 tix-install \
 tix-rmpatch \
 
-PROGRAMS:=\
-$(BINARIES) \
-tix-eradicate-libtool-la \
+.include <sortix/sys.mk>
+.include <template/dependencies.mk>
+.include <template/program.mk>
 
-all: $(PROGRAMS)
+# TODO: HACK
+.ifndef HOST_IS_SORTIX
+  CPPFLAGS+=-D_GNU_SOURCE
+.endif
 
-.PHONY: all install clean
+.PHONY: install install-bin-extra
 
-%: %.c util.h
-	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< -o $@
+install: install-bin-extra
 
-$(DESTDIR)$(SBINDIR):
-	mkdir -p $@
-
-install: all $(DESTDIR)$(SBINDIR)
-	install $(PROGRAMS) $(DESTDIR)$(SBINDIR)
-
-clean:
-	rm -f $(BINARIES)
+install-bin-extra: install-bin
+	install tix-eradicate-libtool-la $(DESTDIR)$(BINDIR)

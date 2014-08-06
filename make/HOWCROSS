@@ -1,0 +1,7 @@
+make clean && "rm" -f make tixmake x86_64-sortix-make &&
+make PROGRAM=tixmake PREFIX=$HOME install &&
+tixmake clean && "rm" -f make tixmake x86_64-sortix-make &&
+tixmake PROGRAM=tixmake PREFIX=$HOME install &&
+tixmake clean && "rm" -f make tixmake x86_64-sortix-make &&
+tixmake TARGET=x86_64-sortix PREFIX=$HOME install &&
+tixmake clean && "rm" -f make tixmake x86_64-sortix-make

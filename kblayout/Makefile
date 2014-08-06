@@ -1,22 +1,19 @@
-include ../build-aux/platform.mak
-include ../build-aux/compiler.mak
-include ../build-aux/version.mak
-include ../build-aux/dirs.mak
-
 KBLAYOUTDIR?=$(DATAROOTDIR)/kblayout
-
-KBLAYOUT_COMPILER?=kblayout-compiler
-
 LAYOUTS=\
 dk \
 us \
 
+.include <sortix/sys.mk>
+.include <dirs.mk>
+
 .PHONY: all install clean
+
+.SUFFIXES: .kblayout
 
 all: $(LAYOUTS)
 
-%: %.kblayout
-	$(KBLAYOUT_COMPILER) --format=sortix-kblayout-1 --compression=none $< -o $@
+.kblayout:
+	kblayout-compiler --format=sortix-kblayout-1 --compression=none $< -o $@
 
 install: all
 	mkdir -p $(DESTDIR)$(KBLAYOUTDIR)

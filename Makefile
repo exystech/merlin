@@ -1,7 +1,37 @@
-SOFTWARE_MEANT_FOR_SORTIX=1
-include build-aux/platform.mak
-include build-aux/compiler.mak
-include build-aux/version.mak
+# Makefile that builds the Sortix operating system in one pass.
+#
+# This Makefile only works with Sortix make (tixmake).
+# You need to bootstrap it from the make/ directory if you're not on Sortix.
+# The cross developer documentation covers this, which you can see by running:
+#
+#   man share/man/man7/cross-development.7
+
+# Don't implicitly include <sys.mk> (see above if this fails).
+.nobuiltin
+
+# Use the new set of make includes and include the new <sys.mk>.
+PWD!=pwd
+MKDIR=$(PWD)/make/mk
+.includepath $(MKDIR)
+.include <sys.mk>
+
+# Include Sortix-specific definitions.
+.include <sortix/sys.mk>
+
+BUILD_TOOLS=\
+carray \
+kblayout-compiler \
+make \
+mkinitrd \
+sf \
+tix \
+
+# TODO: Warn if TARGET isn't set to Sortix for build-tools?
+
+BASE_HEADER_MODULES=\
+kernel \
+libc \
+libm \
 
 MODULES=\
 doc \
@@ -19,6 +49,7 @@ init \
 kblayout \
 kblayout-compiler \
 login \
+make \
 mkinitrd \
 regress \
 sf \
@@ -30,32 +61,51 @@ update-initrd \
 utils \
 kernel
 
-ifndef SYSROOT
-  SYSROOT:=$(shell pwd)/sysroot
-endif
+FSH_DIRECTORIES=\
+/ \
+/bin \
+/boot \
+/dev \
+/etc \
+/etc/skel \
+/home \
+/include \
+/lib \
+/libexec \
+/mnt \
+/sbin \
+/share \
+/tix \
+/tix/manifest \
+/tmp \
+/var \
+/var/empty
 
-ifndef SYSROOT_OVERLAY
-  SYSROOT_OVERLAY:=$(shell pwd)/sysroot-overlay
-endif
+SYSROOT?=$(PWD)/sysroot
+SYSROOT_OVERLAY?=$(PWD)/sysroot-overlay
 
 SORTIX_BUILDS_DIR?=builds
 SORTIX_PORTS_DIR?=ports
 SORTIX_RELEASE_DIR?=release
 SORTIX_REPOSITORY_DIR?=repository
 SORTIX_ISO_COMPRESSION?=xz
+SORTIX_ISO_COMPRESSION_XZ=1 # TODO: HACK
 
-SORTIX_INCLUDE_SOURCE_GIT_REPO?=$(shell test -d .git && echo "file://`pwd`")
-SORTIX_INCLUDE_SOURCE_GIT_REPO:=$(SORTIX_INCLUDE_SOURCE_GIT_REPO)
-SORTIX_INCLUDE_SOURCE_GIT_ORIGIN?=
+SORTIX_INCLUDE_SOURCE_GIT_REPO?!=test -d .git && echo "file://`pwd`"
+#SORTIX_INCLUDE_SOURCE_GIT_ORIGIN?=
 SORTIX_INCLUDE_SOURCE_GIT_CLONE_OPTIONS?=--single-branch
 SORTIX_INCLUDE_SOURCE_GIT_BRANCHES?=master
-ifneq ($(and $(shell which git 2>/dev/null),$(SORTIX_INCLUDE_SOURCE_GIT_REPO)),)
+# TODO: And SORTIX_INCLUDE_SOURCE_GIT_REPO got set.
+# TODO: HACK
+HAS_GIT_WHAT!=which git > /dev/null || echo _LACK
+HAS_GIT$(HAS_GIT_WHAT)=1
+.ifdef HAS_GIT
+  SORTIX_INCLUDE_SOURCE_GIT=1
   SORTIX_INCLUDE_SOURCE?=git
-else
+.else
+  SORTIX_INCLUDE_SOURCE_YES=1
   SORTIX_INCLUDE_SOURCE?=yes
-endif
-
-include build-aux/dirs.mak
+.endif
 
 BUILD_NAME:=sortix-$(VERSION)-$(MACHINE)
 
@@ -63,6 +113,8 @@ LIVE_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).live.initrd
 OVERLAY_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).overlay.initrd
 SRC_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).src.initrd
 SYSTEM_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).system.initrd
+
+.DEFAULT_GOAL = all
 
 .PHONY: all
 all: sysroot
@@ -77,79 +129,45 @@ sysmerge-wait: sysroot
 
 .PHONY: clean-build-tools
 clean-build-tools:
-	$(MAKE) -C carray clean
-	$(MAKE) -C kblayout-compiler clean
-	$(MAKE) -C mkinitrd clean
-	$(MAKE) -C sf clean
-	$(MAKE) -C tix clean
+.for module in $(BUILD_TOOLS)
+	+$(MAKE) -I "$(MKDIR)" -C $(module) clean
+.endfor
 
 .PHONY: build-tools
 build-tools:
-	$(MAKE) -C carray
-	$(MAKE) -C kblayout-compiler
-	$(MAKE) -C mkinitrd
-	$(MAKE) -C sf
-	$(MAKE) -C tix
+.for module in $(BUILD_TOOLS)
+	+$(MAKE) -I "$(MKDIR)" -C $(module)
+.endfor
 
 .PHONY: install-build-tools
 install-build-tools:
-	$(MAKE) -C carray install
-	$(MAKE) -C kblayout-compiler install
-	$(MAKE) -C mkinitrd install
-	$(MAKE) -C sf install
-	$(MAKE) -C tix install
+.for module in $(BUILD_TOOLS)
+	+$(MAKE) -I "$(MKDIR)" -C $(module) install
+.endfor
 
 .PHONY: sysroot-fsh
 sysroot-fsh:
-	mkdir -p "$(SYSROOT)"
-	mkdir -p "$(SYSROOT)/bin"
-	mkdir -p "$(SYSROOT)/boot"
-	mkdir -p "$(SYSROOT)/dev"
-	mkdir -p "$(SYSROOT)/etc"
-	mkdir -p "$(SYSROOT)/etc/skel"
-	mkdir -p "$(SYSROOT)/home"
-	mkdir -p "$(SYSROOT)/include"
-	mkdir -p "$(SYSROOT)/lib"
-	mkdir -p "$(SYSROOT)/libexec"
-	mkdir -p "$(SYSROOT)/mnt"
-	mkdir -p "$(SYSROOT)/sbin"
-	mkdir -p "$(SYSROOT)/share"
-	mkdir -p "$(SYSROOT)/src"
-	mkdir -p "$(SYSROOT)/tix"
-	mkdir -p "$(SYSROOT)/tix/manifest"
-	mkdir -p "$(SYSROOT)/tmp"
-	mkdir -p "$(SYSROOT)/var"
-	mkdir -p "$(SYSROOT)/var/empty"
+.for dir in $(FSH_DIRECTORIES)
+	mkdir -m 755 -p "$(SYSROOT)$(dir)"
+.endfor
 	ln -sfT . "$(SYSROOT)/usr"
 
+.PHONY: sysroot-base-mk
+sysroot-base-mk: sysroot-fsh
+
 .PHONY: sysroot-base-headers
-sysroot-base-headers: sysroot-fsh
-	export SYSROOT="$(SYSROOT)" && \
-	(for D in libc libm kernel; do ($(MAKE) -C $$D install-headers DESTDIR="$(SYSROOT)") || exit $$?; done)
+sysroot-base-headers: sysroot-base-mk
+.for module in $(BASE_HEADER_MODULES)
+	+SYSROOT="$(SYSROOT)" \
+	$(MAKE) -I "$(MKDIR)" -C $(module) install-headers DESTDIR="$(SYSROOT)"
+.endfor
 
 .PHONY: sysroot-system
 sysroot-system: sysroot-fsh sysroot-base-headers
 	rm -f "$(SYSROOT)/tix/manifest/system"
-	echo / >> "$(SYSROOT)/tix/manifest/system"
-	echo /bin >> "$(SYSROOT)/tix/manifest/system"
-	echo /boot >> "$(SYSROOT)/tix/manifest/system"
-	echo /dev >> "$(SYSROOT)/tix/manifest/system"
-	echo /etc >> "$(SYSROOT)/tix/manifest/system"
-	echo /etc/skel >> "$(SYSROOT)/tix/manifest/system"
-	echo /home >> "$(SYSROOT)/tix/manifest/system"
-	echo /include >> "$(SYSROOT)/tix/manifest/system"
-	echo /lib >> "$(SYSROOT)/tix/manifest/system"
-	echo /libexec >> "$(SYSROOT)/tix/manifest/system"
-	echo /mnt >> "$(SYSROOT)/tix/manifest/system"
-	echo /sbin >> "$(SYSROOT)/tix/manifest/system"
-	echo /share >> "$(SYSROOT)/tix/manifest/system"
-	echo /src >> "$(SYSROOT)/tix/manifest/system"
-	echo /tix >> "$(SYSROOT)/tix/manifest/system"
-	echo /tix/manifest >> "$(SYSROOT)/tix/manifest/system"
-	echo /tmp >> "$(SYSROOT)/tix/manifest/system"
-	echo /usr >> "$(SYSROOT)/tix/manifest/system"
-	echo /var >> "$(SYSROOT)/tix/manifest/system"
-	echo /var/empty >> "$(SYSROOT)/tix/manifest/system"
+.for dir in $(FSH_DIRECTORIES)
+	echo $(dir) >> "$(SYSROOT)/tix/manifest/system"
+.endfor
 	echo "$(HOST_MACHINE)" > "$(SYSROOT)/etc/machine"
 	echo /etc/machine >> "$(SYSROOT)/tix/manifest/system"
 	(echo 'NAME="Sortix"' && \
@@ -164,81 +182,88 @@ sysroot-system: sysroot-fsh sysroot-base-headers
 	echo /etc/os-release >> "$(SYSROOT)/tix/manifest/system"
 	find share | sed -e 's,^,/,' >> "$(SYSROOT)/tix/manifest/system"
 	cp -RT share "$(SYSROOT)/share"
-	export SYSROOT="$(SYSROOT)" && \
-	(for D in $(MODULES); \
-	  do ($(MAKE) -C $$D && \
-	      rm -rf "$(SYSROOT).destdir" && \
-	      mkdir -p "$(SYSROOT).destdir" && \
-	      $(MAKE) -C $$D install DESTDIR="$(SYSROOT).destdir" && \
-	      (cd "$(SYSROOT).destdir" && find .) | sed -e 's/\.//' -e 's/^$$/\//' | \
-	      grep -E '^.+$$' >> "$(SYSROOT)/tix/manifest/system" && \
-	      cp -RT "$(SYSROOT).destdir" "$(SYSROOT)" && \
-	      rm -rf "$(SYSROOT).destdir") \
-	  || exit $$?; done)
+.for module in $(MODULES)
+	+SYSROOT="$(SYSROOT)" \
+	$(MAKE) -I "$(MKDIR)" -C $(module)
+	rm -rf "$(SYSROOT).destdir"
+	mkdir -p "$(SYSROOT).destdir"
+	+SYSROOT="$(SYSROOT)" \
+	$(MAKE) -I "$(MKDIR)" -C $(module) install DESTDIR="$(SYSROOT).destdir"
+	(cd "$(SYSROOT).destdir" && find .) | sed -e 's/\.//' -e 's/^$$/\//' | \
+	grep -E '^.+$$' >> "$(SYSROOT)/tix/manifest/system"
+	cp -RT --preserve=mode,timestamp,links "$(SYSROOT).destdir" "$(SYSROOT)"
+	rm -rf "$(SYSROOT).destdir"
+.endfor
 	LC_ALL=C sort -u "$(SYSROOT)/tix/manifest/system" > "$(SYSROOT)/tix/manifest/system.new"
 	mv "$(SYSROOT)/tix/manifest/system.new" "$(SYSROOT)/tix/manifest/system"
 
 .PHONY: sysroot-source
 sysroot-source: sysroot-fsh
-ifeq ($(SORTIX_INCLUDE_SOURCE),git)
+# TODO: HACK:
+#.if ${SORTIX_INCLUDE_SOURCE_GIT} == "git"
+.ifdef SORTIX_INCLUDE_SOURCE_GIT
 	rm -rf "$(SYSROOT)/src"
 	git clone --no-hardlinks $(SORTIX_INCLUDE_SOURCE_GIT_CLONE_OPTIONS) -- $(SORTIX_INCLUDE_SOURCE_GIT_REPO) "$(SYSROOT)/src"
-	-cd "$(SYSROOT)/src" && for BRANCH in $(SORTIX_INCLUDE_SOURCE_GIT_BRANCHES); do \
-	  git fetch origin $$BRANCH && \
-	  (git branch -f $$BRANCH FETCH_HEAD || true) ; \
-	done
-ifneq ($(SORTIX_INCLUDE_SOURCE_GIT_ORIGIN),)
+.for branch in $(SORTIX_INCLUDE_SOURCE_GIT_BRANCHES
+	-cd "$(SYSROOT)/src" && \
+	git fetch origin $(BRANCH) && \
+	git branch -f $(BRANCH) FETCH_HEAD
+.endfor
+.ifdef ($(SORTIX_INCLUDE_SOURCE_GIT_ORIGIN),)
 	cd "$(SYSROOT)/src" && git remote set-url origin $(SORTIX_INCLUDE_SOURCE_GIT_ORIGIN)
-else
+.else
 	-cd "$(SYSROOT)/src" && git remote rm origin
-endif
-else ifneq ($(SORTIX_INCLUDE_SOURCE),no)
+.endif
+.elifdef SORTIX_INCLUDE_SOURCE_YES
 	cp .gitignore -t "$(SYSROOT)/src"
 	cp LICENSE -t "$(SYSROOT)/src"
-	cp Makefile -t "$(SYSROOT)/src"
+# TODO: Be sure to update this if s/TIXmakefile/Makefile/g.
+	cp TIXmakefile -t "$(SYSROOT)/src"
 	cp README -t "$(SYSROOT)/src"
 	cp -RT build-aux "$(SYSROOT)/src/build-aux"
-	cp -RT share "$(SYSROOT)/src/share"
-	(for D in $(MODULES); do (cp -R $$D -t "$(SYSROOT)/src" && $(MAKE) -C "$(SYSROOT)/src/$$D" clean) || exit $$?; done)
-endif
-	(cd "$(SYSROOT)" && find .) | sed 's/\.//' | \
-	grep -E '^/src(/.*)?$$' | \
+.for module in $(MODULES)
+	cp -R $(module) -t "$(SYSROOT)/src"
+	+$(MAKE) -I "$(SYSROOT)/src/make/mk" -C "$(SYSROOT)/src/$(module)" clean
+.endfor
+.endif
+.ifndef SORTIX_INCLUDE_SOURCE_NO
+	(cd "$(SYSROOT)" && find .) | sed 's/\.//' | grep -E '^/src(/.*)?$$' | \
 	LC_ALL=C sort > "$(SYSROOT)/tix/manifest/src"
+.endif
 
 .PHONY: sysroot-ports
-sysroot-ports: sysroot-fsh sysroot-base-headers sysroot-system sysroot-source
-	@SORTIX_PORTS_DIR="$(SORTIX_PORTS_DIR)" \
-	 SORTIX_REPOSITORY_DIR="$(SORTIX_REPOSITORY_DIR)" \
-	 SYSROOT="$(SYSROOT)" \
-	 HOST="$(HOST)" \
-	 MAKE="$(MAKE)" \
-	 MAKEFLAGS="$(MAKEFLAGS)" \
-	 build-aux/build-ports.sh
+sysroot-ports: sysroot-system sysroot-source
+	SORTIX_PORTS_DIR="$(SORTIX_PORTS_DIR)" \
+	SORTIX_REPOSITORY_DIR="$(SORTIX_REPOSITORY_DIR)" \
+	SYSROOT="$(SYSROOT)" \
+	HOST="$(HOST)" \
+	build-aux/build-ports.sh
+
+.PHONY: sysroot-overlay
+sysroot-overlay: sysroot-system sysroot-ports
+	! [ -d "$(SYSROOT_OVERLAY)" ] || \
+	cp -RT --preserve=mode,timestamp,links "$(SYSROOT_OVERLAY)" "$(SYSROOT)"
 
 .PHONY: sysroot
-sysroot: sysroot-system sysroot-source sysroot-ports
-
-$(SORTIX_REPOSITORY_DIR):
-	mkdir -p $@
-
-$(SORTIX_REPOSITORY_DIR)/$(HOST): $(SORTIX_REPOSITORY_DIR)
-	mkdir -p $@
+sysroot: sysroot-system sysroot-source sysroot-ports sysroot-overlay
 
 .PHONY: clean-core
 clean-core:
-	(for D in $(MODULES); do $(MAKE) clean -C $$D || exit $$?; done)
+.for module in $(MODULES)
+	+$(MAKE) -I "$(MKDIR)" -C $(module) clean
+.endfor
 
 .PHONY: clean-ports
 clean-ports:
-	@SORTIX_PORTS_DIR="$(SORTIX_PORTS_DIR)" \
-	 HOST="$(HOST)" \
-	 MAKE="$(MAKE)" \
-	 MAKEFLAGS="$(MAKEFLAGS)" \
-	 build-aux/clean-ports.sh
+	SORTIX_PORTS_DIR="$(SORTIX_PORTS_DIR)" \
+	HOST="$(HOST)" \
+	build-aux/clean-ports.sh
 
 .PHONY: clean-builds
 clean-builds:
 	rm -rf "$(SORTIX_BUILDS_DIR)"
+	rm -f sortix.bin
+	rm -f sortix.initrd
 	rm -f sortix.iso
 
 .PHONY: clean-release
@@ -263,52 +288,10 @@ mostlyclean: clean-core clean-ports clean-builds clean-release clean-sysroot
 .PHONY: distclean
 distclean: clean-core clean-ports clean-builds clean-release clean-repository clean-sysroot
 
-.PHONY: most-things
-most-things: sysroot iso
+$(SORTIX_BUILDS_DIR):
+	mkdir -p $(SORTIX_BUILDS_DIR)
 
-.PHONY: everything
-everything: most-things
-
-# Targets that build multiple architectures.
-
-.PHONY: sysroot-base-headers-all-archs
-sysroot-base-headers-all-archs:
-	$(MAKE) clean clean-sysroot
-	$(MAKE) sysroot-base-headers HOST=i686-sortix
-	$(MAKE) clean clean-sysroot
-	$(MAKE) sysroot-base-headers HOST=x86_64-sortix
-
-.PHONY: all-archs
-all-archs:
-	$(MAKE) clean clean-sysroot
-	$(MAKE) all HOST=i686-sortix
-	$(MAKE) clean clean-sysroot
-	$(MAKE) all HOST=x86_64-sortix
-
-.PHONY: most-things-all-archs
-most-things-all-archs:
-	$(MAKE) clean clean-sysroot
-	$(MAKE) most-things HOST=i686-sortix
-	$(MAKE) clean clean-sysroot
-	$(MAKE) most-things HOST=x86_64-sortix
-
-.PHONY: everything-all-archs
-everything-all-archs:
-	$(MAKE) clean clean-sysroot
-	$(MAKE) everything HOST=i686-sortix
-	$(MAKE) clean clean-sysroot
-	$(MAKE) everything HOST=x86_64-sortix
-
-.PHONY: release-all-archs
-release-all-archs:
-	$(MAKE) clean clean-sysroot
-	$(MAKE) release HOST=i686-sortix
-	$(MAKE) clean clean-sysroot
-	$(MAKE) release HOST=x86_64-sortix
-
-# Initial ramdisk
-
-$(LIVE_INITRD): sysroot
+$(LIVE_INITRD): sysroot $(SORTIX_BUILDS_DIR)
 	mkdir -p `dirname $(LIVE_INITRD)`
 	rm -rf $(LIVE_INITRD).d
 	mkdir -p $(LIVE_INITRD).d
@@ -326,22 +309,15 @@ $(LIVE_INITRD): sysroot
 	rm -rf $(LIVE_INITRD).d
 
 .PHONY: $(OVERLAY_INITRD)
-$(OVERLAY_INITRD): sysroot
+$(OVERLAY_INITRD): sysroot $(SORTIX_BUILDS_DIR)
 	test ! -d "$(SYSROOT_OVERLAY)" || \
 	mkinitrd --format=sortix-initrd-2 "$(SYSROOT_OVERLAY)" -o $(OVERLAY_INITRD)
 
-$(SRC_INITRD): sysroot
+$(SRC_INITRD): sysroot $(SORTIX_BUILDS_DIR)
 	mkinitrd --format=sortix-initrd-2 --manifest="$(SYSROOT)/tix/manifest/src" "$(SYSROOT)" -o $(SRC_INITRD)
 
-$(SYSTEM_INITRD): sysroot
+$(SYSTEM_INITRD): sysroot $(SORTIX_BUILDS_DIR)
 	mkinitrd --format=sortix-initrd-2 --manifest="$(SYSROOT)/tix/manifest/system" "$(SYSROOT)" -o $(SYSTEM_INITRD)
-
-# Packaging
-
-$(SORTIX_BUILDS_DIR):
-	mkdir -p $(SORTIX_BUILDS_DIR)
-
-# Bootable images
 
 $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso: sysroot $(LIVE_INITRD) $(OVERLAY_INITRD) $(SRC_INITRD) $(SYSTEM_INITRD) $(SORTIX_BUILDS_DIR)
 	rm -rf $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
@@ -353,7 +329,7 @@ $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso: sysroot $(LIVE_INITRD) $(OVERLAY_INITRD)
 	SYSROOT="$(SYSROOT)" \
 	HOST="$(HOST)" \
 	build-aux/iso-repository.sh $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/repository
-ifeq ($(SORTIX_ISO_COMPRESSION),xz)
+.ifdef SORTIX_ISO_COMPRESSION_XZ
 	xz -c "$(SYSROOT)/boot/sortix.bin" > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix.bin.xz
 	xz -c $(LIVE_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/live.initrd.xz
 	test ! -e "$(OVERLAY_INITRD)" || \
@@ -362,7 +338,7 @@ ifeq ($(SORTIX_ISO_COMPRESSION),xz)
 	xz -c $(SYSTEM_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/system.initrd.xz
 	build-aux/iso-grub-cfg.sh --platform $(HOST) --version $(VERSION) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 	grub-mkrescue --compress=xz -o $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
-else ifeq ($(SORTIX_ISO_COMPRESSION),gzip)
+.elifdef SORTIX_ISO_COMPRESSION_GZIP
 	gzip -c "$(SYSROOT)/boot/sortix.bin" > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix.bin.gz
 	gzip -c $(LIVE_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/live.initrd.gz
 	test ! -e "$(OVERLAY_INITRD)" || \
@@ -371,7 +347,7 @@ else ifeq ($(SORTIX_ISO_COMPRESSION),gzip)
 	gzip -c $(SYSTEM_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/system.initrd.gz
 	build-aux/iso-grub-cfg.sh --platform $(HOST) --version $(VERSION) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 	grub-mkrescue --compress=gz -o $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
-else # none
+.else
 	cp "$(SYSROOT)/boot/sortix.bin" $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix.bin
 	cp $(LIVE_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/live.initrd
 	test ! -e "$(OVERLAY_INITRD)" || \
@@ -380,7 +356,7 @@ else # none
 	cp $(SYSTEM_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/system.initrd
 	build-aux/iso-grub-cfg.sh --platform $(HOST) --version $(VERSION) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 	grub-mkrescue -o $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
-endif
+.endif
 	rm -rf $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 
 .PHONY: iso

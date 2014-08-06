@@ -1,19 +1,8 @@
-SOFTWARE_MEANT_FOR_SORTIX=1
-include ../build-aux/platform.mak
-include ../build-aux/compiler.mak
-include ../build-aux/version.mak
-include ../build-aux/dirs.mak
-
-OPTLEVEL?=$(DEFAULT_OPTLEVEL)
+.include <sortix/sys.mk>
 
 CPUDIR:=$(CPU)
 
-CPPINCLUDES=-Iinclude
-CPPFLAGS=-D__is_sortix_libc $(CPPINCLUDES)
-FLAGS=-Wall -Wextra -ffreestanding $(OPTLEVEL)
-CFLAGS=-std=gnu11 -Wstrict-prototypes -Werror=implicit-function-declaration
-CXXFLAGS=-std=gnu++11 -fno-exceptions -fno-rtti
-ASFLAGS=
+LIBRARY=libc libdl libk librt libpthread
 
 FREEOBJS=\
 assert/__assert.o \
@@ -723,122 +712,45 @@ unistd/usleep.o \
 unistd/write.o \
 utime/utime.o \
 
-OBJS=\
-$(FREEOBJS) \
-$(HOSTEDOBJS) \
+LIBRARY_OBJS=
+libc_OBJS:=$(FREEOBJS) $(HOSTEDOBJS)
+libk_OBJS:=$(FREEOBJS:.o=.libk.o)
 
-CRTOBJ=\
-crt0.o \
-crt1.o \
-crti.o \
-crtn.o \
+CRT_OBJS=$(CPUDIR)/crt0.o $(CPUDIR)/crti.o $(CPUDIR)/crtn.o
 
-MISCOBJ=\
-$(CRTOBJ) \
+CPPFLAGS+=-D__is_sortix_libc
 
-HEADERS:=$(shell find include -type f)
+.SUFFIXES: .libk.o
 
-LIBK_OBJS:=$(FREEOBJS:.o=.libk.o)
-LIBK_CPPFLAGS:=$(CPPFLAGS) -D__is_sortix_libk
-LIBK_FLAGS:=$(FLAGS)
-LIBK_CFLAGS:=$(CFLAGS)
-LIBK_CXXFLAGS:=$(CXXFLAGS)
-ifeq ($(HOST),x86_64-sortix)
-    LIBK_FLAGS:=$(LIBK_FLAGS) -mno-red-zone -mno-mmx -mno-sse -mno-sse2
-endif
+.PHONY: all install install-crt
 
-BINS=libc.a libdl.a libpthread.a librt.a $(CRTOBJ)
-BINSKERNEL=libk.a
-INSTALLLIBS:=$(addprefix $(DESTDIR)$(LIBDIR)/,$(BINS))
-INSTALLLIBSKERNEL:=$(addprefix $(DESTDIR)$(LIBDIR)/,$(BINSKERNEL))
+all: $(CRT_OBJS)
 
-all: libs libs-kernel
+install: install-crt
 
-libs: $(BINS)
+install-crt:
+	mkdir -p $(DESTDIR)$(LIBDIR)
+.for crt in $(CRT_OBJS)
+	install $(crt) $(DESTDIR)$(LIBDIR)
+.endfor
+	ln -f $(DESTDIR)$(LIBDIR)/crt0.o $(DESTDIR)$(LIBDIR)/crt1.o
 
-libs-kernel: $(BINSKERNEL)
+.c.libk.o:
+# TODO: HACK
+.ifdef HOST_IS_x86_64_sortix
+	$(COMPILE.c) -ffreestanding -D__is_sortix_libk -mno-red-zone -mno-mmx -mno-sse -mno-sse2 $< -o $@
+.else
+	$(COMPILE.c) -ffreestanding -D__is_sortix_libk $< -o $@
+.endif
 
-.PHONY: all libs headers clean install install-include-dirs install-headers \
-        install-lib-dirs install-libs libs-kernel
+.c++.libk.o:
+# TODO: HACK
+.ifdef HOST_IS_x86_64_sortix
+	$(COMPILE.c++) -ffreestanding -D__is_sortix_libk -mno-red-zone -mno-mmx -mno-sse -mno-sse2 $< -o $@
+.else
+	$(COMPILE.c++) -ffreestanding -D__is_sortix_libk $< -o $@
+.endif
 
-FORCE:
-
-libc.a: $(OBJS)
-	$(AR) rcs $@ $(OBJS)
-
-libdl.a:
-	$(AR) rcs $@
-
-libk.a: $(LIBK_OBJS)
-	$(AR) rcs $@ $(LIBK_OBJS)
-
-libpthread.a:
-	$(AR) rcs $@
-
-librt.a:
-	$(AR) rcs $@
-
-crt0.o: $(CPUDIR)/crt0.o
-	ln -f $< $@
-
-crt1.o: crt0.o
-	cp $< $@
-
-crti.o: $(CPUDIR)/crti.o
-	ln -f $< $@
-
-crtn.o: $(CPUDIR)/crtn.o
-	ln -f $< $@
-
-# header preprocessing
-$(OBJS) $(LIBK_OBJS): $(HEADERS)
-
-headers:
-
-# standard library
-%.o: %.c
-	$(CC) -c $< -o $@ $(CPPFLAGS) $(FLAGS) $(CFLAGS)
-
-%.o: %.c++
-	$(CXX) -c $< -o $@ $(CPPFLAGS) $(FLAGS) $(CXXFLAGS)
-
-%.o: %.S
-	$(CC) -c $< -o $@ $(CPPFLAGS) $(FLAGS) $(CFLAGS)
-
-# libk
-%.libk.o: %.c
-	$(CC) -c $< -o $@ $(LIBK_CPPFLAGS) $(LIBK_FLAGS) $(LIBK_CFLAGS)
-
-%.libk.o: %.c++
-	$(CXX) -c $< -o $@ $(LIBK_CPPFLAGS) $(LIBK_FLAGS) $(LIBK_CXXFLAGS)
-
-%.libk.o: %.S
-	$(CC) -c $< -o $@ $(LIBK_CPPFLAGS) $(LIBK_FLAGS) $(LIBK_CFLAGS)
-
-clean:
-	rm -f *.o */*.o */*/*.o *.a
-
-# Installation into sysroot
-install: install-headers install-libs install-libs-kernel
-
-$(DESTDIR)$(LIBDIR):
-	mkdir -p $@
-
-$(DESTDIR)$(LIBDIR)/%: %
-	cp -P $< $@
-
-$(INSTALLLIBS): | $(DESTDIR)$(LIBDIR)
-
-$(INSTALLLIBSKERNEL): | $(DESTDIR)$(LIBDIR)
-
-install-include-dirs: headers
-	mkdir -p $(DESTDIR)$(INCLUDEDIR)
-
-install-headers: install-include-dirs headers
-	cp -RTv include $(DESTDIR)$(INCLUDEDIR)
-
-install-lib-dirs: $(DESTDIR)$(LIBDIR)
-
-install-libs: $(INSTALLLIBS)
-
-install-libs-kernel: $(INSTALLLIBSKERNEL)
+.include <template/dependencies.mk>
+.include <template/headers.mk>
+.include <template/library.mk>
