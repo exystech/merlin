@@ -34,6 +34,7 @@ struct utsname
 	char nodename[_UTSNAME_LENGTH];
 	char release[_UTSNAME_LENGTH];
 	char version[_UTSNAME_LENGTH];
+	char tagline[_UTSNAME_LENGTH];
 	char machine[_UTSNAME_LENGTH];
 	char processor[_UTSNAME_LENGTH];
 	char hwplatform[_UTSNAME_LENGTH];

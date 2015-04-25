@@ -55,6 +55,8 @@ int uname(struct utsname* name)
 		strlcpy(name->nodename, "unknown", sizeof(name->nodename));
 	if ( kernelinfo("version", name->release, sizeof(name->release)) != 0 )
 		strlcpy(name->release, "unknown", sizeof(name->release));
+	if ( kernelinfo("tagline", name->tagline, sizeof(name->tagline)) != 0 )
+		strlcpy(name->tagline, "unknown", sizeof(name->tagline));
 	if ( kernelinfo("builddate", name->version, sizeof(name->version)) != 0 )
 		strlcpy(name->version, "unknown", sizeof(name->version));
 	strlcpy(name->machine, machine, sizeof(name->machine));

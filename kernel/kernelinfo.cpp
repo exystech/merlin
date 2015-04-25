@@ -34,6 +34,7 @@ static const char* KernelInfo(const char* req)
 {
 	if ( strcmp(req, "name") == 0 ) { return BRAND_KERNEL_NAME; }
 	if ( strcmp(req, "version") == 0 ) { return VERSIONSTR; }
+	if ( strcmp(req, "tagline") == 0 ) { return BRAND_RELEASE_TAGLINE; }
 	if ( strcmp(req, "builddate") == 0 ) { return __DATE__; }
 	if ( strcmp(req, "buildtime") == 0 ) { return __TIME__; }
 #if defined(__i386__) || defined(__x86_64__)

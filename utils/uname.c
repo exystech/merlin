@@ -32,6 +32,7 @@ static const int PRINT_KERNELNAME = 1 << 0;
 static const int PRINT_NODENAME = 1 << 1;
 static const int PRINT_KERNELREL = 1 << 2;
 static const int PRINT_KERNELVER = 1 << 3;
+static const int PRINT_TAGLINE = 1 << 4;
 static const int PRINT_MACHINE = 1 << 5;
 static const int PRINT_PROCESSOR = 1 << 6;
 static const int PRINT_HWPLATFORM = 1 << 7;
@@ -92,6 +93,7 @@ int main(int argc, char* argv[])
 			case 's': flags |= PRINT_KERNELNAME; break;
 			case 'n': flags |= PRINT_NODENAME; break;
 			case 'r': flags |= PRINT_KERNELREL; break;
+			case 't': flags |= PRINT_TAGLINE; break;
 			case 'v': flags |= PRINT_KERNELVER; break;
 			case 'm': flags |= PRINT_MACHINE; break;
 			case 'p': flags |= PRINT_PROCESSOR; break;
@@ -111,6 +113,8 @@ int main(int argc, char* argv[])
 			flags |= PRINT_KERNELREL;
 		else if ( !strcmp(arg, "--kernel-version") )
 			flags |= PRINT_KERNELVER;
+		else if ( !strcmp(arg, "--tagline") )
+			flags |= PRINT_TAGLINE;
 		else if ( !strcmp(arg, "--machine") )
 			flags |= PRINT_MACHINE;
 		else if ( !strcmp(arg, "--processor") )
@@ -148,6 +152,8 @@ int main(int argc, char* argv[])
 		DoPrint(utsname.nodename);
 	if ( flags & PRINT_KERNELREL )
 		DoPrint(utsname.release);
+	if ( flags & PRINT_TAGLINE )
+		DoPrint(utsname.tagline);
 	if ( flags & PRINT_KERNELVER )
 		DoPrint(utsname.version);
 	if ( flags & PRINT_MACHINE )
