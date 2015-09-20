@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +25,7 @@
 #include <sortix/kernel/ioport.h>
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/kthread.h>
+#include <sortix/kernel/interrupt.h>
 #include <sortix/kernel/pci.h>
 
 namespace Sortix {
@@ -135,28 +136,155 @@ pcitype_t GetDeviceType(uint32_t devaddr)
 	return ret;
 }
 
-static bool MatchesSearchCriteria(uint32_t devaddr, pcifind_t pcifind)
+static void MakeCoarsePattern(pcifind_t* coarse,
+                              const pcifind_t* patterns,
+                              size_t pattern_count)
+{
+	if ( pattern_count < 1 )
+	{
+		memset(coarse, 255, sizeof(*coarse));
+		return;
+	}
+	const pcifind_t* first = patterns;
+	coarse->vendorid = first->vendorid;
+	coarse->deviceid = first->deviceid;
+	coarse->classid = first->classid;
+	coarse->subclassid = first->subclassid;
+	coarse->progif = first->progif;
+	coarse->revid = first->revid;
+	for ( size_t i = 1; i < pattern_count; i++ )
+	{
+		const pcifind_t* pattern = patterns + i;
+		if ( coarse->vendorid != pattern->vendorid )
+			coarse->vendorid = 0xffff;
+		if ( coarse->deviceid != pattern->deviceid )
+			coarse->deviceid = 0xffff;
+		if ( coarse->classid != pattern->classid )
+			coarse->classid = 0xff;
+		if ( coarse->subclassid != pattern->subclassid )
+			coarse->subclassid = 0xff;
+		if ( coarse->progif != pattern->progif )
+			coarse->progif = 0xff;
+		if ( coarse->revid != pattern->revid )
+			coarse->revid = 0xff;
+	}
+}
+
+static bool MatchesPattern(const pciid_t* id,
+                           const pcitype_t* type,
+                           const pcifind_t* pattern)
+{
+	if ( id->vendorid == 0xFFFF && id->deviceid == 0xFFFF )
+		return false;
+	if ( pattern->vendorid != 0xFFFF && id->vendorid != pattern->vendorid )
+		return false;
+	if ( pattern->deviceid != 0xFFFF && id->deviceid != pattern->deviceid )
+		return false;
+	if ( pattern->classid != 0xFF && type->classid != pattern->classid )
+		return false;
+	if ( pattern->subclassid != 0xFF &&
+	     type->subclassid != pattern->subclassid )
+		return false;
+	if ( pattern->progif != 0xFF && type->progif != pattern->progif )
+		return false;
+	if ( pattern->revid != 0xFF && type->revid != pattern->revid )
+		return false;
+	return true;
+}
+
+static const pcifind_t* MatchesPatterns(const pciid_t* id,
+                                        const pcitype_t* type,
+                                        const pcifind_t* patterns,
+                                        size_t pattern_count)
+{
+	if ( id->vendorid == 0xFFFF || id->deviceid == 0xFFFF )
+		return NULL;
+	for ( size_t i = 0; i < pattern_count; i++ )
+	{
+		const pcifind_t* pattern = &patterns[i];
+		if ( MatchesPattern(id, type, pattern) )
+			return pattern;
+	}
+	return NULL;
+}
+
+static bool SearchBus(bool (*callback)(uint32_t,
+                                       const pciid_t*,
+                                       const pcitype_t*,
+                                       void*,
+                                       void*),
+                      void* context,
+                      const pcifind_t* coarse_pattern,
+                      const pcifind_t* patterns,
+                      size_t pattern_count,
+                      uint8_t bus)
+{
+	for ( unsigned int slot = 0; slot < 32; slot++ )
+	{
+		unsigned int num_functions = 1;
+		for ( unsigned int function = 0; function < num_functions; function++ )
+		{
+			uint32_t devaddr = MakeDevAddr(bus, slot, function);
+			pciid_t id = GetDeviceId(devaddr);
+			pcitype_t type = GetDeviceType(devaddr);
+			uint8_t header = Read8(devaddr, PCIFIELD_HEADER_TYPE);
+			if ( header & 0x80 ) // Multi function device.
+				num_functions = 8;
+			if ( (header & 0x7F) == 0x01 ) // PCI to PCI bus.
+			{
+				uint8_t subbusid = Read8(devaddr, PCIFIELD_SECONDARY_BUS_NUMBER);
+				bool search = SearchBus(callback, context, coarse_pattern,
+				                        patterns, pattern_count, subbusid);
+				if ( !search )
+					return false;
+			}
+			// Do a coarse pattern before the more detailed one to save time.
+			if ( 1 < pattern_count &&
+			     !MatchesPattern(&id, &type, coarse_pattern) )
+				continue;
+			const pcifind_t* pattern =
+				MatchesPatterns(&id, &type, patterns, pattern_count);
+			if ( !pattern )
+				continue;
+			// Unlock PCI in this scope to allow the callback to lock and change
+			// settings. Stop the search if the callback fails.
+			kthread_mutex_unlock(&pci_lock);
+			bool continue_search =
+				callback(devaddr, &id, &type, context, pattern->context);
+			kthread_mutex_lock(&pci_lock);
+			if ( !continue_search )
+				return false;
+		}
+	}
+	return true;
+}
+
+void Search(bool (*callback)(uint32_t,
+                             const pciid_t*,
+                             const pcitype_t*,
+                             void*,
+                             void*),
+            void* context,
+            const pcifind_t* patterns,
+            size_t pattern_count)
+{
+	pcifind_t coarse_pattern;
+	MakeCoarsePattern(&coarse_pattern, patterns, pattern_count);
+	ScopedLock lock(&pci_lock);
+	SearchBus(callback, context, &coarse_pattern, patterns, pattern_count, 0);
+}
+
+static bool MatchesPatternByDevAddr(uint32_t devaddr, const pcifind_t* pcifind)
 {
 	pciid_t id = GetDeviceId(devaddr);
 	if ( id.vendorid == 0xFFFF && id.deviceid == 0xFFFF )
 		return false;
 	pcitype_t type = GetDeviceType(devaddr);
-	if ( pcifind.vendorid != 0xFFFF && id.vendorid != pcifind.vendorid )
-		return false;
-	if ( pcifind.deviceid != 0xFFFF && id.deviceid != pcifind.deviceid )
-		return false;
-	if ( pcifind.classid != 0xFF && type.classid != pcifind.classid )
-		return false;
-	if ( pcifind.subclassid != 0xFF && type.subclassid != pcifind.subclassid )
-		return false;
-	if ( pcifind.progif != 0xFF && type.progif != pcifind.progif )
-		return false;
-	if ( pcifind.revid != 0xFF && type.revid != pcifind.revid )
-		return false;
-	return true;
+	return MatchesPattern(&id, &type, pcifind);
 }
 
-// TODO: This iterates the whole PCI device tree on each call!
+// TODO: This iterates the whole PCI device tree on each call! Transition the
+//       callers to use the new callback API and delete this API.
 static uint32_t SearchForDevicesOnBus(uint8_t bus, pcifind_t pcifind, uint32_t last = 0)
 {
 	bool found_any_device = false;
@@ -170,7 +298,7 @@ static uint32_t SearchForDevicesOnBus(uint8_t bus, pcifind_t pcifind, uint32_t l
 			uint32_t devaddr = MakeDevAddr(bus, slot, function);
 			if ( last < devaddr &&
 			     (!found_any_device || devaddr < next_device) &&
-			     MatchesSearchCriteria(devaddr, pcifind) )
+			     MatchesPatternByDevAddr(devaddr, &pcifind) )
 				next_device = devaddr, found_any_device = true;
 			uint8_t header = Read8(devaddr, PCIFIELD_HEADER_TYPE);
 			if ( header & 0x80 ) // Multi function device.
@@ -262,21 +390,18 @@ pcibar_t GetExpansionROM(uint32_t devaddr)
 void EnableExpansionROM(uint32_t devaddr)
 {
 	ScopedLock lock(&pci_lock);
-
 	PCI::Write32(devaddr, 0x30, PCI::Read32(devaddr, 0x30) | 0x1);
 }
 
 void DisableExpansionROM(uint32_t devaddr)
 {
 	ScopedLock lock(&pci_lock);
-
 	PCI::Write32(devaddr, 0x30, PCI::Read32(devaddr, 0x30) & ~UINT32_C(0x1));
 }
 
 bool IsExpansionROMEnabled(uint32_t devaddr)
 {
 	ScopedLock lock(&pci_lock);
-
 	return PCI::Read32(devaddr, 0x30) & 0x1;
 }
 
@@ -297,6 +422,61 @@ uint8_t SetupInterruptLine(uint32_t devaddr)
 	uint8_t line = Read8(devaddr, PCIFIELD_INTERRUPT_LINE);
 	if ( !IsOkayInterruptLine(line) )
 		return 0;
+	return Interrupt::IRQ0 + line;
+}
+
+void EnableBusMaster(uint32_t devaddr)
+{
+	ScopedLock lock(&pci_lock);
+	uint16_t command = PCI::Read16(devaddr, PCIFIELD_COMMAND);
+	PCI::Write16(devaddr, PCIFIELD_COMMAND,
+		command | PCIFIELD_COMMAND_BUS_MASTER);
+}
+
+void DisableBusMaster(uint32_t devaddr)
+{
+	ScopedLock lock(&pci_lock);
+	uint16_t command = PCI::Read16(devaddr, PCIFIELD_COMMAND);
+	PCI::Write16(devaddr, PCIFIELD_COMMAND,
+		command & ~PCIFIELD_COMMAND_BUS_MASTER);
+}
+
+void EnableMemoryWrite(uint32_t devaddr)
+{
+	ScopedLock lock(&pci_lock);
+	uint16_t command = PCI::Read16(devaddr, PCIFIELD_COMMAND);
+	PCI::Write16(devaddr, PCIFIELD_COMMAND,
+		command | PCIFIELD_COMMAND_MEMORY_WRITE_AND_INVALIDATE);
+}
+
+void DisableMemoryWrite(uint32_t devaddr)
+{
+	ScopedLock lock(&pci_lock);
+	uint16_t command = PCI::Read16(devaddr, PCIFIELD_COMMAND);
+	PCI::Write16(devaddr, PCIFIELD_COMMAND,
+		command & ~PCIFIELD_COMMAND_MEMORY_WRITE_AND_INVALIDATE);
+}
+
+void EnableInterruptLine(uint32_t devaddr)
+{
+	ScopedLock lock(&pci_lock);
+	uint16_t command = PCI::Read16(devaddr, PCIFIELD_COMMAND);
+	PCI::Write16(devaddr, PCIFIELD_COMMAND,
+		command & ~PCIFIELD_COMMAND_INTERRUPT_DISABLE);
+}
+
+void DisableInterruptLine(uint32_t devaddr)
+{
+	ScopedLock lock(&pci_lock);
+	uint16_t command = PCI::Read16(devaddr, PCIFIELD_COMMAND);
+	PCI::Write16(devaddr, PCIFIELD_COMMAND,
+		command | PCIFIELD_COMMAND_INTERRUPT_DISABLE);
+}
+
+uint8_t GetInterruptIndex(uint32_t devaddr)
+{
+	ScopedLock lock(&pci_lock);
+	uint32_t line = PCI::Read8(devaddr, PCIFIELD_INTERRUPT_LINE) & 0xf;
 	return Interrupt::IRQ0 + line;
 }
 

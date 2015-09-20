@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -40,15 +40,28 @@ typedef struct
 } pcitype_t;
 
 // memset(&pcifind, 255, sizeof(pcifind)) and fill out rest.
-typedef struct
+struct pcifind_t
 {
-	uint16_t deviceid;
+public:
+	pcifind_t() {}
+	constexpr pcifind_t(void* context_, uint16_t vendorid_, uint16_t deviceid_,
+	                    uint8_t classid_ = 0xff, uint8_t subclassid_ = 0xff,
+	                    uint8_t progif_ = 0xff, uint8_t revid_ = 0xff) :
+		context(context_), vendorid(vendorid_), deviceid(deviceid_),
+		classid(classid_), subclassid(subclassid_), progif(progif_),
+		revid(revid_)
+	{
+	}
+
+public:
+	void* context;
 	uint16_t vendorid;
+	uint16_t deviceid;
 	uint8_t classid;
 	uint8_t subclassid;
 	uint8_t progif;
 	uint8_t revid;
-} pcifind_t;
+};
 
 static const uint8_t PCIBAR_TYPE_IOSPACE = 0x0 << 1 | 0x1 << 0;
 static const uint8_t PCIBAR_TYPE_16BIT = 0x1 << 1 | 0x0 << 0;
@@ -146,6 +159,14 @@ void Write32(uint32_t devaddr, uint8_t off, uint32_t val); // Host endian
 void WriteRaw32(uint32_t devaddr, uint8_t off, uint32_t val); // PCI endian
 pciid_t GetDeviceId(uint32_t devaddr);
 pcitype_t GetDeviceType(uint32_t devaddr);
+void Search(bool (*callback)(uint32_t devaddr,
+                             const pciid_t* id,
+                             const pcitype_t* type,
+                             void* context,
+                             void* pattern_context),
+            void* context,
+            const pcifind_t* patterns,
+            size_t pattern_count);
 uint32_t SearchForDevices(pcifind_t pcifind, uint32_t last = 0);
 pcibar_t GetBAR(uint32_t devaddr, uint8_t bar);
 pcibar_t GetExpansionROM(uint32_t devaddr);
@@ -153,6 +174,13 @@ void EnableExpansionROM(uint32_t devaddr);
 void DisableExpansionROM(uint32_t devaddr);
 bool IsExpansionROMEnabled(uint32_t devaddr);
 uint8_t SetupInterruptLine(uint32_t devaddr);
+void EnableBusMaster(uint32_t devaddr);
+void DisableBusMaster(uint32_t devaddr);
+void EnableMemoryWrite(uint32_t devaddr);
+void DisableMemoryWrite(uint32_t devaddr);
+void EnableInterruptLine(uint32_t devaddr);
+void DisableInterruptLine(uint32_t devaddr);
+uint8_t GetInterruptIndex(uint32_t devaddr);
 
 } // namespace PCI
 } // namespace Sortix
