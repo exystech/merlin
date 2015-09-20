@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2014, 2015, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -82,6 +82,14 @@ inline bool IsAligned(addr_t page) { return AlignDown(page) == page; }
 namespace Sortix {
 namespace Memory {
 
+const addr_t PAT_UC = 0x00; // Uncacheable
+const addr_t PAT_WC = 0x01; // Write-Combine
+const addr_t PAT_WT = 0x04; // Writethrough
+const addr_t PAT_WP = 0x05; // Write-Protect
+const addr_t PAT_WB = 0x06; // Writeback
+const addr_t PAT_UCM = 0x07; // Uncacheable, overruled by MTRR.
+const addr_t PAT_NUM = 0x08;
+
 void Init(multiboot_info_t* bootinfo);
 void InvalidatePage(addr_t addr);
 void Flush();
@@ -90,6 +98,7 @@ addr_t GetAddressSpace();
 addr_t SwitchAddressSpace(addr_t addrspace);
 void DestroyAddressSpace(addr_t fallback);
 bool Map(addr_t physical, addr_t mapto, int prot);
+bool MapPAT(addr_t physical, addr_t mapto, int prot, addr_t mtype);
 addr_t Unmap(addr_t mapto);
 addr_t Physical(addr_t mapto);
 int PageProtection(addr_t mapto);

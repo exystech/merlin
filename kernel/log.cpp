@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,6 +24,7 @@
 #include <sortix/kernel/addralloc.h>
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/log.h>
+#include <sortix/kernel/memorymanagement.h>
 #include <sortix/kernel/pci.h>
 #include <sortix/kernel/pci-mmio.h>
 #include <sortix/kernel/textbuffer.h>
@@ -165,7 +166,7 @@ void Init(multiboot_info_t* bootinfo)
 		fakebar.size_raw = (uint64_t) bootinfo->framebuffer_pitch * bootinfo->framebuffer_height;
 		fakebar.addr_raw |= PCIBAR_TYPE_64BIT;
 		addralloc_t fb_alloc;
-		if ( !MapPCIBAR(&fb_alloc, fakebar, MAP_PCI_BAR_WRITE_COMBINE) )
+		if ( !MapPCIBAR(&fb_alloc, fakebar, Memory::PAT_WC) )
 			Panic("Framebuffer setup failure.");
 		uint8_t* lfb = (uint8_t*) fb_alloc.from;
 		uint32_t lfbformat = bootinfo->framebuffer_bpp;

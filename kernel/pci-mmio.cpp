@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -35,7 +35,7 @@
 
 namespace Sortix {
 
-bool MapPCIBAR(addralloc_t* allocation, pcibar_t bar, int flags)
+bool MapPCIBAR(addralloc_t* allocation, pcibar_t bar, addr_t mtype)
 {
 	if ( !bar.is_mmio() )
 		return errno = EINVAL, false;
@@ -78,17 +78,9 @@ bool MapPCIBAR(addralloc_t* allocation, pcibar_t bar, int flags)
 
 		if ( sizeof(void*) <= 4 && 0x100000000 <= phys_addr + i )
 			errno = EOVERFLOW, failure = true;
-#if defined(__i386__) || defined(__x86_64__)
-		else if ( flags & MAP_PCI_BAR_WRITE_COMBINE )
-		{
-			const addr_t mtype = Memory::PAT_WC;
-			if ( !Memory::MapPAT(phys_addr + i, mapat, prot, mtype) )
-				failure = true;
-		}
-#endif
 		else
 		{
-			if ( !Memory::Map(phys_addr + i, mapat, prot) )
+			if ( !Memory::MapPAT(phys_addr + i, mapat, prot, mtype) )
 				failure = true;
 		}
 
@@ -120,6 +112,43 @@ void UnmapPCIBar(addralloc_t* allocation)
 	Memory::Flush();
 	FreeKernelAddress(allocation);
 	memset(allocation, 0, sizeof(*allocation));
+}
+
+bool AllocateAndMapPage(paddrmapped_t* ret, enum page_usage usage, addr_t mtype)
+{
+	addralloc_t kmem_virt;
+	if ( !ret )
+		return errno = EINVAL, false;
+	if ( !AllocateKernelAddress(&kmem_virt, Page::Size()) )
+		return errno = ENOMEM, false;
+	addr_t page = Page::Get(usage);
+	if ( !page )
+	{
+		FreeKernelAddress(&kmem_virt);
+		return errno = ENOMEM, false;
+	}
+	int prot = PROT_KREAD | PROT_KWRITE;
+	if ( !Memory::MapPAT(page, kmem_virt.from, prot, mtype) )
+	{
+		Page::Put(page, usage);
+		FreeKernelAddress(&kmem_virt);
+		return false;
+	}
+	ret->from = kmem_virt.from;
+	ret->size = kmem_virt.size;
+	ret->phys = page;
+	ret->usage = usage;
+	return true;
+}
+
+void FreeAllocatedAndMappedPage(paddrmapped_t* alloc)
+{
+	if ( alloc->size == 0 )
+		return;
+	Memory::Unmap(alloc->from);
+	Memory::Flush();
+	Page::Put(alloc->phys, alloc->usage);
+	alloc->size = 0;
 }
 
 } // namespace Sortix

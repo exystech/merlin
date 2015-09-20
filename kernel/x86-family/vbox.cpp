@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -263,7 +263,7 @@ bool VBoxDevice::Initialize()
 		return false;
 	}
 	port = port_bar.ioaddr();
-	if ( !MapPCIBAR(&mmio_alloc, mmio_bar, 0) )
+	if ( !MapPCIBAR(&mmio_alloc, mmio_bar, Memory::PAT_UC) )
 	{
 		LogF("error: failed to memory map BAR 1: %m");
 		return false;

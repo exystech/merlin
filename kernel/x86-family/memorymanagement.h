@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2014, 2015, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,6 +19,8 @@
 
 #ifndef SORTIX_X86_FAMILY_MEMORYMANAGEMENT_H
 #define SORTIX_X86_FAMILY_MEMORYMANAGEMENT_H
+
+#include <sortix/kernel/memorymanagement.h>
 
 namespace Sortix {
 
@@ -49,13 +51,6 @@ const addr_t PML_NX         = 0;
 #endif
 const addr_t PML_FLAGS      = 0xFFFUL | PML_NX; // Bits used for the flags.
 const addr_t PML_ADDRESS    = ~PML_FLAGS; // Bits used for the address.
-const addr_t PAT_UC = 0x00; // Uncacheable
-const addr_t PAT_WC = 0x01; // Write-Combine
-const addr_t PAT_WT = 0x04; // Writethrough
-const addr_t PAT_WP = 0x05; // Write-Protect
-const addr_t PAT_WB = 0x06; // Writeback
-const addr_t PAT_UCM = 0x07; // Uncacheable, overruled by MTRR.
-const addr_t PAT_NUM = 0x08;
 
 // Desired PAT-Register PA-Field Indexing (different from BIOS defaults)
 const addr_t PA[PAT_NUM] =
@@ -93,7 +88,6 @@ static inline addr_t EncodePATAsPMLFlag(addr_t pat)
 	return result;
 }
 
-bool MapPAT(addr_t physical, addr_t mapto, int prot, addr_t mtype);
 addr_t ProtectionToPMLFlags(int prot);
 int PMLFlagsToProtection(addr_t flags);
 

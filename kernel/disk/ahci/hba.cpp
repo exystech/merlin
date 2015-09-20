@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,6 +26,7 @@
 #include <sortix/kernel/interrupt.h>
 #include <sortix/kernel/ioctx.h>
 #include <sortix/kernel/log.h>
+#include <sortix/kernel/memorymanagement.h>
 #include <sortix/kernel/panic.h>
 #include <sortix/kernel/pci.h>
 #include <sortix/kernel/pci-mmio.h>
@@ -141,7 +142,7 @@ bool HBA::Initialize(Ref<Descriptor> dev, const char* devpath)
 		return errno = EINVAL, false;
 	}
 
-	if ( !MapPCIBAR(&mmio_alloc, mmio_bar, 0) )
+	if ( !MapPCIBAR(&mmio_alloc, mmio_bar, Memory::PAT_UC) )
 	{
 		LogF("error: registers could not be mapped: %m");
 		return false;

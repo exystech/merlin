@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,14 +21,24 @@
 #define INCLUDE_SORTIX_KERNEL_PCI_MMIO_H
 
 #include <sortix/kernel/addralloc.h>
+#include <sortix/kernel/memorymanagement.h>
 #include <sortix/kernel/pci.h>
 
 namespace Sortix {
 
-const int MAP_PCI_BAR_WRITE_COMBINE = 1 << 0;
+struct paddrmapped_t
+{
+	addr_t from;
+	addr_t phys;
+	size_t size;
+	enum page_usage usage;
+};
 
-bool MapPCIBAR(addralloc_t* allocation, pcibar_t bar, int flags = 0);
+bool MapPCIBAR(addralloc_t* allocation, pcibar_t bar, addr_t mtype);
 void UnmapPCIBar(addralloc_t* allocation);
+bool AllocateAndMapPage(paddrmapped_t* ret, enum page_usage usage,
+                        addr_t mtype = Memory::PAT_WB);
+void FreeAllocatedAndMappedPage(paddrmapped_t* alloc);
 
 } // namespace Sortix
 

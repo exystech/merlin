@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -39,7 +39,6 @@
 #include <sortix/kernel/video.h>
 
 #if defined(__i386__) || defined(__x86_64__)
-#include "x86-family/memorymanagement.h"
 #include "x86-family/vbox.h"
 #endif
 
@@ -521,7 +520,6 @@ TextBuffer* BGADevice::CreateTextBuffer(uint64_t connector,
 {
 	if ( !Supports(connector, mode) )
 		return NULL;
-
 	if ( connector != 0 )
 		return errno = EINVAL, (TextBuffer*) NULL;
 
@@ -549,7 +547,7 @@ static void TryInitializeDevice(uint32_t devaddr)
 	bool fallback_ioport = false;
 
 	fb_bar = PCI::GetBAR(devaddr, 0);
-	if ( !MapPCIBAR(&fb_alloc, fb_bar, MAP_PCI_BAR_WRITE_COMBINE) )
+	if ( !MapPCIBAR(&fb_alloc, fb_bar, Memory::PAT_WC) )
 	{
 		Log::PrintF("[BGA device @ PCI:0x%X] Framebuffer could not be mapped: %s\n",
 		            devaddr, strerror(errno));
@@ -563,7 +561,7 @@ static void TryInitializeDevice(uint32_t devaddr)
 	{
 		has_mmio = true;
 
-		if ( !MapPCIBAR(&mmio_alloc, mmio_bar, MAP_PCI_BAR_WRITE_COMBINE) )
+		if ( !MapPCIBAR(&mmio_alloc, mmio_bar, Memory::PAT_UC) )
 		{
 			Log::PrintF("[BGA device @ PCI:0x%X] Memory-mapped registers could not be mapped: %s\n",
 			            devaddr, strerror(errno));
