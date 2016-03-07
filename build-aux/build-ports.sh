@@ -41,7 +41,7 @@ SORTIX_PORTS_DIR=$(make_dir_path_absolute "$SORTIX_PORTS_DIR")
 SORTIX_REPOSITORY_DIR=$(make_dir_path_absolute "$SORTIX_REPOSITORY_DIR")
 
 # Decide the optimization options with which the ports will be built.
-if [ -z "${OPTLEVEL+x}" ]; then OPTLEVEL="-Os"; fi
+if [ -z "${OPTLEVEL+x}" ]; then OPTLEVEL="-Os -s"; fi
 if [ -z "${PORTS_OPTLEVEL+x}" ]; then PORTS_OPTLEVEL="$OPTLEVEL"; fi
 if [ -z "${PORTS_CFLAGS+x}" ]; then PORTS_CFLAGS="$PORTS_OPTLEVEL"; fi
 if [ -z "${PORTS_CXXFLAGS+x}" ]; then PORTS_CXXFLAGS="$PORTS_OPTLEVEL"; fi
