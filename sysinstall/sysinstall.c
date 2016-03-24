@@ -421,7 +421,7 @@ int main(void)
 		while ( true )
 		{
 			prompt(input, sizeof(input),
-			       "Select default display resolution? (yes/no)", "yes");
+			       "Select a default display resolution? (yes/no)", "yes");
 			if ( strcasecmp(input, "no") && strcasecmp(input, "yes") )
 				continue;
 			bool was_no = strcasecmp(input, "no") == 0;
@@ -446,18 +446,19 @@ int main(void)
 			         get_mode.mode.fb_format);
 			break;
 		}
+
+		if ( !input[0] )
+			text("/etc/videomode will not be created.\n");
+		else
+		{
+			textf("/etc/videomode will be set to \"%s\".\n", input);
+			mode_t old_umask = getumask();
+			umask(022);
+			install_configurationf("videomode", "w", "%s\n", input);
+			umask(old_umask);
+		}
+		text("\n");
 	}
-	if ( !input[0] )
-		text("/etc/videomode will not be created.\n");
-	else
-	{
-		textf("/etc/videomode will be set to \"%s\".\n", input);
-		mode_t old_umask = getumask();
-		umask(022);
-		install_configurationf("videomode", "w", "%s\n", input);
-		umask(old_umask);
-	}
-	text("\n");
 
 	scan_devices();
 
