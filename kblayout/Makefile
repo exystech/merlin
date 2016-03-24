@@ -11,6 +11,8 @@ LAYOUTS=\
 dk \
 us \
 
+#it \ # Doesn't work (assertion failure because kblayout-compiler has no comments)
+
 .PHONY: all install clean
 
 all: $(LAYOUTS)
