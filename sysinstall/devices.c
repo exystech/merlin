@@ -378,20 +378,20 @@ void mountpoint_mount(struct mountpoint* mountpoint)
 		{
 			mountpoint->pid = -1;
 			if ( WIFSIGNALED(code) )
-				err(2, "%s: Mount failed: %s: %s", bdev_path, fs->driver,
-				       strsignal(WTERMSIG(code)));
+				errx(2, "%s: Mount failed: %s: %s", bdev_path, fs->driver,
+				        strsignal(WTERMSIG(code)));
 			else if ( !WIFEXITED(code) )
-				err(2, "%s: Mount failed: %s: %s", bdev_path, fs->driver,
-				       "Unexpected unusual termination");
+				errx(2, "%s: Mount failed: %s: %s", bdev_path, fs->driver,
+				        "Unexpected unusual termination");
 			else if ( WEXITSTATUS(code) == 127 )
-				err(2, "%s: Mount failed: %s: %s", bdev_path, fs->driver,
-				       "Filesystem driver is absent");
+				errx(2, "%s: Mount failed: %s: %s", bdev_path, fs->driver,
+				        "Filesystem driver is absent");
 			else if ( WEXITSTATUS(code) == 0 )
-				err(2, "%s: Mount failed: %s: Unexpected successful exit",
-				       bdev_path, fs->driver);
+				errx(2, "%s: Mount failed: %s: Unexpected successful exit",
+				        bdev_path, fs->driver);
 			else
-				err(2, "%s: Mount failed: %s: Exited with status %i", bdev_path,
-				       fs->driver, WEXITSTATUS(code));
+				errx(2, "%s: Mount failed: %s: Exited with status %i", bdev_path,
+				        fs->driver, WEXITSTATUS(code));
 		}
 		struct timespec delay = timespec_make(0, 50L * 1000L * 1000L);
 		nanosleep(&delay, NULL);

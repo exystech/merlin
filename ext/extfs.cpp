@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -49,6 +49,7 @@
 #include "inode.h"
 #include "ioleast.h"
 
+// These must be kept up to date with libmount/ext2.c.
 static const uint32_t EXT2_FEATURE_COMPAT_SUPPORTED = 0;
 static const uint32_t EXT2_FEATURE_INCOMPAT_SUPPORTED = \
                       EXT2_FEATURE_INCOMPAT_FILETYPE;

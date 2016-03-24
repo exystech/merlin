@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,9 +24,23 @@
 
 #include <mount/filesystem.h>
 
-static const uint16_t EXT2_SUPER_MAGIC = 0xEF53;
-static const uint16_t EXT2_VALID_FS = 1;
-static const uint16_t EXT2_ERROR_FS = 2;
+#define EXT2_SUPER_MAGIC 0xEF53
+#define EXT2_VALID_FS 1
+#define EXT2_ERROR_FS 2
+#define EXT2_FEATURE_COMPAT_DIR_PREALLOC (1U << 0U)
+#define EXT2_FEATURE_COMPAT_IMAGIC_INODES (1U << 1U)
+#define EXT3_FEATURE_COMPAT_HAS_JOURNAL (1U << 2U)
+#define EXT2_FEATURE_COMPAT_EXT_ATTR (1U << 3U)
+#define EXT2_FEATURE_COMPAT_RESIZE_INO (1U << 4U)
+#define EXT2_FEATURE_COMPAT_DIR_INDEX (1U << 5U)
+#define EXT2_FEATURE_INCOMPAT_COMPRESSION (1U << 0U)
+#define EXT2_FEATURE_INCOMPAT_FILETYPE (1U << 1U)
+#define EXT2_FEATURE_INCOMPAT_RECOVER (1U << 2U)
+#define EXT2_FEATURE_INCOMPAT_JOURNAL_DEV (1U << 3U)
+#define EXT2_FEATURE_INCOMPAT_META_BG (1U << 4U)
+#define EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER (1U << 0U)
+#define EXT2_FEATURE_RO_COMPAT_LARGE_FILE (1U << 1U)
+#define EXT2_FEATURE_RO_COMPAT_BTREE_DIR (1U << 2U)
 
 struct ext2_superblock
 {

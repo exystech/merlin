@@ -597,24 +597,32 @@ int main(void)
 			continue;
 		}
 		root_filesystem = NULL;
+		bool cant_mount = false;
 		for ( size_t i = 0; i < mountpoints_used; i++ )
 		{
 			struct mountpoint* mnt = &mountpoints[i];
 			const char* spec = mnt->entry.fs_spec;
 			if ( !(mnt->fs = search_for_filesystem_by_spec(spec)) )
 			{
-				warnx("fstab: Found no filesystem matching `%s'", spec);
+				warnx("fstab: %s: Found no mountable filesystem matching `%s'",
+				      mnt->entry.fs_file, spec);
+				cant_mount = true;
 				continue;
 			}
 			if ( !mnt->fs->driver )
 			{
-				textf("Don't know how to mount a root filesystem of type %s. "
-					  "Try again.\n", mnt->fs->fstype_name);
+				warnx("fstab: %s: %s: Don't know how to mount this %s filesystem",
+				      mnt->entry.fs_file,
+				      path_of_blockdevice(mnt->fs->bdev),
+				      mnt->fs->fstype_name);
+				cant_mount = true;
 				continue;
 			}
 			if ( !strcmp(mnt->entry.fs_file, "/") )
 				root_filesystem = mnt->fs;
 		}
+		if ( cant_mount )
+			continue;
 		assert(root_filesystem);
 		if ( !strcasecmp(accept_grub, "yes") &&
 		     missing_bios_boot_partition(root_filesystem) )

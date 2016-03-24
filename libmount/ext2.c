@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,6 +29,13 @@
 #include <mount/filesystem.h>
 
 #include "util.h"
+
+// These must be kept up to date with ext/extfs.cpp.
+#define EXT2_FEATURE_COMPAT_SUPPORTED 0
+#define EXT2_FEATURE_INCOMPAT_SUPPORTED \
+        (EXT2_FEATURE_INCOMPAT_FILETYPE)
+#define EXT2_FEATURE_RO_COMPAT_SUPPORTED \
+        (EXT2_FEATURE_RO_COMPAT_LARGE_FILE)
 
 void ext2_superblock_decode(struct ext2_superblock* sb)
 {
@@ -141,6 +148,8 @@ static enum filesystem_error ext2_inspect(struct filesystem** fs_ptr,
 	fs->fstype_name = "ext2";
 	fs->fsck = "fsck.ext2";
 	fs->driver = "extfs";
+	if ( sb->s_feature_incompat & ~EXT2_FEATURE_INCOMPAT_SUPPORTED )
+		fs->driver = NULL;
 	fs->flags |= FILESYSTEM_FLAG_UUID;
 	memcpy(&fs->uuid, sb->s_uuid, 16);
 	struct timespec now;
