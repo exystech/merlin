@@ -442,4 +442,4 @@ run-virtualbox-debug: sortix.iso
 # Statistics
 .PHONY: linecount
 linecount:
-	wc -l `find . -type f | grep -Ev '\.(h|h\+\+|c$$|cpp|c\+\+|s|S|asm|kblayout|mak|sh)$$|(^|/)Makefile$$' | grep -Ev '^\./(\.git|sysroot|sysroot-overlay|ports|repository)(/|$$)'` | sort -n
+	wc -l `find . -type f | grep -E '\.(h|h\+\+|c|cpp|c\+\+|s|S|asm|kblayout|mak|sh)$$|(^|/)Makefile$$' | grep -Ev '^\./(\.git|sysroot|sysroot-overlay|ports|repository)(/|$$)'` | sort -n
