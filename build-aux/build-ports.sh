@@ -143,7 +143,7 @@ strip_tix() {
   $HOST-strip -d "$DIR/data/libexec"* 2>/dev/null || true
   $HOST-strip -d "$DIR/data/libexec/git-core/"* 2>/dev/null || true
   $HOST-strip -d "$DIR/data/sbin/"* 2>/dev/null || true
-  (cd "$DIR" && tar -cJf port.tar.tix.xz tix data)
+  (cd "$DIR" && tar --numeric-owner --owner=0 --group=0 -cJf port.tar.tix.xz tix data)
   cp "$DIR/port.tar.tix.xz" "$1"
   rm -rf "$DIR"
 }

@@ -364,6 +364,8 @@ void InstallPackage(const char* tix_path)
 			"--extract",
 			"--file", tix_path,
 			"--keep-directory-symlink",
+			"--same-permissions",
+			"--no-same-owner",
 			data_and_prefix,
 			NULL
 		};
