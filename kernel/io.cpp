@@ -472,6 +472,26 @@ int sys_fchownat(int dirfd, const char* path, uid_t owner, gid_t group, int flag
 	return desc->chown(&ctx, owner, group);
 }
 
+#if defined(__i386__)
+struct fchownat_request /* duplicated in libc/unistd/fchownat.c */
+{
+	int dirfd;
+	const char* path;
+	uid_t owner;
+	gid_t group;
+	int flags;
+};
+
+int sys_fchownat_wrapper(const struct fchownat_request* user_request)
+{
+	struct fchownat_request request;
+	if ( !CopyFromUser(&request, user_request, sizeof(request)) )
+		return -1;
+	return sys_fchownat(request.dirfd, request.path, request.owner,
+	                    request.group, request.flags);
+}
+#endif
+
 int sys_fchmod(int fd, mode_t mode)
 {
 	Ref<Descriptor> desc = CurrentProcess()->GetDescriptor(fd);

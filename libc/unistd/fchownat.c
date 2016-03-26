@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,9 +23,35 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#if !defined(__i386__)
+
 DEFN_SYSCALL5(int, sys_fchownat, SYSCALL_FCHOWNAT, int, const char*, uid_t, gid_t, int);
 
 int fchownat(int dirfd, const char* path, uid_t owner, gid_t group, int flags)
 {
 	return sys_fchownat(dirfd, path, owner, group, flags);
 }
+
+#else
+
+// TODO: The i386 system call ABI doesn't have enough registers to do this with
+//       64-bit uid_t and gid_t.
+
+struct fchownat_request /* duplicated in kernel/io.cpp */
+{
+	int dirfd;
+	const char* path;
+	uid_t owner;
+	gid_t group;
+	int flags;
+};
+
+DEFN_SYSCALL1(int, sys_fchownat_wrapper, SYSCALL_FCHOWNAT, const struct fchownat_request*);
+
+int fchownat(int dirfd, const char* path, uid_t owner, gid_t group, int flags)
+{
+	struct fchownat_request request = { dirfd, path, owner, group, flags };
+	return sys_fchownat_wrapper(&request);
+}
+
+#endif

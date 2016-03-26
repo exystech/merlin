@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -46,6 +46,9 @@
 
 namespace Sortix {
 
+#if defined(__i386__)
+struct fchownat_request;
+#endif
 struct mmap_request;
 
 int sys_accept4(int, void*, size_t*, int);
@@ -71,6 +74,9 @@ int sys_fchmod(int, mode_t);
 int sys_fchmodat(int, const char*, mode_t, int);
 int sys_fchown(int, uid_t, gid_t);
 int sys_fchownat(int, const char*, uid_t, gid_t, int);
+#if defined(__i386__)
+int sys_fchownat_wrapper(const struct fchownat_request*);
+#endif
 int sys_fchroot(int);
 int sys_fchrootat(int, const char*);
 int sys_fcntl(int, int, uintptr_t);

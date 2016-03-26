@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -96,7 +96,11 @@ void* syscall_list[SYSCALL_MAX_NUM + 1] =
 	[SYSCALL_MKDIRAT] = (void*) sys_mkdirat,
 	[SYSCALL_FCHDIR] = (void*) sys_fchdir,
 	[SYSCALL_TRUNCATEAT] = (void*) sys_truncateat,
+#if !defined(__i386__)
 	[SYSCALL_FCHOWNAT] = (void*) sys_fchownat,
+#else
+	[SYSCALL_FCHOWNAT] = (void*) sys_fchownat_wrapper,
+#endif
 	[SYSCALL_FCHOWN] = (void*) sys_fchown,
 	[SYSCALL_FCHMOD] = (void*) sys_fchmod,
 	[SYSCALL_FCHMODAT] = (void*) sys_fchmodat,
