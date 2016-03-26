@@ -412,17 +412,8 @@ $(SORTIX_RELEASE_DIR)/$(VERSION)/README: README $(SORTIX_RELEASE_DIR)/$(VERSION)
 .PHONY: release-readme
 release-readme: $(SORTIX_RELEASE_DIR)/$(VERSION)/README
 
-$(SORTIX_RELEASE_DIR)/$(VERSION)/repository:
-	mkdir -p $@
-
-$(SORTIX_RELEASE_DIR)/$(VERSION)/repository/$(HOST): sysroot $(SORTIX_REPOSITORY_DIR)/$(HOST) $(SORTIX_RELEASE_DIR)/$(VERSION)/repository
-	cp -RT $(SORTIX_REPOSITORY_DIR)/$(HOST) $@
-
-.PHONY: release-repository
-release-repository: $(SORTIX_RELEASE_DIR)/$(VERSION)/repository/$(HOST)
-
 .PHONY: release-arch
-release-arch: release-builds release-readme release-repository
+release-arch: release-builds release-readme
 
 .PHONY: release-shared
 release-shared: release-readme
