@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -204,6 +204,9 @@ __start:
 	mov %cr4, %rax
 	or $0x600, %rax
 	mov %rax, %cr4
+	push $0x1F80
+	ldmxcsr (%rsp)
+	addq $8, %rsp
 
 	# Store a copy of the initialial floating point registers.
 	fxsave fpu_initialized_regs

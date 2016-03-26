@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -39,6 +39,10 @@
 #include <sortix/kernel/syscall.h>
 #include <sortix/kernel/thread.h>
 #include <sortix/kernel/time.h>
+
+#if defined(__i386__) || defined(__x86_64__)
+#include "x86-family/float.h"
+#endif
 
 void* operator new (size_t /*size*/, void* address) throw()
 {
@@ -191,6 +195,7 @@ static void SetupKernelThreadRegs(struct thread_registers* regs,
 	regs->signal_pending = 0;
 	regs->kernel_stack = stack + stack_size;
 	regs->cr3 = process->addrspace;
+	memcpy(regs->fpuenv, Float::fpu_initialized_regs, 512);
 #elif defined(__x86_64__)
 	uintptr_t* stack_values = (uintptr_t*) (stack + stack_size);
 
@@ -225,6 +230,7 @@ static void SetupKernelThreadRegs(struct thread_registers* regs,
 	regs->signal_pending = 0;
 	regs->kernel_stack = stack + stack_size;
 	regs->cr3 = process->addrspace;
+	memcpy(regs->fpuenv, Float::fpu_initialized_regs, 512);
 #else
 #warning "You need to add kernel thread register initialization support"
 #endif

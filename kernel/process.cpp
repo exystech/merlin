@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1437,6 +1437,7 @@ pid_t sys_tfork(int flags, struct tfork* user_regs)
 	cpuregs.gsbase = regs.gsbase;
 	cpuregs.cr3 = child_process->addrspace;
 	cpuregs.kernel_stack = stack_aligned + stack_aligned_size;
+	memcpy(&cpuregs.fpuenv, Float::fpu_initialized_regs, 512);
 #elif defined(__x86_64__)
 	cpuregs.rip = regs.rip;
 	cpuregs.rsp = regs.rsp;
@@ -1463,6 +1464,7 @@ pid_t sys_tfork(int flags, struct tfork* user_regs)
 	cpuregs.gsbase = regs.gsbase;
 	cpuregs.cr3 = child_process->addrspace;
 	cpuregs.kernel_stack = stack_aligned + stack_aligned_size;
+	memcpy(&cpuregs.fpuenv, Float::fpu_initialized_regs, 512);
 #else
 #warning "You need to implement initializing the registers of the new thread"
 #endif
