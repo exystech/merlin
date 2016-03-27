@@ -111,6 +111,12 @@ cat << EOF
 if loadfont unicode ; then
   insmod vbe
   insmod vga
+EOF
+# TODO: Better method of detecting Sortix GRUB and desirable video_bochs.
+if [ x"$(uname)" = x"Sortix" ]; then
+  echo "  insmod video_bochs"
+fi
+cat << EOF
   insmod gfxterm
 fi
 terminal_output gfxterm
