@@ -555,7 +555,7 @@ int main(void)
 	textf("Type ls to list partitions on the device. "
 	      "%s"
 	      "Type mkpart to make a new partition. "
-	      "Type mount 2 /mnt to create a mountpoint for partition 2. "
+	      "Type mount 2 / to create a mountpoint for partition 2. "
 	      "Type exit when done. "
 	      "There is partitioning advise in installation(7). "
 	      "Type man 8 disked to display the disked(8) man page.\n",
