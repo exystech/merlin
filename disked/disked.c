@@ -83,7 +83,7 @@ static bool verify_mountpoint(const char* mountpoint)
 			if ( !mountpoint[index] || mountpoint[index] == '/' )
 				return false;
 		}
-		while ( mountpoint[index] != '/' )
+		while ( mountpoint[index] && mountpoint[index] != '/' )
 			index++;
 		while ( mountpoint[index] == '/' )
 			index++;
