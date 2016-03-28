@@ -322,6 +322,7 @@ static void RealSwitch(struct interrupt_context* intctx, bool yielded)
 		{
 			// We're already this thread, so run the signal handler.
 			Interrupt::Enable();
+			assert(Interrupt::IsEnabled());
 			Signal::DispatchHandler(intctx, NULL);
 		}
 		else

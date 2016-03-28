@@ -818,6 +818,7 @@ void Thread::HandleSigreturn(struct interrupt_context* intctx)
 
 	lock.Reset();
 
+	assert(Interrupt::IsEnabled());
 	HandleSignal(intctx);
 }
 
@@ -825,11 +826,13 @@ namespace Signal {
 
 void DispatchHandler(struct interrupt_context* intctx, void* /*user*/)
 {
+	assert(Interrupt::IsEnabled());
 	return CurrentThread()->HandleSignal(intctx);
 }
 
 void ReturnHandler(struct interrupt_context* intctx, void* /*user*/)
 {
+	assert(Interrupt::IsEnabled());
 	return CurrentThread()->HandleSigreturn(intctx);
 }
 

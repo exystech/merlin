@@ -132,6 +132,13 @@ static struct interrupt_handler Signal__DispatchHandler_handler;
 static struct interrupt_handler Signal__ReturnHandler_handler;
 static struct interrupt_handler Scheduler__ThreadExitCPU_handler;
 
+// Temporarily to see if this is the source of the assertion failure.
+void DispatchHandlerWrap(struct interrupt_context* intctx, void* user)
+{
+	assert(Interrupt::IsEnabled());
+	return Signal::DispatchHandler(intctx, user);
+}
+
 void RegisterHandler(unsigned int index, struct interrupt_handler* handler)
 {
 	assert(index < NUM_INTERRUPTS);
@@ -239,7 +246,7 @@ void Init()
 
 	Scheduler__InterruptYieldCPU_handler.handler = Scheduler::InterruptYieldCPU;
 	RegisterHandler(129, &Scheduler__InterruptYieldCPU_handler);
-	Signal__DispatchHandler_handler.handler = Signal::DispatchHandler;
+	Signal__DispatchHandler_handler.handler = DispatchHandlerWrap;
 	RegisterHandler(130, &Signal__DispatchHandler_handler);
 	Signal__ReturnHandler_handler.handler = Signal::ReturnHandler;
 	RegisterHandler(131, &Signal__ReturnHandler_handler);
@@ -295,7 +302,10 @@ void UserCrashHandler(struct interrupt_context* intctx)
 			CurrentThread()->DeliverSignalUnlocked(SIGSEGV);
 		kthread_mutex_unlock(&CurrentProcess()->signal_lock);
 		if ( handled )
+		{
+			assert(Interrupt::IsEnabled());
 			return Signal::DispatchHandler(intctx, NULL);
+		}
 	}
 
 	// Issue a diagnostic message to the kernel log concerning the crash.
@@ -310,6 +320,7 @@ void UserCrashHandler(struct interrupt_context* intctx)
 	CurrentProcess()->ExitThroughSignal(SIGSEGV);
 
 	// Deliver signals to this thread so it can exit correctly.
+	assert(Interrupt::IsEnabled());
 	Signal::DispatchHandler(intctx, NULL);
 }
 
