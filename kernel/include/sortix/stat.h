@@ -54,7 +54,7 @@ struct stat
 
 #define S_IXOTH 01
 #define S_IWOTH 02
-#define S_IROTH 03
+#define S_IROTH 04
 #define S_IRWXO 07
 #define S_IXGRP 010
 #define S_IWGRP 020
