@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -33,7 +33,7 @@
 #define BRAND_KERNEL_NAME "Sortix"
 
 /* The tagline of this release. */
-#define BRAND_RELEASE_TAGLINE "\"Self-Hosting & Installable\""
+#define BRAND_RELEASE_TAGLINE "\"I'd like to add you to my professional Sortix network\""
 
 /* Ascii version of the maxsi logo. */
 #define BRAND_MAXSI \
