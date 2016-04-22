@@ -207,11 +207,13 @@ vgafont.h: vgafont.f16
 
 *.cpp */*.cpp */*/*.cpp: | kb/default-kblayout.h vgafont.h
 
+# The kernel cannot use system calls to call itself, so it must be compiled
+# without CFI.
 %.o: %.cpp
-	$(CXX) -c $< -o $@ $(CPPFLAGS) $(CXXFLAGS)
+	CFI_ENABLE=0 $(CXX) -c $< -o $@ $(CPPFLAGS) $(CXXFLAGS)
 
 %.o: %.S
-	$(CXX) -c $< -o $@ $(CPPFLAGS) $(CXXFLAGS)
+	CFI_ENABLE=0 $(CXX) -c $< -o $@ $(CPPFLAGS) $(CXXFLAGS)
 
 clean:
 	rm -f $(ALLOBJS) sortix.bin

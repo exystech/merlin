@@ -1,6 +1,10 @@
 *.o
 basename
 cat
+cfg
+cfi-test
+cfi-test-2
+cfi-test-3
 chkblayout
 chmod
 chroot

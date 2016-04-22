@@ -16,4 +16,4 @@ ENTRY(tanf)
 	fptan
 	fstp	%st(0)
 	XMM_FLOAT_EPILOGUE
-	ret
+	int $0x91

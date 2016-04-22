@@ -42,4 +42,4 @@ ENTRY(fpsetsticky)
 
 	ldmxcsr	-32(%rsp)
 	fldenv	-28(%rsp)
-	ret
+	int $0x91

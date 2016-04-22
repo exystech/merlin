@@ -16,8 +16,8 @@ ENTRY(lrint)
 	fistpl	(%esp)
 	movl	(%esp),%eax
 	leave
-	ret
+	int $0x91
 #else
 	cvtsd2siq %xmm0,%rax
-	ret
+	int $0x91
 #endif

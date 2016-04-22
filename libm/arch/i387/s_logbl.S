@@ -13,4 +13,4 @@ ENTRY(logbl)
 	fldt	ARG_LONG_DOUBLE_ONE
 	fxtract
 	fstp	%st
-	ret
+	int $0x91

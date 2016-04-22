@@ -15,4 +15,4 @@ ENTRY(cosf)
 	flds	ARG_FLOAT_ONE
 	fcos
 	XMM_FLOAT_EPILOGUE
-	ret
+	int $0x91

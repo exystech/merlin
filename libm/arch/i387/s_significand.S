@@ -15,4 +15,4 @@ ENTRY(significand)
 	fxtract
 	fstp	%st(1)
 	XMM_DOUBLE_EPILOGUE
-	ret
+	int $0x91

@@ -22,4 +22,4 @@ ENTRY(fpgetprec)
 	movl -4(%rsp),%eax
 	rorl $8,%eax
 	andl $3,%eax
-	ret
+	int $0x91

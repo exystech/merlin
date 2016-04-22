@@ -20,11 +20,16 @@
 #include <assert.h>
 #include <errno.h>
 #include <msr.h>
+#include <setjmp.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
+#include <sortix/kernel/copy.h>
 #include <sortix/kernel/cpu.h>
+#include <sortix/kernel/descriptor.h>
 #include <sortix/kernel/interrupt.h>
+#include <sortix/kernel/ioctx.h>
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/process.h>
 #include <sortix/kernel/scheduler.h>
@@ -91,6 +96,13 @@ extern "C" void interrupt_handler_null();
 extern "C" void syscall_handler();
 extern "C" void yield_cpu_handler();
 extern "C" void thread_exit_handler();
+// Forward declare the raw handlers in kernel/x64/interrupt.S.
+extern "C" void secure_call_handler();
+extern "C" void secure_ret_handler();
+extern "C" void secure_indirect_call_handler();
+extern "C" void secure_indirect_jmp_handler();
+extern "C" void secure_setjmp_handler();
+extern "C" void secure_longjmp_handler();
 
 namespace Sortix {
 namespace Interrupt {
@@ -131,6 +143,211 @@ static struct interrupt_handler Scheduler__InterruptYieldCPU_handler;
 static struct interrupt_handler Signal__DispatchHandler_handler;
 static struct interrupt_handler Signal__ReturnHandler_handler;
 static struct interrupt_handler Scheduler__ThreadExitCPU_handler;
+// Storage for the registration of the CFI interrupt handers.
+static struct interrupt_handler CFI__secure_call_handler;
+static struct interrupt_handler CFI__secure_ret_handler;
+static struct interrupt_handler CFI__secure_indirect_call_handler;
+static struct interrupt_handler CFI__secure_indirect_jmp_handler;
+static struct interrupt_handler CFI__secure_setjmp_handler;
+static struct interrupt_handler CFI__secure_longjmp_handler;
+
+// Terminates the process abnormally with SIGABRT due to a CFI violation.
+__attribute__((noreturn))
+static void CFIViolation(const char* event)
+{
+	Process* process = CurrentProcess();
+	process->ExitThroughSignal(SIGABRT);
+	Log::PrintF("%s[%ji]: CFI violation: %s\n",
+	            process->program_image_path, (intmax_t) process->pid, event);
+	kthread_exit();
+}
+
+// The secure call system call. The destination address is in the rax register
+// and the return address is the current instruction (as the int $0x90
+// instruction has already been executed, rip will point to the next one). The
+// return pointer is saved in the call stack array, and rip is changed to the
+// destination address (rax). The stack is still decremented by 8, as the call
+// instruction normally would, but the memory is unchanged (uninitialized) and
+// unused (the called function would use secure ret). It's important to still
+// decrement the stack by 8 because the System V ABI for x86_64 requires 16-byte
+// stack alignment, which we must preserve, and the call instruction pushes 8
+// bytes. The rax register is safe to clobber because it is used for the return
+// value of the called function and there is no expectation that it would stay
+// intact.
+void SecureCallHandler(struct interrupt_context* intctx, void*)
+{
+	Thread* thread = CurrentThread();
+	if ( thread->call_count == CFI_MAX_CALL_DEPTH )
+		CFIViolation("secure call stack overflow");
+	thread->calls[thread->call_count++] = intctx->rip;
+	intctx->rip = intctx->rax;
+	intctx->rsp -= 8;
+}
+
+// The secure return system call. There are no parameters. It simply pops the
+// saved return pointer in the call stack, transfers execution to that location
+// by setting rip, and then incrementing the stack by 8 as the ret instruction
+// would do. If any setjmp objects go out of scope, they are cleaned up.
+void SecureRetHandler(struct interrupt_context* intctx, void*)
+{
+	Thread* thread = CurrentThread();
+	if ( thread->call_count == 0 )
+		CFIViolation("secure call stack underflow");
+	intctx->rip = thread->calls[--thread->call_count];
+	intctx->rsp += 8;
+	// jmp_buf registations may have gone out of scope.
+	while ( thread->setjmp_count &&
+            thread->call_count < thread->setjmps[thread->setjmp_count-1].call_level )
+		thread->setjmp_count--;
+}
+
+// Control flow comparison function used for binary search of valid control
+// flow in the control flow graph.
+static int SearchControlFlow(const void* key_ptr, const void* cand_ptr)
+{
+	const struct control_flow* key = (const struct control_flow*) key_ptr;
+	const struct control_flow* cand = (const struct control_flow*) cand_ptr;
+	if ( cand->from < key->from )
+		return 1;
+	if ( cand->from > key->from )
+		return -1;
+	if ( cand->to < key->to )
+		return 1;
+	if ( cand->to > key->to )
+		return -1;
+	return 0;
+}
+
+// Verifies control flow is in the control flow graph.
+static void CheckControlFlow(const struct control_flow* cf)
+{
+	Process* process = CurrentProcess();
+	// If recording, don't enforce the control flow graph, but record instead.
+	if ( process->cfi_dump )
+	{
+		// Don't record this control flow if already seen.
+		for ( size_t i = 0; i < process->cfg_length; i++ )
+		{
+			if ( process->cfg[i].from == cf->from &&
+				 process->cfg[i].to == cf->to )
+				return;
+		}
+		// Double the control flow graph array in size if it is full.
+		if ( process->cfg_length == process->cfg_allocated )
+		{
+			size_t new_allocated = process->cfg_allocated * 2;
+			if ( new_allocated == 0 )
+				new_allocated = 16;
+			struct control_flow* new_cfg = new struct control_flow[new_allocated];
+			if ( !new_cfg )
+				CFIViolation("recording CFG: Out of memory");
+			if ( process->cfg )
+				memcpy(new_cfg, process->cfg, sizeof(struct control_flow) * process->cfg_length);
+			delete[] process->cfg;
+			process->cfg = new_cfg;
+			process->cfg_allocated = new_allocated;
+		}
+		// Add the control flow to the (unsorted) control flow graph.
+		process->cfg[process->cfg_length++] = *cf;
+		ioctx_t ctx;
+		SetupKernelIOCtx(&ctx);
+		// Write the control flow to the trace file.
+		if ( process->cfi_dump->write(&ctx, (const uint8_t*) cf, sizeof(*cf)) != sizeof(*cf) )
+			CFIViolation("recording CFG: Trace file write failure");
+		return;
+	}
+
+	// If there is no control flow graph loaded, don't enforce.
+	if ( !process->cfg )
+		return;
+
+	// Use binary search to look up the control flow in the sorted control
+	// flow graph.
+	if ( bsearch(cf, process->cfg, process->cfg_length,
+	             sizeof(struct control_flow), SearchControlFlow) )
+		return;
+
+	CFIViolation("control flow failure");
+}
+
+// Call a function, but only after verifying the control flow using the
+// control flow graph. The destination is in the rax register.
+void SecureIndirectCallHandler(struct interrupt_context* intctx, void* ctx)
+{
+	struct control_flow cf;
+	cf.from = intctx->rip - 2 /* point to start of int 0x92, not the end */;
+	cf.to = intctx->rax;
+	CheckControlFlow(&cf);
+	SecureCallHandler(intctx, ctx);
+}
+
+// Jump to code, but only after verifying the control flow. The destination
+// is on the stack, after the red zone has skipped.
+void SecureIndirectJmpHandler(struct interrupt_context* intctx, void*)
+{
+	uintptr_t dest;
+	if ( !CopyFromUser(&dest, (uintptr_t*) intctx->rsp, sizeof(dest)) )
+		CFIViolation("secure indirect jmp: Failed to read stack parameter");
+	intctx->rsp += 8; // Unwind the parameter.
+	intctx->rsp += 128; // Unwind the red zone.
+	struct control_flow cf;
+	cf.from = intctx->rip - 2 /* point to start of int 0x92, not the end */;
+	cf.to = dest;
+	CheckControlFlow(&cf);
+	intctx->rip = dest;
+}
+
+// The secure setjmp handler. Registers a jmp_buf object such that it can be
+// securely longjmp'd to later.
+void SecureSetJmpHandler(struct interrupt_context* intctx, void*)
+{
+	Thread* thread = CurrentThread();
+	// TODO: Check if overwriting existing setjmp.
+	if ( thread->setjmp_count == 16 )
+		CFIViolation("secure setjmp: jmp_buf registation stack overflow");
+	if ( thread->call_count == 0 )
+		CFIViolation("secure setjmp: secure stack underflow");
+	struct secure_setjmp* setjmp = &thread->setjmps[thread->setjmp_count++];
+	// Subtracted by one here, to remember the function that called setjmp, not
+	// the libc setjmp function itself.
+	setjmp->call_level = thread->call_count - 1;
+	setjmp->rip = thread->calls[thread->call_count - 1];
+	setjmp->jmpbuf_ptr = intctx->rdi;
+}
+
+// The secure longjmp handler.
+void SecureLongJmpHandler(struct interrupt_context* intctx, void*)
+{
+	Thread* thread = CurrentThread();
+	// Search for a maatching registation.
+	for ( size_t i = 0; i < thread->setjmp_count; i++ )
+	{
+		struct secure_setjmp* setjmp = &thread->setjmps[i];
+		if ( setjmp->jmpbuf_ptr != intctx->rdi )
+			continue;
+		jmp_buf buf;
+		if ( !CopyFromUser(&buf, (const jmp_buf*) setjmp->jmpbuf_ptr, sizeof(buf)) )
+			CFIViolation("secure longjmp: Failed to read jmp_buf");
+		// Restore all the registers from the jmp_buf.
+		intctx->rbx = buf[0];
+		intctx->rsp = buf[1];
+		intctx->rbp = buf[2];
+		intctx->r12 = buf[3];
+		intctx->r13 = buf[4];
+		intctx->r14 = buf[5];
+		intctx->r15 = buf[6];
+		intctx->rip = setjmp->rip;
+		intctx->rax = intctx->rsi;
+		// Unwind the protected shadow stack.
+		thread->call_count = setjmp->call_level;
+		// jmp_buf registations may have gone out of scope.
+		while ( thread->setjmp_count &&
+		        thread->call_count < thread->setjmps[thread->setjmp_count-1].call_level )
+			thread->setjmp_count--;
+		return;
+	}
+	CFIViolation("secure longjmp: No such jmp_buf registation");
+}
 
 // Temporarily to see if this is the source of the assertion failure.
 void DispatchHandlerWrap(struct interrupt_context* intctx, void* user)
@@ -243,6 +460,13 @@ void Init()
 	RegisterRawHandler(130, isr130, true, true);
 	RegisterRawHandler(131, isr131, true, true);
 	RegisterRawHandler(132, thread_exit_handler, true, false);
+	// Register the raw interrupt handlers for the 6 new CFI interrupts.
+	RegisterRawHandler(0x90, secure_call_handler, true, true);
+	RegisterRawHandler(0x91, secure_ret_handler, true, true);
+	RegisterRawHandler(0x92, secure_indirect_call_handler, true, true);
+	RegisterRawHandler(0x93, secure_indirect_jmp_handler, true, true);
+	RegisterRawHandler(0x94, secure_setjmp_handler, true, true);
+	RegisterRawHandler(0x95, secure_longjmp_handler, true, true);
 
 	Scheduler__InterruptYieldCPU_handler.handler = Scheduler::InterruptYieldCPU;
 	RegisterHandler(129, &Scheduler__InterruptYieldCPU_handler);
@@ -252,6 +476,19 @@ void Init()
 	RegisterHandler(131, &Signal__ReturnHandler_handler);
 	Scheduler__ThreadExitCPU_handler.handler = Scheduler::ThreadExitCPU;
 	RegisterHandler(132, &Scheduler__ThreadExitCPU_handler);
+	CFI__secure_call_handler.handler = SecureCallHandler;
+	// Register handles for each of the six new CFI interrupts.
+	RegisterHandler(0x90, &CFI__secure_call_handler);
+	CFI__secure_ret_handler.handler = SecureRetHandler;
+	RegisterHandler(0x91, &CFI__secure_ret_handler);
+	CFI__secure_indirect_call_handler.handler = SecureIndirectCallHandler;
+	RegisterHandler(0x92, &CFI__secure_indirect_call_handler);
+	CFI__secure_indirect_jmp_handler.handler = SecureIndirectJmpHandler;
+	RegisterHandler(0x93, &CFI__secure_indirect_jmp_handler);
+	CFI__secure_setjmp_handler.handler = SecureSetJmpHandler;
+	RegisterHandler(0x94, &CFI__secure_setjmp_handler);
+	CFI__secure_longjmp_handler.handler = SecureLongJmpHandler;
+	RegisterHandler(0x95, &CFI__secure_longjmp_handler);
 
 	IDT::Set(interrupt_table, NUM_INTERRUPTS);
 

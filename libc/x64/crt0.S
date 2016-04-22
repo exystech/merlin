@@ -39,20 +39,24 @@ __start:
 	pushq %rsi
 	pushq %rdi
 	pushq %rcx
-	call initialize_standard_library
+	mov $initialize_standard_library, %rax
+	int $0x90
 
 	# Run the global constructors.
-	call _init
+	mov $_init, %rax
+	int $0x90
 
 	# Run main
 	popq %rdx # Note! envp is now %rdx (previously %rcx)
 	popq %rdi
 	popq %rsi
 	addq $8, %rsp
-	call main
+	mov $main, %rax
+	int $0x90
 
 	# Terminate the process with main's exit code.
 	movl %eax, %edi
-	call exit
+	mov $exit, %rax
+	int $0x90
 .size _start, .-_start
 .size __start, .-__start

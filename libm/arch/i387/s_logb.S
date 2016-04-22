@@ -15,4 +15,4 @@ ENTRY(logb)
 	fxtract
 	fstp	%st
 	XMM_DOUBLE_EPILOGUE
-	ret
+	int $0x91

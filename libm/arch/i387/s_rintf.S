@@ -14,4 +14,4 @@ ENTRY(rintf)
 	flds	ARG_FLOAT_ONE
 	frndint
 	XMM_FLOAT_EPILOGUE
-	ret
+	int $0x91

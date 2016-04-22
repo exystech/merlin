@@ -88,7 +88,7 @@ ENTRY(__ieee754_exp)
 	fldcw	CWSTORE_SAV
 1:
 	XMM_DOUBLE_EPILOGUE
-	ret
+	int $0x91
 x_Inf_or_NaN:
 	/*
 	 * Return 0 if x is -Inf.  Otherwise just return x, although the
@@ -100,9 +100,9 @@ x_Inf_or_NaN:
 	jne	x_not_minus_Inf
 	fldz
 	XMM_DOUBLE_EPILOGUE
-	ret
+	int $0x91
 
 x_not_minus_Inf:
 	fldl	ARG_DOUBLE_ONE
 	XMM_DOUBLE_EPILOGUE
-	ret
+	int $0x91

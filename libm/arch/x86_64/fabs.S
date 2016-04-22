@@ -14,4 +14,4 @@ __signmask:
 ENTRY(fabs)
 	movsd	__signmask(%rip),%xmm1
 	andpd	%xmm1,%xmm0
-	ret
+	int $0x91

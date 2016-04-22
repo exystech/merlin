@@ -15,4 +15,4 @@ ENTRY(logbf)
 	fxtract
 	fstp	%st
 	XMM_FLOAT_EPILOGUE
-	ret
+	int $0x91

@@ -21,4 +21,4 @@ ENTRY(ilogbl)
 	fistpl	-4(%rsp)
 	movl	-4(%rsp), %eax
 #endif
-	ret
+	int $0x91

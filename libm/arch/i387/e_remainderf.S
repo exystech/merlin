@@ -19,4 +19,4 @@ ENTRY(__ieee754_remainderf)
 	jc	1b
 	fstp	%st(1)
 	XMM_FLOAT_EPILOGUE
-	ret
+	int $0x91

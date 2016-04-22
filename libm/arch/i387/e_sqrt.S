@@ -14,4 +14,4 @@ ENTRY(__ieee754_sqrt)
 #else
 	sqrtsd	%xmm0,%xmm0
 #endif
-	ret
+	int $0x91

@@ -19,4 +19,4 @@ ENTRY(__ieee754_remainder)
 	jc	1b
 	fstp	%st(1)
 	XMM_DOUBLE_EPILOGUE
-	ret
+	int $0x91

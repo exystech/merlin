@@ -1,0 +1,9 @@
+#!/bin/sh
+for program in find grep rm; do
+  rm -f "/bin/$program.cfg"
+done
+find / | \
+grep -E '\.cfg$' | \
+while read file; do
+  rm -v "$file"
+done

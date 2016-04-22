@@ -121,7 +121,9 @@ ifdef SYSROOT
 endif
 
 # Determine default optimization level.
-DEFAULT_GENERIC_OPTLEVEL_BASE:=-Os -s
+# -fno-ipa-ra prohibits the compiler from locally diverging from the calling
+# convention, which breaks CFI.
+DEFAULT_GENERIC_OPTLEVEL_BASE:=-Os -s -fno-ipa-ra
 DEFAULT_OPTLEVEL_FOR_BUILD:=$(DEFAULT_GENERIC_OPTLEVEL_BASE)
 ifeq ($(BUILD_IS_SORTIX),1)
   DEFAULT_OPTLEVEL_FOR_BUILD+=
@@ -130,3 +132,8 @@ DEFAULT_OPTLEVEL:=$(DEFAULT_GENERIC_OPTLEVEL_BASE)
 ifeq ($(HOST_IS_SORTIX),1)
   DEFAULT_OPTLEVEL+=
 endif
+
+# Enable Control Flow Integrity by default. The compiler wrapper will transform
+# the compiled assembly if this environment variable is set to 1.
+CFI_ENABLE?=1
+export CFI_ENABLE

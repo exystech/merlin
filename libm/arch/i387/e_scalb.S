@@ -16,4 +16,4 @@ ENTRY(__ieee754_scalb)
 	fscale
 	fstp	%st(1)			/* bug fix for fp stack overflow */
 	XMM_DOUBLE_EPILOGUE
-	ret
+	int $0x91

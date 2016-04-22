@@ -39,4 +39,4 @@ ENTRY(fpsetround)
 	movl	%edx,-4(%rsp)
 	ldmxcsr	-4(%rsp)
 
-	ret
+	int $0x91

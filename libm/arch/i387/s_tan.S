@@ -18,7 +18,7 @@ ENTRY(tan)
 	jnz	1f
 	fstp	%st(0)
 	XMM_DOUBLE_EPILOGUE
-	ret
+	int $0x91
 1:	fldpi
 	fadd	%st(0)
 	fxch	%st(1)
@@ -30,4 +30,4 @@ ENTRY(tan)
 	fptan
 	fstp	%st(0)
 	XMM_DOUBLE_EPILOGUE
-	ret
+	int $0x91

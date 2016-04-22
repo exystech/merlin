@@ -35,7 +35,7 @@ ENTRY(__ieee754_expf)
 	fscale				/* e^x */
 	fstp	%st(1)
 	XMM_FLOAT_EPILOGUE
-	ret
+	int $0x91
 
 x_Inf_or_NaN:
 	/*
@@ -47,9 +47,9 @@ x_Inf_or_NaN:
 	jne	x_not_minus_Inf
 	fldz
 	XMM_FLOAT_EPILOGUE
-	ret
+	int $0x91
 
 x_not_minus_Inf:
 	flds	ARG_FLOAT_ONE
 	XMM_FLOAT_EPILOGUE
-	ret
+	int $0x91

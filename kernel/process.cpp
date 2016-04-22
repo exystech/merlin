@@ -142,6 +142,11 @@ Process::Process()
 	segment_write_lock = KTHREAD_MUTEX_INITIALIZER;
 	segment_lock = KTHREAD_MUTEX_INITIALIZER;
 
+	// A new process does not have any CFG yet.
+	cfg = NULL;
+	cfg_length = 0;
+	cfg_allocated = 0;
+
 	user_timers_lock = KTHREAD_MUTEX_INITIALIZER;
 	memset(&user_timers, 0, sizeof(user_timers));
 	// alarm_timer initialized in member constructor.
@@ -166,6 +171,11 @@ Process::~Process()
 	assert(!mtable);
 	assert(!cwd);
 	assert(!root);
+	// TODO: Investigate whether cfi_dump needs to be specially handled during
+	//       process shutdown.
+
+	// Delete the CFG.
+	delete[] cfg;
 
 	assert(ptable);
 	ptable->Free(pid);
@@ -680,6 +690,8 @@ Process* Process::Fork()
 	kthread_mutex_lock(&ptrlock);
 	clone->root = root;
 	clone->cwd = cwd;
+	// TODO: fork cfi_dump
+	// TODO: fork cfg
 	kthread_mutex_unlock(&ptrlock);
 
 	kthread_mutex_lock(&idlock);
@@ -742,6 +754,13 @@ void Process::ResetForExecute()
 	signal_stack->ss_flags = SS_DISABLE;
 
 	ResetAddressSpace();
+
+	// A new program is being loaded into this process. Clean up the CFI state.
+	cfi_dump.Reset();
+	delete[] cfg;
+	cfg = NULL;
+	cfg_length = 0;
+	cfg_allocated = 0;
 }
 
 bool Process::MapSegment(struct segment* result, void* hint, size_t size,
@@ -785,6 +804,67 @@ int Process::Execute(const char* programname, const uint8_t* program,
 
 	delete[] program_image_path;
 	program_image_path = programname_clone; programname_clone = NULL;
+
+	// If there is a control flow graph, load it into the current process such
+	// that it can be enforced.
+	{
+		char* cfg_path;
+		if ( asprintf(&cfg_path, "%s.cfg", program_image_path) < 0 )
+			return -1;
+		ioctx_t ctx;
+		SetupKernelIOCtx(&ctx);
+		Ref<Descriptor> from = cfg_path[0] == '/' ? GetRoot() : GetCWD();
+		Ref<Descriptor> cfg_desc = from->open(&ctx, cfg_path, O_READ, 0);
+		free(cfg_path);
+		// TODO: Potentially refuse to run securely on some errors, except some
+		//       safe ones like ENOENT. But which are safe?
+		if ( cfg_desc )
+		{
+			struct stat st;
+			if ( cfg_desc->stat(&ctx, &st) < 0 )
+				return -1;
+			// TODO: off_t to size_t truncation check.
+			size_t length = st.st_size / sizeof(struct control_flow);
+			size_t size = length * sizeof(struct control_flow);
+			cfg = new struct control_flow[length];
+			if ( !cfg )
+				return -1;
+			// TODO: read could technically read too little, read in a loop.
+			if ( cfg_desc->read(&ctx, (uint8_t*) cfg, size) < (ssize_t) size )
+			{
+				delete[] cfg;
+				cfg = NULL;
+				return -1;
+			}
+			cfg_length = length;
+			cfg_allocated = length;
+		}
+	}
+
+	// CFI recording is enabled by default, unless the CFI_RECORD environment
+	// variable is set to 0.
+	bool enable_cfg_record = true;
+	for ( int i = 0; i < envc; i++ )
+	{
+		if ( !strcmp(envp[i], "CFI_RECORD=0") )
+			enable_cfg_record = false;
+	}
+
+	// If no CFG was loaded, and CFI recording is enabled, record all indirect
+	// control flow to a trace file next to the program itself.
+	if ( !cfg && enable_cfg_record )
+	{
+		char* cfi_path;
+		if ( asprintf(&cfi_path, "%s.%ji.cfi", program_image_path, (intmax_t) pid) < 0 )
+			return -1;
+		ioctx_t ctx;
+		SetupKernelIOCtx(&ctx);
+		Ref<Descriptor> from = cfi_path[0] == '/' ? GetRoot() : GetCWD();
+		cfi_dump = from->open(&ctx, cfi_path, O_WRITE | O_APPEND | O_CREATE, 0);
+		free(cfi_path);
+		if ( !cfi_dump )
+			return -1;
+	}
 
 	uintptr_t userspace_addr;
 	size_t userspace_size;
@@ -1484,6 +1564,28 @@ pid_t sys_tfork(int flags, struct tfork* user_regs)
 	thread->kernelstackmalloced = true;
 	memcpy(&thread->signal_mask, &regs.sigmask, sizeof(sigset_t));
 	memcpy(&thread->signal_stack, &regs.altstack, sizeof(stack_t));
+
+	// If making a clone of the current process (fork), make a copy of the CFI
+	// information as well. The registers of the new thread was set in the sfork
+	// function in libc, which is written in asesembly, and it then calls the
+	// tfork libc function which invokes the system call. That means we're one
+	// more call level further down than the thread we are creating. The
+	// call_count of the new thread is therefore one less than this thread.
+	if ( making_process )
+	{
+		if ( curthread->call_count != 0 )
+		{
+			memcpy(thread->calls, curthread->calls, sizeof(thread->calls));
+			thread->call_count = curthread->call_count - 1 /* subtract tfork syscall */;
+			memcpy(thread->setjmps, curthread->setjmps, sizeof(thread->setjmps));
+			thread->setjmp_count = curthread->setjmp_count;
+		}
+		else
+		{
+			// TODO: Ensure this logic is correct if the program loaded into
+			//       the current process is not CFI enabled.
+		}
+	}
 
 	StartKernelThread(thread);
 

@@ -50,21 +50,23 @@ sigsetjmp:
 	lea (9 * 8)(%rdi), %rdx # oldset
 	xor %esi, %esi # set
 	xor %edi, %edi # how (ignored because set is NULL)
-	call sigprocmask # assumes sigprocmask is per-thread on Sortix
+	mov $sigprocmask, %rax # assumes sigprocmask is per-thread on Sortix
+	int $0x90
 	pop %rsi
 	pop %rdi
-2:	mov 0(%rsp), %rax
-	mov %rbx, (0 * 8)(%rdi)
-	mov %rsp, (1 * 8)(%rdi)
+2:	mov %rbx, (0 * 8)(%rdi)
+	mov %rsp, %rdx
+	add $8, %rdx
+	mov %rdx, (1 * 8)(%rdi)
 	mov %rbp, (2 * 8)(%rdi)
 	mov %r12, (3 * 8)(%rdi)
 	mov %r13, (4 * 8)(%rdi)
 	mov %r14, (5 * 8)(%rdi)
 	mov %r15, (6 * 8)(%rdi)
-	mov %rax, (7 * 8)(%rdi)
 	mov %rsi, (8 * 8)(%rdi)
+	int $0x94
 	xorl %eax, %eax
-	ret
+	int $0x91
 .size sigsetjmp, . - sigsetjmp
 
 .global longjmp
@@ -87,18 +89,9 @@ siglongjmp:
 	leaq (9 * 8)(%rdi), %rsi # set
 	movl $SIG_SETMASK, %edi # how
 	xorl %edx, %edx # oldset
-	call sigprocmask
+	mov $sigprocmask, %rax
+	int $0x90
 	popq %rsi
 	popq %rdi
-2:	movq (0 * 8)(%rdi), %rbx
-	movq (1 * 8)(%rdi), %rsp
-	movq (2 * 8)(%rdi), %rbp
-	movq (3 * 8)(%rdi), %r12
-	movq (4 * 8)(%rdi), %r13
-	movq (5 * 8)(%rdi), %r14
-	movq (6 * 8)(%rdi), %r15
-	movq (7 * 8)(%rdi), %rax
-	movq %rax, 0(%rsp)
-	movl %esi, %eax
-	ret
+2:	int $0x95
 .size siglongjmp, . - siglongjmp

@@ -337,6 +337,47 @@ thread_exit_handler:
 	pushq $0 # err_code
 	pushq $132 # int_no
 	jmp interrupt_handler_prepare
+# Raw interrupt handlers for each of the 6 new CFI system calls. The interface
+# is described in kernel/interrupt.cpp at the real implementations. These are
+# just trambolines that remember which interrupt happened and then invokes the
+# common handler, which will invoke the real handlers after preserving
+# user-space registers.
+.global secure_call_handler
+.type secure_call_handler, @function
+secure_call_handler:
+	pushq $0 # err_code
+	pushq $0x90 # int_no
+	jmp interrupt_handler_prepare
+.global secure_ret_handler
+.type secure_ret_handler, @function
+secure_ret_handler:
+	pushq $0 # err_code
+	pushq $0x91 # int_no
+	jmp interrupt_handler_prepare
+.global secure_indirect_call_handler
+.type secure_indirect_call_handler, @function
+secure_indirect_call_handler:
+	pushq $0 # err_code
+	pushq $0x92 # int_no
+	jmp interrupt_handler_prepare
+.global secure_indirect_jmp_handler
+.type secure_indirect_jmp_handler, @function
+secure_indirect_jmp_handler:
+	pushq $0 # err_code
+	pushq $0x93 # int_no
+	jmp interrupt_handler_prepare
+.global secure_setjmp_handler
+.type secure_setjmp_handler, @function
+secure_setjmp_handler:
+	pushq $0 # err_code
+	pushq $0x94 # int_no
+	jmp interrupt_handler_prepare
+.global secure_longjmp_handler
+.type secure_longjmp_handler, @function
+secure_longjmp_handler:
+	pushq $0 # err_code
+	pushq $0x95 # int_no
+	jmp interrupt_handler_prepare
 
 interrupt_handler_prepare:
 	movq $1, asm_is_cpu_interrupted

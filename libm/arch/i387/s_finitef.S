@@ -22,4 +22,4 @@ ENTRY(finitef)
 	cmpl	$0x7ff00000,%esi
 	setne	%al
 #endif
-	ret
+	int $0x91

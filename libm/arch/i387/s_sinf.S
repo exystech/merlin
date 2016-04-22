@@ -15,4 +15,4 @@ ENTRY(sinf)
 	flds	ARG_FLOAT_ONE
 	fsin
 	XMM_FLOAT_EPILOGUE
-	ret
+	int $0x91

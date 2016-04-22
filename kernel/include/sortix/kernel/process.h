@@ -52,6 +52,13 @@ struct ioctx_struct;
 typedef struct ioctx_struct ioctx_t;
 struct segment;
 
+// The control flow graph is a set of such pairs.
+struct control_flow
+{
+	uintptr_t from;
+	uintptr_t to;
+};
+
 class Process
 {
 friend void Process__OnLastThreadExit(void*);
@@ -81,6 +88,10 @@ private:
 	Ref<Descriptor> cwd;
 	Ref<MountTable> mtable;
 	Ref<DescriptorTable> dtable;
+
+// If this file is open, then the indirect control flow is recorded to it.
+public:
+	Ref<Descriptor> cfi_dump;
 
 public:
 	Ref<ProcessTable> ptable;
@@ -144,6 +155,13 @@ public:
 	size_t segments_length;
 	kthread_mutex_t segment_write_lock;
 	kthread_mutex_t segment_lock;
+
+// The control flow graph, how many entries it contains, and how many are room
+// for (for efficient expansion).
+public:
+	struct control_flow* cfg;
+	size_t cfg_length;
+	size_t cfg_allocated;
 
 public:
 	kthread_mutex_t user_timers_lock;

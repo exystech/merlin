@@ -14,4 +14,4 @@ ENTRY(rint)
 	fldl	ARG_DOUBLE_ONE
 	frndint
 	XMM_DOUBLE_EPILOGUE
-	ret
+	int $0x91

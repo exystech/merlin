@@ -15,4 +15,4 @@ ENTRY(__ieee754_log10f)
 	flds	ARG_FLOAT_ONE
 	fyl2x
 	XMM_FLOAT_EPILOGUE
-	ret
+	int $0x91

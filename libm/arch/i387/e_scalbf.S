@@ -15,4 +15,4 @@ ENTRY(__ieee754_scalbf)
 	flds	ARG_FLOAT_ONE
 	fscale
 	XMM_FLOAT_EPILOGUE
-	ret
+	int $0x91

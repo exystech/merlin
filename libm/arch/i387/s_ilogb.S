@@ -29,4 +29,4 @@ ENTRY(ilogb)
 	fistpl	-8(%rsp)
 	movl	-8(%rsp),%eax
 #endif
-	ret
+	int $0x91

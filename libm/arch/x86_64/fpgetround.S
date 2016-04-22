@@ -21,4 +21,4 @@ ENTRY(fpgetround)
 	fnstcw -4(%rsp)
 	movl -4(%rsp), %eax
 	andl $0x00000c00, %eax
-	ret
+	int $0x91

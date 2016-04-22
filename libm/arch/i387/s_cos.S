@@ -17,7 +17,7 @@ ENTRY(cos)
 	andw	$0x400,%ax
 	jnz	1f
 	XMM_DOUBLE_EPILOGUE
-	ret
+	int $0x91
 1:	fldpi
 	fadd	%st(0)
 	fxch	%st(1)
@@ -28,4 +28,4 @@ ENTRY(cos)
 	fstp	%st(1)
 	fcos
 	XMM_DOUBLE_EPILOGUE
-	ret
+	int $0x91

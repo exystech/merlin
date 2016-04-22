@@ -21,4 +21,4 @@ ENTRY(__ieee754_acos)
 	fxch	%st(1)
 	fpatan
 	XMM_DOUBLE_EPILOGUE
-	ret
+	int $0x91

@@ -13,6 +13,10 @@ CPPFLAGS:=$(CPPFLAGS) -DVERSIONSTR=\"$(VERSION)\"
 BINARIES_EXCEPT_INSTALL:=\
 basename \
 cat \
+cfg \
+cfi-test \
+cfi-test-2 \
+cfi-test-3 \
 chkblayout \
 chmod \
 chroot \
@@ -79,6 +83,9 @@ install: all
 	mkdir -p $(DESTDIR)$(BINDIR)
 	install $(BINARIES_EXCEPT_INSTALL) $(DESTDIR)$(BINDIR)
 	install xinstall $(DESTDIR)$(BINDIR)/install
+	mkdir -p $(DESTDIR)$(SBINDIR)
+	install cfion $(DESTDIR)$(SBINDIR)/cfion
+	install cfioff $(DESTDIR)$(SBINDIR)/cfioff
 
 %: %.c
 	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< -o $@

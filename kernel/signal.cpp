@@ -713,7 +713,7 @@ retry_another_signal:
 	handler_regs.eip = (unsigned long) handler_ptr;
 	handler_regs.eflags &= ~FLAGS_DIRECTION;
 #elif defined(__x86_64__)
-	stack_location -= 128; /* Red zone. */
+	stack_location -= 128 + 16; /* Red zone and two CFI stack parameters. */
 	stack_location -= sizeof(stack_frame);
 	stack_location &= ~(16UL-1UL); /* 16-byte align */
 	struct stack_frame* stack = (struct stack_frame*) stack_location;
@@ -802,6 +802,25 @@ retry_another_signal:
 		signal_count++;
 	if ( (signal_single = signal_count == 1) )
 		signal_single_frame = (uintptr_t) stack;
+
+	// TODO: This shouldn't be done for non-CFI programs.
+	// Signals handlers are normally invoked by transferring control to the
+	// signal handler, while setting up the stack such that the function returns
+	// to a sigreturn tramboline, which invokes a system call that make the
+	// thread return from the system. Since we're enforcing CFI, we will rather
+	// fake a call to the signal handler from the sigreturn function. That makes
+	// the signal handler return to the sigreturn function, which will then
+	// invoke the system call and the signal is properly returned from.
+	Thread* thread = CurrentThread();
+	if ( CFI_MAX_CALL_DEPTH - thread->call_count < 2 )
+	{
+		process->ExitThroughSignal(SIGABRT);
+		Log::PrintF("%s[%ji]: CFI violation: signal delivery secure stack overflow\n",
+			        process->program_image_path, (intmax_t) process->pid);
+		kthread_exit();
+	}
+	thread->calls[thread->call_count++] = stack_frame.ucontext.uc_mcontext.gregs[REG_RIP];
+	thread->calls[thread->call_count++] = (uintptr_t) process->sigreturn;
 
 	// Run the signal handler by returning to user-space.
 	return;
@@ -901,6 +920,18 @@ void Thread::HandleSigreturn(struct interrupt_context* intctx)
 	Scheduler::SaveInterruptedContext(intctx, &resume_regs);
 	DecodeMachineContext(&stack_frame.ucontext.uc_mcontext, &resume_regs);
 	Scheduler::LoadInterruptedContext(intctx, &resume_regs);
+
+	// Restore the instruction pointer after returning from a signal using the
+	// protected shadow stack, rather than from the state saved in user-space.
+	Thread* thread = CurrentThread();
+	if ( thread->call_count == 0 )
+	{
+		process->ExitThroughSignal(SIGABRT);
+		Log::PrintF("%s[%ji]: CFI violation: signal return secure stack underflow\n",
+			        process->program_image_path, (intmax_t) process->pid);
+		kthread_exit();
+	}
+	intctx->rip = thread->calls[--thread->call_count];
 
 	if ( signal_count != SIZE_MAX )
 		signal_count--;

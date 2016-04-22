@@ -65,7 +65,7 @@ use_fyl2x:
         faddp
         fyl2x
 	XMM_DOUBLE_EPILOGUE
-        ret
+	int $0x91
 
 	.align	4
 use_fyl2xp1:
@@ -73,4 +73,4 @@ use_fyl2xp1:
 	fldl	ARG_DOUBLE_ONE
 	fyl2xp1
 	XMM_DOUBLE_EPILOGUE
-	ret
+	int $0x91

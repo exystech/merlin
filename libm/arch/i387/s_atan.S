@@ -15,4 +15,4 @@ ENTRY(atan)
 	fld1
 	fpatan
 	XMM_DOUBLE_EPILOGUE
-	ret
+	int $0x91

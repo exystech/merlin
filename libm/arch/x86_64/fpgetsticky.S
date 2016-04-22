@@ -24,4 +24,4 @@ ENTRY(fpgetsticky)
 	movl	-4(%rsp),%eax
 	orl	-8(%rsp),%eax
 	andl	$63,%eax
-	ret
+	int $0x91

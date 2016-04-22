@@ -52,21 +52,24 @@ __sfork:
 	popq %rax
 	movq %rax, (17 * 8)(%rsi) # rflags
 	movl $MSRID_FSBASE, %edi
-	call rdmsr
+	mov $rdmsr, %rax
+	int $0x90
 	movq 0(%rsp), %rsi
 	movq %rax, (18 * 8)(%rsi) # fsbase
 	movl $MSRID_GSBASE, %edi
-	call rdmsr
+	mov $rdmsr, %rax
+	int $0x90
 	movq 0(%rsp), %rsi
 	movq %rax, (19 * 8)(%rsi) # gsbase
 	movq 8(%rsp), %rdi
 
-	call tfork
+	mov $tfork, %rax
+	int $0x90
 
 .Lafter_fork:
 	# The value in %rax determines whether we are child or parent. There is no
 	# need to clean up the stack from the above pushes, leaveq sets %rsp to %rbp
 	# which does that for us.
 	leaveq
-	retq
+	int $0x91
 .size __sfork, . - __sfork

@@ -103,4 +103,4 @@ ENTRY(modf)
 L1:
 #endif
 	leave
-	ret
+	int $0x91

@@ -100,6 +100,9 @@ Thread::Thread()
 	sigemptyset(&signal_mask);
 	memset(&signal_stack, 0, sizeof(signal_stack));
 	signal_stack.ss_flags = SS_DISABLE;
+	// Initialize the CFI information to empty arrays on thread creation.
+	call_count = 0;
+	setjmp_count = 0;
 	// execute_clock initialized in member constructor.
 	// system_clock initialized in member constructor.
 	Time::InitializeThreadClocks(this);

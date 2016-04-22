@@ -41,4 +41,4 @@ ENTRY(fpsetmask)
 
 	notl	%eax
 	andl	$0x0000003f, %eax
-	ret
+	int $0x91

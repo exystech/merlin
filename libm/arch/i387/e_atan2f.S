@@ -15,4 +15,4 @@ ENTRY(__ieee754_atan2f)
 	flds	ARG_FLOAT_TWO
 	fpatan
 	XMM_FLOAT_EPILOGUE
-	ret
+	int $0x91

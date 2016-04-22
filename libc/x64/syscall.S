@@ -37,5 +37,5 @@ asm_syscall: /* syscall num in %rax. */
 	mov %ecx, errno@tpoff(%rsi)
 1:
 	pop %rbp
-	ret
+	int $0x91
 .size asm_syscall, .-asm_syscall

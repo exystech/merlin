@@ -807,13 +807,13 @@ headers:
 
 # libk
 %.libk.o: %.c
-	$(CC) -c $< -o $@ $(LIBK_CPPFLAGS) $(LIBK_FLAGS) $(LIBK_CFLAGS)
+	CFI_ENABLE=0 $(CC) -c $< -o $@ $(LIBK_CPPFLAGS) $(LIBK_FLAGS) $(LIBK_CFLAGS)
 
 %.libk.o: %.c++
-	$(CXX) -c $< -o $@ $(LIBK_CPPFLAGS) $(LIBK_FLAGS) $(LIBK_CXXFLAGS)
+	CFI_ENABLE=0 $(CXX) -c $< -o $@ $(LIBK_CPPFLAGS) $(LIBK_FLAGS) $(LIBK_CXXFLAGS)
 
 %.libk.o: %.S
-	$(CC) -c $< -o $@ $(LIBK_CPPFLAGS) $(LIBK_FLAGS) $(LIBK_CFLAGS)
+	CFI_ENABLE=0 $(CC) -c $< -o $@ $(LIBK_CPPFLAGS) $(LIBK_FLAGS) $(LIBK_CFLAGS)
 
 clean:
 	rm -f *.o */*.o */*/*.o *.a

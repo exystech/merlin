@@ -27,4 +27,4 @@ ENTRY(_scalbn)
 	fscale
 	fstp %st(1)		/* clean up stack */
 #endif
-	ret
+	int $0x91

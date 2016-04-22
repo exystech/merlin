@@ -1,0 +1,14 @@
+#!/bin/sh
+find / | \
+grep -E '\.[[:digit:]]+\.cfi$' | \
+sed -E 's/\.[[:digit:]]+\.cfi//g' |
+sort -u |
+while read program; do
+  echo "$program"
+  cfg "$program".*.cfi > "$program.cfg.new" 2>/dev/null
+  rm "$program".*.cfi
+  mv "$program.cfg.new" "$program.0.cfi"
+  if [ "$program" != "/bin/rm" ] && [ "$program" != "/bin/dash" ]; then
+    cp "$program.0.cfi" "$program.cfg"
+  fi
+done

@@ -20,4 +20,4 @@ ENTRY(__ieee754_asin)
 	fsqrt				/* sqrt (1 - x^2) */
 	fpatan
 	XMM_DOUBLE_EPILOGUE
-	ret
+	int $0x91

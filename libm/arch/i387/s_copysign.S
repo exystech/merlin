@@ -35,4 +35,4 @@ ENTRY(copysign)
 	pand	%xmm3,%xmm0
 	por	%xmm1,%xmm0
 #endif
-	ret
+	int $0x91

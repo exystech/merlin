@@ -36,4 +36,4 @@ ENTRY(fpsetprec)
 	movl	%edx,-4(%rsp)
 
 	fldcw	-4(%rsp)
-	ret
+	int $0x91

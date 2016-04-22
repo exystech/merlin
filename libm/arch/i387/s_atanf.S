@@ -15,4 +15,4 @@ ENTRY(atanf)
 	fld1
 	fpatan
 	XMM_FLOAT_EPILOGUE
-	ret
+	int $0x91

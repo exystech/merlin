@@ -15,4 +15,4 @@ ENTRY(__ieee754_log)
 	fldl	ARG_DOUBLE_ONE
 	fyl2x
 	XMM_DOUBLE_EPILOGUE
-	ret
+	int $0x91

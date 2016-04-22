@@ -18,4 +18,4 @@ ENTRY(__flt_rounds)
 	movl	$0x2d, %eax	/* 0x2d = 00.10.11.01 */
 	sarl	%cl, %eax	/* 0,1,2,3 -> 1,3,2,0 */
 	andl	$3, %eax
-	ret
+	int $0x91

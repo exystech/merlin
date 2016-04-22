@@ -15,4 +15,4 @@ ENTRY(__ieee754_atan2)
 	fldl	ARG_DOUBLE_TWO
 	fpatan
 	XMM_DOUBLE_EPILOGUE
-	ret
+	int $0x91

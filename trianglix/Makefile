@@ -4,7 +4,7 @@ include ../build-aux/compiler.mak
 include ../build-aux/version.mak
 include ../build-aux/dirs.mak
 
-OPTLEVEL?=-g -O2
+OPTLEVEL?=$(DEFAULT_OPTLEVEL)
 CXXFLAGS?=$(OPTLEVEL)
 
 CXXFLAGS:=$(CXXFLAGS) -std=gnu++0x -Wall -Wextra -fno-exceptions -fno-rtti -msse -msse2

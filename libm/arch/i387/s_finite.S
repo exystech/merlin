@@ -23,4 +23,4 @@ ENTRY(finite)
 	cmpq	%rdi,%rsi
 	setne	%al
 #endif
-	ret
+	int $0x91

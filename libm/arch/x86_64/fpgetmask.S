@@ -23,4 +23,4 @@ ENTRY(fpgetmask)
 	movl -4(%rsp),%eax
 	notl %eax
 	andl $63,%eax
-	ret
+	int $0x91

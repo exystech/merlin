@@ -42,4 +42,4 @@ ENTRY(ceil)
 	fstpl	-8(%rsp)
 	movsd	-8(%rsp),%xmm0
 #endif
-	ret
+	int $0x91
