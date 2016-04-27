@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,8 +17,9 @@
  * Evaluate expressions.
  */
 
+#include <ctype.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <inttypes.h>
 #include <locale.h>
 #include <regex.h>
@@ -34,58 +35,71 @@
 //         `expr + 5 + + 2 +'
 // TODO: Support the other GNU function extensions documented in help().
 
-char* strdup_or_die(const char* str)
+static bool integer_of_string(const char* str, intmax_t* out)
+{
+	if ( !isdigit((unsigned char) str[0]) )
+		return false;
+	char* endptr;
+	errno = 0;
+	intmax_t result = strtoimax((char*) str, &endptr, 10);
+	if ( (result == INTMAX_MIN || result == INTMAX_MAX) && errno == ERANGE )
+		return false;
+	if ( *endptr )
+		return false;
+	return *out = result, true;
+}
+
+static char* strdup_or_die(const char* str)
 {
 	char* result = strdup(str);
 	if ( !str )
-		error(2, errno, "strdup");
+		err(2, "strdup");
 	return result;
 }
 
-char* strndup_or_die(const char* str, size_t n)
+static char* strndup_or_die(const char* str, size_t n)
 {
 	char* result = strndup(str, n);
 	if ( !str )
-		error(2, errno, "strndup");
+		err(2, "strndup");
 	return result;
 }
 
-char* print_intmax_or_die(intmax_t value)
+static char* print_intmax_or_die(intmax_t value)
 {
 	char value_string[sizeof(intmax_t) * 3];
 	snprintf(value_string, sizeof(value_string), "%ji", value);
 	return strdup_or_die(value_string);
 }
 
-__attribute__((noreturn))
-void syntax_error(void)
+static void syntax_error(void)
 {
-	error(2, 0, "syntax error");
-	__builtin_unreachable();
+	errx(2, "syntax error");
 }
 
-__attribute__((noreturn))
-void non_integer_argument(void)
+static void non_integer_argument(void)
 {
-	error(2, 0, "non-integer argument");
-	__builtin_unreachable();
+	errx(2, "non-integer argument");
 }
 
-__attribute__((noreturn))
-void division_by_zero(void)
+static void division_by_zero(void)
 {
-	error(2, 0, "division by zero");
-	__builtin_unreachable();
+	errx(2, "division by zero");
 }
 
-char* interpret(char** tokens, size_t num_tokens);
+static void overflow(const char* op)
+{
+	errx(2, "%s overflow", op);
+}
 
-char* interpret_left_associative(char** tokens,
-                                 size_t num_tokens,
-                                 const char* operator_name,
-                                 char* (*next)(char**, size_t, const void*),
-                                 const void* next_context,
-                                 char* (*function)(const char*, const char*))
+static char* interpret(char** tokens, size_t num_tokens);
+
+static char* interpret_left_associative(char** tokens,
+                                        size_t num_tokens,
+                                        const char* operator_name,
+                                        char* (*next)(char**, size_t, const void*),
+                                        const void* next_context,
+                                        char* (*function)(const char*, const char*))
 {
 	size_t depth = 0;
 	for ( size_t n = num_tokens; n != 0; n-- )
@@ -132,14 +146,14 @@ char* interpret_left_associative(char** tokens,
 	return next(tokens, num_tokens, next_context);
 }
 
-char* bool_to_boolean_value(bool b)
+static char* bool_to_boolean_value(bool b)
 {
 	return strdup_or_die(b ? "1" : "0");
 }
 
-char* interpret_literal(char** tokens,
-                        size_t num_tokens,
-                        const void* ctx)
+static char* interpret_literal(char** tokens,
+                               size_t num_tokens,
+                               const void* ctx)
 {
 	(void) ctx;
 	if ( num_tokens != 1 )
@@ -147,9 +161,9 @@ char* interpret_literal(char** tokens,
 	return strdup_or_die(tokens[0]);
 }
 
-char* interpret_parentheses(char** tokens,
-                            size_t num_tokens,
-                            const void* ctx)
+static char* interpret_parentheses(char** tokens,
+                                   size_t num_tokens,
+                                   const void* ctx)
 {
 	if ( 2 <= num_tokens &&
 	     strcmp(tokens[0], "(") == 0 &&
@@ -158,7 +172,7 @@ char* interpret_parentheses(char** tokens,
 	return interpret_literal(tokens, num_tokens, ctx);
 }
 
-char* evaluate_and(const char* a, const char* b)
+static char* evaluate_and(const char* a, const char* b)
 {
 	if ( strcmp(a, "") != 0 && strcmp(a, "0") != 0 &&
 	     strcmp(b, "") != 0 && strcmp(b, "0") != 0 )
@@ -166,7 +180,7 @@ char* evaluate_and(const char* a, const char* b)
 	return strdup_or_die("0");
 }
 
-char* evaluate_or(const char* a, const char* b)
+static char* evaluate_or(const char* a, const char* b)
 {
 	if ( strcmp(a, "") != 0 && strcmp(a, "0") != 0 )
 		return strdup_or_die(a);
@@ -175,14 +189,11 @@ char* evaluate_or(const char* a, const char* b)
 	return strdup_or_die("0");
 }
 
-int compare_values(const char* a, const char* b)
+static int compare_values(const char* a, const char* b)
 {
-	// TODO: Compute using arbitrary length integers.
-	char* a_endptr;
-	char* b_endptr;
-	intmax_t a_int = strtoimax((char*) a, &a_endptr, 10);
-	intmax_t b_int = strtoimax((char*) b, &b_endptr, 10);
-	if ( a[0] && !*a_endptr && b[0] && !*b_endptr )
+	intmax_t a_int, b_int;
+	if ( integer_of_string(a, &a_int) &&
+	     integer_of_string(b, &b_int) )
 	{
 		if ( a_int < b_int )
 			return -1;
@@ -193,104 +204,116 @@ int compare_values(const char* a, const char* b)
 	return strcoll(a, b);
 }
 
-char* evaluate_eq(const char* a, const char* b)
+static char* evaluate_eq(const char* a, const char* b)
 {
 	return bool_to_boolean_value(compare_values(a, b) == 0);
 }
 
-char* evaluate_gt(const char* a, const char* b)
+static char* evaluate_gt(const char* a, const char* b)
 {
 	return bool_to_boolean_value(0 < compare_values(a, b));
 }
 
-char* evaluate_ge(const char* a, const char* b)
+static char* evaluate_ge(const char* a, const char* b)
 {
 	return bool_to_boolean_value(0 <= compare_values(a, b));
 }
 
-char* evaluate_lt(const char* a, const char* b)
+static char* evaluate_lt(const char* a, const char* b)
 {
 	return bool_to_boolean_value(compare_values(a, b) < 0);
 }
 
-char* evaluate_le(const char* a, const char* b)
+static char* evaluate_le(const char* a, const char* b)
 {
 	return bool_to_boolean_value(compare_values(a, b) <= 0);
 }
 
-char* evaluate_neq(const char* a, const char* b)
+static char* evaluate_neq(const char* a, const char* b)
 {
 	return bool_to_boolean_value(compare_values(a, b) != 0);
 }
 
-char* evaluate_integer_function(const char* a, const char* b,
-                                intmax_t (*function)(intmax_t, intmax_t))
+static char* evaluate_integer_function(const char* a, const char* b,
+                                       intmax_t (*function)(intmax_t, intmax_t))
 {
-	// TODO: Compute using arbitrary length integers.
-	char* a_endptr;
-	char* b_endptr;
-	intmax_t a_int = strtoimax((char*) a, &a_endptr, 10);
-	intmax_t b_int = strtoimax((char*) b, &b_endptr, 10);
-	if ( !a[0] || *a_endptr || !b[0] || *b_endptr )
+	intmax_t a_int;
+	intmax_t b_int;
+	if ( !integer_of_string(a, &a_int) ||
+	     !integer_of_string(b, &b_int) )
 		non_integer_argument();
 	return print_intmax_or_die(function(a_int, b_int));
 }
 
-intmax_t integer_add(intmax_t a, intmax_t b)
+static intmax_t integer_add(intmax_t a, intmax_t b)
 {
-	return a + b;
+	intmax_t result = 0;
+	if ( __builtin_add_overflow(a, b, &result) )
+		overflow("addition");
+	return result;
 }
 
-char* evaluate_add(const char* a, const char* b)
+static char* evaluate_add(const char* a, const char* b)
 {
 	return evaluate_integer_function(a, b, integer_add);
 }
 
-intmax_t integer_sub(intmax_t a, intmax_t b)
+static intmax_t integer_sub(intmax_t a, intmax_t b)
 {
-	return a - b;
+	intmax_t result = 0;
+	if ( __builtin_sub_overflow(a, b, &result) )
+		overflow("subtraction");
+	return result;
 }
 
-char* evaluate_sub(const char* a, const char* b)
+static char* evaluate_sub(const char* a, const char* b)
 {
 	return evaluate_integer_function(a, b, integer_sub);
 }
 
-intmax_t integer_mul(intmax_t a, intmax_t b)
+static intmax_t integer_mul(intmax_t a, intmax_t b)
 {
-	return a * b;
+	intmax_t result = 0;
+	if ( __builtin_mul_overflow(a, b, &result) )
+		overflow("multiplication");
+	return result;
 }
 
-char* evaluate_mul(const char* a, const char* b)
+static char* evaluate_mul(const char* a, const char* b)
 {
 	return evaluate_integer_function(a, b, integer_mul);
 }
 
-intmax_t integer_div(intmax_t a, intmax_t b)
+static intmax_t integer_div(intmax_t a, intmax_t b)
 {
 	if ( b == 0 )
 		division_by_zero();
+	if ( a == INTMAX_MIN && b == -1 )
+		overflow("division");
 	return a / b;
 }
 
-char* evaluate_div(const char* a, const char* b)
+static char* evaluate_div(const char* a, const char* b)
 {
 	return evaluate_integer_function(a, b, integer_div);
 }
 
-intmax_t integer_mod(intmax_t a, intmax_t b)
+// TODO: Is this fully well-defined?
+static intmax_t integer_mod(intmax_t a, intmax_t b)
 {
 	if ( b == 0 )
 		division_by_zero();
+	if ( a == INTMAX_MIN && b == -1 )
+		overflow("division");
 	return a % b;
 }
 
-char* evaluate_mod(const char* a, const char* b)
+static char* evaluate_mod(const char* a, const char* b)
 {
 	return evaluate_integer_function(a, b, integer_mod);
 }
 
-char* evaluate_match(const char* a, const char* b)
+static char* evaluate_match(const char* a, const char* b)
 {
 	regex_t regex;
 	int status = regcomp(&regex, b, 0);
@@ -309,7 +332,7 @@ char* evaluate_match(const char* a, const char* b)
 				regerror(status, &regex, erralloc, errbuf_needed);
 			}
 		}
-		error(2, 0, "compiling regular expression: %s", errmsg);
+		errx(2, "compiling regular expression: %s", errmsg);
 		free(erralloc);
 	}
 
@@ -360,9 +383,9 @@ struct binary_operator binary_operators[] =
 	{ ":", evaluate_match },
 };
 
-char* interpret_binary_operator(char** tokens,
-                                size_t num_tokens,
-                                const void* context)
+static char* interpret_binary_operator(char** tokens,
+                                       size_t num_tokens,
+                                       const void* context)
 {
 	size_t index = *(const size_t*) context;
 	size_t next_index = index + 1;
@@ -386,7 +409,7 @@ char* interpret_binary_operator(char** tokens,
 	                                  next, next_context, binop->function);
 }
 
-char* interpret(char** tokens, size_t num_tokens)
+static char* interpret(char** tokens, size_t num_tokens)
 {
 	if ( !num_tokens )
 		syntax_error();
