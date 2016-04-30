@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,7 +23,7 @@
 #include <sys/cdefs.h>
 
 #include <sys/__/types.h>
-#if __STDC_HOSTED__
+#if !defined(__is_sortix_libk) && !defined(__is_sortix_kernel)
 #include <__/pthread.h>
 #endif
 
@@ -459,7 +459,7 @@ typedef __uid_t uid_t;
 #define SCNxUID __SCNxUID
 #endif
 
-#if __STDC_HOSTED__
+#if !defined(__is_sortix_libk) && !defined(__is_sortix_kernel)
 
 #ifndef __pthread_attr_t_defined
 #define __pthread_attr_t_defined

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -117,7 +117,7 @@ extern "C" {
 
 #define EOPNOTSUPP ENOTSUP
 
-#if __STDC_HOSTED__
+#if !defined(__is_sortix_libk) && !defined(__is_sortix_kernel)
 
 extern __thread int errno;
 #define errno errno

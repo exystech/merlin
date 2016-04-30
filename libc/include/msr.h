@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -52,7 +52,7 @@ static __inline uint64_t wrmsr_instruction(uint32_t msrid, uint64_t value)
 	return value;
 }
 
-#if __STDC_HOSTED__
+#if !defined(__is_sortix_libk) && !defined(__is_sortix_kernel)
 
 uint64_t rdmsr(uint32_t msrid);
 uint64_t wrmsr(uint32_t msrid, uint64_t value);

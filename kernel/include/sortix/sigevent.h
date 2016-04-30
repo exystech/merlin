@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,7 +22,7 @@
 
 #include <sys/cdefs.h>
 
-#if __STDC_HOSTED__
+#if !defined(__is_sortix_libk) && !defined(__is_sortix_kernel)
 #include <__/pthread.h>
 #endif
 
@@ -32,7 +32,7 @@
 extern "C" {
 #endif
 
-#if __STDC_HOSTED__
+#if !defined(__is_sortix_libk) && !defined(__is_sortix_kernel)
 #ifndef __pthread_attr_t_defined
 #define __pthread_attr_t_defined
 typedef __pthread_attr_t pthread_attr_t;
@@ -49,7 +49,7 @@ struct sigevent
 	int sigev_signo;
 	union sigval sigev_value;
 	void (*sigev_notify_function)(union sigval);
-#if __STDC_HOSTED__
+#if !defined(__is_sortix_libk) && !defined(__is_sortix_kernel)
 	pthread_attr_t* sigev_notify_attributes;
 #else
 	void* sigev_notify_attributes;

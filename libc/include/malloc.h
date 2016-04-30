@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -74,17 +74,17 @@ int heap_get_paranoia(void);
 #endif
 #endif
 
-#if !defined(HEAP_GUARD_DEBUG) && \
-    defined(__is_sortix_kernel) && defined(HEAP_GUARD_DEBUG_KERNEL)
+#ifdef __is_sortix_libk
+#if !defined(HEAP_GUARD_DEBUG) && defined(HEAP_GUARD_DEBUG_KERNEL)
 #define HEAP_GUARD_DEBUG
 #endif
-
-#if !defined(MALLOC_GUARD_DEBUG) && \
-    __STDC_HOSTED__ && defined(HEAP_GUARD_DEBUG_USERLAND)
+#else
+#if !defined(MALLOC_GUARD_DEBUG) && defined(HEAP_GUARD_DEBUG_USERLAND)
 #define HEAP_GUARD_DEBUG
 #endif
+#endif
 
-#if defined(HEAP_GUARD_DEBUG) && !defined(__is_sortix_kernel)
+#if defined(HEAP_GUARD_DEBUG) && !defined(__is_sortix_libk)
 struct heap_alloc
 {
 	uintptr_t from;

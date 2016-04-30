@@ -26,7 +26,6 @@
 #include <elf.h>
 #include <errno.h>
 #include <limits.h>
-#include <malloc.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>

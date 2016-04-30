@@ -10,7 +10,7 @@ CPUDIR:=$(CPU)
 
 CPPINCLUDES=-Iinclude
 CPPFLAGS=-D__is_sortix_libc $(CPPINCLUDES)
-FLAGS=-Wall -Wextra $(OPTLEVEL)
+FLAGS=-Wall -Wextra -ffreestanding $(OPTLEVEL)
 CFLAGS=-std=gnu11 -Wstrict-prototypes -Werror=implicit-function-declaration
 CXXFLAGS=-std=gnu++11 -fno-exceptions -fno-rtti
 ASFLAGS=
@@ -740,7 +740,7 @@ HEADERS:=$(shell find include -type f)
 
 LIBK_OBJS:=$(FREEOBJS:.o=.libk.o)
 LIBK_CPPFLAGS:=$(CPPFLAGS) -D__is_sortix_libk
-LIBK_FLAGS:=$(FLAGS) -ffreestanding
+LIBK_FLAGS:=$(FLAGS)
 LIBK_CFLAGS:=$(CFLAGS)
 LIBK_CXXFLAGS:=$(CXXFLAGS)
 ifeq ($(HOST),x86_64-sortix)

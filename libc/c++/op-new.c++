@@ -20,7 +20,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#if __STDC_HOSTED__
+#ifndef __is_sortix_libk
 
 __attribute__((weak))
 void* operator new(size_t size)
