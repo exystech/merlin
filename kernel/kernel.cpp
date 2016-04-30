@@ -172,7 +172,7 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 
 	// Display the logo.
 	Log::PrintF("\e[37;41m\e[2J");
-	Log::Center(BRAND_MAXSI);
+	Log::Center(BRAND_LOGO);
 
 #if defined(__x86_64__)
 	// TODO: Remove this hack when qemu 1.4.x and 1.5.0 are obsolete.

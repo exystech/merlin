@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2014, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -110,7 +110,7 @@ void PanicInit()
 	if ( longpanic )
 	{
 		Log::Print("\e[m\e[31;40m\e[2J\e[H");
-		Log::Center(BRAND_MAXSI_DEAD);
+		Log::Center(BRAND_LOGO_PANIC);
 		Log::Center("KERNEL PANIC");
 		Log::Print("\n\nThe operating system encountered an unrecoverable "
 		           "error.\n\nTechincal information:\n");

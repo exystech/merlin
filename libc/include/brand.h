@@ -20,6 +20,14 @@
 #ifndef INCLUDE_BRAND_H
 #define INCLUDE_BRAND_H
 
+/*
+ * The name 'Sortix' and the Sortix Logo are reserved for use by the official
+ * Sortix project. If you publish modified versions of this operating system,
+ * first edit this file to make no use of the 'Sortix' name and the Sortix logo
+ * in its definitions, then rebuild the whole operating system and ports to
+ * change the branding.
+ */
+
 /* The name of the distribution of the operation system. */
 #define BRAND_DISTRIBUTION_NAME "Sortix"
 
@@ -32,11 +40,14 @@
 /* The name of the kernel. */
 #define BRAND_KERNEL_NAME "Sortix"
 
+/* The default hostname. */
+#define BRAND_DEFAULT_HOSTNAME "sortix"
+
 /* The tagline of this release. */
 #define BRAND_RELEASE_TAGLINE "\"I'd like to add you to my professional Sortix network\""
 
-/* Ascii version of the maxsi logo. */
-#define BRAND_MAXSI \
+/* The operating system logo as ascii art. */
+#define BRAND_LOGO \
 "                                        _  \n" \
 "                                       / \\ \n" \
 "   /\\    /\\                           /   \\\n" \
@@ -53,8 +64,8 @@
 "     /_____________\\       /____________\\  \n" \
 "                                           \n" \
 
-/* Dead version of the maxsi logo, used for panic screens and such. */
-#define BRAND_MAXSI_DEAD \
+/* The operating system logo for panic screens. */
+#define BRAND_LOGO_PANIC \
 "                                        _  \n" \
 "                                       / \\ \n" \
 "   /\\    /\\                           /   \\\n" \
@@ -70,22 +81,5 @@
 "      /           \\         /          \\   \n" \
 "     /_____________\\       /____________\\  \n" \
 "                                           \n" \
-
-/* Message printed when a critical error occurs and the system panics. */
-#define BRAND_PANIC_LONG \
-"\e[m\e[31;40m\e[2J\e[H" \
-BRAND_MAXSI_DEAD \
-"                                                                                \n" \
-"                              RED MAXSI OF DEATH                                \n" \
-"                                                                                \n" \
-"A critical error occured within the kernel of the operating system and it has\n" \
-"forcefully shut down as a last resort.\n" \
-"\n" \
-"Technical information:\n" \
-
-/* Short version of the panic version that consumes minimal space. */
-#define BRAND_PANIC_SHORT \
-"\e[m\e[31m\e[0J" \
-"RED MAXSI OF DEATH\n" \
 
 #endif

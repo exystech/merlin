@@ -222,7 +222,7 @@ static char* brand_line()
 	kernelinfo("version", version, sizeof(version));
 	char* result = NULL;
 	asprintf(&result, "%s %s - %s",
-	         BRAND_OPERATING_SYSTEM_NAME,
+	         BRAND_DISTRIBUTION_NAME,
 	         version,
 	         BRAND_DISTRIBUTION_WEBSITE);
 	return result;

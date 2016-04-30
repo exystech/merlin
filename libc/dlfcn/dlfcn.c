@@ -26,7 +26,7 @@ void* dlopen(const char* filename, int mode)
 {
 	(void) filename;
 	(void) mode;
-	dlerrormsg = "Sortix does not yet support dynamic linking";
+	dlerrormsg = "Dynamic linking is not implemented";
 	return NULL;
 }
 
@@ -34,7 +34,7 @@ void* dlsym(void* handle, const char* name)
 {
 	(void) handle;
 	(void) name;
-	dlerrormsg = "Sortix does not yet support dynamic linking";
+	dlerrormsg = "Dynamic linking is not implemented";
 	return NULL;
 }
 

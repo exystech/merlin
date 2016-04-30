@@ -17,6 +17,7 @@
  * System calls for managing the hostname of the current system.
  */
 
+#include <brand.h>
 #include <errno.h>
 #include <string.h>
 
