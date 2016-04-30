@@ -27,7 +27,6 @@
 #if defined(__x86_64__)
 static const char* machine = "x86_64";
 static const char* processor = "x86_64";
-static const char* hwplatform = "x86_64";
 #elif defined(__i386__)
 #if defined(__i686__)
 static const char* machine = "i686";
@@ -39,13 +38,10 @@ static const char* machine = "i486";
 static const char* machine = "i386";
 #endif
 static const char* processor = "i386";
-static const char* hwplatform = "i386";
 #else
 static const char* machine = "unknown";
 static const char* processor = "unknown";
-static const char* hwplatform = "unknown";
 #endif
-static const char* opsysname = BRAND_OPERATING_SYSTEM_NAME;
 
 int uname(struct utsname* name)
 {
@@ -61,7 +57,5 @@ int uname(struct utsname* name)
 		strlcpy(name->version, "unknown", sizeof(name->version));
 	strlcpy(name->machine, machine, sizeof(name->machine));
 	strlcpy(name->processor, processor, sizeof(name->processor));
-	strlcpy(name->hwplatform, hwplatform, sizeof(name->hwplatform));
-	strlcpy(name->opsysname, opsysname, sizeof(name->opsysname));
 	return 0;
 }

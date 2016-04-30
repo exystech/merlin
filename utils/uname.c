@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -35,17 +35,11 @@ static const int PRINT_KERNELVER = 1 << 3;
 static const int PRINT_TAGLINE = 1 << 4;
 static const int PRINT_MACHINE = 1 << 5;
 static const int PRINT_PROCESSOR = 1 << 6;
-static const int PRINT_HWPLATFORM = 1 << 7;
-static const int PRINT_OPSYS = 1 << 8;
 
-bool has_printed = false;
-
-void DoPrint(const char* msg)
+const char* print(const char* prefix, const char* msg)
 {
-	if ( has_printed )
-		printf(" ");
-	printf("%s", msg);
-	has_printed = true;
+	printf("%s%s", prefix, msg);
+	return " ";
 }
 
 static void compact_arguments(int* argc, char*** argv)
@@ -90,15 +84,13 @@ int main(int argc, char* argv[])
 			while ( (c = *++arg) ) switch ( c )
 			{
 			case 'a': flags |= INT_MAX; break;
-			case 's': flags |= PRINT_KERNELNAME; break;
+			case 'm': flags |= PRINT_MACHINE; break;
 			case 'n': flags |= PRINT_NODENAME; break;
+			case 'p': flags |= PRINT_PROCESSOR; break;
 			case 'r': flags |= PRINT_KERNELREL; break;
+			case 's': flags |= PRINT_KERNELNAME; break;
 			case 't': flags |= PRINT_TAGLINE; break;
 			case 'v': flags |= PRINT_KERNELVER; break;
-			case 'm': flags |= PRINT_MACHINE; break;
-			case 'p': flags |= PRINT_PROCESSOR; break;
-			case 'i': flags |= PRINT_HWPLATFORM; break;
-			case 'o': flags |= PRINT_OPSYS; break;
 			default:
 				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
 				help(stderr, argv0);
@@ -107,22 +99,18 @@ int main(int argc, char* argv[])
 		}
 		else if ( !strcmp(arg, "--kernel-name") )
 			flags |= PRINT_KERNELNAME;
-		else if ( !strcmp(arg, "--nodename") )
-			flags |= PRINT_NODENAME;
 		else if ( !strcmp(arg, "--kernel-release") )
 			flags |= PRINT_KERNELREL;
 		else if ( !strcmp(arg, "--kernel-version") )
 			flags |= PRINT_KERNELVER;
-		else if ( !strcmp(arg, "--tagline") )
-			flags |= PRINT_TAGLINE;
 		else if ( !strcmp(arg, "--machine") )
 			flags |= PRINT_MACHINE;
+		else if ( !strcmp(arg, "--nodename") )
+			flags |= PRINT_NODENAME;
 		else if ( !strcmp(arg, "--processor") )
 			flags |= PRINT_PROCESSOR;
-		else if ( !strcmp(arg, "--hardware-platform") )
-			flags |= PRINT_HWPLATFORM;
-		else if ( !strcmp(arg, "--operating-system") )
-			flags |= PRINT_OPSYS;
+		else if ( !strcmp(arg, "--tagline") )
+			flags |= PRINT_TAGLINE;
 		else if ( !strcmp(arg, "--help") )
 			help(stdout, argv0), exit(0);
 		else if ( !strcmp(arg, "--version") )
@@ -146,24 +134,23 @@ int main(int argc, char* argv[])
 
 	if ( !flags )
 		flags = PRINT_KERNELNAME;
+
+	const char* prefix = "";
 	if ( flags & PRINT_KERNELNAME )
-		DoPrint(utsname.sysname);
+		prefix = print(prefix, utsname.sysname);
 	if ( flags & PRINT_NODENAME )
-		DoPrint(utsname.nodename);
+		prefix = print(prefix, utsname.nodename);
 	if ( flags & PRINT_KERNELREL )
-		DoPrint(utsname.release);
+		prefix = print(prefix, utsname.release);
 	if ( flags & PRINT_TAGLINE )
-		DoPrint(utsname.tagline);
+		prefix = print(prefix, utsname.tagline);
 	if ( flags & PRINT_KERNELVER )
-		DoPrint(utsname.version);
+		prefix = print(prefix, utsname.version);
 	if ( flags & PRINT_MACHINE )
-		DoPrint(utsname.machine);
+		prefix = print(prefix, utsname.machine);
 	if ( flags & PRINT_PROCESSOR )
-		DoPrint(utsname.processor);
-	if ( flags & PRINT_HWPLATFORM )
-		DoPrint(utsname.hwplatform);
-	if ( flags & PRINT_OPSYS )
-		DoPrint(utsname.opsysname);
+		prefix = print(prefix, utsname.processor);
 	printf("\n");
+
 	return 0;
 }
