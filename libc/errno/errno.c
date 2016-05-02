@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2014, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,27 +18,9 @@
  */
 
 #include <errno.h>
-#include <stddef.h>
 
 #ifndef __is_sortix_libk
 
 __thread int errno = 0;
-
-#else
-
-int global_errno = 0;
-errno_location_func_t errno_location_func = NULL;
-
-int* get_errno_location(void)
-{
-	if ( errno_location_func )
-		return errno_location_func();
-	return &global_errno;
-}
-
-void set_errno_location_func(errno_location_func_t func)
-{
-	errno_location_func = func;
-}
 
 #endif

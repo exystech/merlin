@@ -372,7 +372,7 @@ interrupt_handler_prepare:
 	pushq %rbp
 
 	# Push the current kernel errno value.
-	movl global_errno, %ebp
+	movl errno, %ebp
 	pushq %rbp
 
 	# Push whether a signal is pending.
@@ -396,7 +396,7 @@ load_interrupted_registers:
 
 	# Restore the previous kernel errno.
 	popq %rbp
-	movl %ebp, global_errno
+	movl %ebp, errno
 
 	# Remove CR2 from the stack.
 	addq $8, %rsp

@@ -24,7 +24,7 @@
 .section .text
 .type syscall_handler, @function
 syscall_handler:
-	movl $0, global_errno # Reset errno
+	movl $0, errno
 
 	pushq %rbp
 	movq %rsp, %rbp
@@ -45,7 +45,7 @@ syscall_handler:
 
 	# Return to user-space, system call result in %rax:%rdx, errno in %ecx.
 	popq %rbp
-	movl global_errno, %ecx
+	movl errno, %ecx
 
 	# Zero registers to avoid information leaks.
 	# rax is return value.

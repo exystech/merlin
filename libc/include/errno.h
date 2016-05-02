@@ -22,10 +22,6 @@
 
 #include <sys/cdefs.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define ENOTBLK 12
 #define ENODEV 13
 #define EWOULDBLOCK 14
@@ -117,6 +113,10 @@ extern "C" {
 
 #define EOPNOTSUPP ENOTSUP
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #if !defined(__is_sortix_libk) && !defined(__is_sortix_kernel)
 
 extern __thread int errno;
@@ -124,24 +124,15 @@ extern __thread int errno;
 
 #else
 
-/* Returns the address of the errno variable for this thread. */
-int* get_errno_location(void);
-
-/* get_errno_location will forward the request to a user-specified function if
-   specified, or if NULL, will return the global thread-shared errno value. */
-typedef int* (*errno_location_func_t)(void);
-void set_errno_location_func(errno_location_func_t func);
-
-#define errno (*get_errno_location())
+int* libk_get_errno_location(void);
+#define errno (*libk_get_errno_location())
 
 #endif
 
+#if __USE_SORTIX
 extern char* program_invocation_name;
 extern char* program_invocation_short_name;
-
-/* Satisfy broken programs that expect these to be macros. */
-#define program_invocation_name program_invocation_name
-#define program_invocation_short_name program_invocation_short_name
+#endif
 
 #ifdef __cplusplus
 } /* extern "C" */

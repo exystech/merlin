@@ -25,7 +25,7 @@
 .type syscall_handler, @function
 syscall_handler:
 	/* -- stack is 12 bytes from being 16-byte aligned -- */
-	movl $0, global_errno # Reset errno
+	movl $0, errno
 
 	pushl %ebp
 	/* -- stack is 8 bytes from being 16-byte aligned -- */
@@ -69,7 +69,7 @@ syscall_handler:
 
 	# Return to user-space, system call result in %eax:%edx, errno in %ecx.
 	popl %ebp
-	movl global_errno, %ecx
+	movl errno, %ecx
 
 	# Zero registers to avoid information leaks.
 	# eax is the return value.

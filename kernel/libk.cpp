@@ -169,4 +169,13 @@ void libk_munmap(void* ptr, size_t size)
 	FreeKernelAddress(&addralloc);
 }
 
+#undef errno
+extern "C" { int errno; }
+
+extern "C"
+int* libk_get_errno_location(void)
+{
+	return &errno;
+}
+
 } // namespace Sortix
