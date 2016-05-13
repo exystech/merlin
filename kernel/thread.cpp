@@ -89,9 +89,13 @@ Thread::Thread()
 	memset(&registers, 0, sizeof(registers));
 	kernelstackpos = 0;
 	kernelstacksize = 0;
+	signal_count = 0;
+	signal_single_frame = 0;
+	signal_canary = 0;
 	kernelstackmalloced = false;
 	pledged_destruction = false;
 	force_no_signals = false;
+	signal_single = false;
 	sigemptyset(&signal_pending);
 	sigemptyset(&signal_mask);
 	memset(&signal_stack, 0, sizeof(signal_stack));

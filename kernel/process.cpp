@@ -1689,7 +1689,7 @@ void sys_scram(int event, const void* user_info)
 			(intmax_t) process->pid,
 			event);
 	}
-	// TODO: Allow debugging this event.
+	// TODO: Allow debugging this event (and see signal.cpp sigreturn).
 	kthread_exit();
 }
 

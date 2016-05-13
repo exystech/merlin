@@ -76,9 +76,13 @@ public:
 	stack_t signal_stack;
 	addr_t kernelstackpos;
 	size_t kernelstacksize;
+	size_t signal_count;
+	uintptr_t signal_single_frame;
+	uintptr_t signal_canary;
 	bool kernelstackmalloced;
 	bool pledged_destruction;
 	bool force_no_signals;
+	bool signal_single;
 	Clock execute_clock;
 	Clock system_clock;
 

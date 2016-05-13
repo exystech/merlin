@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <signal.h>
 
 #include <sortix/sigaction.h>
@@ -508,6 +509,7 @@ struct stack_frame
 	siginfo_t* siginfo_param;
 	ucontext_t* ucontext_param;
 	void* cookie_param;
+	uintptr_t canary;
 	ucontext_t ucontext;
 	siginfo_t siginfo;
 };
@@ -516,6 +518,7 @@ struct stack_frame
 {
 	uintptr_t misalignment[1];
 	uintptr_t sigreturn;
+	uintptr_t canary;
 	ucontext_t ucontext;
 	siginfo_t siginfo;
 };
@@ -728,6 +731,12 @@ retry_another_signal:
 #error "You need to format the stack frame"
 #endif
 
+	// Store a canary so it can later be verified this is a real signal being
+	// returned from.
+	if ( signal_count == 0 )
+		arc4random_buf(&signal_canary, sizeof(signal_canary));
+	stack_frame.canary = signal_canary ^ (uintptr_t) stack;
+
 	// Format the siginfo into the stack frame.
 	stack_frame.siginfo.si_signo = signum;
 #if defined(__i386__) || defined(__x86_64__)
@@ -783,6 +792,17 @@ retry_another_signal:
 		}
 	}
 
+	// Know for sure when there's no signal still being handled. This is an
+	// over-approximation as programs may do absolutely awful things such as
+	// longjmp(3)ing out of signal handlers, so each delivered signal does not
+	// nessesarily mean a sigreturn. This will work correctly in reasonable
+	// programs though and will harden those programs. Remember the stack frame
+	// as well for verification if there is no recursive signal handling.
+	if ( signal_count != SIZE_MAX )
+		signal_count++;
+	if ( (signal_single = signal_count == 1) )
+		signal_single_frame = (uintptr_t) stack;
+
 	// Run the signal handler by returning to user-space.
 	return;
 }
@@ -792,30 +812,99 @@ void Thread::HandleSigreturn(struct interrupt_context* intctx)
 	assert(Interrupt::IsEnabled());
 	assert(this == CurrentThread());
 
-	ScopedLock lock(&process->signal_lock);
-
 	struct stack_frame stack_frame;
-	const struct stack_frame* user_stack_frame;
+	struct stack_frame* user_stack_frame;
 #if defined(__i386__)
-	user_stack_frame = (const struct stack_frame*)
+	user_stack_frame = (struct stack_frame*)
 		(intctx->esp - offsetof(struct stack_frame, sigreturn) - 4);
+	bool wrong_ip = intctx->eip != (uintptr_t) process->sigreturn + 2;
 #elif defined(__x86_64__)
-	user_stack_frame = (const struct stack_frame*)
+	user_stack_frame = (struct stack_frame*)
 		(intctx->rsp - offsetof(struct stack_frame, sigreturn) - 8);
+	bool wrong_ip = intctx->rip != (uintptr_t) process->sigreturn + 2;
 #else
 #error "You need to locate the stack we passed the signal handler"
 #endif
 
-	if ( CopyFromUser(&stack_frame, user_stack_frame, sizeof(stack_frame)) )
+	// Protect against sigreturn oriented programming (SROP) as described in
+	// "Framing Signals - A Return to Portable Shellcode" (Bosman and Bos 2014).
+
+	// If the we're not called from the kernel sigreturn page, it is not a valid
+	// sigreturn.
+	if ( wrong_ip )
 	{
-		memcpy(&signal_mask, &stack_frame.ucontext.uc_sigmask, sizeof(signal_mask));
-		memcpy(&signal_stack, &stack_frame.ucontext.uc_stack, sizeof(signal_stack));
-		signal_stack.ss_flags &= __SS_SUPPORTED_FLAGS;
-		struct thread_registers resume_regs;
-		Scheduler::SaveInterruptedContext(intctx, &resume_regs);
-		DecodeMachineContext(&stack_frame.ucontext.uc_mcontext, &resume_regs);
-		Scheduler::LoadInterruptedContext(intctx, &resume_regs);
+		process->ExitThroughSignal(SIGABRT);
+		Log::PrintF("%s[%ji]: sigreturn smashing detected: Bypassed kernel sigreturn page\n",
+			process->program_image_path,
+			(intmax_t) process->pid);
+		// TODO: Allow debugging this event (see scram(2)).
+		kthread_exit();
 	}
+
+	// If no signals are being serviced by this thread at the moment, it is not
+	// a valid sigreturn.
+	if ( signal_count == 0 )
+	{
+		process->ExitThroughSignal(SIGABRT);
+		Log::PrintF("%s[%ji]: sigreturn smashing detected: Thread wasn't servicing a signal\n",
+			process->program_image_path,
+			(intmax_t) process->pid);
+		// TODO: Allow debugging this event (see scram(2)).
+		kthread_exit();
+	}
+
+	// If a single signal is being serviced by this thread at the moment, the
+	// stack pointer must be what we expect it to be. If there's multiple, we
+	// don't know which one is the correct. (We could keep track of them and
+	// ensure it's one of them, but that's not really worth it. The list of such
+	// delivered signals could grow without bound because it's valid to longjmp
+	// out of a signal handler)
+	if ( signal_single && (uintptr_t) user_stack_frame != signal_single_frame )
+	{
+		process->ExitThroughSignal(SIGABRT);
+		Log::PrintF("%s[%ji]: sigreturn smashing detected: Stack pointer was wrong\n",
+			process->program_image_path,
+			(intmax_t) process->pid);
+		// TODO: Allow debugging this event (see scram(2)).
+		kthread_exit();
+	}
+
+	// If we couldn't read the frame, the sigreturn is certainly bad.
+	if ( !CopyFromUser(&stack_frame, user_stack_frame, sizeof(stack_frame)) )
+	{
+		process->ExitThroughSignal(SIGABRT);
+		Log::PrintF("%s[%ji]: sigreturn smashing detected: Couldn't read stack frame: %m\n",
+			process->program_image_path,
+			(intmax_t) process->pid);
+		// TODO: Allow debugging this event (see scram(2)).
+		kthread_exit();
+	}
+	ZeroUser(user_stack_frame, sizeof(*user_stack_frame));
+
+	// If the random canary isn't correct, the sigreturn is certianly bad.
+	if ( stack_frame.canary != (signal_canary ^ (uintptr_t) user_stack_frame) )
+	{
+		process->ExitThroughSignal(SIGABRT);
+		Log::PrintF("%s[%ji]: sigreturn smashing detected: Verification value was incorrect\n",
+			process->program_image_path,
+			(intmax_t) process->pid);
+		// TODO: Allow debugging this event (see scram(2)).
+		kthread_exit();
+	}
+
+	ScopedLock lock(&process->signal_lock);
+
+	memcpy(&signal_mask, &stack_frame.ucontext.uc_sigmask, sizeof(signal_mask));
+	memcpy(&signal_stack, &stack_frame.ucontext.uc_stack, sizeof(signal_stack));
+	signal_stack.ss_flags &= __SS_SUPPORTED_FLAGS;
+	struct thread_registers resume_regs;
+	Scheduler::SaveInterruptedContext(intctx, &resume_regs);
+	DecodeMachineContext(&stack_frame.ucontext.uc_mcontext, &resume_regs);
+	Scheduler::LoadInterruptedContext(intctx, &resume_regs);
+
+	if ( signal_count != SIZE_MAX )
+		signal_count--;
+	signal_single = false;
 
 	UpdatePendingSignals(this);
 	intctx->signal_pending = asm_signal_is_pending;
