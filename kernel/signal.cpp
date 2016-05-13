@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -502,20 +502,22 @@ static void DecodeMachineContext(const mcontext_t* mctx,
 #if defined(__i386__)
 struct stack_frame
 {
-	unsigned long sigreturn;
+	uintptr_t misalignment[3];
+	uintptr_t sigreturn;
 	int signum_param;
 	siginfo_t* siginfo_param;
 	ucontext_t* ucontext_param;
 	void* cookie_param;
-	siginfo_t siginfo;
 	ucontext_t ucontext;
+	siginfo_t siginfo;
 };
 #elif defined(__x86_64__)
 struct stack_frame
 {
-	unsigned long sigreturn;
-	siginfo_t siginfo;
+	uintptr_t misalignment[1];
+	uintptr_t sigreturn;
 	ucontext_t ucontext;
+	siginfo_t siginfo;
 };
 #else
 #error "You need to implement struct stack_frame"
@@ -695,31 +697,31 @@ retry_another_signal:
 
 #if defined(__i386__)
 	stack_location -= sizeof(stack_frame);
-	stack_location &= ~(4UL-1UL);
+	stack_location &= ~(16UL-1UL); /* 16-byte align */
 	struct stack_frame* stack = (struct stack_frame*) stack_location;
 
-	stack_frame.sigreturn = (unsigned long) process->sigreturn;
+	stack_frame.sigreturn = (uintptr_t) process->sigreturn;
 	stack_frame.signum_param = signum;
 	stack_frame.siginfo_param = &stack->siginfo;
 	stack_frame.ucontext_param = &stack->ucontext;
 	stack_frame.cookie_param = action->sa_cookie;
 
-	handler_regs.esp = (unsigned long) stack;
+	handler_regs.esp = (unsigned long) stack + sizeof(stack->misalignment);
 	handler_regs.eip = (unsigned long) handler_ptr;
 	handler_regs.eflags &= ~FLAGS_DIRECTION;
 #elif defined(__x86_64__)
 	stack_location -= 128; /* Red zone. */
 	stack_location -= sizeof(stack_frame);
-	stack_location = ((stack_location - 8) & ~(16UL-1UL)) + 8;
+	stack_location &= ~(16UL-1UL); /* 16-byte align */
 	struct stack_frame* stack = (struct stack_frame*) stack_location;
 
-	stack_frame.sigreturn = (unsigned long) process->sigreturn;
+	stack_frame.sigreturn = (uintptr_t) process->sigreturn;
 	handler_regs.rdi = (unsigned long) signum;
 	handler_regs.rsi = (unsigned long) &stack->siginfo;
 	handler_regs.rdx = (unsigned long) &stack->ucontext;
 	handler_regs.rcx = (unsigned long) action->sa_cookie;
 
-	handler_regs.rsp = (unsigned long) stack;
+	handler_regs.rsp = (unsigned long) stack + sizeof(stack->misalignment);
 	handler_regs.rip = (unsigned long) handler_ptr;
 	handler_regs.rflags &= ~FLAGS_DIRECTION;
 #else
@@ -795,9 +797,11 @@ void Thread::HandleSigreturn(struct interrupt_context* intctx)
 	struct stack_frame stack_frame;
 	const struct stack_frame* user_stack_frame;
 #if defined(__i386__)
-	user_stack_frame = (const struct stack_frame*) (intctx->esp - 4);
+	user_stack_frame = (const struct stack_frame*)
+		(intctx->esp - offsetof(struct stack_frame, sigreturn) - 4);
 #elif defined(__x86_64__)
-	user_stack_frame = (const struct stack_frame*) (intctx->rsp - 8);
+	user_stack_frame = (const struct stack_frame*)
+		(intctx->rsp - offsetof(struct stack_frame, sigreturn) - 8);
 #else
 #error "You need to locate the stack we passed the signal handler"
 #endif
