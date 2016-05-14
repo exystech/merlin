@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,15 +20,49 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-void* bsearch(const void* key, const void* base, size_t nmemb,
-              size_t size, int (*compare)(const void*, const void*))
+/*
+ * Semantics of binary search:
+ *
+ * bsearch(key, base, 0, size, compare) may return NULL.
+ *
+ * If 0 <= i < nmemb
+ * and ptr = base + size * i
+ * and compare(key, ptr) = 0 then
+ * bsearch(key, base, nmemb, size, compare) may return ptr.
+ *
+ * If 0 <= i < nmemb
+ * and ptr = base + size * i
+ * and compare(key, ptr) < 0 then
+ * bsearch(key, base, nmemb, size, compare) may return
+ * bsearch(key, base, i, size, compare).
+ *
+ * If 0 <= i < nmemb
+ * and ptr = base + size * i
+ * and compare(key, ptr) > 0 then
+ * bsearch(key, base, nmemb, size, compare) may return
+ * bsearch(key, base + size * (i + 1), nemb - (i + 1), size, compare).
+ */
+
+void* bsearch(const void* key,
+              const void* base_ptr,
+              size_t nmemb,
+              size_t size,
+              int (*compare)(const void*, const void*))
 {
-	const uint8_t* baseptr = (const uint8_t*) base;
-	// TODO: Just a quick and surprisingly correct yet slow implementation.
-	for ( size_t i = 0; i < nmemb; i++ )
+	const unsigned char* base = (const unsigned char*) base_ptr;
+	while ( nmemb )
 	{
-		const void* candidate = baseptr + i * size;
-		if ( !compare(key, candidate) )
+		size_t i = nmemb / 2;
+		const unsigned char* candidate = base + i * size;
+		int rel = compare(key, candidate);
+		if ( rel < 0 ) /* key smaller than candidate */
+			nmemb = i;
+		else if ( 0 < rel ) /* key greater than candidate */
+		{
+			base = candidate + size;
+			nmemb -= i + 1;
+		}
+		else /* key equal to candidate */
 			return (void*) candidate;
 	}
 	return NULL;
