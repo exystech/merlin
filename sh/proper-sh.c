@@ -91,8 +91,11 @@ char* search_for_proper_shell(void)
 			ssize_t result_length = getline(&result, &result_size, fp);
 			fclose(fp);
 			if ( result_length < 0 )
+			{
+				free(result);
 				continue;
-			if ( result_length && result[result_length-1] == '\n' )
+			}
+			if ( result[result_length-1] == '\n' )
 				result[--result_length] = '\0';
 			if ( !is_existing_shell(result) )
 			{

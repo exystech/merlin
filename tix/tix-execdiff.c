@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+#include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>

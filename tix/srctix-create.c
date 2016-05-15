@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+#include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
@@ -154,7 +155,7 @@ int main(int argc, char* argv[])
 	ssize_t line_len;
 	while ( 0 < (line_len = getline(&line, &line_size, porttixinfo_fp)) )
 	{
-		if ( line_len && line[line_len-1] == '\n' )
+		if ( line[line_len-1] == '\n' )
 			line[--line_len] = '\0';
 		char* first_space = strchr(line, ' ');
 		if ( !first_space )
@@ -271,6 +272,8 @@ int main(int argc, char* argv[])
 			      porttixinfo_path, function);
 	}
 	free(line);
+	if ( ferror(porttixinfo_fp) )
+		error(1, errno, "%s", porttixinfo_path);
 
 	fclose(porttixinfo_fp);
 	free(porttixinfo_path);

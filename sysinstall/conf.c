@@ -74,7 +74,7 @@ void load_upgrade_conf(struct conf* conf, const char* path)
 	char* line = NULL;
 	size_t line_size = 0;
 	ssize_t line_length;
-	while ( 0 < (errno = 0, line_length = getline(&line, &line_size, fp)) )
+	while ( 0 < (line_length = getline(&line, &line_size, fp)) )
 	{
 		if ( line[line_length - 1] == '\n' )
 			line[--line_length] = '\0';
@@ -105,7 +105,7 @@ void load_upgrade_conf(struct conf* conf, const char* path)
 		name[name_length] = '\0';
 		conf_assign(conf, name, value, path);
 	}
-	if ( errno )
+	if ( ferror(fp) )
 		err(2, "%s", path);
 	free(line);
 	fclose(fp);

@@ -110,7 +110,7 @@ bool os_release_load(struct release* release,
 	char* line = NULL;
 	size_t line_size = 0;
 	ssize_t line_length;
-	while ( 0 < (errno = 0, line_length = getline(&line, &line_size, fp)) )
+	while ( 0 < (line_length = getline(&line, &line_size, fp)) )
 	{
 		if ( line[line_length-1] == '\n' )
 			line[--line_length] = '\0';
@@ -178,7 +178,7 @@ bool os_release_load(struct release* release,
 			}
 		}
 	}
-	if ( errno )
+	if ( ferror(fp) )
 		warn("%s", errpath);
 	else if ( failure )
 		;

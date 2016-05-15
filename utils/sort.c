@@ -105,7 +105,7 @@ char* read_line(FILE* fp, const char* fpname, int delim)
 			error(0, errno, "read: `%s'", fpname);
 		return NULL;
 	}
-	if ( amount && (unsigned char) line[amount-1] == (unsigned char) delim )
+	if ( (unsigned char) line[amount-1] == (unsigned char) delim )
 		line[amount-1] = '\0';
 	return line;
 }

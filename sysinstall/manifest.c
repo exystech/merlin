@@ -97,9 +97,9 @@ void install_manifest(const char* manifest,
 	char* line = NULL;
 	size_t line_size = 0;
 	ssize_t line_length;
-	while ( 0 <= (errno = 0, line_length = getline(&line, &line_size, fpin)) )
+	while ( 0 < (line_length = getline(&line, &line_size, fpin)) )
 	{
-		if ( line_length && line[line_length-1] == '\n' )
+		if ( line[line_length-1] == '\n' )
 			line[--line_length] = '\0';
 		if ( fprintf(fpout, "%s\n", line) < 0 )
 		{
@@ -241,7 +241,7 @@ void install_manifest(const char* manifest,
 		free(out_path);
 	}
 	free(line);
-	if ( errno )
+	if ( ferror(fpin) )
 	{
 		warn("%s", inmanifest);
 		_exit(2);
@@ -273,7 +273,7 @@ bool check_installed(const char* path, const char* package)
 	char* line = NULL;
 	size_t line_size = 0;
 	ssize_t line_length;
-	while ( 0 < (errno = 0, line_length = getline(&line, &line_size, fp)) )
+	while ( 0 < (line_length = getline(&line, &line_size, fp)) )
 	{
 		if ( line[line_length-1] == '\n' )
 			line[--line_length] = '\0';
@@ -284,7 +284,7 @@ bool check_installed(const char* path, const char* package)
 			return true;
 		}
 	}
-	if ( errno != 0 )
+	if ( ferror(fp) )
 		warn("%s", path);
 	free(line);
 	fclose(fp);
@@ -363,7 +363,7 @@ void install_ports(const char* from_prefix, const char* to_prefix)
 	char* line = NULL;
 	size_t line_size = 0;
 	ssize_t line_length;
-	while ( 0 < (errno = 0, line_length = getline(&line, &line_size, fp)) )
+	while ( 0 < (line_length = getline(&line, &line_size, fp)) )
 	{
 		if ( line[line_length-1] == '\n' )
 			line[--line_length] = '\0';
@@ -395,7 +395,7 @@ void install_ports(const char* from_prefix, const char* to_prefix)
 		install_manifest(line, from_prefix, to_prefix);
 	}
 	free(line);
-	if ( errno )
+	if ( ferror(fp) )
 	{
 		warn("%s", cmd);
 		pclose(fp);

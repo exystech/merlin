@@ -105,7 +105,7 @@ bool IsPackageInstalled(const char* tixdb_path, const char* package)
 	ssize_t line_len;
 	while ( 0 < (line_len = getline(&line, &line_size, installed_list_fp)) )
 	{
-		if ( line_len && line[line_len-1] == '\n' )
+		if ( line[line_len-1] == '\n' )
 			line[--line_len] = '\0';
 		if ( !strcmp(line, package) )
 		{
@@ -114,6 +114,8 @@ bool IsPackageInstalled(const char* tixdb_path, const char* package)
 		}
 	}
 	free(line);
+	if ( ferror(installed_list_fp) )
+		error(1, errno, "`%s'", installed_list_path);
 
 	fclose(installed_list_fp);
 	free(installed_list_path);

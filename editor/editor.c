@@ -97,7 +97,7 @@ void editor_load_config_path(struct editor* editor, const char* path)
 	char* line = NULL;
 	size_t line_size = 0;
 	ssize_t line_length = 0;
-	while ( 0 <= (errno = 0, line_length = getline(&line, &line_size, fp)) )
+	while ( 0 < (line_length = getline(&line, &line_size, fp)) )
 	{
 		if ( line[line_length - 1] == '\n' )
 			line[--line_length] = '\0';
@@ -105,7 +105,7 @@ void editor_load_config_path(struct editor* editor, const char* path)
 		line[line_length] = '\0';
 		editor_modal_command_config(editor, line);
 	}
-	if ( errno != 0 )
+	if ( ferror(fp) )
 		error(0, errno, "getline: %s", path);
 	fclose(fp);
 }

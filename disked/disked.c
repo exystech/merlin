@@ -715,9 +715,9 @@ static bool lookup_fstab_by_blockdevice(struct fstab* out_fsent,
 	char* line = NULL;
 	size_t line_size = 0;
 	ssize_t line_length;
-	while ( 0 <= (errno = 0, line_length = getline(&line, &line_size, fstab_fp)) )
+	while ( 0 < (line_length = getline(&line, &line_size, fstab_fp)) )
 	{
-		if ( line_length && line[line_length - 1] == '\n' )
+		if ( line[line_length - 1] == '\n' )
 			line[--line_length] = '\0';
 		if ( !scanfsent(line, out_fsent) )
 			continue;
@@ -730,8 +730,6 @@ static bool lookup_fstab_by_blockdevice(struct fstab* out_fsent,
 	}
 	free(line);
 	fclose(fstab_fp);
-	if ( errno )
-		return false;
 	return false;
 }
 
@@ -747,9 +745,9 @@ static bool remove_blockdevice_from_fstab(struct blockdevice* bdev)
 	char* line = NULL;
 	size_t line_size = 0;
 	ssize_t line_length;
-	while ( 0 <= (errno = 0, line_length = getline(&line, &line_size, rewr.in)) )
+	while ( 0 < (line_length = getline(&line, &line_size, rewr.in)) )
 	{
-		if ( line_length && line[line_length - 1] == '\n' )
+		if ( line[line_length - 1] == '\n' )
 			line[--line_length] = '\0';
 		char* dup = strdup(line);
 		if ( !dup )
@@ -761,7 +759,7 @@ static bool remove_blockdevice_from_fstab(struct blockdevice* bdev)
 		free(dup);
 	}
 	free(line);
-	if ( errno )
+	if ( ferror(rewr.in) )
 		return rewrite_abort(&rewr), false;
 	return rewrite_finish(&rewr);
 }
@@ -811,9 +809,9 @@ static bool add_blockdevice_to_fstab(struct blockdevice* bdev,
 	size_t line_size = 0;
 	ssize_t line_length;
 	bool found = false;
-	while ( 0 <= (errno = 0, line_length = getline(&line, &line_size, rewr.in)) )
+	while ( 0 < (line_length = getline(&line, &line_size, rewr.in)) )
 	{
-		if ( line_length && line[line_length - 1] == '\n' )
+		if ( line[line_length - 1] == '\n' )
 			line[--line_length] = '\0';
 		char* dup = strdup(line);
 		if ( !dup )
@@ -845,7 +843,7 @@ static bool add_blockdevice_to_fstab(struct blockdevice* bdev,
 		free(dup);
 	}
 	free(line);
-	if ( errno )
+	if ( ferror(rewr.in) )
 		return rewrite_abort(&rewr), false;
 	if ( !found )
 		print_blockdevice_fsent(rewr.out, bdev, mountpoint);
@@ -2820,7 +2818,7 @@ int main(int argc, char* argv[])
 			break;
 		}
 
-		if ( line_length && line[line_length-1] == '\n' )
+		if ( line[line_length-1] == '\n' )
 			line[--line_length] = '\0';
 
 		execute(line);

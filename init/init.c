@@ -63,7 +63,7 @@ static char* read_single_line(FILE* fp)
 		free(ret);
 		return NULL;
 	}
-	if ( ret_length && ret[ret_length-1] == '\n' )
+	if ( ret[ret_length-1] == '\n' )
 		ret[--ret_length] = '\0';
 	return ret;
 }
@@ -326,7 +326,7 @@ static void load_fstab(void)
 	char* line = NULL;
 	size_t line_size;
 	ssize_t line_length;
-	while ( 0 < (errno = 0, line_length = getline(&line, &line_size, fp)) )
+	while ( 0 < (line_length = getline(&line, &line_size, fp)) )
 	{
 		if ( line[line_length - 1] == '\n' )
 			line[--line_length] = '\0';
@@ -354,7 +354,7 @@ static void load_fstab(void)
 		line = NULL;
 		line_size = 0;
 	}
-	if ( errno )
+	if ( ferror(fp) )
 		fatal("/etc/fstab: %m");
 	free(line);
 	fclose(fp);

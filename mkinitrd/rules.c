@@ -174,12 +174,12 @@ bool AddRulesFromFile(FILE* fp, const char* fpname)
 	size_t line_num = 0;
 	char* mem = NULL;
 	ssize_t line_len;
-	while ( 0 <= (line_len = getline(&mem, &line_size, fp)) )
+	while ( 0 < (line_len = getline(&mem, &line_size, fp)) )
 	{
 		char* line = mem;
 		line_num++;
-		if ( line_len && line[line_len-1] == '\n' )
-			line[line_len-1] = '\0';
+		if ( line[line_len-1] == '\n' )
+			line[--line_len] = '\0';
 		line = (char*) SkipWhitespace((char*) line);
 		if ( IsLineComment(line) )
 			continue;
@@ -279,10 +279,10 @@ bool AddManifestFromFile(FILE* fp, const char* fpname)
 	char* line = NULL;
 	size_t line_size = 0;
 	ssize_t line_len;
-	while ( 0 <= (line_len = getline(&line, &line_size, fp)) )
+	while ( 0 < (line_len = getline(&line, &line_size, fp)) )
 	{
-		if ( line_len && line[line_len-1] == '\n' )
-			line[line_len-1] = '\0';
+		if ( line[line_len-1] == '\n' )
+			line[--line_len] = '\0';
 		if ( !AddManifestPath(line) )
 			return false;
 	}

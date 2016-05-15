@@ -95,14 +95,14 @@ bool append_lines_from_file(FILE* fp,
 		if ( string_length < 0 )
 		{
 			free(string);
-			if ( feof(stdin) )
-				return true;
-			if ( errno == 0 )
-				return true;
-			error(0, errno, "getline: `%s'", fpname);
-			return false;
+			if ( ferror(fp) )
+			{
+				error(0, errno, "getline: `%s'", fpname);
+				return false;
+			}
+			return true;
 		}
-		if ( string_length && string[string_length-1] == '\n' )
+		if ( string[string_length-1] == '\n' )
 			string[--string_length] = '\0';
 		size_t display_width = measure_line_display_width(string);
 		if ( display_width == 0 && !flag_empty )

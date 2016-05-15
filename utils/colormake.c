@@ -97,9 +97,12 @@ int main(int argc, char* argv[])
 		mode = next_mode;
 	}
 	free(line);
+	int stdin_errno = errno;
 	int status;
 	waitpid(child_pid, &status, 0);
 	printf("\e[m");
 	fflush(stdout);
+	if ( ferror(stdin) )
+		error(1, stdin_errno, "stdin");
 	return WEXITSTATUS(status);
 }

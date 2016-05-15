@@ -67,9 +67,10 @@ bool processfp(const char* inputname, FILE* fp)
 		ssize_t linelen = getline(&line, &linesize, fp);
 		if ( linelen < 0 )
 		{
+			if ( ferror(fp) )
+				error(1, errno, "%s", inputname);
 			free(line);
-			if ( feof(fp) ) { break; }
-			error(1, errno, "%s", inputname);
+			break;
 		}
 		if ( specialleading )
 		{

@@ -29,9 +29,9 @@ struct fstab* getfsent(void)
 	static char* line = NULL;
 	static size_t line_size = 0;
 	ssize_t line_length;
-	while ( 0 <= (line_length = getline(&line, &line_size, __fstab_file)) )
+	while ( 0 < (line_length = getline(&line, &line_size, __fstab_file)) )
 	{
-		if ( line_length && line[line_length - 1] == '\n' )
+		if ( line[line_length - 1] == '\n' )
 			line[--line_length] = '\0';
 		if ( scanfsent(line, &fs) )
 			return &fs;

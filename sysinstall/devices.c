@@ -272,7 +272,7 @@ bool load_mountpoints(const char* fstab_path,
 	char* line = NULL;
 	size_t line_size;
 	ssize_t line_length;
-	while ( 0 < (errno = 0, line_length = getline(&line, &line_size, fp)) )
+	while ( 0 < (line_length = getline(&line, &line_size, fp)) )
 	{
 		if ( line[line_length - 1] == '\n' )
 			line[--line_length] = '\0';
@@ -309,7 +309,7 @@ bool load_mountpoints(const char* fstab_path,
 		line = NULL;
 		line_size = 0;
 	}
-	bool failure = errno;
+	bool failure = ferror(fp);
 	free(line);
 	fclose(fp);
 	if ( failure )

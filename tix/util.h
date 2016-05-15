@@ -242,11 +242,12 @@ void string_array_append_file(string_array_t* sa, FILE* fp)
 	ssize_t entry_length;
 	while ( 0 < (entry_length = getline(&entry, &entry_size, fp)) )
 	{
-		if ( entry_length && entry[entry_length-1] == '\n' )
-			entry[entry_length-1] = '\0';
+		if ( entry[entry_length-1] == '\n' )
+			entry[--entry_length] = '\0';
 		string_array_append(sa, entry);
 	}
 	free(entry);
+	assert(!ferror(fp));
 }
 
 bool string_array_append_file_path(string_array_t* sa, const char* path)
@@ -330,14 +331,15 @@ void dictionary_append_file(string_array_t* sa, FILE* fp)
 	ssize_t entry_length;
 	while ( 0 < (entry_length = getline(&entry, &entry_size, fp)) )
 	{
-		if ( entry_length && entry[entry_length-1] == '\n' )
-			entry[entry_length-1] = '\0';
+		if ( entry[entry_length-1] == '\n' )
+			entry[--entry_length] = '\0';
 		dictionary_normalize_entry(entry);
 		if ( entry[0] == '#' )
 			continue;
 		string_array_append(sa, entry);
 	}
 	free(entry);
+	assert(!ferror(fp));
 }
 
 bool dictionary_append_file_path(string_array_t* sa, const char* path)
@@ -372,8 +374,8 @@ char* read_single_line(FILE* fp)
 		free(ret);
 		return NULL;
 	}
-	if ( ret_len && ret[ret_len-1] == '\n' )
-		ret[ret_len-1] = '\0';
+	if ( ret[ret_len-1] == '\n' )
+		ret[--ret_len] = '\0';
 	return ret;
 }
 
@@ -563,7 +565,7 @@ bool TarContainsFile(const char* archive, const char* file)
 	bool ret = false;
 	while ( 0 < (line_len = getline(&line, &line_size, fp)) )
 	{
-		if ( line_len && line[line_len-1] == '\n' )
+		if ( line[line_len-1] == '\n' )
 			line[--line_len] = '\0';
 		if ( strcmp(line, file) == 0 )
 		{
@@ -575,6 +577,8 @@ bool TarContainsFile(const char* archive, const char* file)
 		}
 	}
 	free(line);
+	if ( ferror(fp) )
+		error(1, errno, "getline: tar");
 
 	fclose(fp);
 	int tar_exit_status;

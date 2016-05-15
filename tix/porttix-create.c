@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+#include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
@@ -313,7 +314,7 @@ int main(int argc, char* argv[])
 	ssize_t line_len;
 	while ( 0 < (line_len = getline(&line, &line_size, tar_fp)) )
 	{
-		if ( line_len && line[line_len-1] == '\n' )
+		if ( line[line_len-1] == '\n' )
 			line[--line_len] = '\0';
 		const char* path = line;
 		while ( *path && *path != '/' )
@@ -335,6 +336,8 @@ int main(int argc, char* argv[])
 		}
 	}
 	free(line);
+	if ( ferror(tar_fp) )
+		error(1, errno, "getline: tar");
 
 	fclose(tar_fp);
 	int tar_exit_status;

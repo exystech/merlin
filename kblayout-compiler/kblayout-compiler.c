@@ -460,9 +460,9 @@ int main(int argc, char* argv[])
 	char* line = NULL;
 	size_t line_size = 0;
 	ssize_t line_length;
-	while ( 0 <= (line_length = getline(&line, &line_size, input)) )
+	while ( 0 < (line_length = getline(&line, &line_size, input)) )
 	{
-		if ( line_length && line[line_length-1] == '\n' )
+		if ( line[line_length-1] == '\n' )
 			line[--line_length] = '\0';
 		if ( line[0] == '/' && line[1] == '/' )
 			continue;
@@ -604,6 +604,8 @@ int main(int argc, char* argv[])
 		assert(found_key);
 	}
 	free(line);
+	if ( ferror(input) )
+		error(1, errno, "%s", input_path);
 	fclose(input);
 
 	if ( verbose )
