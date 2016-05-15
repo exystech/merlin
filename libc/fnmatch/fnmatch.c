@@ -22,7 +22,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define __FNM_NOT_LEADING (1 << 31)
+#define __FNM_NOT_LEADING (1 << 30)
 
 // TODO: This doesn't properly handle multibyte sequences.
 // TODO: This doesn't fully implement all the POSIX requirements.
