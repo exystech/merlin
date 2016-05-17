@@ -123,7 +123,7 @@ uintptr_t Load(const void* file_ptr, size_t file_size, Auxiliary* aux)
 	if ( header->e_type != ET_EXEC )
 		return errno = EINVAL, 0;
 
-	if ( header->e_entry == 0 )
+	if ( header->e_entry < userspace_addr || userspace_end <= header->e_entry )
 		return errno = EINVAL, 0;
 
 	if ( file_size < header->e_phoff )
