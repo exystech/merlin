@@ -270,9 +270,9 @@ static bool downgrading_version(const struct release* old,
 		return true;
 	if ( new->version_major > old->version_major )
 		return false;
-	if ( new->version_major < old->version_major )
+	if ( new->version_minor < old->version_minor )
 		return true;
-	if ( new->version_major > old->version_major )
+	if ( new->version_minor > old->version_minor )
 		return false;
 	if ( new->version_dev && !old->version_dev )
 		return true;
