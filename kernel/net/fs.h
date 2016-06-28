@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,10 +20,13 @@
 #ifndef SORTIX_NET_FS_H
 #define SORTIX_NET_FS_H
 
+#include <sortix/kernel/inode.h>
+
 namespace Sortix {
 namespace NetFS {
 
-void Init(const char* devpath, Ref<Descriptor> slashdev);
+void Init();
+Ref<Inode> Socket(int type, int protocol);
 
 } // namespace NetFS
 } // namespace Sortix

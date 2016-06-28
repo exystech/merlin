@@ -199,6 +199,7 @@ void* syscall_list[SYSCALL_MAX_NUM + 1] =
 	[SYSCALL_SCRAM] = (void*) sys_scram,
 	[SYSCALL_GETSID] = (void*) sys_getsid,
 	[SYSCALL_SETSID] = (void*) sys_setsid,
+	[SYSCALL_SOCKET] = (void*) sys_socket,
 	[SYSCALL_MAX_NUM] = (void*) sys_bad_syscall,
 };
 } /* extern "C" */

@@ -125,6 +125,7 @@ memorymanagement.o \
 mouse/ps2.o \
 mtable.o \
 net/fs.o \
+net/socket.o \
 op-new.o \
 panic.o \
 partition.o \

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,8 +16,6 @@
  * net/fs.cpp
  * Filesystem based socket interface.
  */
-
-// TODO: Should this be moved into user-space?
 
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -550,26 +548,22 @@ Ref<Inode> Manager::open(ioctx_t* /*ctx*/, const char* filename,
 	return errno = ENOENT, Ref<Inode>(NULL);
 }
 
-void Init(const char* devpath, Ref<Descriptor> slashdev)
+static Ref<Manager> manager;
+
+void Init()
 {
-	ioctx_t ctx; SetupKernelIOCtx(&ctx);
-	Ref<Inode> node(new Manager(0, 0, 0666));
-	if ( !node )
-		PanicF("Unable to allocate %s/net/fs inode.", devpath);
-	// TODO: Race condition! Create a mkdir function that returns what it
-	// created, possibly with a O_MKDIR flag to open.
-	if ( slashdev->mkdir(&ctx, "net", 0755) < 0 && errno != EEXIST )
-		PanicF("Could not create a %s/net directory", devpath);
-	if ( slashdev->mkdir(&ctx, "net/fs", 0755) < 0 && errno != EEXIST )
-		PanicF("Could not create a %s/net/fs directory", devpath);
-	Ref<Descriptor> mpoint = slashdev->open(&ctx, "net/fs", O_READ | O_WRITE, 0);
-	if ( !mpoint )
-		PanicF("Could not open the %s/net/fs directory", devpath);
-	Ref<MountTable> mtable = CurrentProcess()->GetMTable();
-	// TODO: Make sure that the mount point is *empty*! Add a proper function
-	// for this on the file descriptor class!
-	if ( !mtable->AddMount(mpoint->ino, mpoint->dev, node, false) )
-		PanicF("Unable to mount filesystem on %s/net/fs", devpath);
+	manager = Ref<Manager>(new Manager(0, 0, 0600));
+}
+
+Ref<Inode> Socket(int type, int protocol)
+{
+	if ( protocol != 0 )
+		return errno = EPROTONOSUPPORT, Ref<Inode>(NULL);
+	switch ( type )
+	{
+	case SOCK_STREAM: return Ref<Inode>(new StreamSocket(0, 0, 0600, manager));
+	default: return errno = EPROTOTYPE, Ref<Inode>(NULL);
+	}
 }
 
 } // namespace NetFS

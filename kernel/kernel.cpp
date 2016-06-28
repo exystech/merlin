@@ -581,8 +581,8 @@ static void BootThread(void* /*user*/)
 	// Initialize the BGA driver.
 	BGA::Init();
 
-	// Initialize the filesystem network-
-	NetFS::Init("/dev", slashdev);
+	// Initialize the filesystem network.
+	NetFS::Init();
 
 	//
 	// Stage 6. Executing Hosted Environment ("User-Space")

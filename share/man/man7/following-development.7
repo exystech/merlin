@@ -59,6 +59,21 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Add socket(2)
+The
+.Pa /dev/net
+virtual filesystem for socket creation has been removed in favor of adding an
+actual
+.Xr socket 2
+system call.
+This is a major incompatible ABI change.
+Only Unix sockets were exposed this way.
+In the base system,
+.Xr sf 1
+is the only program with Unix socket capabilities.
+Ports using Unix sockets must be updated.
+Otherwise the system is compatible except accessing Unix sockets fails with
+.Er ENOENT .
 .Ss Add split packages and cross-bootstrapping support to tix-build(8)
 .Xr tix-build 8
 has gained a number of features that will soon be required in order to build
