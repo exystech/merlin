@@ -16,6 +16,7 @@ CXXFLAGS=-std=gnu++11 -fno-exceptions -fno-rtti
 ASFLAGS=
 
 FREEOBJS=\
+arpa/inet/inet_ntop.o \
 assert/__assert.o \
 c++/c++.o \
 c++/op-new.o \
@@ -316,7 +317,6 @@ wctype/wctype.o \
 HOSTEDOBJS=\
 arpa/inet/inet_addr.o \
 arpa/inet/inet_ntoa.o \
-arpa/inet/inet_ntop.o \
 arpa/inet/inet_pton.o \
 blf/blowfish.o \
 $(CPUDIR)/fork.o \

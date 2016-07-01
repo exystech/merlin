@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,25 +14,48 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  * arpa/inet/inet_ntop.c
- * Internet address manipulation routines.
+ * Convert network address to string.
  */
 
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 
+#include <errno.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 const char* inet_ntop(int af,
                       const void* restrict src,
                       char* restrict dst,
                       socklen_t size)
 {
-	(void) af;
-	(void) src;
-	(void) dst;
-	(void) size;
-	fprintf(stderr, "%s is not implemented yet, aborting.\n", __func__);
-	abort();
+	if ( af == AF_INET )
+	{
+		const unsigned char* ip = (const unsigned char*) src;
+		int len = snprintf(dst, size, "%u.%u.%u.%u",
+		                   ip[0], ip[1], ip[2], ip[3]);
+		if ( len < 0 )
+			return NULL;
+		if ( size <= (size_t) len )
+			return errno = ENOSPC, (const char*) NULL;
+		return dst;
+	}
+	else if ( af == AF_INET6 )
+	{
+		// TODO: Support for :: syntax.
+		// TODO: Support for x:x:x:x:x:x:d.d.d.d syntax.
+		const unsigned char* ip = (const unsigned char*) src;
+		int len = snprintf(dst, size, "%x:%x:%x:%x:%x:%x:%x:%x",
+		                   ip[0] << 8 | ip[1], ip[2] << 8 | ip[3],
+		                   ip[4] << 8 | ip[5], ip[6] << 8 | ip[7],
+		                   ip[8] << 8 | ip[9], ip[10] << 8 | ip[11],
+		                   ip[12] << 8 | ip[13], ip[14] << 8 | ip[15]);
+		if ( len < 0 )
+			return NULL;
+		if ( size <= (size_t) len )
+			return errno = ENOSPC, (const char*) NULL;
+		return dst;
+	}
+	else
+		return errno = EAFNOSUPPORT, NULL;
 }
