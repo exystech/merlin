@@ -29,6 +29,7 @@ env \
 expr \
 false \
 find \
+getaddrinfo \
 halt \
 head \
 help \
