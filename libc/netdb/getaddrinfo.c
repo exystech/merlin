@@ -41,9 +41,13 @@ static bool linkaddrinfo(struct addrinfo** restrict* res_ptr,
 	if ( !link->ai_addr )
 		return free(link), false;
 	memcpy(link->ai_addr, templ->ai_addr, templ->ai_addrlen);
-	link->ai_canonname = templ->ai_canonname ? strdup(templ->ai_canonname) : NULL;
-	if ( templ->ai_canonname && !link->ai_canonname )
-		return free(link), free(link->ai_addr), false;
+	link->ai_canonname = NULL;
+	if ( templ->ai_canonname )
+	{
+		link->ai_canonname = strdup(templ->ai_canonname);
+		if ( !link->ai_canonname )
+			return free(link->ai_addr), free(link), false;
+	}
 	**res_ptr = link;
 	*res_ptr = &link->ai_next;
 	return true;
