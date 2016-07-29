@@ -270,6 +270,7 @@ bool Port::FinishInitialize()
 	if ( !AwaitInterrupt(500 /*ms*/) )
 	{
 		LogF("error: IDENTIFY timed out");
+		transfer_in_progress = false;
 		return false;
 	}
 	transfer_in_progress = false;
