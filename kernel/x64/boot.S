@@ -174,6 +174,15 @@ __start:
 
 .code64
 2:
+	# The upper 32 bits of the general purpose registers are *undefined* after
+	# switching into 64-bit mode (Intel Manual, Vol 1, 3.4.1.1 "General-Purpose
+	# Registers in 64-Bit Mode"). The lower 32 bits are preserved from 32-bit
+	# mode. Any registers whose value we wish to retain must have its upper 32
+	# bits masked off. Assigning a register to itself in a 32-bit operation will
+	# zero the upper 32 bits. The only register the below code assumes is
+	# retained is the stack register (esp/rsp).
+	mov %esp, %esp
+
 	# Switch ds, es, fs, gs, ss to the kernel data segment (0x10).
 	movw $0x10, %cx
 	movw %cx, %ds
