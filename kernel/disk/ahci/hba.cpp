@@ -126,6 +126,13 @@ void HBA__OnInterrupt(struct interrupt_context*, void* context)
 
 bool HBA::Initialize(Ref<Descriptor> dev, const char* devpath)
 {
+	interrupt_index = PCI::SetupInterruptLine(devaddr);
+	if ( !interrupt_index )
+	{
+		LogF("error: cannot determine interrupt line");
+		return errno = EINVAL, false;
+	}
+
 	pcibar_t mmio_bar = PCI::GetBAR(devaddr, 5);
 	if ( mmio_bar.size() < sizeof(struct hba_regs) && /* or || ? */
 	     mmio_bar.size() < 1024 )
@@ -228,8 +235,6 @@ bool HBA::Initialize(Ref<Descriptor> dev, const char* devpath)
 		}
 	}
 
-	interrupt_index =
-		Interrupt::IRQ0 + PCI::Read8(devaddr, PCIFIELD_INTERRUPT_LINE);
 	interrupt_registration.handler = HBA__OnInterrupt;
 	interrupt_registration.context = this;
 	Interrupt::RegisterHandler(interrupt_index, &interrupt_registration);

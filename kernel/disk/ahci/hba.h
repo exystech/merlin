@@ -56,7 +56,7 @@ private:
 	addralloc_t mmio_alloc;
 	volatile struct hba_regs* regs;
 	uint32_t devaddr;
-	unsigned int interrupt_index;
+	uint8_t interrupt_index;
 	bool interrupt_registered;
 	bool mmio_alloced;
 

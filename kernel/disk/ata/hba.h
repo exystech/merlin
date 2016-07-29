@@ -61,7 +61,7 @@ private:
 	uint16_t port_control;
 	uint16_t busmaster_base;
 	Port* drives[2];
-	unsigned int interrupt_index;
+	uint8_t interrupt_index;
 	bool interrupt_registered;
 
 };

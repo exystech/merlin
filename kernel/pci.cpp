@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,6 +21,7 @@
 #include <endian.h>
 
 #include <sortix/kernel/cpu.h>
+#include <sortix/kernel/interrupt.h>
 #include <sortix/kernel/ioport.h>
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/kthread.h>
@@ -31,8 +32,8 @@ namespace PCI {
 
 static kthread_mutex_t pci_lock = KTHREAD_MUTEX_INITIALIZER;
 
-const uint16_t CONFIG_ADDRESS = 0xCF8;
-const uint16_t CONFIG_DATA = 0xCFC;
+static const uint16_t CONFIG_ADDRESS = 0xCF8;
+static const uint16_t CONFIG_DATA = 0xCFC;
 
 uint32_t MakeDevAddr(uint8_t bus, uint8_t slot, uint8_t func)
 {
@@ -277,6 +278,26 @@ bool IsExpansionROMEnabled(uint32_t devaddr)
 	ScopedLock lock(&pci_lock);
 
 	return PCI::Read32(devaddr, 0x30) & 0x1;
+}
+
+static bool IsOkayInterruptLine(uint8_t line)
+{
+	if ( line == 0 )
+		return false; // Conflict with PIT.
+	if ( line == 2 )
+		return false; // Cascade, can't be received.
+	if ( 16 <= line )
+		return false; // Not in set of valid IRQs.
+	return true;
+}
+
+uint8_t SetupInterruptLine(uint32_t devaddr)
+{
+	ScopedLock lock(&pci_lock);
+	uint8_t line = Read8(devaddr, PCIFIELD_INTERRUPT_LINE);
+	if ( !IsOkayInterruptLine(line) )
+		return 0;
+	return Interrupt::IRQ0 + line;
 }
 
 void Init()

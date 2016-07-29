@@ -147,7 +147,7 @@ void FixDefaultDeviceBars(pcibar_t* basebar, pcibar_t* ctrlbar, uint8_t* irq,
 	bool compatibility = interface == 0x00 || interface == 0x02;
 
 	if ( compatibility )
-		*irq = channel_index == 0 ? 14 : 15;
+		*irq = channel_index == 0 ? Interrupt::IRQ14 : Interrupt::IRQ15;
 
 	if ( compatibility ||
 	     basebar->addr_raw == 0 ||
@@ -175,8 +175,14 @@ bool Channel::Initialize(Ref<Descriptor> dev, const char* devpath)
 	pcibar_t basebar = PCI::GetBAR(devaddr, 2 * channel_index + 0);
 	pcibar_t ctrlbar = PCI::GetBAR(devaddr, 2 * channel_index + 1);
 	pcibar_t busmasterbar = PCI::GetBAR(devaddr, 4);
-	uint8_t irq = PCI::Read8(devaddr, PCIFIELD_INTERRUPT_LINE);
-	FixDefaultDeviceBars(&basebar, &ctrlbar, &irq, channel_index, interface);
+	interrupt_index = PCI::SetupInterruptLine(devaddr);
+	FixDefaultDeviceBars(&basebar, &ctrlbar, &interrupt_index, channel_index, interface);
+
+	if ( !interrupt_index )
+	{
+		LogF("error: cannot determine interrupt line");
+		return errno = EINVAL, false;
+	}
 
 	if ( !basebar.is_iospace() )
 	{
@@ -254,8 +260,6 @@ bool Channel::Initialize(Ref<Descriptor> dev, const char* devpath)
 			continue;
 		}
 	}
-
-	interrupt_index = Interrupt::IRQ0 + irq;
 
 	interrupt_registration.handler = Channel__OnInterrupt;
 	interrupt_registration.context = this;
