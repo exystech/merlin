@@ -133,6 +133,7 @@ private:
 	size_t scansize;
 	uint32_t colors[16UL];
 	uint32_t lfbformat;
+	size_t bytes_per_pixel;
 	bool cursorenabled;
 	TextPos cursorpos;
 	bool emergency_state;

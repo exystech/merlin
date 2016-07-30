@@ -35,12 +35,7 @@ namespace Sortix {
 
 static uint32_t ColorFromRGB(uint8_t r, uint8_t g, uint8_t b)
 {
-	union { struct { uint8_t b, g, r, a; }; uint32_t color; } ret;
-	ret.r = r;
-	ret.g = g;
-	ret.b = b;
-	ret.a = 255;
-	return ret.color;
+	return (uint32_t) b << 0 | (uint32_t) g << 8 | (uint32_t) r << 16;
 }
 
 static void LFBTextBuffer__RenderThread(void* user)
@@ -92,6 +87,7 @@ LFBTextBuffer* CreateLFBTextBuffer(uint8_t* lfb, uint32_t lfbformat,
 	ret->lfb = lfb;
 	ret->backbuf = backbuf;
 	ret->lfbformat = lfbformat;
+	ret->bytes_per_pixel = (lfbformat + 7) / 8;
 	ret->pixelsx = xres;
 	ret->pixelsy = yres;
 	ret->scansize = scansize;
@@ -110,7 +106,7 @@ LFBTextBuffer* CreateLFBTextBuffer(uint8_t* lfb, uint32_t lfbformat,
 	ret->cursorenabled = true;
 	ret->cursorpos = TextPos(0, 0);
 	for ( size_t y = 0; y < yres; y++ )
-		memset(lfb + scansize * y, 0, lfbformat/8UL * xres);
+		memset(lfb + scansize * y, 0, ret->bytes_per_pixel * xres);
 	ret->emergency_state = false;
 	ret->invalidated = false;
 
@@ -202,8 +198,11 @@ void LFBTextBuffer::RenderChar(TextChar textchar, size_t posx, size_t posy)
 {
 	if ( columns <= posx || rows <= posy )
 		return;
-	// TODO: Support other font sizes and resolutions.
-	if ( lfbformat != 32 || VGA_FONT_WIDTH != 8UL )
+	// TODO: Support other resolutions.
+	if ( lfbformat != 24 && lfbformat != 32 )
+		return;
+	// TODO: Support other font sizes.
+	if ( VGA_FONT_WIDTH != 8UL )
 		return;
 	bool drawcursor = cursorenabled && posx == cursorpos.x && posy == cursorpos.y;
 	uint8_t fgcoloridx = textchar.vgacolor >> 0 & 0x0F;
@@ -214,37 +213,59 @@ void LFBTextBuffer::RenderChar(TextChar textchar, size_t posx, size_t posy)
 	uint32_t bgcolor = colors[bgcoloridx];
 	int remap = VGA::MapWideToVGAFont(textchar.c);
 	const uint8_t* charfont = VGA::GetCharacterFont(font, remap);
+	size_t pixelyoff = rows * VGA_FONT_HEIGHT;
+	size_t pixelxoff = posx * (VGA_FONT_WIDTH+1);
 	for ( size_t y = 0; y < VGA_FONT_HEIGHT; y++ )
 	{
 		size_t pixely = posy * VGA_FONT_HEIGHT + y;
 		uint8_t linebitmap = charfont[y];
-		uint32_t* line = (uint32_t*) (lfb + pixely * scansize);
-		size_t pixelxoff = posx * (VGA_FONT_WIDTH+1);
+		uint8_t* line = (uint8_t*) (lfb + pixely * scansize);
+		size_t bytesxoff = bytes_per_pixel * pixelxoff;
 		for ( size_t x = 0; x < VGA_FONT_WIDTH; x++ )
-			line[pixelxoff + x] = linebitmap & 1 << (7-x) ? fgcolor : bgcolor;
+		{
+			uint32_t color = linebitmap & 1 << (7-x) ? fgcolor : bgcolor;
+			line[bytesxoff++] = color >> 0;
+			line[bytesxoff++] = color >> 8;
+			line[bytesxoff++] = color >> 16;
+			if ( lfbformat == 32 )
+				line[bytesxoff++] = color >> 24;
+		}
 		uint32_t lastcolor = bgcolor;
 		if ( 0xB0 <= remap && remap <= 0xDF && (linebitmap & 1) )
 			lastcolor = fgcolor;
-		line[pixelxoff + VGA_FONT_WIDTH] = lastcolor;
+		line[bytesxoff++] = lastcolor >> 0;
+		line[bytesxoff++] = lastcolor >> 8;
+		line[bytesxoff++] = lastcolor >> 16;
+		if ( lfbformat == 32 )
+			line[bytesxoff++] = lastcolor >> 24;
 		if ( unlikely(posx + 1 == columns) )
 		{
 			for ( size_t x = pixelxoff + VGA_FONT_WIDTH + 1; x < pixelsx; x++ )
-				line[x] = bgcolor;
+			{
+				line[bytesxoff++] = bgcolor >> 0;
+				line[bytesxoff++] = bgcolor >> 8;
+				line[bytesxoff++] = bgcolor >> 16;
+				if ( lfbformat == 32 )
+					line[bytesxoff++] = bgcolor >> 24;
+			}
 		}
 	}
 	if ( unlikely(posy + 1 == rows) )
 	{
-		size_t pixelyoff = rows * VGA_FONT_HEIGHT;
+		size_t width = VGA_FONT_WIDTH + 1;
+		if ( unlikely(posx + 1 == columns) )
+			width = pixelsx - pixelxoff;
 		for ( size_t y = pixelyoff; y < pixelsy; y++ )
 		{
-			uint32_t* line = (uint32_t*) (lfb + y * scansize);
-			size_t pixelxoff = posx * (VGA_FONT_WIDTH+1);
-			for ( size_t x = 0; x < VGA_FONT_WIDTH + 1; x++ )
-				line[pixelxoff + x] = bgcolor;
-			if ( unlikely(posx + 1 == columns) )
+			size_t bytesxoff = bytes_per_pixel * pixelxoff;
+			uint8_t* line = (uint8_t*) (lfb + y * scansize);
+			for ( size_t x = 0; x < width; x++ )
 			{
-				for ( size_t x = pixelxoff + VGA_FONT_WIDTH + 1; x < pixelsx; x++ )
-					line[x] = bgcolor;
+				line[bytesxoff++] = bgcolor >> 0;
+				line[bytesxoff++] = bgcolor >> 8;
+				line[bytesxoff++] = bgcolor >> 16;
+				if ( lfbformat == 32 )
+					line[bytesxoff++] = bgcolor >> 24;
 			}
 		}
 	}
@@ -254,11 +275,15 @@ void LFBTextBuffer::RenderChar(TextChar textchar, size_t posx, size_t posy)
 	for ( size_t y = VGA_FONT_HEIGHT - 2; y < underlines; y++ )
 	{
 		size_t pixely = posy * VGA_FONT_HEIGHT + y;
+		uint8_t* line = (uint8_t*) (lfb + pixely * scansize);
+		size_t bytesxoff = bytes_per_pixel * pixelxoff;
 		for ( size_t x = 0; x < VGA_FONT_WIDTH+1; x++ )
 		{
-			uint32_t* line = (uint32_t*) (lfb + pixely * scansize);
-			size_t pixelx = posx * (VGA_FONT_WIDTH+1) + x;
-			line[pixelx] = fgcolor;
+			line[bytesxoff++] = fgcolor >> 0;
+			line[bytesxoff++] = fgcolor >> 8;
+			line[bytesxoff++] = fgcolor >> 16;
+			if ( lfbformat == 32 )
+				line[bytesxoff++] = fgcolor >> 24;
 		}
 	}
 }
@@ -304,7 +329,7 @@ void LFBTextBuffer::RenderRange(TextPos from, TextPos to)
 		for ( size_t sc = scanline_start; sc <= scanline_end; sc++ )
 		{
 			size_t offset = sc * scansize;
-			memcpy(lfb + offset, backbuf + offset, pixelsx * sizeof(uint32_t));
+			memcpy(lfb + offset, backbuf + offset, pixelsx * bytes_per_pixel);
 		}
 	}
 }

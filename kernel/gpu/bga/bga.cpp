@@ -299,7 +299,8 @@ bool BGADevice::Supports(uint64_t connector, struct dispmsg_crtc_mode mode) cons
 
 	// TODO: This is disabled because its support needs to be verified, see the
 	//       framebuffer size calculation above?
-	if ( mode.fb_format != VBE_DISPI_BPP_32 )
+	if ( mode.fb_format != VBE_DISPI_BPP_24 &&
+	     mode.fb_format != VBE_DISPI_BPP_32 )
 		return errno = ENOSYS, false;
 
 	return ((BGADevice*) this)->SupportsResolution(mode.view_xres, mode.view_yres, mode.fb_format);

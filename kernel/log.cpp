@@ -143,7 +143,8 @@ void Init(multiboot_info_t* bootinfo)
 	     bootinfo->framebuffer_type != MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT )
 	{
 		assert(bootinfo->framebuffer_type == MULTIBOOT_FRAMEBUFFER_TYPE_RGB);
-		assert(bootinfo->framebuffer_bpp == 32);
+		assert(bootinfo->framebuffer_bpp == 24 ||
+		       bootinfo->framebuffer_bpp == 32);
 		assert(0 < bootinfo->framebuffer_width);
 		assert(0 < bootinfo->framebuffer_height);
 		pcibar_t fakebar;
