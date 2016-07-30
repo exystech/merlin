@@ -108,18 +108,11 @@ find . | grep -Eq '\.xz$' && echo "insmod xzio"
 
 echo
 cat << EOF
-if loadfont unicode ; then
-  insmod vbe
-  insmod vga
-EOF
-# TODO: Better method of detecting Sortix GRUB and desirable video_bochs.
-if [ x"$(uname)" = x"Sortix" ]; then
-  echo "  insmod video_bochs"
-fi
-cat << EOF
+insmod all_video
+if loadfont unicode; then
   insmod gfxterm
+  terminal_output gfxterm
 fi
-terminal_output gfxterm
 
 set menu_title="Sortix $version for $machine"
 set timeout=10
