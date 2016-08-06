@@ -44,6 +44,7 @@ memstat \
 mkdir \
 mktemp \
 mv \
+nc \
 nl \
 pager \
 passwd \
@@ -84,6 +85,7 @@ chkblayout.1 \
 chvideomode.1 \
 kernelinfo.1 \
 logname.1 \
+nc.1 \
 memstat.1 \
 pager.1 \
 passwd.1 \
