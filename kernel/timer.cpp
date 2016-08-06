@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -98,8 +98,9 @@ void Timer::Get(struct itimerspec* current)
 	clock->UnlockClock();
 }
 
-void Timer::Set(struct itimerspec* value, struct itimerspec* ovalue, int flags,
-	            void (*callback)(Clock*, Timer*, void*), void* user)
+void Timer::Set(struct itimerspec* new_value, struct itimerspec* old_value,
+                int new_flags, void (*new_callback)(Clock*, Timer*, void*),
+                void* new_user)
 {
 	assert(clock);
 
@@ -107,19 +108,23 @@ void Timer::Set(struct itimerspec* value, struct itimerspec* ovalue, int flags,
 
 	// Dequeue this timer if it is already armed.
 	if ( flags & TIMER_ACTIVE )
+	{
+		// TODO: How does this interplay with concurrently running timer
+		//       handlers? Maybe the timer should be cancelled instead?
 		clock->Unlink(this);
+	}
 
 	// Let the caller know how much time was left on the timer.
-	if ( ovalue )
-		GetInternal(ovalue);
+	if ( old_value )
+		GetInternal(old_value);
 
 	// Arm the timer if a value was specified.
-	if ( timespec_lt(timespec_nul(), value->it_value) )
+	if ( timespec_lt(timespec_nul(), new_value->it_value) )
 	{
-		this->value = *value;
-		this->flags = flags;
-		this->callback = callback;
-		this->user = user;
+		value = *new_value;
+		flags = new_flags;
+		callback = new_callback;
+		user = new_user;
 		clock->Register(this);
 	}
 

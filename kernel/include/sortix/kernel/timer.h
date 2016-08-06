@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,11 +30,11 @@ namespace Sortix {
 class Clock;
 class Timer;
 
-const int TIMER_ABSOLUTE = 1 << 0;
-const int TIMER_ACTIVE = 1 << 1;
-const int TIMER_FIRING = 1 << 2;
-const int TIMER_FUNC_INTERRUPT_HANDLER = 1 << 3;
-const int TIMER_FUNC_ADVANCE_THREAD = 1 << 4;
+static const int TIMER_ABSOLUTE = 1 << 0;
+static const int TIMER_ACTIVE = 1 << 1;
+static const int TIMER_FIRING = 1 << 2;
+static const int TIMER_FUNC_INTERRUPT_HANDLER = 1 << 3;
+static const int TIMER_FUNC_ADVANCE_THREAD = 1 << 4;
 
 class Timer
 {

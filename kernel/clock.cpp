@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -136,14 +136,14 @@ void Clock::RegisterAbsolute(Timer* timer) // Lock acquired.
 	timer->flags |= TIMER_ACTIVE;
 
 	Timer* before = NULL;
-	for ( Timer* iter = absolute_timer; iter; iter = before->next_timer )
+	for ( Timer* iter = absolute_timer; iter; iter = iter->next_timer )
+	{
 		if ( timespec_lt(timer->value.it_value, iter->value.it_value) )
-			break;
-		else
 			before = iter;
+	}
 
 	timer->prev_timer = before;
-	timer->next_timer = before ? before->next_timer : NULL;
+	timer->next_timer = before ? before->next_timer : absolute_timer;
 	if ( timer->next_timer ) timer->next_timer->prev_timer = timer;
 	(before ? before->next_timer : absolute_timer) = timer;
 }
@@ -154,19 +154,22 @@ void Clock::RegisterDelay(Timer* timer) // Lock acquired.
 	timer->flags |= TIMER_ACTIVE;
 
 	Timer* before = NULL;
-	struct timespec before_time = timespec_nul();
-	for ( Timer* iter = delay_timer; iter; iter = before->next_timer )
+	for ( Timer* iter = delay_timer; iter; iter = iter->next_timer )
+	{
 		if ( timespec_lt(timer->value.it_value, iter->value.it_value) )
 			break;
-		else
-			before = iter,
-			before_time = timespec_add(before_time, iter->value.it_value);
+		timer->value.it_value = timespec_sub(timer->value.it_value, iter->value.it_value);
+		before = iter;
+	}
 
-	timer->value.it_value = timespec_sub(timer->value.it_value, before_time);
 	timer->prev_timer = before;
-	timer->next_timer = before ? before->next_timer : NULL;
-	if ( timer->next_timer ) timer->next_timer->prev_timer = timer;
-	(before ? before->next_timer : delay_timer) = timer;
+	timer->next_timer = before ? before->next_timer : delay_timer;
+	if ( timer->next_timer )
+		timer->next_timer->prev_timer = timer;
+	if ( before )
+		before->next_timer = timer;
+	else
+		delay_timer = timer;
 
 	if ( timer->next_timer )
 		timer->next_timer->value.it_value =
@@ -183,6 +186,7 @@ void Clock::Register(Timer* timer)
 
 void Clock::UnlinkAbsolute(Timer* timer) // Lock acquired.
 {
+	assert(timer->flags & TIMER_ACTIVE);
 	(timer->prev_timer ? timer->prev_timer->next_timer : absolute_timer) = timer->next_timer;
 	if ( timer->next_timer ) timer->next_timer->prev_timer = timer->prev_timer;
 	timer->prev_timer = timer->next_timer = NULL;
@@ -191,6 +195,7 @@ void Clock::UnlinkAbsolute(Timer* timer) // Lock acquired.
 
 void Clock::UnlinkDelay(Timer* timer) // Lock acquired.
 {
+	assert(timer->flags & TIMER_ACTIVE);
 	(timer->prev_timer ? timer->prev_timer->next_timer : delay_timer) = timer->next_timer;
 	if ( timer->next_timer ) timer->next_timer->prev_timer = timer->prev_timer;
 	if ( timer->next_timer ) timer->next_timer->value.it_value = timespec_add(timer->next_timer->value.it_value, timer->value.it_value);
@@ -251,8 +256,10 @@ struct timespec Clock::SleepDelay(struct timespec duration)
 		LockClock();
 
 		if ( !start_advancement_set )
-			start_advancement = current_advancement,
+		{
+			start_advancement = current_advancement;
 			start_advancement_set = true;
+		}
 
 		elapsed = timespec_sub(current_advancement, start_advancement);
 
