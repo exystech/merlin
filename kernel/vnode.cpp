@@ -491,4 +491,9 @@ int Vnode::tcsetattr(ioctx_t* ctx, int actions, const struct termios* tio)
 	return inode->tcsetattr(ctx, actions, tio);
 }
 
+int Vnode::shutdown(ioctx_t* ctx, int how)
+{
+	return inode->shutdown(ctx, how);
+}
+
 } // namespace Sortix

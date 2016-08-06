@@ -543,19 +543,21 @@ bool PipeEndpoint::Connect(PipeEndpoint* destination)
 
 void PipeEndpoint::Disconnect()
 {
-	assert(channel);
+	if ( !channel )
+		return;
 	if ( reading )
 		channel->CloseReading();
 	else
 		channel->CloseWriting();
 	channel = NULL;
-	reading = false;
 }
 
 ssize_t PipeEndpoint::recv(ioctx_t* ctx, uint8_t* buf, size_t count, int flags)
 {
 	if ( !reading )
 		return errno = EBADF, -1;
+	if ( !channel )
+		return 0;
 	ssize_t result = channel->recv(ctx, buf, count, flags);
 	CurrentThread()->yield_to_tid = 0;
 	Scheduler::ScheduleTrueThread();
@@ -566,6 +568,8 @@ ssize_t PipeEndpoint::recvmsg(ioctx_t* ctx, struct msghdr* msg, int flags)
 {
 	if ( !reading )
 		return errno = EBADF, -1;
+	if ( !channel )
+		return 0;
 	ssize_t result = channel->recvmsg(ctx, msg, flags);
 	CurrentThread()->yield_to_tid = 0;
 	Scheduler::ScheduleTrueThread();
@@ -577,6 +581,12 @@ ssize_t PipeEndpoint::send(ioctx_t* ctx, const uint8_t* buf, size_t count,
 {
 	if ( reading )
 		return errno = EBADF, -1;
+	if ( !channel )
+	{
+		if ( !(flags & MSG_NOSIGNAL) )
+			CurrentThread()->DeliverSignal(SIGPIPE);
+		return errno = EPIPE, -1;
+	}
 	ssize_t result = channel->send(ctx, buf, count, flags);
 	CurrentThread()->yield_to_tid = 0;
 	Scheduler::ScheduleTrueThread();
@@ -587,6 +597,12 @@ ssize_t PipeEndpoint::sendmsg(ioctx_t* ctx, const struct msghdr* msg, int flags)
 {
 	if ( reading )
 		return errno = EBADF, -1;
+	if ( !channel )
+	{
+		if ( !(flags & MSG_NOSIGNAL) )
+			CurrentThread()->DeliverSignal(SIGPIPE);
+		return errno = EPIPE, -1;
+	}
 	ssize_t result = channel->sendmsg(ctx, msg, flags);
 	CurrentThread()->yield_to_tid = 0;
 	Scheduler::ScheduleTrueThread();
@@ -598,6 +614,8 @@ ssize_t PipeEndpoint::readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt)
 	if ( !reading )
 		return errno = EBADF, -1;
 	ssize_t result = channel->readv(ctx, iov, iovcnt);
+	if ( !channel )
+		return 0;
 	CurrentThread()->yield_to_tid = 0;
 	Scheduler::ScheduleTrueThread();
 	return result;
@@ -607,6 +625,11 @@ ssize_t PipeEndpoint::writev(ioctx_t* ctx, const struct iovec* iov, int iovcnt)
 {
 	if ( reading )
 		return errno = EBADF, -1;
+	if ( !channel )
+	{
+		CurrentThread()->DeliverSignal(SIGPIPE);
+		return errno = EPIPE, -1;
+	}
 	ssize_t result = channel->writev(ctx, iov, iovcnt);
 	CurrentThread()->yield_to_tid = 0;
 	Scheduler::ScheduleTrueThread();
@@ -615,17 +638,23 @@ ssize_t PipeEndpoint::writev(ioctx_t* ctx, const struct iovec* iov, int iovcnt)
 
 int PipeEndpoint::poll(ioctx_t* ctx, PollNode* node)
 {
+	if ( !channel )
+		return 0;
 	return reading ? channel->read_poll(ctx, node)
 	               : channel->write_poll(ctx, node);
 }
 
 bool PipeEndpoint::GetSIGPIPEDelivery()
 {
+	if ( !channel )
+		return errno = EINVAL, true;
 	return !reading ? channel->GetSIGPIPEDelivery() : false;
 }
 
 bool PipeEndpoint::SetSIGPIPEDelivery(bool deliver_sigpipe)
 {
+	if ( !channel )
+		return errno = EINVAL, false;
 	if ( !reading )
 		channel->SetSIGPIPEDelivery(deliver_sigpipe);
 	else if ( reading && deliver_sigpipe != false )
@@ -635,12 +664,16 @@ bool PipeEndpoint::SetSIGPIPEDelivery(bool deliver_sigpipe)
 
 size_t PipeEndpoint::Size()
 {
+	if ( !channel )
+		return errno = EINVAL, 0;
 	return reading ? channel->ReadSize()
 	               : channel->WriteSize();
 }
 
 bool PipeEndpoint::Resize(size_t new_size)
 {
+	if ( !channel )
+		return errno = EINVAL, false;
 	return reading ? channel->ReadResize(new_size)
 	               : channel->WriteResize(new_size);
 }

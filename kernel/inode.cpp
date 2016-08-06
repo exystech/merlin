@@ -621,4 +621,9 @@ int AbstractInode::tcsetattr(ioctx_t* /*ctx*/, int /*actions*/, const struct ter
 	return errno = ENOTTY, -1;
 }
 
+int AbstractInode::shutdown(ioctx_t* /*ctx*/, int /*how*/)
+{
+	return errno = ENOTSOCK, -1;
+}
+
 } // namespace Sortix

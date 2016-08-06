@@ -266,6 +266,7 @@ public:
 	virtual pid_t tcgetsid(ioctx_t* ctx);
 	virtual int tcsendbreak(ioctx_t* ctx, int duration);
 	virtual int tcsetattr(ioctx_t* ctx, int actions, const struct termios* tio);
+	virtual int shutdown(ioctx_t* ctx, int how);
 
 private:
 	bool SendMessage(Channel* channel, size_t type, void* ptr, size_t size,
@@ -1720,6 +1721,22 @@ int Unode::tcsetattr(ioctx_t* ctx, int actions, const struct termios* user_tio)
 	msg.ino = ino;
 	msg.actions = actions;
 	if ( SendMessage(channel, FSM_REQ_TCSETATTR, &msg, sizeof(msg)) &&
+	     RecvMessage(channel, FSM_RESP_SUCCESS, NULL, 0) )
+		ret = 0;
+	channel->KernelClose();
+	return ret;
+}
+
+int Unode::shutdown(ioctx_t* ctx, int how)
+{
+	struct fsm_req_shutdown msg;
+	Channel* channel = server->Connect(ctx);
+	if ( !channel )
+		return -1;
+	int ret = -1;
+	msg.ino = ino;
+	msg.how = how;
+	if ( SendMessage(channel, FSM_REQ_SHUTDOWN, &msg, sizeof(msg)) &&
 	     RecvMessage(channel, FSM_RESP_SUCCESS, NULL, 0) )
 		ret = 0;
 	channel->KernelClose();

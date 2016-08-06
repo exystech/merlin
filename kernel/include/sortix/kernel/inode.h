@@ -129,6 +129,7 @@ public:
 	virtual pid_t tcgetsid(ioctx_t* ctx) = 0;
 	virtual int tcsendbreak(ioctx_t* ctx, int duration) = 0;
 	virtual int tcsetattr(ioctx_t* ctx, int actions, const struct termios* tio) = 0;
+	virtual int shutdown(ioctx_t* ctx, int how) = 0;
 
 };
 
@@ -233,6 +234,7 @@ public:
 	virtual pid_t tcgetsid(ioctx_t* ctx);
 	virtual int tcsendbreak(ioctx_t* ctx, int duration);
 	virtual int tcsetattr(ioctx_t* ctx, int actions, const struct termios* tio);
+	virtual int shutdown(ioctx_t* ctx, int how);
 
 };
 

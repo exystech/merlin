@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -101,6 +101,7 @@ public:
 	                       void* option_value, size_t* option_size_ptr);
 	virtual int setsockopt(ioctx_t* ctx, int level, int option_name,
 	                       const void* option_value, size_t option_size);
+	virtual int shutdown(ioctx_t* ctx, int how);
 
 private:
 	int do_bind(ioctx_t* ctx, const uint8_t* addr, size_t addrsize);
@@ -380,6 +381,15 @@ int StreamSocket::setsockopt(ioctx_t* ctx, int level, int option_name,
 		return errno = ENOPROTOOPT, -1;
 	}
 
+	return 0;
+}
+
+int StreamSocket::shutdown(ioctx_t* /*ctx*/, int how)
+{
+	if ( how & SHUT_RD )
+		incoming.Disconnect();
+	if ( how & SHUT_WR )
+		outgoing.Disconnect();
 	return 0;
 }
 

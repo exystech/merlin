@@ -1046,4 +1046,11 @@ int Descriptor::tcsetattr(ioctx_t* ctx, int actions, const struct termios* tio)
 	return vnode->tcsetattr(ctx, actions, tio);
 }
 
+int Descriptor::shutdown(ioctx_t* ctx, int how)
+{
+	if ( how & ~(SHUT_RD | SHUT_WR) )
+		return errno = EINVAL, -1;
+	return vnode->shutdown(ctx, how);
+}
+
 } // namespace Sortix

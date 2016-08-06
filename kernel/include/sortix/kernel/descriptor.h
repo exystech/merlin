@@ -120,6 +120,7 @@ public:
 	pid_t tcgetsid(ioctx_t* ctx);
 	int tcsendbreak(ioctx_t* ctx, int duration);
 	int tcsetattr(ioctx_t* ctx, int actions, const struct termios* tio);
+	int shutdown(ioctx_t* ctx, int how);
 
 private:
 	Ref<Descriptor> open_elem(ioctx_t* ctx, const char* filename, int flags,

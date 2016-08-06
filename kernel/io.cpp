@@ -944,9 +944,11 @@ int sys_getsockname(int fd, struct sockaddr* addr, socklen_t* addrsize)
 
 int sys_shutdown(int fd, int how)
 {
-	(void) fd;
-	(void) how;
-	return errno = ENOSYS, -1;
+	Ref<Descriptor> desc = CurrentProcess()->GetDescriptor(fd);
+	if ( !desc )
+		return -1;
+	ioctx_t ctx; SetupUserIOCtx(&ctx);
+	return desc->shutdown(&ctx, how);
 }
 
 int sys_unmountat(int dirfd, const char* path, int flags)
