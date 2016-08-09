@@ -18,8 +18,9 @@
  */
 
 #include <sys/types.h>
+
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <ioleast.h>
 #include <stdbool.h>
@@ -28,6 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
 #include <sortix/initrd.h>
 
 #include "serialize.h"
@@ -254,39 +256,39 @@ int main(int argc, char* argv[])
 	compact_arguments(&argc, &argv);
 
 	if ( argc == 1 )
-		error(1, 0, "No initrd specified");
+		errx(1, "No initrd specified");
 	const char* initrd = argv[1];
 	if ( argc == 2 )
-		error(1, 0, "No command specified");
+		errx(1, "No command specified");
 	const char* cmd = argv[2];
 	if ( argc == 3 )
-		error(1, 0, "No path specified");
+		errx(1, "No path specified");
 	const char* path = argv[3];
 
 	int fd = open(initrd, O_RDONLY);
-	if ( fd < 0 ) { error(1, errno, "open: %s", initrd); }
+	if ( fd < 0 ) { err(1, "open: %s", initrd); }
 
 	initrd_superblock_t* sb = GetSuperBlock(fd);
-	if ( !sb ) { error(1, errno, "read: %s", initrd); }
+	if ( !sb ) { err(1, "read: %s", initrd); }
 
-	if ( path[0] != '/' ) { error(1, ENOENT, "%s", path); }
+	if ( path[0] != '/' ) { errno = ENOENT; err(1, "%s", path); }
 
 	initrd_inode_t* root = GetInode(fd, sb, sb->root);
-	if ( !root ) { error(1, errno, "read: %s", initrd); }
+	if ( !root ) { err(1, "read: %s", initrd); }
 
 	initrd_inode_t* inode = ResolvePath(fd, sb, root, path+1);
-	if ( !inode ) { error(1, errno, "%s", path); }
+	if ( !inode ) { err(1, "%s", path); }
 
 	free(root);
 
 	if ( !strcmp(cmd, "cat") )
 	{
-		if ( !PrintFile(fd, sb, inode) ) { error(1, errno, "%s", path); }
+		if ( !PrintFile(fd, sb, inode) ) { err(1, "%s", path); }
 	}
 	else if ( !strcmp(cmd, "ls") )
 	{
 		initrd_inode_t* dir = inode;
-		if ( !ListDirectory(fd, sb, dir, all) ) { error(1, errno, "%s", path); }
+		if ( !ListDirectory(fd, sb, dir, all) ) { err(1, "%s", path); }
 	}
 	else
 	{

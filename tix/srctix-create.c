@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,8 +24,8 @@
 #include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <libgen.h>
 #include <signal.h>
@@ -105,17 +105,18 @@ int main(int argc, char* argv[])
 	compact_arguments(&argc, &argv);
 
 	if ( argc <= 1 )
-		error(1, 0, "No archived port tix specified");
+		errx(1, "No archived port tix specified");
 
 	if ( 3 <= argc )
-		error(1, 0, "extra operand");
+		errx(1, "extra operand");
+
+	initialize_tmp(tmp, "srctix");
 
 	const char* porttix_path = argv[1];
 
-	char* tmp_in_root = print_string("%s/srctixin.XXXXXX", tmp);
-	if ( !mkdtemp(tmp_in_root) )
-		error(1, errno, "mkdtemp: `%s'", tmp_in_root);
-	on_exit(cleanup_file_or_directory, tmp_in_root);
+	char* tmp_in_root = print_string("%s/in", tmp_root);
+	if ( mkdir(tmp_in_root, 0777) < 0 )
+		err(1, "mkdir: %s", tmp_in_root);
 
 	if ( fork_and_wait_or_death() )
 	{
@@ -129,7 +130,7 @@ int main(int argc, char* argv[])
 			NULL,
 		};
 		execvp(cmd_argv[0], (char* const*) cmd_argv);
-		error(127, errno, "%s", cmd_argv[0]);
+		err(127, "%s", cmd_argv[0]);
 	}
 
 	char* porttixinfo_path = join_paths(tmp_in_root, "porttixinfo");
@@ -137,15 +138,14 @@ int main(int argc, char* argv[])
 	if ( !porttixinfo_fp )
 	{
 		if ( errno == ENOENT )
-			error(0, 0, "`%s' doesn't appear to be an archived port tix",
-			            porttix_path);
-		error(1, errno, "`%s'", porttixinfo_path);
+			warnx("`%s' doesn't appear to be an archived port tix",
+			      porttix_path);
+		err(1, "`%s'", porttixinfo_path);
 	}
 
-	char* tmp_out_root = print_string("%s/srctixout.XXXXXX", tmp);
-	if ( !mkdtemp(tmp_out_root) )
-		error(1, errno, "mkdtemp: `%s'", tmp_out_root);
-	on_exit(cleanup_file_or_directory, tmp_out_root);
+	char* tmp_out_root = print_string("%s/out", tmp_root);
+	if ( mkdir(tmp_out_root, 0777) < 0 )
+		err(1, "mkdir: %s", tmp_out_root);
 
 	char* package_name = NULL;
 	char* srctix_path = NULL;
@@ -159,8 +159,7 @@ int main(int argc, char* argv[])
 			line[--line_len] = '\0';
 		char* first_space = strchr(line, ' ');
 		if ( !first_space )
-			error(1, errno, "`%s`: malformed line `%s'",
-			      porttixinfo_path, line);
+			err(1, "`%s`: malformed line `%s'", porttixinfo_path, line);
 		*first_space = '\0';
 		const char* function = line;
 		const char* parameter = first_space + 1;
@@ -168,23 +167,23 @@ int main(int argc, char* argv[])
 		if ( !strcmp(function, "package_name") )
 		{
 			if ( package_name )
-				error(1, errno, "`%s`: unexpected additional package name `%s'",
-				      porttixinfo_path, parameter);
+				err(1, "`%s`: unexpected additional package name `%s'",
+				    porttixinfo_path, parameter);
 			if ( !is_file_name(parameter) )
-				error(1, errno, "`%s`: malformed package name `%s'",
-				      porttixinfo_path, parameter);
+				err(1, "`%s`: malformed package name `%s'",
+				    porttixinfo_path, parameter);
 			package_name = strdup(parameter);
 			srctix_path = join_paths(tmp_out_root, package_name);
 			if ( mkdir_p(srctix_path, 0755) != 0 )
-				error(1, errno, "mkdir: `%s'", srctix_path);
+				err(1, "mkdir: `%s'", srctix_path);
 		}
 		else if ( !package_name )
-			error(1, errno, "`%s`: expected package name before `%s'",
+			err(1, "`%s`: expected package name before `%s'",
 			      porttixinfo_path, function);
 		else if ( !strcmp(function, "tar_extract") )
 		{
 			if ( !is_file_name(parameter) )
-				error(1, errno, "`%s`: malformed tarball filename `%s'",
+				err(1, "`%s`: malformed tarball filename `%s'",
 				      porttixinfo_path, parameter);
 			char* tarball_path = join_paths(tmp_in_root, parameter);
 			if ( fork_and_wait_or_death() )
@@ -199,15 +198,15 @@ int main(int argc, char* argv[])
 					NULL,
 				};
 				execvp(cmd_argv[0], (char* const*) cmd_argv);
-				error(127, errno, "%s", cmd_argv[0]);
+				err(127, "%s", cmd_argv[0]);
 			}
 			free(tarball_path);
 		}
 		else if ( !strcmp(function, "apply_normalize") )
 		{
 			if ( !is_file_name(parameter) )
-				error(1, errno, "`%s`: malformed normalize filename `%s'",
-				      porttixinfo_path, parameter);
+				err(1, "`%s`: malformed normalize filename `%s'",
+				    porttixinfo_path, parameter);
 			char* rmpatch_path = join_paths(tmp_in_root, parameter);
 			if ( fork_and_wait_or_death() )
 			{
@@ -220,15 +219,15 @@ int main(int argc, char* argv[])
 					NULL,
 				};
 				execvp(cmd_argv[0], (char* const*) cmd_argv);
-				error(127, errno, "%s", cmd_argv[0]);
+				err(127, "%s", cmd_argv[0]);
 			}
 			free(rmpatch_path);
 		}
 		else if ( !strcmp(function, "apply_patch") )
 		{
 			if ( !is_file_name(parameter) )
-				error(1, errno, "`%s`: malformed patch filename `%s'",
-				      porttixinfo_path, parameter);
+				err(1, "`%s`: malformed patch filename `%s'",
+				    porttixinfo_path, parameter);
 			char* patch_path = join_paths(tmp_in_root, parameter);
 			if ( fork_and_wait_or_death() )
 			{
@@ -242,15 +241,15 @@ int main(int argc, char* argv[])
 					NULL,
 				};
 				execvp(cmd_argv[0], (char* const*) cmd_argv);
-				error(127, errno, "%s", cmd_argv[0]);
+				err(127, "%s", cmd_argv[0]);
 			}
 			free(patch_path);
 		}
 		else if ( !strcmp(function, "apply_execpatch") )
 		{
 			if ( !is_file_name(parameter) )
-				error(1, errno, "`%s`: malformed execpatch filename `%s'",
-				      porttixinfo_path, parameter);
+				err(1, "`%s`: malformed execpatch filename `%s'",
+				    porttixinfo_path, parameter);
 			char* execpatch_path = join_paths(tmp_in_root, parameter);
 			if ( fork_and_wait_or_death() )
 			{
@@ -263,17 +262,17 @@ int main(int argc, char* argv[])
 					NULL,
 				};
 				execvp(cmd_argv[0], (char* const*) cmd_argv);
-				error(127, errno, "%s", cmd_argv[0]);
+				err(127, "%s", cmd_argv[0]);
 			}
 			free(execpatch_path);
 		}
 		else
-			error(1, errno, "`%s`: unsupported function `%s'",
-			      porttixinfo_path, function);
+			err(1, "`%s`: unsupported function `%s'",
+			    porttixinfo_path, function);
 	}
 	free(line);
 	if ( ferror(porttixinfo_fp) )
-		error(1, errno, "%s", porttixinfo_path);
+		err(1, "%s", porttixinfo_path);
 
 	fclose(porttixinfo_fp);
 	free(porttixinfo_path);
@@ -295,7 +294,7 @@ int main(int argc, char* argv[])
 			NULL,
 		};
 		execvp(cmd_argv[0], (char* const*) cmd_argv);
-		error(127, errno, "%s", cmd_argv[0]);
+		err(127, "%s", cmd_argv[0]);
 	}
 
 	free(srctix_path);

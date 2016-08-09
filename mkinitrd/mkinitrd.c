@@ -23,8 +23,8 @@
 #include <assert.h>
 #include <dirent.h>
 #include <endian.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <ioleast.h>
 #include <stdalign.h>
@@ -179,7 +179,7 @@ struct Node* RecursiveSearch(const char* real_path, const char* virt_path,
 	struct stat st;
 	if ( lstat(real_path, &st) != 0 )
 	{
-		error(0, errno, "stat: %s", real_path);
+		warn("stat: %s", real_path);
 		return NULL;
 	}
 
@@ -204,7 +204,7 @@ struct Node* RecursiveSearch(const char* real_path, const char* virt_path,
 	char* real_path_clone = strdup(real_path);
 	if ( !real_path_clone )
 	{
-		error(0, errno, "strdup");
+		warn("strdup");
 		free(node);
 		return NULL;
 	}
@@ -225,7 +225,7 @@ struct Node* RecursiveSearch(const char* real_path, const char* virt_path,
 	DIR* dir = opendir(real_path);
 	if ( !dir )
 	{
-		error(0, errno, "opendir: %s", real_path);
+		warn("opendir: %s", real_path);
 		FreeNode(node);
 		return NULL;
 	}
@@ -243,7 +243,7 @@ struct Node* RecursiveSearch(const char* real_path, const char* virt_path,
 		char* virt_subpath = (char*) malloc(virt_subpath_len+1);
 		if ( !virt_subpath )
 		{
-			error(0, errno, "malloc");
+			warn("malloc");
 			successful = false;
 			break;
 		}
@@ -262,7 +262,7 @@ struct Node* RecursiveSearch(const char* real_path, const char* virt_path,
 		if ( !real_subpath )
 		{
 			free(virt_subpath);
-			error(0, errno, "malloc");
+			warn("malloc");
 			successful = false;
 			break;
 		}
@@ -291,7 +291,7 @@ struct Node* RecursiveSearch(const char* real_path, const char* virt_path,
 			struct DirEntry* newdirents = (struct DirEntry*) realloc(node->dirents, newsize);
 			if ( !newdirents )
 			{
-				error(0, errno, "realloc");
+				warn("realloc");
 				successful = false;
 				break;
 			}
@@ -302,7 +302,7 @@ struct Node* RecursiveSearch(const char* real_path, const char* virt_path,
 		char* nameclone = strdup(entry->d_name);
 		if ( !nameclone )
 		{
-			error(0, errno, "strdup");
+			warn("strdup");
 			successful = false;
 			break;
 		}
@@ -337,7 +337,7 @@ struct Node* MergeNodes(struct Node* a, struct Node* b)
 		malloc(sizeof(struct DirEntry) * dirents_length);
 	if ( !dirents )
 	{
-		error(0, errno, "malloc");
+		warn("malloc");
 		FreeNode(a);
 		FreeNode(b);
 		return NULL;
@@ -423,17 +423,17 @@ bool WriteNode(struct initrd_superblock* sb, int fd, const char* outputname,
 		char name[NAME_SIZE];
 		ssize_t namelen = readlink(node->path, name, NAME_SIZE);
 		if ( namelen < 0 )
-			return error(0, errno, "readlink: %s", node->path), false;
+			return warn("readlink: %s", node->path), false;
 		filesize = (uint32_t) namelen;
 		if ( pwriteall(fd, name, filesize, dataoff) < filesize )
-			return error(0, errno, "read: %s", node->path), false;
+			return warn("read: %s", node->path), false;
 		dataoff += filesize;
 	}
 	else if ( S_ISREG(node->mode) ) // Regular file
 	{
 		int nodefd = open(node->path, O_RDONLY);
 		if ( nodefd < 0 )
-			return error(0, errno, "open: %s", node->path), false;
+			return warn("open: %s", node->path), false;
 		const size_t BUFFER_SIZE = 16UL * 1024UL;
 		uint8_t buffer[BUFFER_SIZE];
 		ssize_t amount;
@@ -442,14 +442,14 @@ bool WriteNode(struct initrd_superblock* sb, int fd, const char* outputname,
 			if ( pwriteall(fd, buffer, amount, dataoff) < (size_t) amount )
 			{
 				close(nodefd);
-				return error(0, errno, "write: %s", outputname), false;
+				return warn("write: %s", outputname), false;
 			}
 			dataoff += amount;
 			filesize += amount;
 		}
 		close(nodefd);
 		if ( amount < 0 )
-			return error(0, errno, "read: %s", node->path), false;
+			return warn("read: %s", node->path), false;
 	}
 	else if ( S_ISDIR(node->mode) ) // Directory
 	{
@@ -470,13 +470,13 @@ bool WriteNode(struct initrd_superblock* sb, int fd, const char* outputname,
 			import_initrd_dirent(&dirent);
 			ssize_t nameamt = pwriteall(fd, name, namelen+1, dataoff + entsize);
 			if ( hdramt < (ssize_t) entsize || nameamt < (ssize_t) (namelen+1) )
-				return error(0, errno, "write: %s", outputname), false;
+				return warn("write: %s", outputname), false;
 			size_t padding = dirent.reclen - (entsize + (namelen+1));
 			for ( size_t n = 0; n < padding; n++ )
 			{
 				uint8_t nul = 0;
 				if ( pwrite(fd, &nul, 1, dataoff+entsize+namelen+1+n) != 1 )
-					return error(0, errno, "write: %s", outputname), false;
+					return warn("write: %s", outputname), false;
 			}
 			filesize += dirent.reclen;
 			dataoff += dirent.reclen;
@@ -498,7 +498,7 @@ bool WriteNode(struct initrd_superblock* sb, int fd, const char* outputname,
 	export_initrd_inode(&inode);
 	assert((inodepos & (alignof(inode)-1)) == 0 );
 	if ( pwriteall(fd, &inode, inodesize, inodepos) < inodesize )
-		return error(0, errno, "write: %s", outputname), false;
+		return warn("write: %s", outputname), false;
 	import_initrd_inode(&inode);
 
 	uint32_t increment = dataoff - origfssize;
@@ -559,14 +559,14 @@ bool FormatFD(const char* outputname, int fd, uint32_t inodecount,
 	export_initrd_superblock(&sb);
 	if ( pwriteall(fd, &sb, sizeof(sb), 0) < sizeof(sb) )
 	{
-		error(0, errno, "write: %s", outputname);
+		warn("write: %s", outputname);
 		return false;
 	}
 	import_initrd_superblock(&sb);
 
 	if ( ftruncate(fd, sb.fssize) < 0 )
 	{
-		error(0, errno, "truncate: %s", outputname);
+		warn("truncate: %s", outputname);
 		return false;
 	}
 
@@ -667,7 +667,7 @@ int main(int argc, char* argv[])
 				{
 					if ( i + 1 == argc )
 					{
-						error(0, 0, "option requires an argument -- 'o'");
+						warnx("option requires an argument -- 'o'");
 						fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
 						exit(125);
 					}
@@ -690,7 +690,7 @@ int main(int argc, char* argv[])
 		{
 			FILE* fp = fopen(arg_filter, "r");
 			if ( !fp )
-				error(1, errno, "%s", arg_filter);
+				err(1, "%s", arg_filter);
 			if ( !AddRulesFromFile(fp, arg_filter) )
 				exit(1);
 			fclose(fp);
@@ -701,7 +701,7 @@ int main(int argc, char* argv[])
 		{
 			FILE* fp = fopen(arg_manifest, "r");
 			if ( !fp )
-				error(1, errno, "%s", arg_manifest);
+				err(1, "%s", arg_manifest);
 			if ( !AddManifestFromFile(fp, arg_manifest) )
 				exit(1);
 			fclose(fp);

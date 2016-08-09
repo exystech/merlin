@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,8 +24,8 @@
 #include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <libgen.h>
 #include <signal.h>
@@ -129,7 +129,7 @@ int main(int argc, char* argv[])
 	const char* input_srctix_path = argv[1];
 
 	if ( !IsDirectory(input_srctix_path) )
-		error(1, errno, "`%s'", input_srctix_path);
+		err(1, "`%s'", input_srctix_path);
 
 	char* tixbuildinfo_path = print_string("%s/tixbuildinfo", input_srctix_path);
 
@@ -139,7 +139,7 @@ int main(int argc, char* argv[])
 		if ( errno == ENOENT )
 			fprintf(stderr, "%s: `%s' doesn't appear to be a source tix:\n",
 			                argv0, input_srctix_path);
-		error(1, errno, "`%s'", tixbuildinfo_path);
+		err(1, "`%s'", tixbuildinfo_path);
 	}
 
 	const char* package_name = strdup(dictionary_get(&package_info, "pkg.name"));
@@ -147,11 +147,7 @@ int main(int argc, char* argv[])
 	if ( !output )
 		output = print_string("%s/%s.porttix.tar.xz", output_directory, package_name);
 
-	char* tmp_root = print_string("%s/porttix.XXXXXX", tmp);
-	if ( !mkdtemp(tmp_root) )
-		error(1, errno, "mkdtemp: `%s'", tmp_root);
-
-	on_exit(cleanup_file_or_directory, tmp_root);
+	initialize_tmp(tmp, "porttix");
 
 	const char* tarball_basename = non_modify_basename(input_tarball_path);
 
@@ -160,21 +156,21 @@ int main(int argc, char* argv[])
 
 	char* porttix_path = print_string("%s/%s", tmp_root, package_name);
 	if ( mkdir_p(porttix_path, 0755) != 0 )
-		error(1, errno, "mkdir: `%s'", porttix_path);
+		err(1, "mkdir: `%s'", porttix_path);
 
 	char* srctix_path = print_string("%s/%s", tmp_root, rel_srctix_path);
 	if ( mkdir_p(srctix_path, 0755) != 0 )
-		error(1, errno, "mkdir: `%s'", srctix_path);
+		err(1, "mkdir: `%s'", srctix_path);
 
 	char* normalized_path = print_string("%s/%s", tmp_root, rel_normalized_path);
 	if ( mkdir_p(normalized_path, 0755) != 0 )
-		error(1, errno, "mkdir: `%s'", normalized_path);
+		err(1, "mkdir: `%s'", normalized_path);
 
 	// Create the porttixinfo file.
 	char* porttixinfo_path = join_paths(porttix_path, "porttixinfo");
 	FILE* porttixinfo_fp = fopen(porttixinfo_path, "w");
 	if ( !porttixinfo_fp )
-		error(1, errno, "`%s'", porttixinfo_path);
+		err(1, "`%s'", porttixinfo_path);
 	fprintf(porttixinfo_fp, "package_name %s\n", package_name);
 
 	// Copy the input source tix to the temporary root.
@@ -191,7 +187,7 @@ int main(int argc, char* argv[])
 			NULL,
 		};
 		execvp(cmd_argv[0], (char* const*) cmd_argv);
-		error(127, errno, "%s", cmd_argv[0]);
+		err(127, "%s", cmd_argv[0]);
 	}
 
 	// If no tarball exists, then package up the source directory!
@@ -203,7 +199,7 @@ int main(int argc, char* argv[])
 			char* work_dir = dirname(strdup(srctix_path));
 			char* subdir_name = dirname(strdup(srctix_path));
 			if ( chdir(work_dir) != 0 )
-				error(1, errno, "chdir: `%s'", work_dir);
+				err(1, "chdir: `%s'", work_dir);
 			const char* cmd_argv[] =
 			{
 				"tar",
@@ -216,7 +212,7 @@ int main(int argc, char* argv[])
 				NULL,
 			};
 			execvp(cmd_argv[0], (char* const*) cmd_argv);
-			error(127, errno, "%s", cmd_argv[0]);
+			err(127, "%s", cmd_argv[0]);
 		}
 	}
 
@@ -236,7 +232,7 @@ int main(int argc, char* argv[])
 				NULL,
 			};
 			execvp(cmd_argv[0], (char* const*) cmd_argv);
-			error(127, errno, "%s", cmd_argv[0]);
+			err(127, "%s", cmd_argv[0]);
 		}
 	}
 
@@ -255,7 +251,7 @@ int main(int argc, char* argv[])
 				NULL,
 			};
 			execvp(cmd_argv[0], (char* const*) cmd_argv);
-			error(127, errno, "%s", cmd_argv[0]);
+			err(127, "%s", cmd_argv[0]);
 		}
 	}
 
@@ -272,23 +268,23 @@ int main(int argc, char* argv[])
 			NULL,
 		};
 		execvp(cmd_argv[0], (char* const*) cmd_argv);
-		error(127, errno, "%s", cmd_argv[0]);
+		err(127, "%s", cmd_argv[0]);
 	}
 	fprintf(porttixinfo_fp, "tar_extract %s\n", tarball_basename);
 
 	// Create the normalization patch.
 	int normalized_fd = open(normalized_path, O_RDONLY | O_DIRECTORY);
 	if ( normalized_fd < 0 )
-		error(1, errno, "`%s'", normalized_path);
+		err(1, "`%s'", normalized_path);
 
 	char* patch_normalize_path = join_paths(porttix_path, "patch.normalize");
 	FILE* patch_normalize_fp = fopen(patch_normalize_path, "w");
 	if ( !patch_normalize_fp )
-		error(1, errno, "`%s'", patch_normalize_path);
+		err(1, "`%s'", patch_normalize_path);
 
 	int pipes[2];
 	if ( pipe(pipes) )
-		error(1, errno, "pipe");
+		err(1, "pipe");
 	pid_t tar_pid = fork_or_death();
 	if ( !tar_pid )
 	{
@@ -304,7 +300,7 @@ int main(int argc, char* argv[])
 			NULL
 		};
 		execvp(cmd_argv[0], (char* const*) cmd_argv);
-		error(127, errno, "%s", cmd_argv[0]);
+		err(127, "%s", cmd_argv[0]);
 	}
 	close(pipes[1]);
 	FILE* tar_fp = fdopen(pipes[0], "r");
@@ -337,14 +333,14 @@ int main(int argc, char* argv[])
 	}
 	free(line);
 	if ( ferror(tar_fp) )
-		error(1, errno, "getline: tar");
+		err(1, "getline: tar");
 
 	fclose(tar_fp);
 	int tar_exit_status;
 	waitpid(tar_pid, &tar_exit_status, 0);
 	if ( !WIFEXITED(tar_exit_status) || WEXITSTATUS(tar_exit_status) != 0 )
 	{
-		error(1, 0, "Unable to list contents of `%s'.", porttix_tarball_path);
+		errx(1, "Unable to list contents of `%s'.", porttix_tarball_path);
 		exit(WEXITSTATUS(tar_exit_status));
 	}
 
@@ -360,9 +356,9 @@ int main(int argc, char* argv[])
 	{
 		close(1);
 		if ( open(patch_path, O_WRONLY | O_CREAT | O_TRUNC, 0644) != 1 )
-			error(1, errno, "`%s'", patch_path);
+			err(1, "`%s'", patch_path);
 		if ( chdir(tmp_root) != 0 )
-			error(1, errno, "chdir(`%s')", tmp_root);
+			err(1, "chdir(`%s')", tmp_root);
 		const char* cmd_argv[] =
 		{
 			"diff",
@@ -374,7 +370,7 @@ int main(int argc, char* argv[])
 			NULL,
 		};
 		execvp(cmd_argv[0], (char* const*) cmd_argv);
-		error(127, errno, "%s", cmd_argv[0]);
+		err(127, "%s", cmd_argv[0]);
 	}
 	free(patch_path);
 	fprintf(porttixinfo_fp, "apply_patch patch.patch\n");
@@ -384,9 +380,9 @@ int main(int argc, char* argv[])
 	if ( fork_and_wait_or_death_def(false) )
 	{
 		if ( redirect(patch_exec_path, O_WRONLY | O_CREAT | O_TRUNC, 0644) != 0 )
-			error(1, errno, "`%s'", patch_exec_path);
+			err(1, "`%s'", patch_exec_path);
 		if ( chdir(tmp_root) != 0 )
-			error(1, errno, "chdir(`%s')", tmp_root);
+			err(1, "chdir(`%s')", tmp_root);
 		const char* cmd_argv[] =
 		{
 			"tix-execdiff",
@@ -396,7 +392,7 @@ int main(int argc, char* argv[])
 			NULL,
 		};
 		execvp(cmd_argv[0], (char* const*) cmd_argv);
-		error(127, errno, "%s", cmd_argv[0]);
+		err(127, "%s", cmd_argv[0]);
 	}
 	free(patch_exec_path);
 	fprintf(porttixinfo_fp, "apply_execpatch patch.execpatch\n");
@@ -420,7 +416,7 @@ int main(int argc, char* argv[])
 			NULL,
 		};
 		execvp(cmd_argv[0], (char* const*) cmd_argv);
-		error(127, errno, "%s", cmd_argv[0]);
+		err(127, "%s", cmd_argv[0]);
 	}
 
 	return 0;

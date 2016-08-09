@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,8 +17,8 @@
  * Convert a binary file to a C array.
  */
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <locale.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -77,7 +77,7 @@ void get_short_option_variable(char c, char** varptr,
 	{
 		if ( *ip + 1 == argc )
 		{
-			error(0, 0, "option requires an argument -- '%c'", c);
+			warnx("option requires an argument -- '%c'", c);
 			fprintf(stderr, "Try `%s --help' for more information.\n", argv0);
 			exit(1);
 		}
@@ -224,9 +224,9 @@ int main(int argc, char* argv[])
 	const char* output_path = arg_output;
 
 	if ( flag_extern && flag_static )
-		error(1, 0, "the --extern and --static are mutually incompatible");
+		errx(1, "the --extern and --static are mutually incompatible");
 	if ( flag_forward && flag_raw )
-		error(1, 0, "the --forward and --raw are mutually incompatible");
+		errx(1, "the --forward and --raw are mutually incompatible");
 
 	if ( !arg_type )
 		arg_type = strdup("unsigned char");
@@ -295,7 +295,7 @@ int main(int argc, char* argv[])
 	}
 
 	if ( output_path && !freopen(output_path, "w", stdout) )
-		error(1, errno, "%s", output_path);
+		err(1, "%s", output_path);
 
 	if ( flag_guard && guard )
 	{
@@ -356,7 +356,7 @@ int main(int argc, char* argv[])
 				fp = fopen(arg, "r");
 			}
 			if ( !fp )
-				error(1, errno, "%s", arg);
+				err(1, "%s", arg);
 			int ic;
 			while ( (ic = fgetc(fp)) != EOF )
 			{
@@ -370,7 +370,7 @@ int main(int argc, char* argv[])
 				}
 			}
 			if ( ferror(fp) )
-				error(1, errno, "fgetc: %s", arg);
+				err(1, "fgetc: %s", arg);
 			if ( fp != stdin )
 				fclose(fp);
 		}
@@ -399,7 +399,7 @@ int main(int argc, char* argv[])
 	}
 
 	if ( ferror(stdout) || fflush(stdout) == EOF )
-		error(1, errno, "%s", output_path ? output_path : "stdout");
+		err(1, "%s", output_path ? output_path : "stdout");
 
 	return 0;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,8 +24,8 @@
 #include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <libgen.h>
 #include <signal.h>
@@ -71,7 +71,7 @@ void execdiff(int tree_a, const char* tree_a_path,
 {
 	DIR* dir_b = fdopendupdir(tree_b);
 	if ( !dir_b )
-		error(1, errno, "fdopendupdir(`%s`)", tree_b_path);
+		err(1, "fdopendupdir(`%s`)", tree_b_path);
 	struct dirent* entry;
 	while ( (entry = readdir(dir_b)) )
 	{
@@ -89,7 +89,7 @@ void execdiff(int tree_a, const char* tree_a_path,
 			if ( subtree_a < 0 )
 			{
 				if ( !(errno == ENOTDIR || errno == ELOOP || errno == ENOENT) )
-					error(1, errno, "`%s/%s`", tree_b_path, entry->d_name);
+					err(1, "`%s/%s`", tree_b_path, entry->d_name);
 				execdiff(-1, NULL, subtree_b, subtree_b_path, subrelpath);
 				free(subtree_b_path);
 				close(subtree_b);
@@ -107,7 +107,7 @@ void execdiff(int tree_a, const char* tree_a_path,
 			continue;
 		}
 		else if ( !(errno == ENOTDIR || errno == ELOOP) )
-			error(1, errno, "`%s/%s`", tree_b_path, entry->d_name);
+			err(1, "`%s/%s`", tree_b_path, entry->d_name);
 
 		int a_executableness = ftestexecutableat(tree_a, entry->d_name);
 		int b_executableness = ftestexecutableat(tree_b, entry->d_name);
@@ -194,20 +194,20 @@ int main(int argc, char* argv[])
 	compact_arguments(&argc, &argv);
 
 	if ( argc < 3 )
-		error(1, 0, "You need to specify two directories");
+		errx(1, "You need to specify two directories");
 
 	if ( 3 < argc )
-		error(1, 0, "extra operand");
+		errx(1, "extra operand");
 
 	const char* tree_a_path = argv[1];
 	int tree_a = open(tree_a_path, O_RDONLY | O_DIRECTORY);
 	if ( tree_a < 0 )
-		error(1, errno, "`%s'", tree_a_path);
+		err(1, "`%s'", tree_a_path);
 
 	const char* tree_b_path = argv[2];
 	int tree_b = open(tree_b_path, O_RDONLY | O_DIRECTORY);
 	if ( tree_b < 0 )
-		error(1, errno, "`%s'", tree_b_path);
+		err(1, "`%s'", tree_b_path);
 
 	execdiff(tree_a, tree_a_path, tree_b, tree_b_path, ".");
 

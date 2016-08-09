@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,8 +18,8 @@
  */
 
 #include <ctype.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <libgen.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -193,8 +193,7 @@ bool AddRulesFromFile(FILE* fp, const char* fpname)
 				value = false;
 			else
 			{
-				error(0, 0, "%s:%zu: not a boolean '%s'", fpname,
-				         line_num, parameter);
+				warnx("%s:%zu: not a boolean '%s'", fpname, line_num, parameter);
 				goto error_out;
 			}
 			if ( !default_inclusion_determined )
@@ -208,8 +207,7 @@ bool AddRulesFromFile(FILE* fp, const char* fpname)
 		{
 			if ( !*parameter )
 			{
-				error(0, 0, "%s:%zu: no parameter given", fpname,
-				         line_num);
+				warnx("%s:%zu: no parameter given", fpname, line_num);
 				goto error_out;
 			}
 			const char* pattern = parameter;
@@ -223,8 +221,7 @@ bool AddRulesFromFile(FILE* fp, const char* fpname)
 		}
 		else
 		{
-			error(0, 0, "%s:%zu: line not understood: '%s'", fpname,
-			         line_num, line);
+			warnx("%s:%zu: line not understood: '%s'", fpname, line_num, line);
 			goto error_out;
 		}
 	}
@@ -232,7 +229,7 @@ bool AddRulesFromFile(FILE* fp, const char* fpname)
 	if ( ferror(fp) )
 	{
 	error_out_errno:
-		error(0, errno, "%s", fpname);
+		warn("%s", fpname);
 	error_out:
 		ChangeRulesAmount(rules_at_start);
 		return false;
@@ -258,7 +255,7 @@ bool AddManifestPath(const char* path)
 		char** new_manifest = (char**) realloc(manifest, new_size);
 		if ( !new_manifest )
 		{
-			error(0, errno, "malloc");
+			warn("malloc");
 			return false;
 		}
 		manifest = new_manifest;
@@ -267,7 +264,7 @@ bool AddManifestPath(const char* path)
 	char* copy = strdup(path);
 	if ( !copy )
 	{
-		error(0, errno, "malloc");
+		warn("malloc");
 		return false;
 	}
 	manifest[manifest_used++] = copy;
@@ -289,7 +286,7 @@ bool AddManifestFromFile(FILE* fp, const char* fpname)
 	free(line);
 	if ( ferror(fp) )
 	{
-		error(0, errno, "%s", fpname);
+		warn("%s", fpname);
 		return false;
 	}
 	if ( !AddManifestPath("/") ||
@@ -299,7 +296,7 @@ bool AddManifestFromFile(FILE* fp, const char* fpname)
 	char* fpname_copy = strdup(fpname);
 	if ( !fpname_copy )
 	{
-		error(0, errno, "malloc");
+		warn("malloc");
 		return false;
 	}
 	const char* fpname_basename = basename(fpname_copy);
@@ -307,7 +304,7 @@ bool AddManifestFromFile(FILE* fp, const char* fpname)
 	if ( asprintf(&manifest_path, "/tix/manifest/%s", fpname_basename) < 0 )
 	{
 		free(fpname_copy);
-		error(0, errno, "malloc");
+		warn("malloc");
 		return false;
 	}
 	free(fpname_copy);
