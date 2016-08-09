@@ -23,7 +23,7 @@
 
 #include <assert.h>
 #include <ctype.h>
-#include <error.h>
+#include <err.h>
 #include <errno.h>
 #include <dirent.h>
 #include <fcntl.h>
@@ -41,7 +41,7 @@
 
 void TipTixCollection(const char* prefix)
 {
-	error(0, 0, "error: `%s' isn't a tix collection, use \"tix-collection %s "
+	warnx("error: `%s' isn't a tix collection, use \"tix-collection %s "
 	            "create\" before " "installing packages.", prefix, prefix);
 }
 
@@ -51,7 +51,7 @@ void VerifyTixCollection(const char* prefix)
 	{
 		if ( errno == ENOENT )
 			TipTixCollection(prefix);
-		error(1, errno, "error: tix collection unavailable: `%s'", prefix);
+		err(1, "error: tix collection unavailable: `%s'", prefix);
 	}
 }
 
@@ -61,7 +61,7 @@ void VerifyTixDirectory(const char* prefix, const char* tix_dir)
 	{
 		if ( errno == ENOENT )
 			TipTixCollection(prefix);
-		error(1, errno, "error: tix database unavailable: `%s'", tix_dir);
+		err(1, "error: tix database unavailable: `%s'", tix_dir);
 	}
 }
 
@@ -69,22 +69,22 @@ void VerifyTixDatabase(const char* prefix,
                        const char* tixdb_path)
 {
 	if ( !IsDirectory(tixdb_path) )
-		error(1, errno, "error: tix database unavailable: `%s'", tixdb_path);
+		err(1, "error: tix database unavailable: `%s'", tixdb_path);
 	char* info_path = join_paths(tixdb_path, "collection.conf");
 	if ( !IsFile(info_path) )
 	{
 		if ( errno == ENOENT )
 			TipTixCollection(prefix);
-		error(1, errno, "error: tix collection information unavailable: `%s'",
+		err(1, "error: tix collection information unavailable: `%s'",
 		                info_path);
 	}
 	char* installed_list_path = join_paths(tixdb_path, "installed.list");
 	FILE* installed_list_fp = fopen(installed_list_path, "a");
 	if ( !installed_list_fp )
 	{
-		error(0, errno, "error: unable to open `%s' for writing",
+		warn("error: unable to open `%s' for writing",
 		                installed_list_path);
-		error(1, 0, "error: `%s': do you have sufficient permissions to "
+		errx(1, "error: `%s': do you have sufficient permissions to "
 		            "administer this tix collection?", prefix);
 	}
 	fclose(installed_list_fp);
@@ -97,7 +97,7 @@ bool IsPackageInstalled(const char* tixdb_path, const char* package)
 	char* installed_list_path = join_paths(tixdb_path, "installed.list");
 	FILE* installed_list_fp = fopen(installed_list_path, "r");
 	if ( !installed_list_fp )
-		error(1, errno, "`%s'", installed_list_path);
+		err(1, "`%s'", installed_list_path);
 
 	bool ret = false;
 	char* line = NULL;
@@ -115,7 +115,7 @@ bool IsPackageInstalled(const char* tixdb_path, const char* package)
 	}
 	free(line);
 	if ( ferror(installed_list_fp) )
-		error(1, errno, "`%s'", installed_list_path);
+		err(1, "`%s'", installed_list_path);
 
 	fclose(installed_list_fp);
 	free(installed_list_path);
@@ -127,13 +127,13 @@ void MarkPackageAsInstalled(const char* tixdb_path, const char* package)
 	char* installed_list_path = join_paths(tixdb_path, "installed.list");
 	FILE* installed_list_fp = fopen(installed_list_path, "a");
 	if ( !installed_list_fp )
-		error(1, errno, "`%s'", installed_list_path);
+		err(1, "`%s'", installed_list_path);
 
 	fprintf(installed_list_fp, "%s\n", package);
 	fflush(installed_list_fp);
 
 	if ( ferror(installed_list_fp) || fclose(installed_list_fp) == EOF )
-		error(1, errno, "`%s'", installed_list_path);
+		err(1, "`%s'", installed_list_path);
 	free(installed_list_path);
 }
 
@@ -225,7 +225,7 @@ int main(int argc, char* argv[])
 	char* coll_conf_path = join_paths(tix_directory_path, "collection.conf");
 	string_array_t coll_conf = string_array_make();
 	if ( !dictionary_append_file_path(&coll_conf, coll_conf_path) )
-		error(1, errno, "`%s'", coll_conf_path);
+		err(1, "`%s'", coll_conf_path);
 	VerifyTixCollectionConfiguration(&coll_conf, coll_conf_path);
 	free(coll_conf_path);
 
@@ -257,11 +257,11 @@ static int strcmp_indirect(const void* a_ptr, const void* b_ptr)
 void InstallPackage(const char* tix_path)
 {
 	if ( !IsFile(tix_path) )
-		error(1, errno, "`%s'", tix_path);
+		err(1, "`%s'", tix_path);
 
 	const char* tixinfo_path = "tix/tixinfo";
 	if ( !TarContainsFile(tix_path, tixinfo_path) )
-		error(1, 0, "`%s' doesn't contain a `%s' file", tix_path, tixinfo_path);
+		errx(1, "`%s' doesn't contain a `%s' file", tix_path, tixinfo_path);
 
 	string_array_t tixinfo = string_array_make();
 	FILE* tixinfo_fp = TarOpenFile(tix_path, tixinfo_path);
@@ -279,24 +279,24 @@ void InstallPackage(const char* tix_path)
 
 	bool already_installed = IsPackageInstalled(tix_directory_path, package_name);
 	if ( already_installed && !reinstall )
-		error(1, 0, "error: package `%s' is already installed. Use --reinstall "
+		errx(1, "error: package `%s' is already installed. Use --reinstall "
 		            "to force reinstallation.", package_name);
 
 	if ( package_prefix && strcmp(coll_prefix, package_prefix) != 0 )
 	{
-		error(0, errno, "error: `%s' is compiled with the prefix `%s', but the "
+		warn("error: `%s' is compiled with the prefix `%s', but the "
 		                "destination collection has the prefix `%s'.", tix_path,
 		                package_prefix, coll_prefix);
-		error(1, errno, "you need to recompile the package with "
+		err(1, "you need to recompile the package with "
 		                "--prefix=\"%s\".", coll_prefix);
 	}
 
 	if ( package_platform && strcmp(coll_platform, package_platform) != 0 )
 	{
-		error(0, errno, "error: `%s' is compiled with the platform `%s', but "
+		warn("error: `%s' is compiled with the platform `%s', but "
 		                "the destination collection has the platform `%s'.",
 		                tix_path, package_platform, coll_platform);
-		error(1, errno, "you need to recompile the package with "
+		err(1, "you need to recompile the package with "
 		                "--host=%s\".", coll_platform);
 	}
 
@@ -308,7 +308,7 @@ void InstallPackage(const char* tix_path)
 	char* tixinfo_out_path = print_string("%s/tixinfo/%s", tix_directory_path, package_name);
 	int tixinfo_fd = open(tixinfo_out_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	if ( tixinfo_fd < 0 )
-		error(1, errno, "%s", tixinfo_out_path);
+		err(1, "%s", tixinfo_out_path);
 	TarExtractFileToFD(tix_path, "tix/tixinfo", tixinfo_fd);
 	close(tixinfo_fd);
 
@@ -319,7 +319,7 @@ void InstallPackage(const char* tix_path)
 	char* manifest_path = print_string("%s/manifest/%s", tix_directory_path, package_name);
 	FILE* manifest_fp = fopen(manifest_path, "w");
 	if ( !manifest_fp )
-		error(1, errno, "%s", manifest_path);
+		err(1, "%s", manifest_path);
 	for ( size_t i = 0; i < files.length; i++ )
 	{
 		char* str = files.strings[i];
@@ -332,10 +332,10 @@ void InstallPackage(const char* tix_path)
 		while ( 2 <= len && str[len-1] == '/' )
 			str[--len] = '\0';
 		if ( fprintf(manifest_fp, "%s\n", str) < 0 )
-			error(1, errno, "%s", manifest_path);
+			err(1, "%s", manifest_path);
 	}
 	if ( ferror(manifest_fp) || fflush(manifest_fp) == EOF )
-		error(1, errno, "%s", manifest_path);
+		err(1, "%s", manifest_path);
 	fclose(manifest_fp);
 	string_array_reset(&files);
 	fclose(index_fp);
@@ -357,7 +357,7 @@ void InstallPackage(const char* tix_path)
 			NULL
 		};
 		execvp(cmd_argv[0], (char* const*) cmd_argv);
-		error(127, errno, "%s", cmd_argv[0]);
+		err(127, "%s", cmd_argv[0]);
 	}
 	free(data_and_prefix);
 

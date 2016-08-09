@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,8 +24,8 @@
 #include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <libgen.h>
 #include <signal.h>
@@ -48,7 +48,7 @@ int fgetc_or_die(FILE* input, const char* input_path, size_t* line,
 	else
 		(*column)++;
 	if ( result == EOF && ferror(input) )
-		error(1, errno, "read: `%s'", input_path);
+		err(1, "read: `%s'", input_path);
 	return result;
 }
 
@@ -57,7 +57,7 @@ int fgetc_or_die_eof(FILE* input, const char* input_path, size_t* line,
 {
 	int result = fgetc_or_die(input, input_path, line, column);
 	if ( result == EOF )
-		error(1, errno, "%s:%zu:%zu: unexpected end of file",
+		err(1, "%s:%zu:%zu: unexpected end of file",
 		      input_path, *line, *column);
 	return result;
 }
@@ -82,10 +82,10 @@ void parse_fixed(const char* text, FILE* input, const char* input_path,
 	{
 		int ic = fgetc_or_die(input, input_path, line, column);
 		if ( ic == EOF )
-			error(1, errno, "%s:%zu:%zu: unexpected end of file, expected `%s'",
+			err(1, "%s:%zu:%zu: unexpected end of file, expected `%s'",
 			      input_path, *line, *column, text + i);
 		if ( ic != (unsigned char) text[i] )
-			error(1, errno, "%s:%zu:%zu: parse error, expected `%s'", input_path,
+			err(1, "%s:%zu:%zu: parse error, expected `%s'", input_path,
 			      *line, *column, text + i);
 	}
 }
@@ -109,9 +109,8 @@ bool execpatch(FILE* input, const char* input_path, bool check)
 		case '-': plus = false; break;
 		case '+': plus = true; break;
 		default:
-			error(1, errno, "%s:%zu:%zu: parse error, expected '-' or '+'",
+			err(1, "%s:%zu:%zu: parse error, expected '-' or '+'",
 			      input_path, line, column);
-			__builtin_unreachable();
 		}
 		parse_fixed("x -- '", input, input_path, &line, &column);
 		while ( true )
@@ -135,19 +134,19 @@ bool execpatch(FILE* input, const char* input_path, bool check)
 			buffer[buffer_used++] = ic;
 		}
 		if ( !buffer_used )
-			error(1, errno, "%s:%zu: unexpected empty path", input_path, line);
+			err(1, "%s:%zu: unexpected empty path", input_path, line);
 		assert(buffer_length);
 		buffer[buffer_used] = '\0';
 		if ( buffer[0] == '/' )
-			error(1, errno, "%s:%zu: unexpected absolute path", input_path, line);
+			err(1, "%s:%zu: unexpected absolute path", input_path, line);
 		if ( does_path_contain_dotdot(buffer) )
-			error(1, errno, "%s:%zu: unexpected path with ..", input_path, line);
+			err(1, "%s:%zu: unexpected path with ..", input_path, line);
 		if ( check )
 			continue;
 		struct stat st;
 		if ( fstatat(AT_FDCWD, buffer, &st, AT_SYMLINK_NOFOLLOW) != 0 )
 		{
-			error(0, errno, "chmod %cx: `%s'", plus ? '+' : '-', buffer);
+			warn("chmod %cx: `%s'", plus ? '+' : '-', buffer);
 			result = false;
 			continue;
 		}
@@ -158,7 +157,7 @@ bool execpatch(FILE* input, const char* input_path, bool check)
 			new_mode &= ~0111;
 		if ( fchmodat(AT_FDCWD, buffer, new_mode, 0) != 0 )
 		{
-			error(0, errno, "chmod %cx: `%s'", plus ? '+' : '-', buffer);
+			warn("chmod %cx: `%s'", plus ? '+' : '-', buffer);
 			result = false;
 			continue;
 		}
@@ -221,7 +220,7 @@ int main(int argc, char* argv[])
 	compact_arguments(&argc, &argv);
 
 	if ( 2 < argc )
-		error(1, 0, "extra operand");
+		errx(1, "extra operand");
 
 	const char* input_path = "<stdin>";
 	FILE* input = stdin;
@@ -230,11 +229,11 @@ int main(int argc, char* argv[])
 	{
 		input_path = argv[1];
 		if ( !(input = fopen(input_path, "r")) )
-			error(1, errno, "`%s'", input_path);
+			err(1, "`%s'", input_path);
 	}
 
 	if ( directory && chdir(directory) != 0 )
-		error(1, errno, "chdir: `%s'", directory);
+		err(1, "chdir: `%s'", directory);
 	free(directory);
 
 	return execpatch(input, input_path, check) ? 0 : 1;

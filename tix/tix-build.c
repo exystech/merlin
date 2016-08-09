@@ -24,8 +24,8 @@
 #include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <signal.h>
@@ -115,7 +115,7 @@ bool has_in_path(const char* program)
 {
 	pid_t child_pid = fork();
 	if ( child_pid < 0 )
-		error(1, errno, "fork: which %s", program);
+		err(1, "fork: which %s", program);
 	if ( child_pid )
 	{
 		int exitstatus;
@@ -157,7 +157,7 @@ void emit_compiler_warning_wrapper(metainfo_t* minfo,
 	char* wrapper_path = print_string("%s/%s", bindir, name);
 	FILE* wrapper = fopen(wrapper_path, "w");
 	if ( !wrapper )
-		error(1, errno, "`%s'", wrapper_path);
+		err(1, "`%s'", wrapper_path);
 	// TODO: Find a portable shell way of doing this.
 	fprintf(wrapper, "#!/bin/bash\n");
 	fprint_shell_variable_assignment(wrapper, "PATH", getenv("PATH"));
@@ -207,7 +207,7 @@ void emit_compiler_sysroot_wrapper(metainfo_t* minfo,
 	char* wrapper_path = print_string("%s/%s", bindir, name);
 	FILE* wrapper = fopen(wrapper_path, "w");
 	if ( !wrapper )
-		error(1, errno, "`%s'", wrapper_path);
+		err(1, "`%s'", wrapper_path);
 	fprint_shell_variable_assignment(wrapper, "PATH", getenv("PATH"));
 	if ( minfo->sysroot )
 		fprint_shell_variable_assignment(wrapper, "SYSROOT", minfo->sysroot);
@@ -232,17 +232,15 @@ void emit_compiler_sysroot_cross_wrapper(metainfo_t* minfo,
 
 void emit_pkg_config_wrapper(metainfo_t* minfo)
 {
-	char* bindir = print_string("%s/bin.XXXXXX", minfo->tmp);
-	if ( !mkdtemp(bindir) )
-		error(1, errno, "mkdtemp: `%s'", bindir);
-
-	on_exit(cleanup_file_or_directory, strdup(bindir));
+	char* bindir = print_string("%s/bin", tmp_root);
+	if ( mkdir(bindir, 0777) < 0 )
+		err(1, "mkdir: %s", bindir);
 
 	// Create a pkg-config script for the build system.
 	char* pkg_config_for_build_path = print_string("%s/build-pkg-config", bindir);
 	FILE* pkg_config_for_build = fopen(pkg_config_for_build_path, "w");
 	if ( !pkg_config_for_build )
-		error(1, errno, "`%s'", pkg_config_for_build_path);
+		err(1, "`%s'", pkg_config_for_build_path);
 	fprintf(pkg_config_for_build, "#!/bin/sh\n");
 	fprint_shell_variable_assignment(pkg_config_for_build, "PATH", getenv("PATH"));
 	fprint_shell_variable_assignment(pkg_config_for_build, "PKG_CONFIG", getenv("PKG_CONFIG"));
@@ -260,7 +258,7 @@ void emit_pkg_config_wrapper(metainfo_t* minfo)
 	char* pkg_config_path = print_string("%s/pkg-config", bindir);
 	FILE* pkg_config = fopen(pkg_config_path, "w");
 	if ( !pkg_config )
-		error(1, errno, "`%s'", pkg_config_path);
+		err(1, "`%s'", pkg_config_path);
 	fprintf(pkg_config, "#!/bin/sh\n");
 	fprint_shell_variable_assignment(pkg_config, "PATH", getenv("PATH"));
 	fprint_shell_variable_assignment(pkg_config, "PKG_CONFIG", getenv("PKG_CONFIG"));
@@ -298,7 +296,7 @@ void emit_pkg_config_wrapper(metainfo_t* minfo)
 		}
 		else
 		{
-			error(1, errno, "mkdir: `%s': compiler warnings won't be saved", warnings_dir);
+			err(1, "mkdir: `%s': compiler warnings won't be saved", warnings_dir);
 			unsetenv("TIX_WARNINGS_DIR");
 		}
 		free(warnings_dir);
@@ -422,9 +420,9 @@ void Configure(metainfo_t* minfo, const char* subdir)
 			parse_boolean(dictionary_get_def(pkg_info, "pkg.configure.with-build-sysroot",
 			                                           "false"));
 		if ( chdir(minfo->build_dir) != 0 )
-			error(1, errno, "chdir: `%s'", minfo->build_dir);
+			err(1, "chdir: `%s'", minfo->build_dir);
 		if ( subdir && chdir(subdir) != 0 )
-			error(1, errno, "chdir: `%s/%s'", minfo->build_dir, subdir);
+			err(1, "chdir: `%s/%s'", minfo->build_dir, subdir);
 		SetNeededVariables(minfo);
 		string_array_t env_vars = string_array_make();
 		string_array_append_token_string(&env_vars, conf_extra_vars);
@@ -482,7 +480,7 @@ void Configure(metainfo_t* minfo, const char* subdir)
 		string_array_append_token_string(&args, conf_extra_args);
 		string_array_append(&args, NULL);
 		recovery_execvp(args.strings[0], (char* const*) args.strings);
-		error(127, errno, "`%s'", args.strings[0]);
+		err(127, "`%s'", args.strings[0]);
 	}
 }
 
@@ -494,7 +492,7 @@ bool TestDirty(metainfo_t* minfo,
 		subdir = ".";
 	char* path;
 	if ( asprintf(&path, "%s/%s/%s", minfo->build_dir, subdir, candidate) < 0 )
-		error(1, errno, "asprintf");
+		err(1, "asprintf");
 	bool result = access(path, F_OK) == 0;
 	free(path);
 	return result;
@@ -529,9 +527,9 @@ void Make(metainfo_t* minfo, const char* make_target, const char* destdir,
 		}
 		SetNeededVariables(minfo);
 		if ( chdir(minfo->build_dir) != 0 )
-			error(1, errno, "chdir: `%s'", minfo->build_dir);
+			err(1, "chdir: `%s'", minfo->build_dir);
 		if ( subdir && chdir(subdir) != 0 )
-			error(1, errno, "chdir: `%s/%s'", minfo->build_dir, subdir);
+			err(1, "chdir: `%s/%s'", minfo->build_dir, subdir);
 		if ( destdir )
 			setenv("DESTDIR", destdir, 1);
 		setenv("BUILD", minfo->build, 1);
@@ -582,7 +580,7 @@ void Make(metainfo_t* minfo, const char* make_target, const char* destdir,
 			recovery_execvp(args.strings[0], (char* const*) args.strings);
 		else
 			execvp(args.strings[0], (char* const*) args.strings);
-		error(127, errno, "`%s'", args.strings[0]);
+		err(127, "`%s'", args.strings[0]);
 	}
 }
 
@@ -599,10 +597,9 @@ void BuildPackage(metainfo_t* minfo)
 	bool use_build_dir = parse_boolean(use_build_dir_var);
 	if ( use_build_dir )
 	{
-		minfo->build_dir = print_string("%s/build.XXXXXX", minfo->tmp);
-		if ( !mkdtemp(minfo->build_dir) )
-			error(1, errno, "mkdtemp: `%s'", minfo->build_dir);
-		on_exit(cleanup_file_or_directory, strdup(minfo->build_dir));
+		minfo->build_dir = print_string("%s/build", tmp_root);
+		if ( mkdir(minfo->build_dir, 0777) < 0 )
+			err(1, "mkdir %s", minfo->build_dir);
 	}
 	else
 		minfo->build_dir = strdup(minfo->package_dir);
@@ -635,30 +632,29 @@ void BuildPackage(metainfo_t* minfo)
 	const char* install_target = dictionary_get_def(pinfo, "pkg.make.install-target", "install");
 
 	if ( !location_independent && !minfo->prefix )
-		error(1, 0, "error: %s is not location independent and you need to "
+		errx(1, "error: %s is not location independent and you need to "
 		            "specify the intended destination prefix using --prefix",
 		            minfo->package_name);
 
 	if ( SHOULD_DO_BUILD_STEP(BUILD_STEP_BUILD, minfo) )
 		Make(minfo, build_target, NULL, true, subdir);
 
-	char* tardir_rel = print_string("%s/%s", minfo->tmp, "tix.XXXXXX");
-	if ( !mkdtemp(tardir_rel) )
-		error(1, errno, "mkdtemp: `%s'", tardir_rel);
-	on_exit(cleanup_file_or_directory, strdup(tardir_rel));
+	char* tardir_rel = print_string("%s/%s", tmp_root, "tix");
+	if ( mkdir(tardir_rel, 0777) < 0 )
+		err(1, "mkdir: %s", tardir_rel);
 
 	char* destdir_rel = print_string("%s/%s", tardir_rel, "data");
 	char* tixdir_rel = print_string("%s/%s", tardir_rel, "tix");
 	char* tixinfo_rel = print_string("%s/%s", tardir_rel, "tix/tixinfo");
 
 	if ( mkdir(destdir_rel, 0755) != 0 )
-		error(1, errno, "mkdir: `%s'", destdir_rel);
+		err(1, "mkdir: `%s'", destdir_rel);
 	if ( mkdir(tixdir_rel, 0755) != 0 )
-		error(1, errno, "mkdir: `%s'", tixdir_rel);
+		err(1, "mkdir: `%s'", tixdir_rel);
 
-	char* destdir = canonicalize_file_name(destdir_rel);
+	char* destdir = realpath(destdir_rel, NULL);
 	if ( !destdir )
-		error(1, errno, "canonicalize_file_name: `%s'", destdir_rel);
+		err(1, "realpath: %s", destdir_rel);
 
 	if ( SHOULD_DO_BUILD_STEP(BUILD_STEP_INSTALL, minfo) )
 		Make(minfo, install_target, destdir, true, subdir);
@@ -670,7 +666,7 @@ void BuildPackage(metainfo_t* minfo)
 	     fork_and_wait_or_recovery() )
 	{
 		if ( chdir(minfo->package_dir) != 0 )
-			error(1, errno, "chdir: `%s'", minfo->package_dir);
+			err(1, "chdir: `%s'", minfo->package_dir);
 		setenv("TIX_BUILD_DIR", minfo->build_dir, 1);
 		setenv("TIX_SOURCE_DIR", minfo->package_dir, 1);
 		setenv("TIX_INSTALL_DIR", destdir, 1);
@@ -695,7 +691,7 @@ void BuildPackage(metainfo_t* minfo)
 			NULL
 		};
 		recovery_execvp(cmd_argv[0], (char* const*) cmd_argv);
-		error(127, errno, "%s", cmd_argv[0]);
+		err(127, "%s", cmd_argv[0]);
 	}
 
 	const char* tix_ext = ".tix.tar.xz";
@@ -704,7 +700,7 @@ void BuildPackage(metainfo_t* minfo)
 
 	FILE* tixinfo_fp = fopen(tixinfo_rel, "w");
 	if ( !tixinfo_fp )
-		error(1, errno, "`%s'", tixinfo_rel);
+		err(1, "`%s'", tixinfo_rel);
 
 	const char* runtime_deps = dictionary_get(pinfo, "pkg.runtime-deps");
 
@@ -720,7 +716,7 @@ void BuildPackage(metainfo_t* minfo)
 		fprintf(tixinfo_fp, "pkg.prefix=%s\n", minfo->prefix);
 
 	if ( ferror(tixinfo_fp) )
-		error(1, errno, "write: `%s'", tixinfo_rel);
+		err(1, "write: `%s'", tixinfo_rel);
 
 	fclose(tixinfo_fp);
 
@@ -745,7 +741,7 @@ void BuildPackage(metainfo_t* minfo)
 				NULL
 			};
 			recovery_execvp(cmd_argv[0], (char* const*) cmd_argv);
-			error(127, errno, "%s", cmd_argv[0]);
+			err(127, "%s", cmd_argv[0]);
 		}
 	}
 
@@ -772,14 +768,14 @@ void VerifySourceTixInformation(metainfo_t* minfo)
 	string_array_t* pinfo = &minfo->package_info;
 	const char* tix_version = VerifyInfoVariable(pinfo, "tix.version", pipath);
 	if ( atoi(tix_version) != 1 )
-		error(1, 0, "error: `%s': tix version `%s' not supported", pipath,
+		errx(1, "error: `%s': tix version `%s' not supported", pipath,
 		            tix_version);
 	const char* tix_class = VerifyInfoVariable(pinfo, "tix.class", pipath);
 	if ( !strcmp(tix_class, "tix") )
-		error(1, 0, "error: `%s': this object is a binary tix and is already "
+		errx(1, "error: `%s': this object is a binary tix and is already "
 		            "compiled.\n", pipath);
 	if ( strcmp(tix_class, "srctix") )
-		error(1, 0, "error: `%s': tix class `%s' is not `srctix': this object "
+		errx(1, "error: `%s': tix class `%s' is not `srctix': this object "
 		            "is not suitable for compilation.", pipath, tix_class);
 	VerifyInfoVariable(pinfo, "pkg.name", pipath);
 	VerifyInfoVariable(pinfo, "pkg.build-system", pipath);
@@ -847,7 +843,7 @@ int main(int argc, char* argv[])
 	minfo.sysroot = NULL;
 	minfo.target = NULL;
 	minfo.tar = strdup("tar");
-	minfo.tmp = strdup(getenv_def("TMPDIR", "/tmp"));
+	char* tmp = strdup(getenv_def("TMPDIR", "/tmp"));
 	char* start_step_string = strdup("start");
 	char* end_step_string = strdup("end");
 
@@ -935,9 +931,11 @@ int main(int argc, char* argv[])
 		exit(1);
 	}
 
-	minfo.package_dir = canonicalize_file_name(argv[1]);
+	initialize_tmp(tmp, "tixbuild");
+
+	minfo.package_dir = realpath(argv[1], NULL);
 	if ( !minfo.package_dir )
-		error(1, errno, "canonicalize_file_name: `%s'", argv[1]);
+		err(1, "realpath: %s", argv[1]);
 
 	if ( minfo.build && !minfo.build[0] )
 		free(minfo.build), minfo.build = NULL;
@@ -947,7 +945,7 @@ int main(int argc, char* argv[])
 		free(minfo.target), minfo.target = NULL;
 
 	if ( !minfo.build && !(minfo.build = GetBuildTriplet()) )
-		error(1, errno, "unable to determine build, use --build");
+		err(1, "unable to determine build, use --build");
 	if ( !minfo.host )
 		minfo.host = strdup(minfo.build);
 	if ( !minfo.target )
@@ -957,7 +955,7 @@ int main(int argc, char* argv[])
 		minfo.exec_prefix = strdup(minfo.prefix);
 
 	if ( !IsDirectory(minfo.package_dir) )
-		error(1, errno, "`%s'", minfo.package_dir);
+		err(1, "`%s'", minfo.package_dir);
 
 	minfo.package_info_path = print_string("%s/tixbuildinfo",
 	                                       minfo.package_dir);
@@ -969,7 +967,7 @@ int main(int argc, char* argv[])
 		if ( errno == ENOENT )
 			fprintf(stderr, "%s: `%s' doesn't appear to be a source .tix:\n",
 			                argv0, minfo.package_dir);
-		error(1, errno, "`%s'", minfo.package_info_path);
+		err(1, "`%s'", minfo.package_info_path);
 	}
 
 	VerifySourceTixInformation(&minfo);

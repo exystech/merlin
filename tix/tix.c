@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,7 +24,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
-#include <error.h>
+#include <err.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -90,11 +90,11 @@ string_array_t GetPackageDependencies(params_t* params, const char* pkg_name)
 
 	char* pkg_path = FindPackage(params, &params->repo_list, pkg_name);
 	if ( !pkg_path )
-		error(1, errno, "unable to locate package `%s'", pkg_name);
+		err(1, "unable to locate package `%s'", pkg_name);
 
 	const char* tixinfo_path = "tix/tixinfo";
 	if ( !TarContainsFile(pkg_path, tixinfo_path) )
-		error(1, 0, "`%s' doesn't contain a `%s' file", pkg_path, tixinfo_path);
+		errx(1, "`%s' doesn't contain a `%s' file", pkg_path, tixinfo_path);
 
 	string_array_t tixinfo = string_array_make();
 	FILE* tixinfo_fp = TarOpenFile(pkg_path, tixinfo_path);
@@ -134,7 +134,7 @@ void InstallPackageOfName(params_t* params, const char* pkg_name)
 {
 	char* pkg_path = FindPackage(params, &params->repo_list, pkg_name);
 	if ( !pkg_path )
-		error(1, errno, "unable to locate package `%s'", pkg_name);
+		err(1, "unable to locate package `%s'", pkg_name);
 
 	if ( fork_and_wait_or_death() )
 	{
@@ -146,7 +146,7 @@ void InstallPackageOfName(params_t* params, const char* pkg_name)
 			NULL
 		};
 		execvp(cmd_argv[0], (char* const*) cmd_argv);
-		error(127, errno, "`%s'", cmd_argv[0]);
+		err(127, "`%s'", cmd_argv[0]);
 	}
 
 	free(pkg_path);
@@ -223,30 +223,30 @@ int main(int argc, char* argv[])
 	char* coll_conf_path = join_paths(params.tixdb_path, "collection.conf");
 	params.coll_conf = string_array_make();
 	if ( !dictionary_append_file_path(&params.coll_conf, coll_conf_path) )
-		error(1, errno, "`%s'", coll_conf_path);
+		err(1, "`%s'", coll_conf_path);
 	VerifyTixCollectionConfiguration(&params.coll_conf, coll_conf_path);
 	free(coll_conf_path);
 
 	char* repo_list_path = join_paths(params.tixdb_path, "repository.list");
 	params.repo_list = string_array_make();
 	if ( !string_array_append_file_path(&params.repo_list, repo_list_path) )
-		error(1, errno, "`%s'", repo_list_path);
+		err(1, "`%s'", repo_list_path);
 	free(repo_list_path);
 
 	char* inst_list_path = join_paths(params.tixdb_path, "installed.list");
 	params.inst_list = string_array_make();
 	if ( !string_array_append_file_path(&params.inst_list, inst_list_path) )
-		error(1, errno, "`%s'", inst_list_path);
+		err(1, "`%s'", inst_list_path);
 	free(inst_list_path);
 
 	if ( argc == 1 )
-		error(1, 0, "error: no command specified.");
+		errx(1, "error: no command specified.");
 
 	const char* cmd = argv[1];
 	if ( !strcmp(cmd, "install") )
 	{
 		if ( argc == 2 )
-			error(1, 0, "expected list of packages to install after `install'");
+			errx(1, "expected list of packages to install after `install'");
 
 		string_array_t work = string_array_make();
 

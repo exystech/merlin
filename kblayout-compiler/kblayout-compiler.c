@@ -19,8 +19,8 @@
 
 #include <assert.h>
 #include <endian.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <locale.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -394,7 +394,7 @@ int main(int argc, char* argv[])
 				{
 					if ( i + 1 == argc )
 					{
-						error(0, 0, "option requires an argument -- 'o'");
+						warnx("option requires an argument -- 'o'");
 						fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
 						exit(125);
 					}
@@ -605,7 +605,7 @@ int main(int argc, char* argv[])
 	}
 	free(line);
 	if ( ferror(input) )
-		error(1, errno, "%s", input_path);
+		err(1, "%s", input_path);
 	fclose(input);
 
 	if ( verbose )
@@ -670,7 +670,7 @@ int main(int argc, char* argv[])
 
 	FILE* output = fopen(output_path, "w");
 	if ( !output )
-		error(1, errno, "%s", output_path);
+		err(1, "%s", output_path);
 
 	uint32_t compression_algorithm;
 	void (*compressor)(FILE*, struct kblayout_action*, size_t);

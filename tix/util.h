@@ -22,6 +22,8 @@
 
 #define DEFAULT_GENERATION "2"
 
+extern char** environ;
+
 bool does_path_contain_dotdot(const char* path)
 {
 	size_t index = 0;
@@ -383,7 +385,7 @@ pid_t fork_or_death(void)
 {
 	pid_t child_pid = fork();
 	if ( child_pid < 0 )
-		error(1, errno, "fork");
+		err(1, "fork");
 	return child_pid;
 }
 
@@ -396,7 +398,7 @@ void waitpid_or_death_def(pid_t child_pid, bool die_on_error)
 		if ( WIFEXITED(status) && WEXITSTATUS(status) != 0 )
 			exit(WEXITSTATUS(status));
 		if ( WIFSIGNALED(status) )
-			error(128 + WTERMSIG(status), 0, "child with pid %ju was killed by "
+			errx(128 + WTERMSIG(status), "child with pid %ju was killed by "
 			      "signal %i (%s).", (uintmax_t) child_pid, WTERMSIG(status),
 		          strsignal(WTERMSIG(status)));
 	}
@@ -539,7 +541,7 @@ bool TarContainsFile(const char* archive, const char* file)
 {
 	int pipes[2];
 	if ( pipe(pipes) )
-		error(1, errno, "pipe");
+		err(1, "pipe");
 	pid_t tar_pid = fork_or_death();
 	if ( !tar_pid )
 	{
@@ -554,7 +556,7 @@ bool TarContainsFile(const char* archive, const char* file)
 			NULL
 		};
 		execvp(cmd_argv[0], (char* const*) cmd_argv);
-		error(127, errno, "%s", cmd_argv[0]);
+		err(127, "%s", cmd_argv[0]);
 	}
 	close(pipes[1]);
 	FILE* fp = fdopen(pipes[0], "r");
@@ -578,7 +580,7 @@ bool TarContainsFile(const char* archive, const char* file)
 	}
 	free(line);
 	if ( ferror(fp) )
-		error(1, errno, "getline: tar");
+		err(1, "getline: tar");
 
 	fclose(fp);
 	int tar_exit_status;
@@ -589,7 +591,7 @@ bool TarContainsFile(const char* archive, const char* file)
 	               WEXITSTATUS(tar_exit_status) != 0;
 	if ( errored && !sigpiped )
 	{
-		error(1, 0, "Unable to list contents of `%s'.", archive);
+		errx(1, "Unable to list contents of `%s'.", archive);
 		exit(WEXITSTATUS(tar_exit_status));
 	}
 	return ret;
@@ -602,7 +604,7 @@ void TarExtractFileToFD(const char* archive, const char* file, int fd)
 	{
 		if ( dup2(fd, 1) < 0 )
 		{
-			error(0, errno, "dup2");
+			warn("dup2");
 			_exit(127);
 		}
 		close(fd);
@@ -616,14 +618,14 @@ void TarExtractFileToFD(const char* archive, const char* file, int fd)
 			NULL
 		};
 		execvp(cmd_argv[0], (char* const*) cmd_argv);
-		error(0, errno, "%s", cmd_argv[0]);
+		warn("%s", cmd_argv[0]);
 		_exit(127);
 	}
 	int tar_exit_status;
 	waitpid(tar_pid, &tar_exit_status, 0);
 	if ( !WIFEXITED(tar_exit_status) || WEXITSTATUS(tar_exit_status) != 0 )
 	{
-		error(1, 0, "Unable to extract `%s/%s'", archive, file);
+		errx(1, "Unable to extract `%s/%s'", archive, file);
 		exit(WEXITSTATUS(tar_exit_status));
 	}
 }
@@ -632,10 +634,10 @@ FILE* TarOpenFile(const char* archive, const char* file)
 {
 	FILE* fp = tmpfile();
 	if ( !fp )
-		error(1, errno, "tmpfile");
+		err(1, "tmpfile");
 	TarExtractFileToFD(archive, file, fileno(fp));
 	if ( fseeko(fp, 0, SEEK_SET) < 0 )
-		error(1, errno, "fseeko(tmpfile(), 0, SEEK_SET)");
+		err(1, "fseeko(tmpfile(), 0, SEEK_SET)");
 	return fp;
 }
 
@@ -646,7 +648,7 @@ void TarIndexToFD(const char* archive, int fd)
 	{
 		if ( dup2(fd, 1) < 0 )
 		{
-			error(0, errno, "dup2");
+			warn("dup2");
 			_exit(127);
 		}
 		close(fd);
@@ -658,14 +660,14 @@ void TarIndexToFD(const char* archive, int fd)
 			NULL
 		};
 		execvp(cmd_argv[0], (char* const*) cmd_argv);
-		error(0, errno, "%s", cmd_argv[0]);
+		warn("%s", cmd_argv[0]);
 		_exit(127);
 	}
 	int tar_exit_status;
 	waitpid(tar_pid, &tar_exit_status, 0);
 	if ( !WIFEXITED(tar_exit_status) || WEXITSTATUS(tar_exit_status) != 0 )
 	{
-		error(1, 0, "Unable to list contents of `%s'", archive);
+		errx(1, "Unable to list contents of `%s'", archive);
 		exit(WEXITSTATUS(tar_exit_status));
 	}
 }
@@ -674,10 +676,10 @@ FILE* TarOpenIndex(const char* archive)
 {
 	FILE* fp = tmpfile();
 	if ( !fp )
-		error(1, errno, "tmpfile");
+		err(1, "tmpfile");
 	TarIndexToFD(archive, fileno(fp));
 	if ( fseeko(fp, 0, SEEK_SET) < 0 )
-		error(1, errno, "fseeko(tmpfile(), 0, SEEK_SET)");
+		err(1, "fseeko(tmpfile(), 0, SEEK_SET)");
 	return fp;
 }
 
@@ -686,7 +688,7 @@ const char* VerifyInfoVariable(string_array_t* info, const char* var,
 {
 	const char* ret = dictionary_get(info, var);
 	if ( !ret )
-		error(1, 0, "error: `%s': no `%s' variable declared", path, var);
+		errx(1, "error: `%s': no `%s' variable declared", path, var);
 	return ret;
 }
 
@@ -694,25 +696,25 @@ void VerifyTixInformation(string_array_t* tixinfo, const char* tix_path)
 {
 	const char* tix_version = dictionary_get(tixinfo, "tix.version");
 	if ( !tix_version )
-		error(1, 0, "error: `%s': no `tix.version' variable declared",
+		errx(1, "error: `%s': no `tix.version' variable declared",
 		            tix_path);
 	if ( atoi(tix_version) != 1 )
-		error(1, 0, "error: `%s': tix version `%s' not supported", tix_path,
+		errx(1, "error: `%s': tix version `%s' not supported", tix_path,
 		            tix_version);
 	const char* tix_class = dictionary_get(tixinfo, "tix.class");
 	if ( !tix_class )
-		error(1, 0, "error: `%s': no `tix.class' variable declared", tix_path);
+		errx(1, "error: `%s': no `tix.class' variable declared", tix_path);
 	if ( !strcmp(tix_class, "srctix") )
-		error(1, 0, "error: `%s': this object is a source tix and needs to be "
+		errx(1, "error: `%s': this object is a source tix and needs to be "
 		            "compiled into a binary tix prior to installation.",
 		            tix_path);
 	if ( strcmp(tix_class, "tix") )
-		error(1, 0, "error: `%s': tix class `%s' is not `tix': this object is "
+		errx(1, "error: `%s': tix class `%s' is not `tix': this object is "
 		            "not suitable for installation.", tix_path, tix_class);
 	if ( !(dictionary_get(tixinfo, "tix.platform")) )
-		error(1, 0, "error: `%s': no `tix.platform' variable declared", tix_path);
+		errx(1, "error: `%s': no `tix.platform' variable declared", tix_path);
 	if ( !(dictionary_get(tixinfo, "pkg.name")) )
-		error(1, 0, "error: `%s': no `pkg.name' variable declared", tix_path);
+		errx(1, "error: `%s': no `pkg.name' variable declared", tix_path);
 }
 
 bool IsCollectionPrefixRatherThanCommand(const char* arg)
@@ -742,7 +744,7 @@ void ParseOptionalCommandLineCollectionPrefix(char** collection, int* argcp,
 void VerifyCommandLineCollection(char** collection)
 {
 	if ( !*collection )
-		error(1, 0, "error: you need to specify which tix collection to "
+		errx(1, "error: you need to specify which tix collection to "
 		            "administer using --collection or giving the prefix as the "
 		            "first argument.");
 
@@ -753,8 +755,8 @@ void VerifyCommandLineCollection(char** collection)
 	}
 
 	char* collection_rel = *collection;
-	if ( !(*collection = canonicalize_file_name(collection_rel)) )
-		error(1, errno, "canonicalize_file_name(`%s')", collection_rel);
+	if ( !(*collection = realpath(collection_rel, NULL)) )
+		err(1, "realpath: %s", collection_rel);
 	free(collection_rel);
 }
 
@@ -762,41 +764,36 @@ void VerifyTixCollectionConfiguration(string_array_t* info, const char* path)
 {
 	const char* tix_version = dictionary_get(info, "tix.version");
 	if ( !tix_version )
-		error(1, 0, "error: `%s': no `tix.version' variable declared", path);
+		errx(1, "error: `%s': no `tix.version' variable declared", path);
 	if ( atoi(tix_version) != 1 )
-		error(1, 0, "error: `%s': tix version `%s' not supported", path,
+		errx(1, "error: `%s': tix version `%s' not supported", path,
 		            tix_version);
 	const char* tix_class = dictionary_get(info, "tix.class");
 	if ( !tix_class )
-		error(1, 0, "error: `%s': no `tix.class' variable declared", path);
+		errx(1, "error: `%s': no `tix.class' variable declared", path);
 	if ( strcmp(tix_class, "collection") != 0 )
-		error(1, 0, "error: `%s': error: unexpected tix class `%s'.", path,
+		errx(1, "error: `%s': error: unexpected tix class `%s'.", path,
 		            tix_class);
 	if ( !(dictionary_get(info, "collection.prefix")) )
-		error(1, 0, "error: `%s': no `collection.prefix' variable declared",
+		errx(1, "error: `%s': no `collection.prefix' variable declared",
 		            path);
 	if ( !(dictionary_get(info, "collection.platform")) )
-		error(1, 0, "error: `%s': no `collection.platform' variable declared",
+		errx(1, "error: `%s': no `collection.platform' variable declared",
 		            path);
 }
 
 static pid_t original_pid;
-
-__attribute__((constructor))
-static void initialize_original_pid(void)
+char* tmp_root = NULL;
+static void cleanup_tmp(void)
 {
-	original_pid = getpid();
-}
-
-void cleanup_file_or_directory(int status, void* path_ptr)
-{
-	(void) status;
 	if ( original_pid != getpid() )
+		return;
+	if ( !tmp_root )
 		return;
 	pid_t pid = fork();
 	if ( pid < 0 )
 	{
-		error(0, errno, "fork");
+		warn("fork");
 		return;
 	}
 	if ( pid == 0 )
@@ -806,15 +803,35 @@ void cleanup_file_or_directory(int status, void* path_ptr)
 			"rm",
 			"-rf",
 			"--",
-			(const char*) path_ptr,
+			(const char*) tmp_root,
 			NULL,
 		};
 		execvp(cmd_argv[0], (char* const*) cmd_argv);
-		error(0, errno, "%s", cmd_argv[0]);
+		warn("%s", cmd_argv[0]);
 		_exit(127);
 	}
 	int code;
 	waitpid(pid, &code, 0);
+	free(tmp_root);
+	tmp_root = NULL;
+}
+
+void initialize_tmp(const char* tmp, const char* purpose)
+{
+	if ( tmp_root )
+		errx(1, "error: initialize_tmp called twice");
+	if ( asprintf(&tmp_root, "%s/%s.XXXXXX", tmp, purpose) < 0 )
+		err(1, "error: asprintf");
+	if ( !mkdtemp(tmp_root) )
+		err(1, "mkdtemp: `%s'", tmp_root);
+	original_pid = getpid();
+	if ( atexit(cleanup_tmp) != 0 )
+	{
+		int errnum = errno;
+		cleanup_tmp();
+		errno = errnum;
+		err(1, "atexit");
+	}
 }
 
 mode_t get_umask_value(void)
@@ -980,9 +997,7 @@ int recovery_execvp(const char* path, char* const* argv)
 		NULL
 	};
 	execvp(cmd_argv[0], (char* const*) cmd_argv);
-	error(127, errno, "%s", cmd_argv[0]);
-
-	__builtin_unreachable();
+	err(127, "%s", cmd_argv[0]);
 }
 
 bool fork_and_wait_or_recovery(void)
@@ -1002,14 +1017,14 @@ bool fork_and_wait_or_recovery(void)
 			return false;
 
 		if ( WIFEXITED(status) )
-			error(0, 0, "child with pid %ju exited with status %i.",
+			warnx("child with pid %ju exited with status %i.",
 			            (uintmax_t) child_pid, WEXITSTATUS(status));
 		else if ( WIFSIGNALED(status) )
-			error(0, 0, "child with pid %ju was killed by signal %i (%s).",
+			warnx("child with pid %ju was killed by signal %i (%s).",
 			            (uintmax_t) child_pid, WTERMSIG(status),
 			            strsignal(WTERMSIG(status)));
 		else
-			error(0, 0, "child with pid %ju exited in an unusual manner (%i).",
+			warnx("child with pid %ju exited in an unusual manner (%i).",
 			            (uintmax_t) child_pid, status);
 
 		if ( recovery_print_attempted_execution() )
@@ -1039,7 +1054,7 @@ retry_ask_recovery_method:
 		{
 			fprintf(output, "\n");
 			fclose(output);
-			error(0, errno, "can't read line from standard input, aborting.");
+			warn("can't read line from standard input, aborting.");
 			exit_like_exit_status(status);
 		}
 
@@ -1050,13 +1065,13 @@ retry_ask_recovery_method:
 			selection = (int) strtol(input, &input_end, 0);
 			if ( *input_end )
 			{
-				error(0, 0, "error: `%s' is not an allowed choice", input);
+				warnx("error: `%s' is not an allowed choice", input);
 				goto retry_ask_recovery_method;
 			}
 
 			if ( 5 < selection )
 			{
-				error(0, 0, "error: `%i' is not an allowed choice", selection);
+				warnx("error: `%i' is not an allowed choice", selection);
 				goto retry_ask_recovery_method;
 			}
 		}

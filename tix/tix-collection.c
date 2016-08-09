@@ -24,8 +24,8 @@
 #include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -117,7 +117,7 @@ int main(int argc, char* argv[])
 
 	if ( argc == 1 )
 	{
-		error(0, 0, "error: no command specified.");
+		warnx("error: no command specified.");
 		exit(1);
 	}
 
@@ -125,28 +125,28 @@ int main(int argc, char* argv[])
 	if ( !strcmp(cmd, "create") )
 	{
 		if ( !platform && !(platform = GetBuildTriplet()) )
-			error(1, errno, "unable to determine platform, use --platform");
+			err(1, "unable to determine platform, use --platform");
 
 		char* tix_path = join_paths(collection, "tix");
 		if ( mkdir_p(tix_path, 0755) != 0 )
-			error(1, errno, "mkdir: `%s'", tix_path);
+			err(1, "mkdir: `%s'", tix_path);
 
 		char* tixdb_path = strdup(tix_path);
 
 		char* tixinfo_path = join_paths(tixdb_path, "tixinfo");
 		if ( mkdir_p(tixinfo_path, 0755) != 0 )
-			error(1, errno, "mkdir: `%s'", tixinfo_path);
+			err(1, "mkdir: `%s'", tixinfo_path);
 		free(tixinfo_path);
 
 		char* manifest_path = join_paths(tixdb_path, "manifest");
 		if ( mkdir_p(manifest_path, 0755) != 0 )
-			error(1, errno, "mkdir: `%s'", manifest_path);
+			err(1, "mkdir: `%s'", manifest_path);
 		free(manifest_path);
 
 		char* collection_conf_path = join_paths(tixdb_path, "collection.conf");
 		FILE* conf_fp = fopen(collection_conf_path, "wx");
 		if ( !conf_fp && errno == EEXIST )
-			error(1, 0, "error: `%s' already exists, a tix collection is "
+			errx(1, "error: `%s' already exists, a tix collection is "
 			            "already installed at `%s'.", collection_conf_path,
 		                collection);
 		fprintf(conf_fp, "tix.version=1\n");
@@ -161,13 +161,13 @@ int main(int argc, char* argv[])
 		const char* repo_list_path = join_paths(tixdb_path, "repository.list");
 		FILE* repo_list_fp = fopen(repo_list_path, "w");
 		if ( !repo_list_fp )
-			error(1, errno, "`%s'", repo_list_path);
+			err(1, "`%s'", repo_list_path);
 		fclose(repo_list_fp);
 
 		const char* inst_list_path = join_paths(tixdb_path, "installed.list");
 		FILE* inst_list_fp = fopen(inst_list_path, "w");
 		if ( !inst_list_fp )
-			error(1, errno, "`%s'", inst_list_path);
+			err(1, "`%s'", inst_list_path);
 		fclose(inst_list_fp);
 
 		return 0;

@@ -22,12 +22,6 @@
 
 #include <stdint.h>
 
-#include <sys/cdefs.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define INITRD_ALGO_CRC32 0
 #define INITRD_ALGO_NONE 1
 
@@ -94,9 +88,5 @@ typedef struct initrd_dirent
 	uint16_t namelen;
 	char name[0];
 } initrd_dirent_t;
-
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
 
 #endif
