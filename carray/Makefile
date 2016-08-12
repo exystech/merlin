@@ -6,7 +6,6 @@ include ../build-aux/dirs.mak
 OPTLEVEL?=$(DEFAULT_OPTLEVEL)
 CFLAGS?=$(OPTLEVEL)
 
-CPPFLAGS:=$(CPPFLAGS) -DVERSIONSTR=\"$(VERSION)\"
 CFLAGS:=$(CFLAGS) -Wall -Wextra
 
 ifeq ($(HOST_IS_SORTIX),0)
@@ -22,6 +21,8 @@ all: $(BINARY)
 install: all
 	mkdir -p $(DESTDIR)$(BINDIR)
 	install $(BINARY) $(DESTDIR)$(BINDIR)
+	mkdir -p $(DESTDIR)$(MANDIR)/man1
+	cp carray.1 $(DESTDIR)$(MANDIR)/man1/carray.1
 
 %: %.c
 	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< -o $@

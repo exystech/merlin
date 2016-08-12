@@ -199,11 +199,12 @@ endif
 %: %.kblayout
 	kblayout-compiler --format=sortix-kblayout-1 --compression=none $< -o $@
 
+# TODO: After releasing Sortix 1.1, change --identifier to -i.
 kb/default-kblayout.h: kb/default-kblayout
-	carray -cgis --uint8_t --guard=SORTIX_KB_DEFAULT_KBLAYOUT_H --identifier=default_kblayout $< -o $@
+	carray -cgHs -t uint8_t -G SORTIX_KB_DEFAULT_KBLAYOUT_H --identifier=default_kblayout $< -o $@
 
 vgafont.h: vgafont.f16
-	carray -gis --uint8_t --guard=VGAFONT_H --identifier=vgafont $< -o $@
+	carray -gHs -t uint8_t -G VGAFONT_H --identifier=vgafont $< -o $@
 
 *.cpp */*.cpp */*/*.cpp: | kb/default-kblayout.h vgafont.h
 
