@@ -1,0 +1,237 @@
+.Dd $Mdocdate: August 12 2016 $
+.Dt CARRAY 1
+.Os
+.Sh NAME
+.Nm carray
+.Nd convert binary file to C array
+.Sh SYNOPSIS
+.Nm carray
+.\" After releasing Sortix 1.1, make this change to match carray.c:
+.\".Op Fl ceEgHrsv
+.\" Compatibility:
+.Op Fl ceEgHirsv
+.\" (End)
+.Op Fl G Ar guard
+.\" After releasing Sortix 1.1, make this change to match carray.c:
+.\".Op Fl i Ar identifier
+.\" Compatibility:
+.Op Fl \-identifier Ns "=" Ns Ar identifier
+.\" (End)
+.Op Fl \-includes Ns "=" Ns Ar include-statements
+.Op Fl o Ar output
+.Op Fl t Ar type
+.Op Ar
+.Sh DESCRIPTION
+.Nm
+encodes its input as the source code for a C array of hexadecimal constants.
+The input is the specified
+.Ar file
+operands concatenated, or the standard input if no input files are specified.
+.Nm
+writes the source code for a C array to the standard output, or
+.Ar output
+if the
+.Fl o
+option is given.
+The default type is an array of
+.Sy unsigned char .
+The array contents are indented with tabs
+and the lines don't exceed 80 columns (tabs have the width of 8 spaces).
+.Pp
+The default array name is the output path if set, or the path of the first
+input file (if any), or otherwise
+.Sy carray .
+The default array name has all file extensions removed (but a leading period
+in the file name is kept).  The default array name is converted to the
+characters
+a-z, A-Z,
+.Sq _ ,
+and 0-9.  0-9 cannot be the first character of an identifier.
+.Sq +
+will be replaced by
+.Sq x .
+Any other characters are replaced by
+.Sq _
+unless it is the first character, in which case it is replaced by
+.Sq x .
+.Pp
+A guard macro is optionally used by the
+.Fl g
+and
+.Fl G
+options.  The default guard macro is the output path if set, or the path of the
+first input file (if any) followed by
+.Sy _H ,
+or otherwise
+.Sy CARRAY_H .
+The default guard macro is converted to the characters A-Z,
+.Sq _ ,
+and 0-9.  0-9 cannot be the first character of an identifier.  The lower-case
+a-z is converted to the upper-case A-Z.
+.Sq +
+is replaced by
+.Sq X .
+Any other characters are replaced by
+.Sq _ .
+.Pp
+Parts of the output are optional, but the output will be in this order: The
+opening guard macro check, the guard macro definition, the inclusion of
+prerequisite headers, the opening
+.Sy extern """C"""
+block, the array declaration and initialization, the closing
+.Sy extern """C"""
+block, and the closing guard macro check.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl c , Fl \-const
+Declare the array with the
+.Sy const
+keyword.
+.It Fl e , Fl \-extern
+Declare the array with the
+.Sy extern
+keyword.  This option is mutually incompatible with the
+.Fl s
+option.
+.It Fl E , Fl \-extern-c
+Wrap the array in
+.Sy extern """C""" { }
+subject to a preprocessor check for C++.
+.It Fl f , Fl \-forward
+Forward declare the array only, do not initialize it with contents.  The input
+files are not opened and the standard input is unused.  This option is mutually
+incompatible with the
+.Fl r
+option.
+.It Fl g , Fl \-use-guard
+Wrap the output in a preprocessor conditional checking the guard macro is not
+set, and declare the macro if it is not set.  This conditional is a classic C
+include guard that ensures only the first inclusion of a header has any effect.
+.It Fl G , Fl \-guard Ar guard
+Sets the guard macro to
+.Ar guard
+and enables the guard macro check as if the
+.Fl g
+option was set as well.  The guard macro is unrestricted and untransformed and
+will be be output verbatim.
+.It Fl H , Fl \-headers
+Output inclusions of all the prerequisite headers.  By default, there are no
+prerequisite headers, unless the array type is one of the
+.In stdint.h
+types, in which case
+.In stdint.h
+is the only prerequisite header.
+.\" After releasing Sortix 1.1, make this change to match carray.c:
+.\".It Fl i , Fl \-identifier Ar identifier
+.\" Compatibility:
+.It Fl \-identifier Ar identifier
+.\" (End)
+Sets the name of the array to
+.Ar identifier .
+The identifier is unrestricted and will be be output verbatim.
+.It Fl \-includes Ar include-statements
+Sets the C preprocessor statements
+.Ar include-statements
+as how to include all the prerequisite headers and enables inclusion of the
+prerequisite headers as if the
+.Fl H
+option was set.  The preprocessor statements are unrestricted and untransformed
+and will be be output verbatim.
+.It Fl o , Fl output Ar output
+Write the output to the
+.Ar output
+path rather than the standard output.
+.It Fl r , Fl \-raw
+Output only the hexadecimally encoded array contents, and the guard macro check
+if set by the
+.Fl g
+option.  This option is mutually incompatible with the
+.Fl f
+option.
+.It Fl s , Fl \-static
+Declare the array with the
+.Sy static
+keyword.
+.It Fl t , Fl \-type Ar type
+Declare the array as an array of the specified
+.Ar type .
+The type is unrestricted and will be be output verbatim.
+.It Fl v , Fl \-volatile
+Declare the array with the
+.Sy volatile
+keyword.
+.El
+.Pp
+In addition to the
+.Fl t
+option, the array type can be set by the following options:
+.Bl -tag -width "--unsigned-char"
+.It Fl \-char
+Declare as array of
+.Sy char .
+.It Fl \-signed-char
+Declare as array of
+.Sy signed char .
+.It Fl \-unsigned-char
+Declare as array of
+.Sy unsigned char .
+.It Fl \-int8_t
+Declare as array of
+.Sy int8_t .
+.It Fl \-uint8_t
+Declare as array of
+.Sy uint8_t .
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh EXAMPLES
+.Bd -literal
+$ echo foo | carray
+unsigned char carray[] = {
+	0x66, 0x6F, 0x6F, 0x0A,
+};
+.Ed
+.Bd -literal
+$ echo foo | carray -cs -o foo.inc
+$ cat foo.inc
+static const unsigned char foo[] = {
+	0x66, 0x6F, 0x6F, 0x0A,
+};
+.Ed
+.Bd -literal
+$ echo foo | carray -ceEfgH -t uint8_t -o foo.h
+$ cat foo.h
+#ifndef FOO_H
+#define FOO_H
+
+#include <stdint.h>
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+extern const uint8_t foo[];
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif
+
+#endif
+.Ed
+.Bd -literal
+$ echo foo | carray -cH -t uint8_t -o foo.c
+$ cat foo.c
+#include <stdint.h>
+
+const uint8_t foo[] = {
+	0x66, 0x6F, 0x6F, 0x0A,
+};
+.Ed
+.Bd -literal
+$ echo foo | carray -r
+	0x66, 0x6F, 0x6F, 0x0A,
+.Ed
+.Sh SEE ALSO
+.Xr gcc 1

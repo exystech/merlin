@@ -19,7 +19,6 @@
 
 #include <err.h>
 #include <errno.h>
-#include <locale.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,112 +37,64 @@ static void compact_arguments(int* argc, char*** argv)
 	}
 }
 
-bool get_option_variable(const char* option, char** varptr,
-                         const char* arg, int argc, char** argv, int* ip,
-                         const char* argv0)
+bool get_option_variable(const char* option, const char** varptr,
+                         const char* arg, int argc, char** argv, int* ip)
 {
 	size_t option_len = strlen(option);
 	if ( strncmp(option, arg, option_len) != 0 )
 		return false;
 	if ( arg[option_len] == '=' )
 	{
-		*varptr = strdup(arg + option_len + 1);
+		*varptr = arg + option_len + 1;
 		return true;
 	}
 	if ( arg[option_len] != '\0' )
 		return false;
 	if ( *ip + 1 == argc )
-	{
-		fprintf(stderr, "%s: expected operand after `%s'\n", argv0, option);
-		exit(1);
-	}
-	*varptr = strdup(argv[++*ip]), argv[*ip] = NULL;
+		errx(1, "expected operand after `%s'\n", option);
+	*varptr = argv[++*ip];
+	argv[*ip] = NULL;
 	return true;
 }
 
 #define GET_OPTION_VARIABLE(str, varptr) \
-        get_option_variable(str, varptr, arg, argc, argv, &i, argv0)
+        get_option_variable(str, varptr, arg, argc, argv, &i)
 
-void get_short_option_variable(char c, char** varptr,
-                               const char* arg, int argc, char** argv, int* ip,
-                               const char* argv0)
+void get_short_option_variable(char c, const char** varptr,
+                               const char* arg, int argc, char** argv, int* ip)
 {
-	free(*varptr);
 	if ( *(arg+1) )
-	{
-		*varptr = strdup(arg + 1);
-	}
+		*varptr = arg + 1;
 	else
 	{
 		if ( *ip + 1 == argc )
-		{
-			warn("option requires an argument -- '%c'", c);
-			fprintf(stderr, "Try `%s --help' for more information.\n", argv0);
-			exit(1);
-		}
-		*varptr = strdup(argv[*ip + 1]);
+			errx(1, "option requires an argument -- '%c'", c);
+		*varptr = argv[*ip + 1];
 		argv[++(*ip)] = NULL;
 	}
 }
 
 #define GET_SHORT_OPTION_VARIABLE(c, varptr) \
-        get_short_option_variable(c, varptr, arg, argc, argv, &i, argv0)
-
-static void help(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "Usage: %s [OPTION]... [INPUT...] -o OUTPUT\n", argv0);
-	fprintf(fp, "Convert a binary file to a C array.\n");
-	fprintf(fp, "\n");
-	fprintf(fp, "Mandatory arguments to long options are mandatory for short options too.\n");
-	fprintf(fp, "  -c, --const               add const keyword\n");
-	fprintf(fp, "  -e, --extern              add extern keyword\n");
-	fprintf(fp, "      --extern-c            use C linkage\n");
-	fprintf(fp, "  -f, --forward             forward declare rather than define\n");
-	fprintf(fp, "      --guard=MACRO         use include guard macro MACRO\n");
-	fprintf(fp, "  -g, --use-guard           add include guard\n");
-	fprintf(fp, "  -i, --include             include prerequisite headers\n");
-	fprintf(fp, "      --identifier=NAME     use identifier NAME\n");
-	fprintf(fp, "      --includes=INCLUDES   emit raw preprocessor INCLUDES\n");
-	fprintf(fp, "  -o, --output=FILE         write result to FILE\n");
-	fprintf(fp, "  -r, --raw                 emit only raw \n");
-	fprintf(fp, "  -s, --static              add static keyword\n");
-	fprintf(fp, "      --type=TYPE           use type TYPE [unsigned char]\n");
-	fprintf(fp, "  -v, --volatile            add volatile keyword\n");
-	fprintf(fp, "      --char                use type char\n");
-	fprintf(fp, "      --signed-char         use type signed char\n");
-	fprintf(fp, "      --unsigned-char       use type unsigned char\n");
-	fprintf(fp, "      --int8_t              use type int8_t\n");
-	fprintf(fp, "      --uint8_t             use type uint8_t\n");
-	fprintf(fp, "      --help                display this help and exit\n");
-	fprintf(fp, "      --version             output version information and exit\n");
-}
-
-static void version(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
-}
+        get_short_option_variable(c, varptr, arg, argc, argv, &i)
 
 int main(int argc, char* argv[])
 {
-	setlocale(LC_ALL, "");
-
 	bool flag_const = false;
 	bool flag_extern_c = false;
 	bool flag_extern = false;
 	bool flag_forward = false;
 	bool flag_guard = false;
-	bool flag_include = false;
+	bool flag_headers = false;
 	bool flag_raw = false;
 	bool flag_static = false;
 	bool flag_volatile = false;
 
-	char* arg_guard = NULL;
-	char* arg_identifier = NULL;
-	char* arg_includes = NULL;
-	char* arg_output = NULL;
-	char* arg_type = NULL;
+	const char* guard = NULL;
+	const char* identifier = NULL;
+	const char* includes = NULL;
+	const char* output = NULL;
+	const char* type = NULL;
 
-	const char* argv0 = argv[0];
 	for ( int i = 1; i < argc; i++ )
 	{
 		const char* arg = argv[i];
@@ -159,33 +110,44 @@ int main(int argc, char* argv[])
 			{
 			case 'c': flag_const = true; break;
 			case 'e': flag_extern = true; break;
+			case 'E': flag_extern_c = true; break;
 			case 'f': flag_forward = true; break;
 			case 'g': flag_guard = true; break;
-			case 'i': flag_include = true; break;
-			case 'o': GET_SHORT_OPTION_VARIABLE('o', &arg_output); arg = "o"; break;
+			case 'G': GET_SHORT_OPTION_VARIABLE('G', &guard); arg = "G"; flag_guard = true; break;
+			case 'H': flag_headers = true; break;
+			// TODO: After releasing Sortix 1.1, change -i to --identifier
+			//       rather than -H (--headers).
+#if 0 // Future behavior:
+			case 'i': GET_SHORT_OPTION_VARIABLE('i', &identifier); arg = "i"; break;
+#else // Compatibility:
+			case 'i': flag_headers = true; break;
+#endif
+			case 'o': GET_SHORT_OPTION_VARIABLE('o', &output); arg = "o"; break;
 			case 'r': flag_raw = true; break;
 			case 's': flag_static = true; break;
+			case 't': GET_SHORT_OPTION_VARIABLE('t', &type); arg = "t"; break;
 			case 'v': flag_volatile = true; break;
 			default:
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				help(stderr, argv0);
-				exit(1);
+				errx(1, "unknown option -- '%c'\n", c);
 			}
 		}
-		else if ( !strcmp(arg, "--help") )
-			help(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--version") )
-			version(stdout, argv0), exit(0);
 		else if ( !strcmp(arg, "--const") )
 			flag_const = true;
 		else if ( !strcmp(arg, "--extern") )
 			flag_extern = true;
+		else if ( !strcmp(arg, "--extern-c") )
+			flag_extern_c = true;
 		else if ( !strcmp(arg, "--forward") )
 			flag_forward = true;
 		else if ( !strcmp(arg, "--use-guard") )
 			flag_guard = true;
+		else if ( !strcmp(arg, "--headers") )
+			flag_headers = true;
+		// TODO: After releasing Sortix 1.1, remove --include.
+#if 1 // Compatibility:
 		else if ( !strcmp(arg, "--include") )
-			flag_include = true;
+			flag_headers = true;
+#endif
 		else if ( !strcmp(arg, "--raw") )
 			flag_raw = true;
 		else if ( !strcmp(arg, "--static") )
@@ -193,109 +155,112 @@ int main(int argc, char* argv[])
 		else if ( !strcmp(arg, "--volatile") )
 			flag_volatile = true;
 		else if ( !strcmp(arg, "--char") )
-			free(arg_type), arg_type = strdup("char");
+			type = "char";
 		else if ( !strcmp(arg, "--signed-char") )
-			free(arg_type), arg_type = strdup("signed char");
+			type = "signed char";
 		else if ( !strcmp(arg, "--unsigned-char") )
-			free(arg_type), arg_type = strdup("unsigned char");
+			type = "unsigned char";
 		else if ( !strcmp(arg, "--int8_t") )
-			free(arg_type), arg_type = strdup("int8_t");
+			type = "int8_t";
 		else if ( !strcmp(arg, "--uint8_t") )
-			free(arg_type), arg_type = strdup("uint8_t");
-		else if ( GET_OPTION_VARIABLE("--guard", &arg_guard) )
+			type = "uint8_t";
+		else if ( GET_OPTION_VARIABLE("--guard", &guard) )
 			flag_guard = true;
-		else if ( GET_OPTION_VARIABLE("--identifier", &arg_identifier) ) { }
-		else if ( GET_OPTION_VARIABLE("--includes", &arg_includes) )
-			flag_include = true;
-		else if ( GET_OPTION_VARIABLE("--output", &arg_output) ) { }
-		else if ( GET_OPTION_VARIABLE("--type", &arg_type) ) { }
-		else if ( !strcmp(arg, "--extern-c") )
-			flag_extern_c = true;
+		else if ( GET_OPTION_VARIABLE("--identifier", &identifier) ) { }
+		else if ( GET_OPTION_VARIABLE("--includes", &includes) )
+			flag_headers = true;
+		else if ( GET_OPTION_VARIABLE("--output", &output) ) { }
+		else if ( GET_OPTION_VARIABLE("--type", &type) ) { }
 		else
-		{
-			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			help(stderr, argv0);
-			exit(1);
-		}
+			errx(1, "unknown option: %s\n", arg);
 	}
 
 	compact_arguments(&argc, &argv);
 
-	const char* output_path = arg_output;
-
 	if ( flag_extern && flag_static )
-		errx(1, "the --extern and --static are mutually incompatible");
+		errx(1, "the --extern and --static options are mutually incompatible");
 	if ( flag_forward && flag_raw )
-		errx(1, "the --forward and --raw are mutually incompatible");
+		errx(1, "the --forward and --raw options are mutually incompatible");
 
-	if ( !arg_type )
-		arg_type = strdup("unsigned char");
+	if ( !type )
+		type = "unsigned char";
 
-	char* guard = arg_guard;
 	if ( !guard )
 	{
-		if ( output_path )
-			guard = strdup(output_path);
+		char* new_guard;
+		if ( output )
+			new_guard = strdup(output);
 		else if ( 2 <= argc && strcmp(argv[1], "-") != 0 )
-			asprintf(&guard, "%s_H", argv[1]);
-		else
-			guard = strdup("CARRAY_H");
-
-		for ( size_t i = 0; guard[i]; i++ )
 		{
-			if ( 'A' <= guard[i] && guard[i] <= 'Z' )
-				continue;
-			else if ( 'a' <= guard[i] && guard[i] <= 'z' )
-				guard[i] = 'A' + guard[i] - 'a';
-			else if ( i != 0 && '0' <= guard[i] && guard[i] <= '9' )
-				continue;
-			else if ( guard[i] == '+' )
-				guard[i] = 'X';
-			else if ( i == 0 )
-				guard[i] = 'X';
-			else
-				guard[i] = '_';
+			if ( asprintf(&new_guard, "%s_H", argv[1]) < 0 )
+				err(1, "asprintf");
 		}
+		else
+			new_guard = strdup("CARRAY_H");
+		if ( !new_guard )
+			err(1, "strdup");
+
+		for ( size_t i = 0; new_guard[i]; i++ )
+		{
+			if ( 'A' <= new_guard[i] && new_guard[i] <= 'Z' )
+				continue;
+			else if ( 'a' <= new_guard[i] && new_guard[i] <= 'z' )
+				new_guard[i] = 'A' + new_guard[i] - 'a';
+			else if ( i != 0 && '0' <= new_guard[i] && new_guard[i] <= '9' )
+				continue;
+			else if ( new_guard[i] == '+' )
+				new_guard[i] = 'X';
+			else if ( i == 0 )
+				new_guard[i] = 'X';
+			else
+				new_guard[i] = '_';
+		}
+
+		guard = new_guard;
 	}
 
-	if ( flag_include && !arg_includes )
+	if ( flag_headers && !includes )
 	{
-		if ( !strcmp(arg_type, "int8_t") ||
-		     !strcmp(arg_type, "uint8_t") )
-			arg_includes = strdup("#include <stdint.h>");
+		if ( !strcmp(type, "int8_t") ||
+		     !strcmp(type, "uint8_t") )
+			includes = "#include <stdint.h>";
 	}
 
-	char* identifier = arg_identifier;
 	if ( !identifier )
 	{
-		if ( output_path )
-			identifier = strdup(output_path);
+		char* new_identifier;
+		if ( output )
+			new_identifier = strdup(output);
 		else if ( 2 <= argc && strcmp(argv[1], "-") != 0 )
-			identifier = strdup(argv[1]);
+			new_identifier = strdup(argv[1]);
 		else
-			identifier = strdup("carray");
+			new_identifier = strdup("carray");
+		if ( !new_identifier )
+			err(1, "strdup");
 
-		for ( size_t i = 0; identifier[i]; i++ )
+		for ( size_t i = 0; new_identifier[i]; i++ )
 		{
-			if ( i && identifier[i] == '.' && !strchr(identifier + i, '/') )
-				identifier[i] = '\0';
-			else if ( 'a' <= identifier[i] && identifier[i] <= 'z' )
+			if ( i && new_identifier[i] == '.' && !strchr(new_identifier + i, '/') )
+				new_identifier[i] = '\0';
+			else if ( 'a' <= new_identifier[i] && new_identifier[i] <= 'z' )
 				continue;
-			else if ( 'A' <= identifier[i] && identifier[i] <= 'Z' )
-				identifier[i] = 'a' + identifier[i] - 'A';
-			else if ( i != 0 && '0' <= identifier[i] && identifier[i] <= '9' )
+			else if ( 'A' <= new_identifier[i] && new_identifier[i] <= 'Z' )
+				new_identifier[i] = 'a' + new_identifier[i] - 'A';
+			else if ( i != 0 && '0' <= new_identifier[i] && new_identifier[i] <= '9' )
 				continue;
 			else if ( guard[i] == '+' )
-				identifier[i] = 'x';
+				new_identifier[i] = 'x';
 			else if ( i == 0 )
-				identifier[i] = 'x';
+				new_identifier[i] = 'x';
 			else
-				identifier[i] = '_';
+				new_identifier[i] = '_';
 		}
+
+		identifier = new_identifier;
 	}
 
-	if ( output_path && !freopen(output_path, "w", stdout) )
-		err(1, "%s", output_path);
+	if ( output && !freopen(output, "w", stdout) )
+		err(1, "%s", output);
 
 	if ( flag_guard && guard )
 	{
@@ -304,9 +269,9 @@ int main(int argc, char* argv[])
 		printf("\n");
 	}
 
-	if ( flag_include && arg_includes )
+	if ( flag_headers && includes )
 	{
-		printf("%s\n", arg_includes);
+		printf("%s\n", includes);
 		printf("\n");
 	}
 
@@ -327,7 +292,7 @@ int main(int argc, char* argv[])
 			printf("const ");
 		if ( flag_volatile )
 			printf("volatile ");
-		printf("%s %s[]", arg_type, identifier);
+		printf("%s %s[]", type, identifier);
 		if ( flag_forward )
 			printf(";\n");
 		else
@@ -399,7 +364,7 @@ int main(int argc, char* argv[])
 	}
 
 	if ( ferror(stdout) || fflush(stdout) == EOF )
-		err(1, "%s", output_path ? output_path : "stdout");
+		err(1, "%s", output ? output : "stdout");
 
 	return 0;
 }
