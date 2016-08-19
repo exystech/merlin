@@ -56,6 +56,14 @@ static const int OPEN_FLAGS = O_CREATE | O_DIRECTORY | O_EXCL | O_TRUNC |
 // Flags that only make sense for descriptors.
 static const int DESCRIPTOR_FLAGS = O_APPEND | O_NONBLOCK;
 
+// Let the ioctx_t force bits like O_NONBLOCK and otherwise use the dflags of
+// the current file descriptor. This allows the caller to do non-blocking reads
+// without calls to fcntl that may be racy with respect to other threads.
+static int ContextFlags(int ctx_dflags, int desc_dflags)
+{
+	return desc_dflags | (ctx_dflags & DESCRIPTOR_FLAGS);
+}
+
 int LinkInodeInDir(ioctx_t* ctx,
                    Ref<Descriptor> dir,
                    const char* name,
@@ -269,13 +277,19 @@ ssize_t Descriptor::read(ioctx_t* ctx, uint8_t* buf, size_t count)
 		return 0;
 	if ( SIZE_MAX < count )
 		count = SSIZE_MAX;
-	ctx->dflags = dflags;
+	int old_ctx_dflags = ctx->dflags;
+	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
 	if ( !IsSeekable() )
-		return vnode->read(ctx, buf, count);
+	{
+		ssize_t result = vnode->read(ctx, buf, count);
+		ctx->dflags = old_ctx_dflags;
+		return result;
+	}
 	ScopedLock lock(&current_offset_lock);
 	ssize_t ret = vnode->pread(ctx, buf, count, current_offset);
 	if ( 0 <= ret )
 		current_offset += ret;
+	ctx->dflags = old_ctx_dflags;
 	return ret;
 }
 
@@ -289,8 +303,11 @@ ssize_t Descriptor::pread(ioctx_t* ctx, uint8_t* buf, size_t count, off_t off)
 		return 0;
 	if ( SSIZE_MAX < count )
 		count = SSIZE_MAX;
-	ctx->dflags = dflags;
-	return vnode->pread(ctx, buf, count, off);
+	int old_ctx_dflags = ctx->dflags;
+	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
+	ssize_t result = vnode->pread(ctx, buf, count, off);
+	ctx->dflags = old_ctx_dflags;
+	return result;
 }
 
 ssize_t Descriptor::write(ioctx_t* ctx, const uint8_t* buf, size_t count)
@@ -301,20 +318,29 @@ ssize_t Descriptor::write(ioctx_t* ctx, const uint8_t* buf, size_t count)
 		return 0;
 	if ( SSIZE_MAX < count )
 		count = SSIZE_MAX;
-	ctx->dflags = dflags;
+	int old_ctx_dflags = ctx->dflags;
+	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
 	if ( !IsSeekable() )
-		return vnode->write(ctx, buf, count);
+	{
+		ssize_t result = vnode->write(ctx, buf, count);
+		ctx->dflags = old_ctx_dflags;
+		return result;
+	}
 	ScopedLock lock(&current_offset_lock);
-	if ( dflags & O_APPEND )
+	if ( ctx->dflags & O_APPEND )
 	{
 		off_t end = vnode->lseek(ctx, 0, SEEK_END);
 		if ( end < 0 )
+		{
+			ctx->dflags = old_ctx_dflags;
 			return -1;
+		}
 		current_offset = end;
 	}
 	ssize_t ret = vnode->pwrite(ctx, buf, count, current_offset);
 	if ( 0 <= ret )
 		current_offset += ret;
+	ctx->dflags = old_ctx_dflags;
 	return ret;
 }
 
@@ -328,8 +354,11 @@ ssize_t Descriptor::pwrite(ioctx_t* ctx, const uint8_t* buf, size_t count, off_t
 		return 0;
 	if ( SSIZE_MAX < count )
 		count = SSIZE_MAX;
-	ctx->dflags = dflags;
-	return vnode->pwrite(ctx, buf, count, off);
+	int old_ctx_dflags = ctx->dflags;
+	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
+	ssize_t result = vnode->pwrite(ctx, buf, count, off);
+	ctx->dflags = old_ctx_dflags;
+	return result;
 }
 
 static inline bool valid_utimens_timespec(struct timespec ts)
@@ -722,12 +751,20 @@ int Descriptor::listen(ioctx_t* ctx, int backlog)
 
 ssize_t Descriptor::recv(ioctx_t* ctx, uint8_t* buf, size_t count, int flags)
 {
-	return vnode->recv(ctx, buf, count, flags);
+	int old_ctx_dflags = ctx->dflags;
+	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
+	ssize_t result = vnode->recv(ctx, buf, count, flags);
+	ctx->dflags = old_ctx_dflags;
+	return result;
 }
 
 ssize_t Descriptor::send(ioctx_t* ctx, const uint8_t* buf, size_t count, int flags)
 {
-	return vnode->send(ctx, buf, count, flags);
+	int old_ctx_dflags = ctx->dflags;
+	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
+	ssize_t result = vnode->send(ctx, buf, count, flags);
+	ctx->dflags = old_ctx_dflags;
+	return result;
 }
 
 int Descriptor::getsockopt(ioctx_t* ctx, int level, int option_name,
