@@ -162,7 +162,7 @@ EOF
 esac
 cat << EOF
   echo -n "Loading /$kernel ($(human_size $kernel)) ... "
-  multiboot /$kernel "\$@"
+  multiboot /$kernel --no-random-seed "\$@"
   echo done
 EOF
 for initrd in $system_initrd $src_initrd $live_initrd $overlay_initrd; do

@@ -17,8 +17,15 @@
  * Upgrade compatibility hooks.
  */
 
-#include <stdbool.h>
+#include <sys/types.h>
 
+#include <err.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#include "fileops.h"
 #include "hooks.h"
 #include "release.h"
 
@@ -42,4 +49,26 @@ void upgrade_finalize(const struct release* old_release,
 	(void) new_release;
 	(void) source_prefix;
 	(void) target_prefix;
+
+	// TODO: After releasing Sortix 1.1, remove this compatibility.
+	if ( old_release->version_major < 1 ||
+	     (old_release->version_major == 1 &&
+	      old_release->version_minor < 1) ||
+	     (old_release->version_major == 1 &&
+	      old_release->version_minor == 1 &&
+	      old_release->version_dev) )
+	{
+		char* random_seed_path;
+		if ( asprintf(&random_seed_path, "%sboot/random.seed", target_prefix) < 0 )
+		{
+			warn("asprintf");
+			_exit(1);
+		}
+		if ( access_or_die(random_seed_path, F_OK) < 0 )
+		{
+			printf(" - Creating random seed...\n");
+			write_random_seed(random_seed_path);
+		}
+		free(random_seed_path);
+	}
 }

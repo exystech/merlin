@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -43,7 +43,7 @@ __attribute__((noreturn))
 void libk_abort(void);
 void libk_random_lock(void);
 void libk_random_unlock(void);
-bool libk_hasentropy(void);
+bool libk_hasentropy(size_t);
 void libk_getentropy(void*, size_t);
 __attribute__((noreturn))
 void libk_ubsan_abort(const char*, const char*, uint32_t, uint32_t);

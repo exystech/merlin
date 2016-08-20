@@ -127,6 +127,14 @@ set graphics resolution (see
 .Nm
 mounts all the filesystems according to
 .Xr fstab 5 .
+.Ss Random Seed
+.Nm
+will write 256 bytes of randomness to
+.Pa /boot/random.seed ,
+which serves as the initial entropy for the
+.Xr kernel 7
+on the next boot.  The file is also written on system shutdown where the
+system has the most entropy.
 .Ss Merge
 The
 .Sy merge
@@ -174,7 +182,9 @@ sortix
 root
 .El
 .Sh FILES
-.Bl -tag -width "/etc/init/target" -compact
+.Bl -tag -width "/boot/random.seed" -compact
+.It Pa /boot/random.seed
+initial kernel entropy
 .It Pa /etc/init/target
 default initialization target
 .It Pa /etc/fstab

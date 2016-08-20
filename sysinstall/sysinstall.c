@@ -750,6 +750,11 @@ int main(void)
 		// TODO: Auto detect appropriate bcrypt rounds and set up etc/login.conf
 		//       and use those below instead of blowfish,a.
 		install_ports("", ".");
+		if ( access_or_die("boot/random.seed", F_OK) < 0 )
+		{
+			printf(" - Creating random seed...\n");
+			write_random_seed("boot/random.seed");
+		}
 		printf(" - Creating initrd...\n");
 		execute((const char*[]) { "update-initrd", "--sysroot", fs, NULL }, "_e");
 		if ( strcasecmp(accept_grub, "yes") == 0 )

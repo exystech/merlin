@@ -168,12 +168,13 @@ static unsigned char rs_buf[16 * 64];
 
 void arc4random_buf(void* buffer_ptr, size_t size)
 {
+	unsigned char entropy[KEYSZ + IVSZ];
 	unsigned char* buffer = (unsigned char*) buffer_ptr;
 
 #ifdef __is_sortix_libk
 	libk_random_lock();
 
-	if ( libk_hasentropy() )
+	if ( libk_hasentropy(sizeof(entropy)) )
 	{
 		rs_count = 0;
 		rs_have = 0;
@@ -215,7 +216,6 @@ void arc4random_buf(void* buffer_ptr, size_t size)
 
 		if ( rs_count == 0 )
 		{
-			unsigned char entropy[KEYSZ + IVSZ];
 #ifdef __is_sortix_libk
 			libk_getentropy(entropy, sizeof(entropy));
 #else

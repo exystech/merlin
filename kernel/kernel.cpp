@@ -53,6 +53,7 @@
 #include <sortix/kernel/pci.h>
 #include <sortix/kernel/process.h>
 #include <sortix/kernel/ptable.h>
+#include <sortix/kernel/random.h>
 #include <sortix/kernel/refcount.h>
 #include <sortix/kernel/scheduler.h>
 #include <sortix/kernel/signal.h>
@@ -166,6 +167,9 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 	// Detect available physical memory.
 	Memory::Init(bootinfo);
 
+	// Initialize randomness from the random seed if provided.
+	Random::Init(bootinfo);
+
 	// Initialize the kernel log.
 	Log::Init(bootinfo);
 
@@ -228,6 +232,7 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 		FreeKernelAddress(&alloc);
 	}
 
+	bool no_random_seed = false;
 	char* arg_saved = cmdline;
 	char* arg;
 	struct kernel_option
@@ -237,6 +242,7 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 	} options[] =
 	{
 		{ "--init", true },
+		{ "--no-random-seed", false },
 	};
 	size_t options_count = sizeof(options) / sizeof(options[0]);
 	while ( (arg = cmdline_tokenize(&arg_saved)) )
@@ -277,6 +283,8 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 		}
 		if ( !strcmp(option->name, "--init") )
 			init_cmdline = parameter;
+		else if ( !strcmp(option->name, "--no-random-seed") )
+			no_random_seed = true;
 	}
 
 	// Initialize the interrupt handler table and enable interrupts.
@@ -285,12 +293,35 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 	// Initialize the interrupt worker (before scheduling is enabled).
 	Interrupt::InitWorker();
 
+	// Initialize the clocks.
+	Time::Init();
+
+	// Initialize the real-time clock.
+	CMOS::Init();
+
+	// Check a random seed was provided, or try to fallback and warn.
+	int random_status = Random::GetFallbackStatus();
+	if ( random_status )
+	{
+		if ( no_random_seed )
+		{
+			// There's not much we can if this is an initial boot.
+		}
+		else if ( random_status == 1 )
+		{
+			Log::PrintF("kernel: warning: No random seed file was loaded\n");
+			Log::PrintF("kernel: warning: With GRUB, try: "
+			            "module /boot/random.seed --random-seed\n");
+		}
+		else
+		{
+			Log::PrintF("kernel: warning: The random seed file is too small\n");
+		}
+	}
+
 	//
 	// Stage 2. Transition to Multithreaded Environment
 	//
-
-	// Initialize the clocks.
-	Time::Init();
 
 	// Initialize Unix Signals.
 	Signal::Init();
@@ -423,9 +454,6 @@ static void BootThread(void* /*user*/)
 	//
 	// Stage 5. Loading and Initializing Core Drivers.
 	//
-
-	// Initialize the real-time clock.
-	CMOS::Init();
 
 	// Get a descriptor for the /dev directory so we can populate it.
 	if ( droot->mkdir(&ctx, "dev", 0775) != 0 && errno != EEXIST )

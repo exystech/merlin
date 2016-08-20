@@ -22,6 +22,7 @@
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <ioleast.h>
 #include <libgen.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -92,4 +93,39 @@ void mkdir_or_chmod_or_die(const char* path, mode_t mode)
 		err(2, "chmod: %s", path);
 	}
 	err(2, "mkdir: %s", path);
+}
+
+void write_random_seed(const char* path)
+{
+	int fd = open(path, O_WRONLY | O_CREAT | O_NOFOLLOW, 0600);
+	if ( fd < 0 )
+	{
+		warn("%s", path);
+		_exit(2);
+	}
+	if ( fchown(fd, 0, 0) < 0 )
+	{
+		warn("chown: %s", path);
+		_exit(2);
+	}
+	if ( fchmod(fd, 0600) < 0 )
+	{
+		warn("chmod: %s", path);
+		_exit(2);
+	}
+	unsigned char buf[256];
+	arc4random_buf(buf, sizeof(buf));
+	size_t done = writeall(fd, buf, sizeof(buf));
+	explicit_bzero(buf, sizeof(buf));
+	if ( done < sizeof(buf) )
+	{
+		warn("write: %s", path);
+		_exit(2);
+	}
+	if ( ftruncate(fd, sizeof(buf)) < 0  )
+	{
+		warn("truncate: %s", path);
+		_exit(2);
+	}
+	close(fd);
 }
