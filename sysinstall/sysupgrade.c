@@ -634,7 +634,7 @@ int main(void)
 		     "You must cancel this to proceed.\n\n");
 		if ( !can_run_old_abi )
 		{
-			text("Error: Can't pending upgrade due to ABI change.\n");
+			text("Error: Can't cancel pending upgrade due to ABI change.\n");
 			errx(2, "Upgrade aborted due to pending sysmerge(8) upgrade");
 		}
 
