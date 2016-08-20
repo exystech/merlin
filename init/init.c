@@ -53,6 +53,35 @@
 #include <mount/partition.h>
 #include <mount/uuid.h>
 
+struct device_match
+{
+	const char* path;
+	struct blockdevice* bdev;
+};
+
+struct mountpoint
+{
+	struct fstab entry;
+	char* entry_line;
+	pid_t pid;
+	char* absolute;
+};
+
+static pid_t main_pid;
+
+static struct harddisk** hds = NULL;
+static size_t hds_used = 0;
+static size_t hds_length = 0;
+
+static struct mountpoint* mountpoints = NULL;
+static size_t mountpoints_used = 0;
+static size_t mountpoints_length = 0;
+
+static bool chain_location_made = false;
+static char chain_location[] = "/tmp/fs.XXXXXX";
+static bool chain_location_dev_made = false;
+static char chain_location_dev[] = "/tmp/fs.XXXXXX/dev";
+
 static char* read_single_line(FILE* fp)
 {
 	char* ret = NULL;
@@ -78,8 +107,6 @@ static char* join_paths(const char* a, const char* b)
 		return NULL;
 	return result;
 }
-
-static pid_t main_pid;
 
 __attribute__((noreturn))
 __attribute__((format(printf, 1, 2)))
@@ -120,10 +147,6 @@ static void note(const char* format, ...)
 	fflush(stderr);
 	va_end(ap);
 }
-
-static struct harddisk** hds = NULL;
-static size_t hds_used = 0;
-static size_t hds_length = 0;
 
 static void prepare_filesystem(const char* path, struct blockdevice* bdev)
 {
@@ -233,12 +256,6 @@ static void prepare_block_devices(void)
 		fatal("iterating devices: %m");
 }
 
-struct device_match
-{
-	const char* path;
-	struct blockdevice* bdev;
-};
-
 static void search_by_uuid(const char* uuid_string,
                            void (*cb)(void*, struct device_match*),
                            void* ctx)
@@ -294,18 +311,6 @@ static void ensure_single_device_match(void* ctx, struct device_match* match)
 	}
 	*result = *match;
 }
-
-struct mountpoint
-{
-	struct fstab entry;
-	char* entry_line;
-	pid_t pid;
-	char* absolute;
-};
-
-static struct mountpoint* mountpoints = NULL;
-static size_t mountpoints_used = 0;
-static size_t mountpoints_length = 0;
 
 static int sort_mountpoint(const void* a_ptr, const void* b_ptr)
 {
@@ -704,6 +709,29 @@ static void mountpoints_unmount(void)
 	}
 }
 
+// This function must be usable as an atexit handler, which means it is
+// undefined behavior for it to invoke exit(), including through calls to fatal
+// in any function transitively called by this function.
+static void niht(void)
+{
+	if ( getpid() != main_pid )
+		return;
+
+	if ( chain_location_dev_made )
+	{
+		unmount(chain_location_dev, 0);
+		chain_location_dev_made = false;
+	}
+
+	mountpoints_unmount();
+
+	if ( chain_location_made )
+	{
+		rmdir(chain_location);
+		chain_location_made = false;
+	}
+}
+
 static int init(const char* target)
 {
 	init_early();
@@ -712,8 +740,6 @@ static int init(const char* target)
 	set_videomode();
 	prepare_block_devices();
 	load_fstab();
-	if ( atexit(mountpoints_unmount) != 0 )
-		fatal("atexit: %m");
 	mountpoints_mount(false);
 	sigset_t oldset, sigttou;
 	sigemptyset(&sigttou);
@@ -800,26 +826,7 @@ static int init(const char* target)
 		else
 			note("session: Unexpected unusual termination%s", back);
 	}
-	mountpoints_unmount();
 	return result;
-}
-
-static bool chain_location_made = false;
-static char chain_location[] = "/tmp/fs.XXXXXX";
-static bool chain_location_dev_made = false;
-static char chain_location_dev[] = "/tmp/fs.XXXXXX/dev";
-static void init_chain_atexit(void)
-{
-	if ( chain_location_dev_made )
-	{
-		unmount(chain_location_dev, 0);
-		chain_location_dev_made = false;
-	}
-	if ( chain_location_made )
-	{
-		rmdir(chain_location);
-		chain_location_made = false;
-	}
 }
 
 static int init_chain(const char* target)
@@ -827,8 +834,6 @@ static int init_chain(const char* target)
 	init_early();
 	prepare_block_devices();
 	load_fstab();
-	if ( atexit(init_chain_atexit) != 0 )
-		fatal("atexit: %m");
 	if ( !mkdtemp(chain_location) )
 		fatal("mkdtemp: /tmp/fs.XXXXXX: %m");
 	chain_location_made = true;
@@ -844,8 +849,6 @@ static int init_chain(const char* target)
 	}
 	if ( !found_root )
 		fatal("/etc/fstab: Root filesystem not found in filesystem table");
-	if ( atexit(mountpoints_unmount) != 0 )
-		fatal("atexit: %m");
 	mountpoints_mount(true);
 	snprintf(chain_location_dev, sizeof(chain_location_dev), "%s/dev",
 	         chain_location);
@@ -917,8 +920,6 @@ static int init_chain(const char* target)
 		else
 			note("chain init: Unexpected unusual termination%s", back);
 	}
-	mountpoints_unmount();
-	init_chain_atexit();
 	return result;
 }
 
@@ -996,6 +997,9 @@ int main(int argc, char* argv[])
 
 	if ( getenv("INIT_PID") )
 		fatal("System is already managed by an init process");
+
+	if ( atexit(niht) != 0 )
+		fatal("atexit: %m");
 
 	if ( !strcmp(target, "single-user") ||
 	     !strcmp(target, "multi-user") ||
