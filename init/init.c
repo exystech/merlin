@@ -25,9 +25,9 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <err.h>
 #include <dirent.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <fstab.h>
 #include <grp.h>
@@ -935,17 +935,6 @@ static void compact_arguments(int* argc, char*** argv)
 	}
 }
 
-static void help(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "Usage: %s [OPTION]...\n", argv0);
-	fprintf(fp, "Initialize and manage the userland.\n");
-}
-
-static void version(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
-}
-
 int main(int argc, char* argv[])
 {
 	main_pid = getpid();
@@ -954,7 +943,6 @@ int main(int argc, char* argv[])
 
 	const char* target = NULL;
 
-	const char* argv0 = argv[0];
 	for ( int i = 1; i < argc; i++ )
 	{
 		const char* arg = argv[i];
@@ -969,9 +957,7 @@ int main(int argc, char* argv[])
 			while ( (c = *++arg) ) switch ( c )
 			{
 			default:
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				help(stderr, argv0);
-				exit(1);
+				errx(2, "unknown option -- '%c'", c);
 			}
 		}
 		else if ( !strncmp(arg, "--target=", strlen("--target=")) )
@@ -979,24 +965,12 @@ int main(int argc, char* argv[])
 		else if ( !strcmp(arg, "--target") )
 		{
 			if ( i + 1 == argc )
-			{
-				error(0, 0, "option '--target' requires an argument");
-				fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
-				exit(125);
-			}
+				errx(2, "option '--target' requires an argument");
 			target = argv[i+1];
 			argv[++i] = NULL;
 		}
-		else if ( !strcmp(arg, "--help") )
-			help(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--version") )
-			version(stdout, argv0), exit(0);
 		else
-		{
-			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			help(stderr, argv0);
-			exit(1);
-		}
+			errx(2, "unknown option: %s", arg);
 	}
 
 	compact_arguments(&argc, &argv);
