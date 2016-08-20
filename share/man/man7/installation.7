@@ -251,9 +251,11 @@ installation.  If you answer yes, then the installation will begin.
 The installer will copy the live environment into the target root filesystem
 according to the file lists in
 .Pa /tix/manifest
-and create configuration files matching your earlier choices.  It will generate
-an initrd that locates and boots the root filesystem.  It will install the
-bootloader if desired.  The installation will take a moment.
+and create configuration files matching your earlier choices.  It will write
+256 bytes of randomness to
+.Pa /boot/random.seed .
+It will generate an initrd that locates and boots the root filesystem.  It will
+install the bootloader if desired.  The installation will take a moment.
 .Ss Configuration
 After the installation is complete, a bare system is installed but it lacks
 crucial configuration files and it will refuse to start when booted.

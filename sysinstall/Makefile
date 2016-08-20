@@ -68,7 +68,7 @@ conf.o: conf.h
 devices.o: devices.h
 execute.o: execute.h
 fileops.o: fileops.h
-hooks.o: release.h
+hooks.o: fileops.h release.h
 interactive.o: interactive.h execute.h
 manifest.o: manifest.h execute.h fileops.h
 release.o: release.h

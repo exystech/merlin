@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,11 +22,15 @@
 
 #include <stddef.h>
 
+typedef struct multiboot_info multiboot_info_t;
+
 namespace Sortix {
 namespace Random {
 
-bool HasEntropy();
+void Init(multiboot_info_t* bootinfo);
+bool HasEntropy(size_t amount);
 void GetEntropy(void* buffer, size_t size);
+int GetFallbackStatus();
 
 } // namespace Random
 } // namespace Sortix

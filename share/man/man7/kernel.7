@@ -34,6 +34,10 @@ The
 argument is split into tokens and used as the command line to invoke the
 specified
 .Xr init 8 .
+.It Fl \-no-random-seed
+Don't warn if no random seed file was loaded by the bootloader (usually from
+.Pa /boot/random.seed ) .
+This option is useful for live environments where this situation is unavoidable.
 .El
 .Sh SEE ALSO
 .Xr initrd 7 ,

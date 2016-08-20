@@ -115,9 +115,9 @@ void libk_random_unlock(void)
 }
 
 extern "C"
-bool libk_hasentropy(void)
+bool libk_hasentropy(size_t amount)
 {
-	return Sortix::Random::HasEntropy();
+	return Sortix::Random::HasEntropy(amount);
 }
 
 extern "C"

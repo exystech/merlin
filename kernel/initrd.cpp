@@ -728,6 +728,10 @@ static void ExtractModule(struct multiboot_mod_list* module,
 	size_t mod_size = module->mod_end - module->mod_start;
 	const char* cmdline = (const char*) (uintptr_t) module->cmdline;
 
+	// Ignore the random seed.
+	if ( !strcmp(cmdline, "--random-seed") )
+		return;
+
 	// Allocate the needed kernel virtual address space.
 	addralloc_t initrd_addr_alloc;
 	if ( !AllocateKernelAddress(&initrd_addr_alloc, mod_size) )

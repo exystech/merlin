@@ -31,6 +31,7 @@
 #include <fcntl.h>
 #include <fstab.h>
 #include <grp.h>
+#include <ioleast.h>
 #include <locale.h>
 #include <pwd.h>
 #include <signal.h>
@@ -146,6 +147,48 @@ static void note(const char* format, ...)
 	fprintf(stderr, "\n");
 	fflush(stderr);
 	va_end(ap);
+}
+
+static void write_random_seed(void)
+{
+	const char* will_not = "next boot will not have fresh randomness";
+	const char* path = "/boot/random.seed";
+	int fd = open(path, O_WRONLY | O_CREAT | O_NOFOLLOW, 0600);
+	if ( fd < 0 )
+	{
+		if ( errno != ENOENT && errno != EROFS )
+			warning("%s: %s: %m", will_not, path);
+		return;
+	}
+	if ( fchown(fd, 0, 0) < 0 )
+	{
+		warning("%s: chown: %s: %m", will_not, path);
+		close(fd);
+		return;
+	}
+	if ( fchmod(fd, 0600) < 0 )
+	{
+		warning("%s: chown: %s: %m", will_not, path);
+		close(fd);
+		return;
+	}
+	unsigned char buf[256];
+	arc4random_buf(buf, sizeof(buf));
+	size_t done = writeall(fd, buf, sizeof(buf));
+	explicit_bzero(buf, sizeof(buf));
+	if ( done < sizeof(buf) )
+	{
+		warning("%s: write: %s: %m", will_not, path);
+		close(fd);
+		return;
+	}
+	if ( ftruncate(fd, sizeof(buf)) < 0  )
+	{
+		warning("%s: truncate: %s: %m", will_not, path);
+		close(fd);
+		return;
+	}
+	close(fd);
 }
 
 static void prepare_filesystem(const char* path, struct blockdevice* bdev)
@@ -732,6 +775,8 @@ static void niht(void)
 	if ( getpid() != main_pid )
 		return;
 
+	write_random_seed();
+
 	if ( chain_location_dev_made )
 	{
 		unmount(chain_location_dev, 0);
@@ -756,6 +801,7 @@ static int init(const char* target)
 	prepare_block_devices();
 	load_fstab();
 	mountpoints_mount(false);
+	write_random_seed();
 	if ( !strcmp(target, "merge") )
 	{
 		pid_t child_pid = fork();
