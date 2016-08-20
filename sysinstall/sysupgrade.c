@@ -770,7 +770,7 @@ int main(void)
 			        "_eqQ");
 		}
 		else if ( conf.system &&
-		          access_or_die("/etc/grub.d/10_sortix", F_OK) == 0 )
+		          access_or_die("etc/grub.d/10_sortix", F_OK) == 0 )
 		{
 			// Help dual booters by making /etc/grub.d/10_sortix.cache.
 			printf(" - Creating bootloader fragment...\n");
