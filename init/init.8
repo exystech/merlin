@@ -14,7 +14,7 @@ initializing the operating system and starting the specified
 .Ar init-target .
 This is normally a login screen, a root shell, or a dedicated special purpose
 program.
-.Pp
+.Ppchain-merge
 The
 .Xr kernel 7
 starts the system in a temporary environment with a root filesystem
@@ -40,21 +40,31 @@ option if specified or
 otherwise. Supported targets are:
 .Pp
 .Bl -tag -width "single-user" -compact -offset indent
-.It chain
+.It Sy chain
 mount real root filesystem and run its
 .Nm
-.It chain-merge
-complete a
+.It Sy chain-merge
+like
+.Sy chain
+but run
+.Pa /sysmerge/sbin/init
+with the
+.Sy merge
+target.
+.It Sy merge
+finish a
 .Xr sysmerge 8
-upgrade during a chain boot
-.It multi-user
+upgrade and then execute the real
+.Nm
+with its default target.
+.It Sy multi-user
 boot to
 .Xr login 8
-.It single-user
+.It Sy single-user
 boot to root shell without password (not secure)
-.It sysinstall
+.It Sy sysinstall
 boot to operating system installer (not secure)
-.It sysupgrade
+.It Sy sysupgrade
 boot to operating system upgrader (not secure)
 .El
 .Pp
@@ -72,7 +82,9 @@ will scan every block device for valid partition tables and create the
 corresponding partition devices in
 .Pa /dev .
 .Ss Chain Initialization
-The chain target mounts the root filesystem as in
+The
+.Sy chain
+target mounts the root filesystem as in
 .Pa /etc/fstab
 (see
 .Xr fstab 5) and runs the next
@@ -115,6 +127,20 @@ set graphics resolution (see
 .Nm
 mounts all the filesystems according to
 .Xr fstab 5 .
+.Ss Merge
+The
+.Sy merge
+target completes a delayed system upgrade by invoking the
+.Xr sysmerge 8
+at
+.Pa /sysmerge/sbin/sysmerge
+with the
+.Ar --booting
+option.  If the upgrade succeeds, the temporary
+.Nm
+deinitializes the system and invokes the real (now upgraded)
+.Nm
+which will restart system initialization in the normal fashion.
 .Ss Session
 Finally
 .Nm
