@@ -430,6 +430,21 @@ static void set_videomode(void)
 		return;
 	}
 	free(videomode);
+	struct dispmsg_get_crtc_mode get_mode;
+	memset(&get_mode, 0, sizeof(get_mode));
+	get_mode.msgid = DISPMSG_GET_CRTC_MODE;
+	get_mode.device = 0;
+	get_mode.connector = 0;
+	// Don't set the resolution if it's already correct.
+	if ( dispmsg_issue(&get_mode, sizeof(get_mode)) == 0 )
+	{
+		if ( get_mode.mode.control & DISPMSG_CONTROL_VALID &&
+		     !(get_mode.mode.control & DISPMSG_CONTROL_FALLBACK) &&
+		     get_mode.mode.fb_format == bpp &&
+		     get_mode.mode.view_xres == xres &&
+		     get_mode.mode.view_yres == yres )
+			return;
+	}
 	struct dispmsg_set_crtc_mode set_mode;
 	memset(&set_mode, 0, sizeof(set_mode));
 	set_mode.msgid = DISPMSG_SET_CRTC_MODE;
