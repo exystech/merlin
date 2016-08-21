@@ -756,6 +756,33 @@ static int init(const char* target)
 	prepare_block_devices();
 	load_fstab();
 	mountpoints_mount(false);
+	if ( !strcmp(target, "merge") )
+	{
+		pid_t child_pid = fork();
+		if ( child_pid < 0 )
+			fatal("fork: %m");
+		if ( !child_pid )
+		{
+			const char* argv[] = { "sysmerge", "--booting", NULL };
+			execv("/sysmerge/sbin/sysmerge", (char* const*) argv);
+			fatal("Failed to run automatic update: %s: %m", argv[0]);
+		}
+		int status;
+		if ( waitpid(child_pid, &status, 0) < 0 )
+			fatal("waitpid");
+		if ( WIFEXITED(status) && WEXITSTATUS(status) != 0 )
+			fatal("Automatic upgrade failed: Exit status %i",
+			      WEXITSTATUS(status));
+		else if ( WIFSIGNALED(status) )
+			fatal("Automatic upgrade failed: %s", strsignal(WTERMSIG(status)));
+		else if ( !WIFEXITED(status) )
+			fatal("Automatic upgrade failed: Unexpected unusual termination");
+		niht();
+		unsetenv("INIT_PID");
+		const char* argv[] = { "init", NULL };
+		execv("/sbin/init", (char* const*) argv);
+		fatal("Failed to load chain init: %s: %m", argv[0]);
+	}
 	sigset_t oldset, sigttou;
 	sigemptyset(&sigttou);
 	sigaddset(&sigttou, SIGTTOU);
@@ -891,15 +918,15 @@ static int init_chain(const char* target)
 				fatal("chroot: %s: %m", chain_location);
 			if ( chdir("/") < 0 )
 				fatal("chdir: %s: %m", chain_location);
+			unsetenv("INIT_PID");
 			if ( !strcmp(target, "chain-merge") )
 			{
-				const char* argv[] = { "sysmerge", "--booting", NULL };
-				execv("/sysmerge/sbin/sysmerge", (char* const*) argv);
-				fatal("Failed to run automatic update: %s: %m", argv[0]);
+				const char* argv[] = { "init", "--target=merge", NULL };
+				execv("/sysmerge/sbin/init", (char* const*) argv);
+				fatal("Failed to load automatic update chain init: %s: %m", argv[0]);
 			}
 			else
 			{
-				unsetenv("INIT_PID");
 				const char* argv[] = { "init", NULL };
 				execv("/sbin/init", (char* const*) argv);
 				fatal("Failed to load chain init: %s: %m", argv[0]);
@@ -908,23 +935,10 @@ static int init_chain(const char* target)
 		int status;
 		if ( waitpid(child_pid, &status, 0) < 0 )
 			fatal("waitpid");
-		const char* back = ": Trying to bring it back up again";
+		// Only run an automatic update once.
 		if ( !strcmp(target, "chain-merge") )
-		{
-			if ( WIFEXITED(status) && WEXITSTATUS(status) == 0 )
-			{
-				target = "chain";
-				continue;
-			}
-			if ( WIFEXITED(status) )
-				fatal("Automatic upgrade failed: Exit status %i",
-				      WEXITSTATUS(status));
-			else if ( WIFSIGNALED(status) )
-				fatal("Automatic upgrade failed: %s",
-				      strsignal(WTERMSIG(status)));
-			else
-				fatal("Automatic upgrade failed: Unexpected unusual termination");
-		}
+			target = "chain";
+		const char* back = ": Trying to bring it back up again";
 		if ( WIFEXITED(status) )
 		{
 			result = WEXITSTATUS(status);
@@ -1019,7 +1033,8 @@ int main(int argc, char* argv[])
 	if ( !strcmp(target, "single-user") ||
 	     !strcmp(target, "multi-user") ||
 	     !strcmp(target, "sysinstall") ||
-	     !strcmp(target, "sysupgrade") )
+	     !strcmp(target, "sysupgrade") ||
+	     !strcmp(target, "merge") )
 		return init(target);
 
 	if ( !strcmp(target, "chain") ||
