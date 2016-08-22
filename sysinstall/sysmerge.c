@@ -120,21 +120,21 @@ int main(int argc, char* argv[])
 	{
 		source = NULL;
 		if ( 1 < argc )
-			err(2, "Unexpected extra operand `%s'", argv[2]);
+			errx(2, "Unexpected extra operand `%s'", argv[1]);
 	}
 	else if ( booting )
 	{
 		source = "/sysmerge";
 		if ( 1 < argc )
-			err(2, "Unexpected extra operand `%s'", argv[2]);
+			errx(2, "Unexpected extra operand `%s'", argv[1]);
 	}
 	else
 	{
 		if ( argc < 2 )
-			err(2, "No source operand was given");
+			errx(2, "No source operand was given");
 		source = argv[1];
 		if ( 2 < argc )
-			err(2, "Unexpected extra operand `%s'", argv[2]);
+			errx(2, "Unexpected extra operand `%s'", argv[2]);
 	}
 
 	if ( booting )
@@ -216,11 +216,11 @@ int main(int argc, char* argv[])
 	{
 		printf(" - Scheduling upgrade on next boot...\n");
 		execute((const char*[]) { "cp", "/boot/sortix.bin",
-		                                "/boot/sortix.bin.sysmerge.orig" }, "_e");
+		                                "/boot/sortix.bin.sysmerge.orig", NULL }, "_e");
 		execute((const char*[]) { "cp", "/boot/sortix.initrd",
-		                                "/boot/sortix.initrd.sysmerge.orig" }, "_e");
+		                                "/boot/sortix.initrd.sysmerge.orig", NULL }, "_e");
 		execute((const char*[]) { "cp", "/sysmerge/boot/sortix.bin",
-		                                "/boot/sortix.bin" }, "_e");
+		                                "/boot/sortix.bin", NULL }, "_e");
 		execute((const char*[]) { "/sysmerge/sbin/update-initrd", NULL }, "_e");
 
 		printf("The system will be upgraded to %s on the next boot.\n",
