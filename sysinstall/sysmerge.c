@@ -31,6 +31,7 @@
 
 #include "conf.h"
 #include "execute.h"
+#include "hooks.h"
 #include "fileops.h"
 #include "manifest.h"
 #include "release.h"
@@ -70,8 +71,10 @@ int main(int argc, char* argv[])
 {
 	setvbuf(stdout, NULL, _IOLBF, 0); // Pipes.
 
-	bool cancel = false;
 	bool booting = false;
+	bool cancel = false;
+	bool hook_finalize = false;
+	bool hook_prepare = false;
 	bool wait = false;
 
 	const char* argv0 = argv[0];
@@ -88,6 +91,7 @@ int main(int argc, char* argv[])
 			char c;
 			while ( (c = *++arg) ) switch ( c )
 			{
+			case 'c': cancel = false; break;
 			case 'w': wait = true; break;
 			default:
 				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
@@ -99,10 +103,14 @@ int main(int argc, char* argv[])
 			help(stdout, argv0), exit(0);
 		else if ( !strcmp(arg, "--version") )
 			version(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--cancel") )
-			cancel = true;
 		else if ( !strcmp(arg, "--booting") )
 			booting = true;
+		else if ( !strcmp(arg, "--cancel") )
+			cancel = true;
+		else if ( !strcmp(arg, "--hook-finalize") )
+			hook_finalize = true;
+		else if ( !strcmp(arg, "--hook-prepare") )
+			hook_prepare = true;
 		else if ( !strcmp(arg, "--wait") )
 			wait = true;
 		else
@@ -115,10 +123,17 @@ int main(int argc, char* argv[])
 
 	compact_arguments(&argc, &argv);
 
+	if ( 1 < booting + cancel + hook_finalize + hook_prepare + wait )
+		errx(2, "Mutually incompatible options were passed");
+
+	bool hook_only = hook_prepare || hook_finalize;
+	bool no_source = cancel;
+	bool no_cancel = booting || hook_only;
+
 	const char* source;
-	if ( cancel )
+	if ( no_source )
 	{
-		source = NULL;
+		source = "";
 		if ( 1 < argc )
 			errx(2, "Unexpected extra operand `%s'", argv[1]);
 	}
@@ -137,22 +152,23 @@ int main(int argc, char* argv[])
 			errx(2, "Unexpected extra operand `%s'", argv[2]);
 	}
 
-	if ( booting )
-	{
-	}
-	else if ( has_pending_upgrade() )
+	bool did_cancel = false;
+	if ( !no_cancel && has_pending_upgrade() )
 	{
 		rename("/boot/sortix.bin.sysmerge.orig", "/boot/sortix.bin");
 		rename("/boot/sortix.initrd.sysmerge.orig", "/boot/sortix.initrd");
 		execute((const char*[]) { "rm", "-rf", "/sysmerge", NULL }, "");
-		execute((const char*[]) { "update-initrd", NULL }, "_e");
+		execute((const char*[]) { "update-initrd", NULL }, "e");
 		printf("Cancelled pending system upgrade.\n");
+		did_cancel = true;
 	}
-	else if ( cancel )
-		printf("No system upgrade was pending.\n");
 
 	if ( cancel )
+	{
+		if ( !did_cancel )
+			printf("No system upgrade was pending.\n");
 		return 0;
+	}
 
 	const char* old_release_path = "/etc/sortix-release";
 	struct release old_release;
@@ -181,53 +197,141 @@ int main(int argc, char* argv[])
 	struct conf conf;
 	load_upgrade_conf(&conf, "/etc/upgrade.conf");
 
-	bool can_run_old_abi = old_release.abi_major == new_release.abi_major &&
-	                       old_release.abi_minor <= new_release.abi_minor;
-	if ( !can_run_old_abi && !wait )
-	{
-		printf("Incompatible %lu.%lu -> %lu.%lu ABI transition, "
-		       "delaying upgrade to next boot.\n",
-		       old_release.abi_major, old_release.abi_major,
-		       new_release.abi_major, new_release.abi_major);
-		wait = true;
-	}
+	bool can_run_new_abi = new_release.abi_major == old_release.abi_major &&
+	                       new_release.abi_minor <= old_release.abi_minor;
 
-	const char* target;
-	if ( wait )
+	bool header;
+	bool copy_files;
+	bool run_prepare;
+	bool run_finalize;
+	bool my_prepare;
+	bool my_finalize;
+	if ( booting )
 	{
-		printf("Scheduling upgrade to %s on next boot using %s:\n",
-		       new_release.pretty_name, source);
-		target = "/sysmerge";
-		if ( mkdir(target, 0755) < 0 )
-			err(2, "%s", target);
-		execute((const char*[]) { "tix-collection", "/sysmerge", "create",
-		                          NULL }, "_e");
+		header = true;
+		copy_files = true;
+		run_prepare = true;
+		my_prepare = true;
+		run_finalize = true;
+		my_finalize = true;
+	}
+	else if ( hook_prepare )
+	{
+		header = false;
+		copy_files = false;
+		run_prepare = true;
+		my_prepare = true;
+		run_finalize = false;
+		my_finalize = false;
+	}
+	else if ( hook_finalize )
+	{
+		header = false;
+		copy_files = false;
+		run_prepare = false;
+		my_prepare = false;
+		run_finalize = true;
+		my_finalize = true;
 	}
 	else
 	{
-		printf("Upgrading to %s using %s:\n", new_release.pretty_name, source);
-		target = "";
+		if ( !wait && !can_run_new_abi )
+		{
+			printf("%lu.%lu -> %lu.%lu ABI transition, "
+				   "delaying upgrade to next boot.\n",
+				   old_release.abi_major, old_release.abi_major,
+				   new_release.abi_major, new_release.abi_major);
+			wait = true;
+		}
+		header = true;
+		copy_files = true;
+		run_prepare = !wait;
+		my_prepare = false;
+		run_finalize = !wait;
+		my_finalize = false;
 	}
 
-	install_manifest("system", source, target);
-	install_ports(source, target);
+	if ( header )
+	{
+		if ( wait )
+			printf("Scheduling upgrade to %s on next boot using %s:\n",
+			       new_release.pretty_name, source);
+		else
+			printf("Upgrading to %s using %s:\n",
+			       new_release.pretty_name, source);
+	}
+
+	// Compatibility hooks that runs before the old system is replaced.
+	if ( run_prepare )
+	{
+		if ( my_prepare )
+		{
+			upgrade_prepare(&old_release, &new_release, source, "/");
+		}
+		else
+		{
+			char* new_sysmerge = join_paths(source, "sbin/sysmerge");
+			if ( !new_sysmerge )
+				err(2, "asprintf");
+			execute((const char*[]) { new_sysmerge, "--hook-prepare", source,
+			                          NULL }, "e");
+			free(new_sysmerge);
+		}
+		if ( hook_prepare )
+			return 0;
+	}
+
+	if ( copy_files )
+	{
+		const char* target = "";
+		if ( wait )
+		{
+			target = "/sysmerge";
+			if ( mkdir(target, 0755) < 0 )
+				err(2, "%s", target);
+			execute((const char*[]) { "tix-collection", "/sysmerge", "create",
+				                      NULL }, "e");
+		}
+		install_manifest("system", source, target);
+		install_ports(source, target);
+	}
 
 	if ( wait )
 	{
 		printf(" - Scheduling upgrade on next boot...\n");
 		execute((const char*[]) { "cp", "/boot/sortix.bin",
-		                                "/boot/sortix.bin.sysmerge.orig", NULL }, "_e");
+		                                "/boot/sortix.bin.sysmerge.orig", NULL }, "e");
 		execute((const char*[]) { "cp", "/boot/sortix.initrd",
-		                                "/boot/sortix.initrd.sysmerge.orig", NULL }, "_e");
+		                                "/boot/sortix.initrd.sysmerge.orig", NULL }, "e");
 		execute((const char*[]) { "cp", "/sysmerge/boot/sortix.bin",
-		                                "/boot/sortix.bin", NULL }, "_e");
-		execute((const char*[]) { "/sysmerge/sbin/update-initrd", NULL }, "_e");
+		                                "/boot/sortix.bin", NULL }, "e");
+		execute((const char*[]) { "/sysmerge/sbin/update-initrd", NULL }, "e");
 
 		printf("The system will be upgraded to %s on the next boot.\n",
 		       new_release.pretty_name);
 		printf("Run %s --cancel to cancel the upgrade.\n", argv[0]);
 
 		return 0;
+	}
+
+	// Compatibility hooks that run after the new system is installed.
+	if ( run_finalize )
+	{
+		if ( my_finalize )
+		{
+			upgrade_finalize(&old_release, &new_release, source, "/");
+		}
+		else
+		{
+			char* new_sysmerge = join_paths(source, "sbin/sysmerge");
+			if ( !new_sysmerge )
+				err(2, "asprintf");
+			execute((const char*[]) { new_sysmerge, "--hook-finalize", source,
+			                          NULL }, "e");
+			free(new_sysmerge);
+		}
+		if ( hook_finalize )
+			return 0;
 	}
 
 	if ( booting )
@@ -237,23 +341,23 @@ int main(int argc, char* argv[])
 		execute((const char*[]) { "rm", "-rf", "/sysmerge", NULL }, "");
 	}
 
-	if ( !wait && access_or_die("/etc/fstab", F_OK) == 0 )
+	if ( access_or_die("/etc/fstab", F_OK) == 0 )
 	{
 		printf(" - Creating initrd...\n");
-		execute((const char*[]) { "update-initrd", NULL }, "_e");
+		execute((const char*[]) { "update-initrd", NULL }, "e");
 
 		if ( conf.grub )
 		{
 			// TODO: Figure out the root device.
 			//printf(" - Installing bootloader...\n");
-			//execute((const char*[]) { "grub-install", "/", NULL }, "_eqQ");
+			//execute((const char*[]) { "grub-install", "/", NULL }, "eqQ");
 			printf(" - Configuring bootloader...\n");
-			execute((const char*[]) { "update-grub", NULL }, "_eqQ");
+			execute((const char*[]) { "update-grub", NULL }, "eqQ");
 		}
 		else if ( access_or_die("/etc/grub.d/10_sortix", F_OK) == 0 )
 		{
 			printf(" - Creating bootloader fragment...\n");
-			execute((const char*[]) { "/etc/grub.d/10_sortix", NULL }, "_eq");
+			execute((const char*[]) { "/etc/grub.d/10_sortix", NULL }, "eq");
 		}
 	}
 

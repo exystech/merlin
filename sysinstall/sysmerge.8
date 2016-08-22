@@ -6,10 +6,10 @@
 .Nd upgrade current operating system from a sysroot
 .Sh SYNOPSIS
 .Nm sysmerge
-.Op Fl w
+.Op Fl cw
 .Op Fl \-booting
-.Op Fl \-cancel
-.Op Fl \-wait
+.Op Fl \-hook-finalize
+.Op Fl \-hook-prepare
 .Ar source
 .Sh DESCRIPTION
 .Nm
@@ -35,17 +35,10 @@ then the bootloader is reinstalled and reconfigured as needed.
 .Pp
 .Nm
 is an automatic and non-interactive upgrade.  It is meant to be used as part of
-the development process to upgrade to locally built versions.  It does not
-contain compatibility to help upgrade across larger changes, or to easily handle
-changes to configuration file formats, or other caveats.  It places a burden on
-the system administrator/developer to know the system changes in detail and to
-do any necessary tasks manually.
-.Pp
-The
+the development process to upgrade to locally built versions.  The
 .Xr sysupgrade 8
 program is by contrast an interactive program, meant to help upgrading across
-much larger development distances.  It contains compatibility to automatically
-handle changes in configuration files and other larger changes.
+much larger development distances.
 .Pp
 The options are as follows:
 .Bl -tag -width "12345678"
@@ -60,13 +53,27 @@ boot target.  This installs the
 directory onto the root filesystem and removes the
 .Pa /sysmerge
 directory.
-.It Fl \-cancel
+.It Fl c , Fl \-cancel
 Cancel a pending upgrade that would trigger on the next boot.  Remove the
 .Pa /sysmerge
 directory and restore the old
 .Xr kernel 7
 and
 .Xr initrd 7 .
+.It Fl \-hook-finalize
+Run the pre-installation compatibility hooks.  This is meant to be used by the
+old
+.Nm
+when it invokes the new
+.Nm
+during a non-waiting upgrade.
+.It Fl \-hook-prepare
+Run the post-prepare compatibility hooks.  This is meant to be used by the
+old
+.Nm
+when it invokes the new
+.Nm
+during a non-waiting upgrade.
 .It Fl w , Fl \-wait
 Wait until the next boot to complete the upgrade, rather than finishing it now.
 This installs into the

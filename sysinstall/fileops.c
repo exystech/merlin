@@ -23,11 +23,24 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <libgen.h>
+#include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
 #include "fileops.h"
+
+char* join_paths(const char* a, const char* b)
+{
+	size_t a_len = strlen(a);
+	bool has_slash = (a_len && a[a_len-1] == '/') || b[0] == '/';
+	char* result;
+	if ( (has_slash && asprintf(&result, "%s%s", a, b) < 0) ||
+	     (!has_slash && asprintf(&result, "%s/%s", a, b) < 0) )
+		return NULL;
+	return result;
+}
 
 int mkdir_p(const char* path, mode_t mode)
 {

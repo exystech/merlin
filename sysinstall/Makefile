@@ -20,6 +20,7 @@ conf.o \
 devices.o \
 execute.o \
 fileops.o \
+hooks.o \
 interactive.o \
 manifest.o \
 release.o \
@@ -27,8 +28,8 @@ release.o \
 OBJS=$(MAIN_OBJS) $(UTIL_OBJS)
 
 SYSINSTALL_DEPS=devices execute fileops interactive manifest
-SYSMERGE_DEPS=conf fileops execute manifest release
-SYSUPGRADE_DEPS=conf devices execute fileops interactive manifest release
+SYSMERGE_DEPS=conf fileops execute hooks manifest release
+SYSUPGRADE_DEPS=conf devices execute fileops hooks interactive manifest release
 
 SYSINSTALL_OBJS:=sysinstall.o $(SYSINSTALL_DEPS:=.o)
 SYSMERGE_OBJS:=sysmerge.o $(SYSMERGE_DEPS:=.o)
@@ -67,6 +68,7 @@ conf.o: conf.h
 devices.o: devices.h
 execute.o: execute.h
 fileops.o: fileops.h
+hooks.o: release.h
 interactive.o: interactive.h execute.h
 manifest.o: manifest.h execute.h fileops.h
 release.o: release.h
