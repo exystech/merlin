@@ -48,6 +48,7 @@
 #include "devices.h"
 #include "execute.h"
 #include "fileops.h"
+#include "hooks.h"
 #include "interactive.h"
 #include "manifest.h"
 #include "release.h"
@@ -716,7 +717,10 @@ int main(void)
 		// TODO: Use an upgrade manifest system that notices files that are now
 		//       untracked or moved from one manifest to another.
 		if ( conf.system )
+		{
+			upgrade_prepare(target_release, &new_release, "/", "");
 			install_manifest("system", "", ".");
+		}
 		if ( has_manifest("src") )
 		{
 			if ( conf.newsrc )
@@ -754,6 +758,8 @@ int main(void)
 		}
 		if ( conf.ports )
 			install_ports("", ".");
+		if ( conf.system )
+			upgrade_finalize(target_release, &new_release, "/", "");
 		if ( conf.system )
 		{
 			printf(" - Creating initrd...\n");

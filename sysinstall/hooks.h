@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,16 +13,22 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * fileops.h
- * File operation utility functions.
+ * hooks.h
+ * Upgrade compatibility hooks.
  */
 
-#ifndef FILEOPS_H
-#define FILEOPS_H
+#ifndef HOOKS_H
+#define HOOKS_H
 
-char* join_paths(const char* a, const char* b);
-int mkdir_p(const char* path, mode_t mode);
-int access_or_die(const char* path, int mode);
-void mkdir_or_chmod_or_die(const char* path, mode_t mode);
+#include "release.h"
+
+void upgrade_prepare(const struct release* old_release,
+                     const struct release* new_release,
+                     const char* source_prefix,
+                     const char* target_prefix);
+void upgrade_finalize(const struct release* old_release,
+                      const struct release* new_release,
+                      const char* source_prefix,
+                      const char* target_prefix);
 
 #endif
