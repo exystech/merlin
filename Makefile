@@ -69,11 +69,11 @@ all: sysroot
 
 .PHONY: sysmerge
 sysmerge: sysroot
-	"$(SYSROOT)/sbin/sysmerge" "$(SYSROOT)"
+	sysmerge "$(SYSROOT)"
 
 .PHONY: sysmerge-wait
 sysmerge-wait: sysroot
-	"$(SYSROOT)/sbin/sysmerge" --wait "$(SYSROOT)"
+	sysmerge --wait "$(SYSROOT)"
 
 .PHONY: clean-build-tools
 clean-build-tools:
