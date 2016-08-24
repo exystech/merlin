@@ -42,14 +42,13 @@ void unscan_devices(void);
 void scan_devices(void);
 struct filesystem* search_for_filesystem_by_uuid(const unsigned char* uuid);
 struct filesystem* search_for_filesystem_by_spec(const char* spec);
-bool check_existing_systems(void);
 bool check_lacking_partition_table(void);
 bool fsck(struct filesystem* fs);
 void free_mountpoints(struct mountpoint* mnts, size_t mnts_count);
 bool load_mountpoints(const char* fstab_path,
                       struct mountpoint** mountpoints_out,
                       size_t* mountpoints_used_out);
-void mountpoint_mount(struct mountpoint* mountpoint);
+bool mountpoint_mount(struct mountpoint* mountpoint);
 void mountpoint_unmount(struct mountpoint* mountpoint);
 
 #endif

@@ -148,7 +148,8 @@ bootloader to boot the operating system.  You will be offered the choice of
 installing GRUB as the bootloader.  Note however that this GRUB is not able to
 detect other operating systems and you will have to configure it manually if you
 wish to use it in a dual boot scheme.  The answer will default to yes if no
-existing partitions are found, and will default to no if some are found.
+existing partitions are found, or if an existing Sortix installation is found
+that uses the provided bootloader; and will otherwise default to no.
 .Pp
 Single-boot configurations should use the offered bootloader.  Dual-boot
 configurations should refuse it and arrange for bootloading by other means.  The

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -67,6 +67,7 @@ static enum filesystem_error extended_inspect(struct filesystem** fs_ptr,
 	fs->handler = &extended_handler;
 	fs->handler_private = NULL;
 	fs->fstype_name = "extended";
+	fs->flags = FILESYSTEM_FLAG_NOT_FILESYSTEM;
 	return *fs_ptr = fs, FILESYSTEM_ERROR_NONE;
 }
 

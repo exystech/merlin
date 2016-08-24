@@ -51,11 +51,13 @@
 #include <mount/partition.h>
 #include <mount/uuid.h>
 
+#include "conf.h"
 #include "devices.h"
 #include "execute.h"
 #include "fileops.h"
 #include "interactive.h"
 #include "manifest.h"
+#include "release.h"
 
 const char* prompt_man_section = "7";
 const char* prompt_man_page = "installation";
@@ -103,6 +105,116 @@ static bool missing_bios_boot_partition(struct filesystem* root_fs)
 	if ( !pt )
 		return NULL;
 	return !search_bios_boot_search(pt);
+}
+
+static bool should_install_bootloader_path(const char* mnt,
+                                           struct blockdevice* bdev)
+{
+	char* release_errpath;
+	if ( asprintf(&release_errpath, "%s: /etc/sortix-release",
+	              path_of_blockdevice(bdev)) < 0 )
+	{
+		warn("malloc");
+		return false;
+	}
+	char* release_path;
+	if ( asprintf(&release_path, "%s/etc/sortix-release", mnt) < 0 )
+	{
+		warn("malloc");
+		free(release_errpath);
+		return false;
+	}
+	struct release release;
+	if ( !os_release_load(&release, release_path, release_errpath) )
+	{
+		free(release_path);
+		free(release_errpath);
+		return false;
+	}
+	free(release_path);
+	free(release_errpath);
+	char* conf_path;
+	if ( asprintf(&conf_path, "%s/etc/upgrade.conf", mnt) < 0 )
+	{
+		warn("malloc");
+		return false;
+	}
+	// TODO: The load_upgrade_conf function might exit the process on failure,
+	//       but we don't want that. Redesign the mountpoint code so the caller
+	//       controls this.
+	pid_t pid = fork();
+	if ( pid < 0 )
+	{
+		warn("fork");
+		free(conf_path);
+		return false;
+	}
+	if ( !pid )
+	{
+		struct conf conf;
+		load_upgrade_conf(&conf, conf_path);
+		bool should = conf.grub;
+		_exit(should ? 0 : 1);
+	}
+	int status;
+	if ( waitpid(pid, &status, 0) < 0 )
+		return false;
+	return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+
+static bool should_install_bootloader_bdev(struct blockdevice* bdev)
+{
+	if ( !bdev->fs )
+		return false;
+	if ( bdev->fs->flags & FILESYSTEM_FLAG_NOT_FILESYSTEM )
+		return false;
+	if ( !bdev->fs->driver )
+		return false;
+	char mnt[] = "/tmp/fs.XXXXXX";
+	if ( !mkdtemp(mnt) )
+	{
+		warn("mkdtemp: %s", "/tmp/fs.XXXXXX");
+		return false;
+	}
+	struct mountpoint mp = { 0 };
+	mp.absolute = mnt;
+	mp.fs = bdev->fs;
+	mp.entry.fs_file = mnt;
+	if ( !mountpoint_mount(&mp) )
+	{
+		rmdir(mnt);
+		return false;
+	}
+	bool should = should_install_bootloader_path(mnt, bdev);
+	mountpoint_unmount(&mp);
+	rmdir(mnt);
+	return should;
+}
+
+static bool should_install_bootloader(void)
+{
+	bool any_systems = false;
+	for ( size_t i = 0; i < hds_count; i++ )
+	{
+		struct harddisk* hd = hds[i];
+		if ( hd->bdev.pt )
+		{
+			for ( size_t n = 0; n < hd->bdev.pt->partitions_count; n++ )
+			{
+				any_systems = true;
+				struct partition* p = hd->bdev.pt->partitions[n];
+				if ( should_install_bootloader_bdev(&p->bdev) )
+					return true;
+			}
+		}
+		else if ( hd->bdev.fs )
+		{
+			any_systems = true;
+			if ( should_install_bootloader_bdev(&hd->bdev) )
+				return true;
+		}
+	}
+	return !any_systems;
 }
 
 static bool passwd_check(const char* passwd_path,
@@ -460,7 +572,10 @@ int main(void)
 		text("\n");
 	}
 
+	text("Searching for existing installations...\n");
 	scan_devices();
+	bool bootloader_default = should_install_bootloader();
+	text("\n");
 
 	textf("You need a bootloader to start the operating system. GRUB is the "
 	      "standard %s bootloader and this installer comes with a copy. "
@@ -476,9 +591,7 @@ int main(void)
 	char grub_password[512];
 	while ( true )
 	{
-		const char* def = "yes";
-		if ( check_existing_systems() )
-			def = "no";
+		const char* def = bootloader_default ? "yes" : "no";
 		prompt(accept_grub, sizeof(accept_grub),
 		       "Install a new GRUB bootloader?", def);
 		if ( strcasecmp(accept_grub, "no") == 0 ||
@@ -704,7 +817,8 @@ int main(void)
 		mnt->absolute = absolute;
 		if ( mkdir_p(mnt->absolute, 0755) < 0 )
 			err(2, "mkdir: %s", mnt->absolute);
-		mountpoint_mount(mnt);
+		if ( !mountpoint_mount(mnt) )
+			exit(2);
 	}
 
 	if ( chdir(fs) < 0 )
