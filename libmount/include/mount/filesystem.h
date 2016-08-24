@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -35,6 +35,7 @@ struct filesystem_handler;
 #define FILESYSTEM_FLAG_UUID (1 << 0)
 #define FILESYSTEM_FLAG_FSCK_SHOULD (1 << 1)
 #define FILESYSTEM_FLAG_FSCK_MUST (1 << 2)
+#define FILESYSTEM_FLAG_NOT_FILESYSTEM (1 << 3)
 
 struct filesystem
 {

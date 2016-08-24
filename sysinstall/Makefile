@@ -27,7 +27,7 @@ release.o \
 
 OBJS=$(MAIN_OBJS) $(UTIL_OBJS)
 
-SYSINSTALL_DEPS=devices execute fileops interactive manifest
+SYSINSTALL_DEPS=conf devices execute fileops interactive manifest release
 SYSMERGE_DEPS=conf fileops execute hooks manifest release
 SYSUPGRADE_DEPS=conf devices execute fileops hooks interactive manifest release
 

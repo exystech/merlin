@@ -173,19 +173,6 @@ struct filesystem* search_for_filesystem_by_spec(const char* spec)
 	return NULL;
 }
 
-bool check_existing_systems(void)
-{
-	for ( size_t di = 0; di < hds_count; di++ )
-	{
-		struct blockdevice* dbdev = &hds[di]->bdev;
-		if ( dbdev->fs )
-			return true;
-		else if ( dbdev->pt )
-			return 1 <= dbdev->pt->partitions_count;
-	}
-	return false;
-}
-
 bool check_lacking_partition_table(void)
 {
 	for ( size_t di = 0; di < hds_count; di++ )
@@ -324,7 +311,7 @@ bool load_mountpoints(const char* fstab_path,
 	return true;
 }
 
-void mountpoint_mount(struct mountpoint* mountpoint)
+bool mountpoint_mount(struct mountpoint* mountpoint)
 {
 	struct filesystem* fs = mountpoint->fs;
 	// TODO: It would be ideal to get an exclusive lock so that no other
@@ -333,17 +320,29 @@ void mountpoint_mount(struct mountpoint* mountpoint)
 	const char* bdev_path = bdev->p ? bdev->p->path : bdev->hd->path;
 	assert(bdev_path);
 	if ( fs->flags & FILESYSTEM_FLAG_FSCK_MUST && !fsck(fs) )
-		errx(2, "Failed to fsck %s", bdev_path);
+	{
+		warnx("Failed to fsck %s", bdev_path);
+		return false;
+	}
 	if ( !fs->driver )
-		errx(2, "%s: Don't know how to mount a %s filesystem",
-		     bdev_path, fs->fstype_name);
+	{
+		warnx("%s: Don't know how to mount a %s filesystem",
+		      bdev_path, fs->fstype_name);
+		return false;
+	}
 	const char* pretend_where = mountpoint->entry.fs_file;
 	const char* where = mountpoint->absolute;
 	struct stat st;
 	if ( stat(where, &st) < 0 )
-		err(2, "stat: %s", where);
+	{
+		warn("stat: %s", where);
+		return false;
+	}
 	if ( (mountpoint->pid = fork()) < 0 )
-		err(2, "%s: Unable to mount: fork", bdev_path);
+	{
+		warn("%s: Unable to mount: fork", bdev_path);
+		return false;
+	}
 	// TODO: This design is broken. The filesystem should tell us when it is
 	//       ready instead of having to poll like this.
 	if ( mountpoint->pid == 0 )
@@ -366,36 +365,41 @@ void mountpoint_mount(struct mountpoint* mountpoint)
 			int code;
 			waitpid(mountpoint->pid, &code, 0);
 			mountpoint->pid = -1;
-			exit(2);
+			return false;
 		}
 		if ( newst.st_dev != st.st_dev || newst.st_ino != st.st_ino )
 			break;
 		int code;
 		pid_t child = waitpid(mountpoint->pid, &code, WNOHANG);
 		if ( child < 0 )
-			err(2, "waitpid");
+		{
+			warn("waitpid");
+			return false;
+		}
 		if ( child != 0 )
 		{
 			mountpoint->pid = -1;
 			if ( WIFSIGNALED(code) )
-				errx(2, "%s: Mount failed: %s: %s", bdev_path, fs->driver,
-				        strsignal(WTERMSIG(code)));
+				warnx("%s: Mount failed: %s: %s", bdev_path, fs->driver,
+				      strsignal(WTERMSIG(code)));
 			else if ( !WIFEXITED(code) )
-				errx(2, "%s: Mount failed: %s: %s", bdev_path, fs->driver,
-				        "Unexpected unusual termination");
+				warnx("%s: Mount failed: %s: %s", bdev_path, fs->driver,
+				      "Unexpected unusual termination");
 			else if ( WEXITSTATUS(code) == 127 )
-				errx(2, "%s: Mount failed: %s: %s", bdev_path, fs->driver,
-				        "Filesystem driver is absent");
+				warnx("%s: Mount failed: %s: %s", bdev_path, fs->driver,
+				      "Filesystem driver is absent");
 			else if ( WEXITSTATUS(code) == 0 )
-				errx(2, "%s: Mount failed: %s: Unexpected successful exit",
-				        bdev_path, fs->driver);
+				warnx("%s: Mount failed: %s: Unexpected successful exit",
+				      bdev_path, fs->driver);
 			else
-				errx(2, "%s: Mount failed: %s: Exited with status %i", bdev_path,
-				        fs->driver, WEXITSTATUS(code));
+				warnx("%s: Mount failed: %s: Exited with status %i", bdev_path,
+				      fs->driver, WEXITSTATUS(code));
+			return false;
 		}
 		struct timespec delay = timespec_make(0, 50L * 1000L * 1000L);
 		nanosleep(&delay, NULL);
 	}
+	return true;
 }
 
 void mountpoint_unmount(struct mountpoint* mountpoint)
