@@ -222,7 +222,7 @@ static struct dispmsg_crtc_mode GetLogFallbackMode()
 {
 	struct dispmsg_crtc_mode mode;
 	memset(&mode, 0, sizeof(mode));
-	mode.control = DISPMSG_CONTROL_VALID;
+	mode.control = DISPMSG_CONTROL_VALID | DISPMSG_CONTROL_FALLBACK;
 	mode.fb_format = Log::fallback_framebuffer_bpp;
 	mode.view_xres = (uint32_t) Log::fallback_framebuffer_width;
 	mode.view_yres = (uint32_t) Log::fallback_framebuffer_height;
