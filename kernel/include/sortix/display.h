@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,6 +32,7 @@ extern "C" {
 static const uint32_t DISPMSG_CONTROL_VALID = 1 << 0;
 static const uint32_t DISPMSG_CONTROL_VGA = 1 << 1;
 static const uint32_t DISPMSG_CONTROL_OTHER_RESOLUTIONS = 1 << 2;
+static const uint32_t DISPMSG_CONTROL_FALLBACK = 1 << 3;
 
 struct dispmsg_string
 {
