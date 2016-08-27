@@ -18,8 +18,6 @@
  */
 
 #include <sys/display.h>
-#include <sys/mount.h>
-#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
@@ -29,14 +27,12 @@
 #include <err.h>
 #include <errno.h>
 #include <fstab.h>
-#include <sched.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <timespec.h>
 #include <unistd.h>
 
 #include <mount/blockdevice.h>
@@ -60,13 +56,23 @@ struct installation
 {
 	struct blockdevice* bdev;
 	struct release release;
+	struct mountpoint* mountpoints;
+	size_t mountpoints_used;
 };
 
 static struct installation* installations;
 static size_t installations_count;
 static size_t installations_length;
+static pid_t main_pid;
+static struct mountpoint* mountpoints;
+static size_t mountpoints_used;
+static bool fs_made = false;
+static char fs[] = "/tmp/fs.XXXXXX";
 
-static bool add_installation(struct blockdevice* bdev, struct release* release)
+static bool add_installation(struct blockdevice* bdev,
+                             struct release* release,
+                             struct mountpoint* mountpoints,
+                             size_t mountpoints_used)
 {
 	if ( installations_count == installations_length )
 	{
@@ -83,6 +89,8 @@ static bool add_installation(struct blockdevice* bdev, struct release* release)
 	struct installation* installation = &installations[installations_count++];
 	installation->bdev = bdev;
 	installation->release = *release;
+	installation->mountpoints = mountpoints;
+	installation->mountpoints_used = mountpoints_used;
 	return true;
 }
 
@@ -103,123 +111,60 @@ static void search_installation_path(const char* mnt, struct blockdevice* bdev)
 		return;
 	}
 	struct release release;
-	if ( os_release_load(&release, release_path, release_errpath) &&
-	    !add_installation(bdev, &release) )
-		release_free(&release);
+	bool status = os_release_load(&release, release_path, release_errpath);
 	free(release_path);
 	free(release_errpath);
-}
-
-// TODO: Switch to mountpoint_mount().
-static bool await_mount(const char* mnt, pid_t pid, struct stat* oldst,
-                        const char* bdev_path, const char* driver)
-{
-	while ( true )
+	if ( !status )
+		return;
+	char* fstab_path;
+	if ( asprintf(&fstab_path, "%s/etc/fstab", mnt) < 0 )
 	{
-		struct stat newst;
-		if ( stat(mnt, &newst) < 0 )
-		{
-			warn("%s", mnt);
-			return false;
-		}
-		if ( newst.st_dev != oldst->st_dev || newst.st_ino != oldst->st_ino )
-			break;
-		int code;
-		pid_t child = waitpid(pid, &code, WNOHANG);
-		if ( child < 0 )
-		{
-			err(2, "waitpid");
-			return false;
-		}
-		if ( child != 0 )
-		{
-			if ( WIFSIGNALED(code) )
-				warnx("%s: Mount failed: %s: %s", bdev_path, driver,
-				      strsignal(WTERMSIG(code)));
-			else if ( !WIFEXITED(code) )
-				warnx("%s: Mount failed: %s: %s", bdev_path, driver,
-				      "Unexpected unusual termination");
-			else if ( WEXITSTATUS(code) == 127 )
-				warnx("%s: Mount failed: %s: %s", bdev_path, driver,
-				      "Filesystem driver is absent");
-#if 0
-			else if ( WEXITSTATUS(code) == 0 )
-				warnx("%s: Mount failed: %s: Unexpected successful exit",
-				      bdev_path, driver);
-			else
-				warnx("%s: Mount failed: %s: Exited with status %i", bdev_path,
-				      driver, WEXITSTATUS(code));
-#endif
-			return false;
-		}
-		struct timespec delay = timespec_make(0, 50L * 1000L * 1000L);
-		nanosleep(&delay, NULL);
+		warn("malloc");
+		release_free(&release);
+		return;
 	}
-	return true;
-}
-
-static pid_t begin_mount(const char* mnt, struct blockdevice* bdev)
-{
-	struct filesystem* fs = bdev->fs;
-	if ( !fs )
-		return -1;
-	if ( !fs->driver )
-		return -1;
-	if ( fs->flags & FILESYSTEM_FLAG_FSCK_MUST && !fsck(fs) )
-		return -1;
-	struct stat fs_oldstat;
-	if ( stat(mnt, &fs_oldstat) < 0 )
+	struct mountpoint* mountpoints;
+	size_t mountpoints_used;
+	status = load_mountpoints(fstab_path, &mountpoints, &mountpoints_used);
+	free(fstab_path);
+	if ( !status )
 	{
-		warn("stat: %s", mnt);
-		return -1;
+		warn("%s: %s", path_of_blockdevice(bdev), "/etc/fstab");
+		release_free(&release);
+		return;
 	}
-	const char* bdev_path = path_of_blockdevice(fs->bdev);
-	pid_t fs_pid = fork();
-	if ( fs_pid < 0 )
+	if ( !add_installation(bdev, &release, mountpoints, mountpoints_used) )
 	{
-		warn("fork");
-		return -1;
+		free_mountpoints(mountpoints, mountpoints_used);
+		release_free(&release);
+		return;
 	}
-	if ( fs_pid == 0 )
-	{
-		setpgid(0, 0);
-		const char* argv[] =
-		{
-			fs->driver,
-			"--foreground",
-			bdev_path,
-			mnt,
-			NULL
-		};
-		execvp(argv[0], (char* const*) argv);
-		warn("%s", argv[0]);
-		_exit(127);
-	}
-	if ( !await_mount(mnt, fs_pid, &fs_oldstat, bdev_path, fs->driver) )
-		return false;
-	return fs_pid;
-}
-
-static void end_mount(const char* mnt, pid_t fs_pid)
-{
-	sched_yield();
-	unmount(mnt, 0);
-	waitpid(fs_pid, NULL, 0);
 }
 
 static void search_installation_bdev(const char* mnt, struct blockdevice* bdev)
 {
-	pid_t fs_pid = begin_mount(mnt, bdev);
-	if ( fs_pid < 0 )
+	if ( !bdev->fs )
+		return;
+	if ( !bdev->fs->driver )
+		return;
+	struct mountpoint mp = { 0 };
+	mp.absolute = (char*) mnt;
+	mp.fs = bdev->fs;
+	mp.entry.fs_file = (char*) mnt;
+	if ( !mountpoint_mount(&mp) )
 		return;
 	search_installation_path(mnt, bdev);
-	end_mount(mnt, fs_pid);
+	mountpoint_unmount(&mp);
 }
 
 static void search_installations(const char* mnt)
 {
 	for ( size_t i = 0; i < installations_count; i++ )
-		release_free(&installations[i].release);
+	{
+		struct installation* inst = &installations[i];
+		free_mountpoints(inst->mountpoints, inst->mountpoints_used);
+		release_free(&inst->release);
+	}
 	free(installations);
 	installations_count = 0;
 	installations_length = 0;
@@ -345,6 +290,21 @@ static void preserve_src(const char* where)
 	}
 }
 
+void exit_handler(void)
+{
+	if ( getpid() != main_pid )
+		 return;
+	chdir("/");
+	for ( size_t n = mountpoints_used; n != 0; n-- )
+	{
+		size_t i = n - 1;
+		struct mountpoint* mountpoint = &mountpoints[i];
+		mountpoint_unmount(mountpoint);
+	}
+	if ( fs_made )
+		rmdir(fs);
+}
+
 int main(void)
 {
 	shlvl();
@@ -360,6 +320,10 @@ int main(void)
 		errx(2, "You need to be root to install %s", BRAND_DISTRIBUTION_NAME);
 	if ( getgid() != 0 )
 		errx(2, "You need to be group root to install %s", BRAND_DISTRIBUTION_NAME);
+
+	main_pid = getpid();
+	if ( atexit(exit_handler) != 0 )
+		err(2, "atexit");
 
 	struct utsname uts;
 	uname(&uts);
@@ -487,8 +451,7 @@ int main(void)
 		exit(2);
 	}
 
-	char mnt[] = "/tmp/fs.XXXXXX";
-	if ( !mkdtemp(mnt) )
+	if ( !mkdtemp(fs) )
 		err(2, "mkdtemp: %s", "/tmp/fs.XXXXXX");
 
 	struct installation* target = NULL;
@@ -496,7 +459,7 @@ int main(void)
 	{
 		text("Searching for existing installations...\n");
 		scan_devices();
-		search_installations(mnt);
+		search_installations(fs);
 		text("\n");
 
 		if ( installations_count == 0 )
@@ -511,12 +474,9 @@ int main(void)
 			if ( !strcasecmp(input, "yes") )
 			{
 				text("\n");
-				rmdir(mnt);
+				rmdir(fs);
 				execlp("sysinstall", "sysinstall", (const char*) NULL);
-				warn("sysinstall");
-				if ( !mkdtemp(mnt) )
-					err(2, "mkdtemp: %s", "/tmp/fs.XXXXXX");
-				text("\n");
+				err(2, "sysinstall");
 			}
 			continue;
 		}
@@ -619,15 +579,45 @@ int main(void)
 	bool can_run_old_abi = target_release->abi_major == new_release.abi_major &&
 	                       target_release->abi_minor <= new_release.abi_minor;
 
+	mountpoints = target->mountpoints;
+	mountpoints_used = target->mountpoints_used;
+
 	struct blockdevice* bdev = target->bdev;
+	struct blockdevice* bootloader_bdev = target->bdev;
+
+	for ( size_t i = 0; i < mountpoints_used; i++ )
+	{
+		struct mountpoint* mnt = &mountpoints[i];
+		const char* spec = mnt->entry.fs_spec;
+		if ( !(mnt->fs = search_for_filesystem_by_spec(spec)) )
+			errx(2, "fstab: %s: Found no mountable filesystem matching `%s'",
+			     mnt->entry.fs_file, spec);
+		if ( !mnt->fs->driver )
+			errx(2, "fstab: %s: %s: Don't know how to mount this %s filesystem",
+			     mnt->entry.fs_file,
+			     path_of_blockdevice(mnt->fs->bdev),
+			     mnt->fs->fstype_name);
+	}
+
+	for ( size_t i = 0; i < mountpoints_used; i++ )
+	{
+		struct mountpoint* mnt = &mountpoints[i];
+		if ( !strcmp(mnt->entry.fs_file, "/boot") )
+			bootloader_bdev = mnt->fs->bdev;
+		char* absolute;
+		if ( asprintf(&absolute, "%s%s", fs, mnt->absolute) < 0 )
+			err(2, "asprintf");
+		free(mnt->absolute);
+		mnt->absolute = absolute;
+		if ( !mountpoint_mount(mnt) )
+			exit(2);
+	}
+
 	const char* bdev_path = path_of_blockdevice(bdev);
+	const char* bootloader_dev_path = device_path_of_blockdevice(bootloader_bdev);
 
-	pid_t fs_pid = begin_mount(mnt, bdev);
-	if ( fs_pid < 0 )
-		err(2, "mounting %s at %s", bdev_path, mnt);
-
-	if ( chdir(mnt) < 0 )
-		err(2, "%s", mnt);
+	if ( chdir(fs) < 0 )
+		err(2, "chdir: %s", fs);
 
 	if ( access_or_die("sysmerge", F_OK) == 0 )
 	{
@@ -652,10 +642,14 @@ int main(void)
 		execute((const char*[]) { "chroot", "-d", "sysmerge", "--cancel", NULL }, "e");
 	}
 
+	bool do_upgrade_bootloader;
 	struct conf conf;
 	while ( true )
 	{
 		load_upgrade_conf(&conf, "etc/upgrade.conf");
+
+		do_upgrade_bootloader =
+			conf.grub && (conf.ports || (conf.system && can_run_old_abi));
 
 		textf("We are now ready to upgrade to %s %s. Take a moment to verify "
 			  "everything is sane.\n", BRAND_DISTRIBUTION_NAME, VERSIONSTR);
@@ -663,6 +657,8 @@ int main(void)
 		char abibuf[16];
 		printf("  %-16s  system architecture\n", uts.machine);
 		printf("  %-16s  root filesystem\n", bdev_path);
+		if ( do_upgrade_bootloader )
+			printf("  %-16s  bootloader installation target\n", bootloader_dev_path);
 		printf("  %-16s  old version\n", target_release->pretty_name);
 		printf("  %-16s  new version\n", new_release.pretty_name);
 		snprintf(abibuf, sizeof(abibuf), "%lu.%lu",
@@ -690,6 +686,10 @@ int main(void)
 		}
 		else
 			printf("  %-16s  will not be updated\n", "/src");
+		if ( do_upgrade_bootloader )
+			printf("  %-16s  will be updated\n", "bootloader");
+		else
+			printf("  %-16s  will not be updated\n", "bootloader");
 		text("\n");
 
 		prompt(input, sizeof(input),
@@ -763,13 +763,13 @@ int main(void)
 		if ( conf.system )
 		{
 			printf(" - Creating initrd...\n");
-			execute((const char*[]) { "update-initrd", "--sysroot", mnt, NULL }, "_e");
+			execute((const char*[]) { "update-initrd", "--sysroot", fs, NULL }, "_e");
 		}
-		if ( (conf.ports || (conf.system && can_run_old_abi)) && conf.grub )
+		if ( do_upgrade_bootloader )
 		{
 			printf(" - Installing bootloader...\n");
 			execute((const char*[]) { "chroot", "-d", ".", "grub-install",
-			        device_path_of_blockdevice(bdev), NULL },
+			        bootloader_dev_path, NULL },
 			        "_eqQ");
 			printf(" - Configuring bootloader...\n");
 			execute((const char*[]) { "chroot", "-d", ".", "update-grub", NULL },
@@ -798,11 +798,6 @@ int main(void)
 	else
 		errx(2, "upgrade failed: unknown waitpid code %i", upgrade_code);
 	text("\n");
-
-	if ( chdir("/") < 0 )
-		err(2, "%s", "/");
-
-	end_mount(mnt, fs_pid);
 
 	if ( conf.system )
 		textf("The %s installation has now been upgraded to %s.\n\n",

@@ -341,8 +341,8 @@ static void grub_hash_password(char* buffer, size_t buffer_size, const char* pw)
 }
 
 static pid_t main_pid;
-static struct mountpoint* mountpoints = NULL;
-static size_t mountpoints_used = 0;
+static struct mountpoint* mountpoints;
+static size_t mountpoints_used;
 static bool etc_made = false;
 static char etc[] = "/tmp/etc.XXXXXX";
 static bool fs_made = false;

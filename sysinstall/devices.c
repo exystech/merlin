@@ -284,6 +284,7 @@ bool load_mountpoints(const char* fstab_path,
 			mountpoints_length = new_length;
 		}
 		struct mountpoint* mountpoint = &mountpoints[mountpoints_used++];
+		memset(mountpoint, 0, sizeof(*mountpoint));
 		memcpy(&mountpoint->entry, &fstabent, sizeof(fstabent));
 		mountpoint->entry_line = line;
 		mountpoint->pid = -1;
