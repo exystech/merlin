@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
