@@ -324,7 +324,7 @@ int main(void)
 
 	text("You are about to install a new operating system on this computer. "
 	     "This is not something you should do on a whim or when you are "
-         "impatient. Take the time to read the documentation and be patient "
+	     "impatient. Take the time to read the documentation and be patient "
 	     "while you learn the new system. This is a very good time to start an "
 		 "external music player that plays soothing classical music on loop.\n\n");
 	const char* readies[] =
@@ -557,7 +557,7 @@ int main(void)
 	      "Type mkpart to make a new partition. "
 	      "Type mount 2 / to create a mountpoint for partition 2. "
 	      "Type exit when done. "
-	      "There is partitioning advise in installation(7). "
+	      "There is partitioning advice in installation(7). "
 	      "Type man 8 disked to display the disked(8) man page.\n",
 	      mktable_tip);
 	struct filesystem* root_filesystem = NULL;
@@ -636,7 +636,7 @@ int main(void)
 			while ( true )
 			{
 				prompt(return_to_disked, sizeof(return_to_disked),
-					   "Return to disked to make a BIOS boot partition?", "yes");
+				       "Return to disked to make a BIOS boot partition?", "yes");
 				if ( strcasecmp(accept_grub, "no") == 0 ||
 					 strcasecmp(accept_grub, "yes") == 0 )
 					break;
@@ -739,7 +739,7 @@ int main(void)
 		umask(0022);
 		if ( access("tix/collection.conf", F_OK) < 0 )
 			execute((const char*[]) { "tix-collection", ".", "create",
-		                              "--prefix=", NULL }, "_e");
+			                          "--prefix=", NULL }, "_e");
 		install_manifest("system", "", ".");
 		// TODO: Preserve the existing /src if it exists like in sysupgrade.
 		if ( has_manifest("src") )
@@ -909,7 +909,7 @@ int main(void)
 			{
 				char answer[32];
 				prompt(answer, sizeof(answer),
-					   "Empty password is stupid, are you sure? (yes/no)", "no");
+				       "Empty password is stupid, are you sure? (yes/no)", "no");
 				if ( strcasecmp(answer, "yes") != 0 )
 					continue;
 			}
@@ -925,7 +925,7 @@ int main(void)
 		explicit_bzero(first, sizeof(first));
 		if ( !install_configurationf("etc/passwd", "a",
 				"%s:%s:%" PRIuUID ":%" PRIuGID ":%s:/home/%s:sh\n",
-		        user, hash, uid, gid, name, user) )
+				user, hash, uid, gid, name, user) )
 			continue;
 		if ( !install_configurationf("etc/group", "a",
 				"%s::%" PRIuGID ":%s\n", user, gid, user) )

@@ -307,7 +307,7 @@ you will have to implement features in Sortix or add some compatibility. Other
 times, you can work around the build system or patch the software.
 
 Try ask around and examine other archived port tixes and see their patches
-reveal any useful advise on how to resolve the situation:
+reveal any useful advice on how to resolve the situation:
 
 Here is a list of common problems:
 
@@ -476,5 +476,5 @@ This should be a basic walk-through the process of porting a piece of software
 to the Sortix operating system. Note how the porting facilities are experimental
 and much is subject to change in the near future. Porting software is an
 advanced topic and this documentation merely touches the more common situations
-and surely important advise is missing from this documentation. It's always a
-good idea to consult the Sortix developers for advise.
+and surely important advice is missing from this documentation. It's always a
+good idea to consult the Sortix developers for advice.
