@@ -674,6 +674,8 @@ int main(void)
 	      "Type man 8 disked to display the disked(8) man page.\n",
 	      mktable_tip);
 	struct filesystem* root_filesystem = NULL;
+	struct filesystem* boot_filesystem = NULL;
+	struct filesystem* bootloader_filesystem = NULL;
 	bool not_first = false;
 	while ( true )
 	{
@@ -711,6 +713,7 @@ int main(void)
 			continue;
 		}
 		root_filesystem = NULL;
+		boot_filesystem = NULL;
 		bool cant_mount = false;
 		for ( size_t i = 0; i < mountpoints_used; i++ )
 		{
@@ -734,17 +737,25 @@ int main(void)
 			}
 			if ( !strcmp(mnt->entry.fs_file, "/") )
 				root_filesystem = mnt->fs;
+			if ( !strcmp(mnt->entry.fs_file, "/boot") )
+				boot_filesystem = mnt->fs;
 		}
 		if ( cant_mount )
 			continue;
 		assert(root_filesystem);
+		bootloader_filesystem = boot_filesystem ? boot_filesystem : root_filesystem;
+		assert(bootloader_filesystem);
 		if ( !strcasecmp(accept_grub, "yes") &&
-		     missing_bios_boot_partition(root_filesystem) )
+		     missing_bios_boot_partition(bootloader_filesystem) )
 		{
-			textf("You are a installing BIOS bootloader and the root "
+			const char* where = boot_filesystem ? "/boot" : "root";
+			const char* dev = device_path_of_blockdevice(bootloader_filesystem->bdev);
+			assert(dev);
+			textf("You are a installing BIOS bootloader and the %s "
 			      "filesystem is located on a GPT partition, but you haven't "
-			      "made a BIOS boot partition on the root GPT disk. Pick "
-			      "biosboot during mkpart and make a 1 MiB partition.\n");
+			      "made a BIOS boot partition on the %s GPT disk. Pick "
+			      "biosboot during mkpart and make a 1 MiB partition.\n",
+			      where, dev);
 			char return_to_disked[10];
 			while ( true )
 			{
@@ -775,12 +786,12 @@ int main(void)
 	}
 	if ( strcasecmp(accept_grub, "yes") == 0 )
 	{
-		struct partition* bbp = search_bios_boot_partition(root_filesystem);
+		struct partition* bbp = search_bios_boot_partition(bootloader_filesystem);
 		if ( bbp )
 			printf("  %-16s  bios boot partition\n",
 			       path_of_blockdevice(&bbp->bdev));
 		printf("  %-16s  bootloader installation target\n",
-		       device_path_of_blockdevice(root_filesystem->bdev));
+		       device_path_of_blockdevice(bootloader_filesystem->bdev));
 	}
 	text("\n");
 
@@ -875,7 +886,7 @@ int main(void)
 		{
 			printf(" - Installing bootloader...\n");
 			execute((const char*[]) { "chroot", "-d", ".", "grub-install",
-			        device_path_of_blockdevice(root_filesystem->bdev), NULL },
+			        device_path_of_blockdevice(bootloader_filesystem->bdev), NULL },
 			        "_eqQ");
 			printf(" - Configuring bootloader...\n");
 			execute((const char*[]) { "chroot", "-d", ".", "update-grub", NULL },
