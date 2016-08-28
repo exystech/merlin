@@ -238,7 +238,10 @@ bool fsck(struct filesystem* fs)
 		warnx("%s: Mandatory repair failed: %s: %s", bdev_path,
 		      fs->fsck, "Filesystem checker was unsuccessful");
 	else
+	{
+		fs->flags &= ~(FILESYSTEM_FLAG_FSCK_SHOULD | FILESYSTEM_FLAG_FSCK_MUST);
 		return true;
+	}
 	return false;
 }
 
