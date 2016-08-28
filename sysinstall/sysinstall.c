@@ -665,14 +665,19 @@ int main(void)
 	const char* mktable_tip = "";
 	if ( check_lacking_partition_table() )
 		mktable_tip = "Type mktable to make a new partition table. ";
+	const char* devices_tip = "";
+	if ( check_multiple_harddisks() )
+		devices_tip = "Type devices to list the devices. "
+		              "Type device 1 to switch to device 1. ";
 	textf("Type ls to list partitions on the device. "
+	      "%s"
 	      "%s"
 	      "Type mkpart to make a new partition. "
 	      "Type mount 2 / to create a mountpoint for partition 2. "
 	      "Type exit when done. "
 	      "There is partitioning advice in installation(7). "
 	      "Type man 8 disked to display the disked(8) man page.\n",
-	      mktable_tip);
+	      mktable_tip, devices_tip);
 	struct filesystem* root_filesystem = NULL;
 	struct filesystem* boot_filesystem = NULL;
 	struct filesystem* bootloader_filesystem = NULL;

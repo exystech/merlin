@@ -186,6 +186,11 @@ bool check_lacking_partition_table(void)
 	return false;
 }
 
+bool check_multiple_harddisks(void)
+{
+	return 2 <= hds_count;
+}
+
 bool fsck(struct filesystem* fs)
 {
 	const char* bdev_path = path_of_blockdevice(fs->bdev);
