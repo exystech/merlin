@@ -31,6 +31,11 @@ void prompt(char* buffer,
             size_t buffer_size,
             const char* question,
             const char* answer);
+void promptx(char* buffer,
+             size_t buffer_size,
+             const char* question,
+             const char* answer,
+             bool catch_if_shell);
 void password(char* buffer,
               size_t buffer_size,
               const char* question);

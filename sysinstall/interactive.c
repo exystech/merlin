@@ -147,6 +147,15 @@ void prompt(char* buffer,
             const char* question,
             const char* answer)
 {
+	promptx(buffer, buffer_size, question, answer, false);
+}
+
+void promptx(char* buffer,
+             size_t buffer_size,
+             const char* question,
+             const char* answer,
+             bool catch_if_shell)
+{
 	while ( true )
 	{
 		text(question);
@@ -169,9 +178,11 @@ void prompt(char* buffer,
 		}
 		if ( !strcmp(buffer, "!") )
 		{
-			printf("Type 'exit' to return to install.\n");
+			printf("Type 'exit' to return to the %s.\n", prompt_man_page);
 			fflush(stdout);
 			execute((const char*[]) { "sh", NULL }, "f");
+			if ( catch_if_shell )
+				break;
 			continue;
 		}
 		if ( !strcmp(buffer, "!man") )

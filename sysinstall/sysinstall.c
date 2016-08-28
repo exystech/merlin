@@ -774,7 +774,7 @@ int main(void)
 	text("\n");
 
 	textf("We are now ready to install %s %s. Take a moment to verify "
-	      "everything is sane.\n", BRAND_DISTRIBUTION_NAME, VERSIONSTR);
+	      "everything is in order.\n", BRAND_DISTRIBUTION_NAME, VERSIONSTR);
 	text("\n");
 	printf("  %-16s  system architecture\n", uts.machine);
 	for ( size_t i = 0; i < mountpoints_used; i++ )
@@ -798,14 +798,24 @@ int main(void)
 	while ( true )
 	{
 		prompt(input, sizeof(input),
-		       "Install " BRAND_DISTRIBUTION_NAME "? (yes/no)", "yes");
-		if ( strcasecmp(input, "yes") != 0 )
+		       "Install " BRAND_DISTRIBUTION_NAME "? (yes/no/poweroff/reboot)",
+		       "yes");
+		if ( !strcasecmp(input, "yes") )
+			break;
+		else if ( !strcasecmp(input, "no") )
 		{
-			text("Everything isn't sane? Answer '!' to get a shell or type ^C "
-			     "to abort the install.\n");
+			text("Answer '!' to get a shell. Type !man to view the "
+			     "installation(7) manual page.\n");
+			text("Alternatively, you can answer 'poweroff' or 'reboot' to "
+			     "cancel the installation.\n");
 			continue;
 		}
-		break;
+		else if ( !strcasecmp(input, "poweroff") )
+			exit(0);
+		else if ( !strcasecmp(input, "reboot") )
+			exit(1);
+		else
+			continue;
 	}
 	text("\n");
 

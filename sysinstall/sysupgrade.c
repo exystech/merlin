@@ -652,7 +652,7 @@ int main(void)
 			conf.grub && (conf.ports || (conf.system && can_run_old_abi));
 
 		textf("We are now ready to upgrade to %s %s. Take a moment to verify "
-			  "everything is sane.\n", BRAND_DISTRIBUTION_NAME, VERSIONSTR);
+			  "everything is in order.\n", BRAND_DISTRIBUTION_NAME, VERSIONSTR);
 		text("\n");
 		char abibuf[16];
 		printf("  %-16s  system architecture\n", uts.machine);
@@ -692,15 +692,33 @@ int main(void)
 			printf("  %-16s  will not be updated\n", "bootloader");
 		text("\n");
 
-		prompt(input, sizeof(input),
-		       "Upgrade? (yes/no)", "yes");
-		if ( strcasecmp(input, "yes") != 0 )
+		while ( true )
 		{
-			text("Everything isn't sane? Answer '!' to get a shell or type ^C "
-			     "to abort the upgrade.\n");
-			continue;
+			promptx(input, sizeof(input),
+				   "Upgrade? (yes/no/poweroff/reboot)", "yes", true);
+			if ( !strcasecmp(input, "yes") )
+				break;
+			else if ( !strcasecmp(input, "no") )
+			{
+				text("Answer '!' to get a shell. Type !man to view the "
+				     "upgrade(7) manual page. You can edit the upgrade.conf(5) "
+				     "configuration file of the target system to change which "
+				     "upgrade operations are performed.\n");
+				text("Alternatively, you can answer 'poweroff' or 'reboot' to "
+				     "cancel the upgrade.\n");
+				continue;
+			}
+			else if ( !strcasecmp(input, "poweroff") )
+				exit(0);
+			else if ( !strcasecmp(input, "reboot") )
+				exit(1);
+			else if ( !strcasecmp(input, "!") )
+				break;
+			else
+				continue;
 		}
-		break;
+		if ( !strcasecmp(input, "yes") )
+			break;
 	}
 	text("\n");
 
