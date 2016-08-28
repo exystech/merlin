@@ -43,6 +43,7 @@ void scan_devices(void);
 struct filesystem* search_for_filesystem_by_uuid(const unsigned char* uuid);
 struct filesystem* search_for_filesystem_by_spec(const char* spec);
 bool check_lacking_partition_table(void);
+bool check_multiple_harddisks(void);
 bool fsck(struct filesystem* fs);
 void free_mountpoints(struct mountpoint* mnts, size_t mnts_count);
 bool load_mountpoints(const char* fstab_path,
