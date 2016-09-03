@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -33,10 +33,10 @@
 namespace Sortix {
 namespace Video {
 
-const uint64_t ONE_AND_ONLY_DEVICE = 0;
-const uint64_t ONE_AND_ONLY_CONNECTOR = 0;
+static const uint64_t CONSOLE_DEVICE = 0;
+static const uint64_t CONSOLE_CONNECTOR = 0;
 
-kthread_mutex_t video_lock = KTHREAD_MUTEX_INITIALIZER;
+static kthread_mutex_t video_lock = KTHREAD_MUTEX_INITIALIZER;
 
 struct DeviceEntry
 {
@@ -44,9 +44,9 @@ struct DeviceEntry
 	VideoDevice* device;
 };
 
-size_t num_devices = 0;
-size_t devices_length = 0;
-DeviceEntry* devices = NULL;
+static size_t num_devices = 0;
+static size_t devices_length = 0;
+static DeviceEntry* devices = NULL;
 
 bool RegisterDevice(const char* name, VideoDevice* device)
 {
@@ -73,7 +73,87 @@ bool RegisterDevice(const char* name, VideoDevice* device)
 	size_t index = num_devices++;
 	devices[index].name = drivername;
 	devices[index].device = device;
+	device->device_index = index;
 	return true;
+}
+
+static bool SetVideoMode(VideoDevice* device,
+                         uint64_t connector,
+                         struct dispmsg_crtc_mode mode)
+{
+	uint64_t device_index = device->device_index;
+	TextBuffer* textbuf = NULL;
+	if ( device_index == CONSOLE_DEVICE && connector == CONSOLE_CONNECTOR )
+	{
+		if ( !(textbuf = device->CreateTextBuffer(connector, mode)) )
+			return false;
+		Log::BeginReplace();
+	}
+	if ( !device->SwitchMode(connector, mode) )
+	{
+		if ( textbuf )
+		{
+			Log::CancelReplace();
+			delete textbuf;
+		}
+		return false;
+	}
+	if ( textbuf )
+	{
+		Log::FinishReplace(textbuf);
+		Log::fallback_framebuffer = NULL;
+	}
+	return true;
+}
+
+bool ConfigureDevice(VideoDevice* device)
+{
+	bool success = true;
+	ScopedLock lock(&video_lock);
+	uint64_t connectors_count = device->GetConnectorCount();
+	for ( uint64_t connector = 0; connector < connectors_count; connector++ )
+	{
+		struct dispmsg_crtc_mode mode;
+		if ( !device->GetDefaultMode(connector, &mode) ||
+		     !SetVideoMode(device, connector, mode) )
+			success = false;
+	}
+	return success;
+}
+
+bool ResizeDisplay(uint64_t device_index, uint64_t connector, uint32_t xres,
+                   uint32_t yres, uint32_t bpp)
+{
+	ScopedLock lock(&video_lock);
+
+	if ( num_devices <= device_index )
+		return errno = ENODEV, false;
+
+	DeviceEntry* device_entry = &devices[device_index];
+	VideoDevice* device = device_entry->device;
+
+	// TODO: xres/yres/bpp == 0 means unchanged, so get current mode.
+	if ( xres == 0 || yres == 0 || bpp == 0 )
+		return true;
+	struct dispmsg_crtc_mode mode;
+	memset(&mode, 0, sizeof(0));
+	mode.driver_index = 0;
+	mode.magic = 0;
+	mode.control = DISPMSG_CONTROL_VALID;
+	mode.fb_format = bpp;
+	mode.view_xres = xres;
+	mode.view_yres = yres;
+	mode.fb_location = 0;
+	mode.pitch = xres * (bpp + 7) / 8;
+	mode.surf_off_x = 0;
+	mode.surf_off_y = 0;
+	mode.start_x = 0;
+	mode.start_y = 0;
+	mode.end_x = 0;
+	mode.end_y = 0;
+	mode.desktop_height = yres;
+
+	return SetVideoMode(device, connector, mode);
 }
 
 __attribute__((unused))
@@ -246,19 +326,13 @@ static int SetCrtcMode(void* ptr, size_t size)
 	{
 		DeviceEntry* device_entry = &devices[msg.device];
 		VideoDevice* device = device_entry->device;
-		if ( !device->SwitchMode(msg.connector, msg.mode) )
+
+		if ( !SetVideoMode(device, msg.connector, msg.mode) )
 			return -1;
-		// TODO: This could potentially fail.
-		if ( msg.device == ONE_AND_ONLY_DEVICE &&
-			 msg.connector == ONE_AND_ONLY_CONNECTOR )
-		{
-			Log::fallback_framebuffer = NULL;
-			Log::device_textbufhandle->Replace(device->CreateTextBuffer(msg.connector));
-		}
 	}
 	else if ( Log::fallback_framebuffer &&
-	          msg.device == ONE_AND_ONLY_DEVICE &&
-	          msg.connector == ONE_AND_ONLY_CONNECTOR )
+	          msg.device == CONSOLE_DEVICE &&
+	          msg.connector == CONSOLE_CONNECTOR )
 	{
 		struct dispmsg_crtc_mode fallback_mode = GetLogFallbackMode();
 		if ( memcmp(&msg.mode, &fallback_mode, sizeof(msg.mode)) != 0 )
@@ -286,8 +360,8 @@ static int GetCrtcMode(void* ptr, size_t size)
 
 	struct dispmsg_crtc_mode mode;
 	if ( Log::fallback_framebuffer &&
-	     msg.device == ONE_AND_ONLY_DEVICE &&
-	     msg.connector == ONE_AND_ONLY_CONNECTOR )
+	     msg.device == CONSOLE_DEVICE &&
+	     msg.connector == CONSOLE_CONNECTOR )
 	{
 		mode = GetLogFallbackMode();
 	}
@@ -295,10 +369,7 @@ static int GetCrtcMode(void* ptr, size_t size)
 	{
 		DeviceEntry* device_entry = &devices[msg.device];
 		VideoDevice* device = device_entry->device;
-		// TODO: There is no real way to detect failure here.
-		errno = 0;
-		mode = device->GetCurrentMode(msg.connector);
-		if ( !(mode.control & DISPMSG_CONTROL_VALID) && errno != 0 )
+		if ( !device->GetCurrentMode(msg.connector, &mode) )
 			return -1;
 	}
 	else
@@ -335,8 +406,8 @@ static int GetCrtcModes(void* ptr, size_t size)
 			return -1;
 	}
 	else if ( Log::fallback_framebuffer &&
-	          msg.device == ONE_AND_ONLY_DEVICE &&
-	          msg.connector == ONE_AND_ONLY_CONNECTOR )
+	          msg.device == CONSOLE_DEVICE &&
+	          msg.connector == CONSOLE_CONNECTOR )
 	{
 		if ( !(modes = new struct dispmsg_crtc_mode[1]) )
 			return -1;
@@ -384,7 +455,7 @@ static int GetMemorySize(void* ptr, size_t size)
 	ScopedLock lock(&video_lock);
 
 	if ( Log::fallback_framebuffer &&
-	     msg.device == ONE_AND_ONLY_DEVICE )
+	     msg.device == CONSOLE_DEVICE )
 	{
 		msg.memory_size = Log::fallback_framebuffer_width *
 		                  Log::fallback_framebuffer_height *
@@ -423,7 +494,7 @@ static int WriteMemory(void* ptr, size_t size)
 	ScopedLock lock(&video_lock);
 
 	if ( Log::fallback_framebuffer &&
-	     msg.device == ONE_AND_ONLY_DEVICE )
+	     msg.device == CONSOLE_DEVICE )
 	{
 		size_t ideal_pitch = Log::fallback_framebuffer_width *
 		                     Log::fallback_framebuffer_bpp / 8;
@@ -493,7 +564,7 @@ static int ReadMemory(void* ptr, size_t size)
 	ScopedLock lock(&video_lock);
 
 	if ( Log::fallback_framebuffer &&
-	     msg.device == ONE_AND_ONLY_DEVICE )
+	     msg.device == CONSOLE_DEVICE )
 	{
 		size_t ideal_pitch = Log::fallback_framebuffer_width *
 		                     Log::fallback_framebuffer_bpp / 8;

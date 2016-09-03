@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -74,17 +74,17 @@ size_t VGATextBuffer::OffsetOfPos(TextPos pos) const
 	return pos.y * width + pos.x;
 }
 
-size_t VGATextBuffer::Width() const
+size_t VGATextBuffer::Width()
 {
 	return width;
 }
 
-size_t VGATextBuffer::Height() const
+size_t VGATextBuffer::Height()
 {
 	return height;
 }
 
-TextChar VGATextBuffer::GetChar(TextPos pos) const
+TextChar VGATextBuffer::GetChar(TextPos pos)
 {
 	if ( UsablePosition(pos) )
 		return chars[OffsetOfPos(pos)];
@@ -153,7 +153,7 @@ void VGATextBuffer::Fill(TextPos from, TextPos to, TextChar fillwith)
 	}
 }
 
-bool VGATextBuffer::GetCursorEnabled() const
+bool VGATextBuffer::GetCursorEnabled()
 {
 	return cursorenabled;
 }
@@ -164,7 +164,7 @@ void VGATextBuffer::SetCursorEnabled(bool enablecursor)
 	UpdateCursor();
 }
 
-TextPos VGATextBuffer::GetCursorPos() const
+TextPos VGATextBuffer::GetCursorPos()
 {
 	return cursorpos;
 }
@@ -205,6 +205,15 @@ void VGATextBuffer::EmergencyReset()
 {
 	Fill(TextPos{0, 0}, TextPos{width-1, height-1}, TextChar{0, 0, 0});
 	SetCursorPos(TextPos{0, 0});
+}
+
+void VGATextBuffer::Resume()
+{
+	UpdateCursor();
+}
+
+void VGATextBuffer::Pause()
+{
 }
 
 } // namespace Sortix

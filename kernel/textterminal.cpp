@@ -133,6 +133,32 @@ bool TextTerminal::Invalidate()
 	return true;
 }
 
+void TextTerminal::BeginReplace()
+{
+	kthread_mutex_lock(&termlock);
+	textbufhandle->BeginReplace();
+}
+
+void TextTerminal::CancelReplace()
+{
+	textbufhandle->CancelReplace();
+	kthread_mutex_unlock(&termlock);
+}
+
+void TextTerminal::FinishReplace(TextBuffer* new_textbuf)
+{
+	textbufhandle->FinishReplace(new_textbuf);
+	TextBuffer* textbuf = textbufhandle->Acquire();
+	size_t new_width = textbuf->Width();
+	size_t new_height = textbuf->Height();
+	textbufhandle->Release(textbuf);
+	if ( new_width < column )
+		column = new_width;
+	if ( new_height <= line )
+		line = new_height ? new_height - 1 : 0;
+	kthread_mutex_unlock(&termlock);
+}
+
 bool TextTerminal::EmergencyIsImpaired()
 {
 	// This is during a kernel emergency where preemption has been disabled and

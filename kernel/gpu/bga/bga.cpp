@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -38,7 +38,10 @@
 #include <sortix/kernel/textbuffer.h>
 #include <sortix/kernel/video.h>
 
+#if defined(__i386__) || defined(__x86_64__)
 #include "x86-family/memorymanagement.h"
+#endif
+
 #include "lfbtextbuffer.h"
 #include "bga.h"
 
@@ -100,20 +103,22 @@ public:
 	virtual ~BGADevice();
 
 public:
-	virtual struct dispmsg_crtc_mode GetCurrentMode(uint64_t connector) const;
+	virtual uint64_t GetConnectorCount();
+	virtual bool GetDefaultMode(uint64_t connector, struct dispmsg_crtc_mode* mode);
+	virtual bool GetCurrentMode(uint64_t connector, struct dispmsg_crtc_mode* mode);
 	virtual bool SwitchMode(uint64_t connector, struct dispmsg_crtc_mode mode);
-	virtual bool Supports(uint64_t connector, struct dispmsg_crtc_mode mode) const;
-	virtual struct dispmsg_crtc_mode* GetModes(uint64_t connector, size_t* num_modes) const;
-	virtual off_t FrameSize() const;
+	virtual bool Supports(uint64_t connector, struct dispmsg_crtc_mode mode);
+	virtual struct dispmsg_crtc_mode* GetModes(uint64_t connector, size_t* num_modes);
+	virtual off_t FrameSize();
 	virtual ssize_t WriteAt(ioctx_t* ctx, off_t off, const void* buf, size_t count);
 	virtual ssize_t ReadAt(ioctx_t* ctx, off_t off, void* buf, size_t count);
-	virtual TextBuffer* CreateTextBuffer(uint64_t connector);
+	virtual TextBuffer* CreateTextBuffer(uint64_t connector, struct dispmsg_crtc_mode mode);
 
 public:
 	bool Initialize();
 
 private:
-	bool DetectModes() const;
+	bool DetectModes();
 	uint16_t WriteRegister(uint16_t index, uint16_t value);
 	uint16_t ReadRegister(uint16_t index);
 	uint16_t GetCapability(uint16_t index);
@@ -121,8 +126,8 @@ private:
 	bool SupportsResolution(uint16_t width, uint16_t height, uint16_t depth);
 
 private:
-	mutable size_t num_modes;
-	mutable struct dispmsg_crtc_mode* modes;
+	size_t num_modes;
+	struct dispmsg_crtc_mode* modes;
 	struct dispmsg_crtc_mode current_mode;
 	addralloc_t fb_alloc;
 	addralloc_t mmio_alloc;
@@ -223,32 +228,91 @@ bool BGADevice::SetVideoMode(uint16_t width, uint16_t height, uint16_t depth, bo
 	return true;
 }
 
+uint64_t BGADevice::GetConnectorCount()
+{
+	return 1;
+}
+
 // TODO: Need a better method of detecting available/desired resolutions.
 bool BGADevice::SupportsResolution(uint16_t width, uint16_t height, uint16_t depth)
 {
 	if ( !width || !height || !depth )
-		return false;
+		return errno = EINVAL, false;
 	if ( maxxres < width || maxyres < height || maxbpp < depth )
-		return false;
+		return errno = EINVAL, false;
 	// TODO: Is this actually a restriction?
-	if ( width % 8U )
-		return false;
+	// TODO: This is not a restriction in VirtualBox anymore at least.
+	//if ( width % 8U )
+	//	return errno = EINVAL, false;
 	// TODO: Can we determine this more closely in advance? Perhaps if the
 	//       framebuffer we will be using is larger than video memory?
 	return true;
 }
 
-struct dispmsg_crtc_mode BGADevice::GetCurrentMode(uint64_t connector) const
+bool BGADevice::GetDefaultMode(uint64_t connector,
+                               struct dispmsg_crtc_mode* mode_out)
 {
-	if ( connector != 0 )
+	if ( connector )
+		return errno = EINVAL, false;
+
+	bool good = false;
+	uint32_t xres;
+	uint32_t yres;
+	uint32_t bpp;
+	if ( connector == 0 && Log::fallback_framebuffer &&
+	     SupportsResolution(Log::fallback_framebuffer_width,
+	                        Log::fallback_framebuffer_height,
+	                        32) )
 	{
-		errno = EINVAL;
-		struct dispmsg_crtc_mode mode;
-		memset(&mode, 0, sizeof(mode));
-		return mode;
+		xres = Log::fallback_framebuffer_width;
+		yres = Log::fallback_framebuffer_height;
+		bpp = 32;
+	}
+	else if ( connector == 0 && Log::fallback_framebuffer &&
+	          SupportsResolution(Log::fallback_framebuffer_width,
+	                             Log::fallback_framebuffer_height,
+	                             Log::fallback_framebuffer_bpp) )
+	{
+		xres = Log::fallback_framebuffer_width;
+		yres = Log::fallback_framebuffer_height;
+		bpp = Log::fallback_framebuffer_bpp;
+	}
+	else
+	{
+		return errno = EINVAL, false;
 	}
 
-	return current_mode;
+	struct dispmsg_crtc_mode mode;
+	memset(&mode, 0, sizeof(0));
+	mode.driver_index = 0;
+	mode.magic = 0;
+	mode.control = DISPMSG_CONTROL_VALID | DISPMSG_CONTROL_DEFAULT;
+	if ( good )
+		mode.control |= DISPMSG_CONTROL_GOOD_DEFAULT;
+	mode.fb_format = bpp;
+	mode.view_xres = xres;
+	mode.view_yres = yres;
+	mode.fb_location = 0;
+	mode.pitch = xres * (bpp + 7) / 8;
+	mode.surf_off_x = 0;
+	mode.surf_off_y = 0;
+	mode.start_x = 0;
+	mode.start_y = 0;
+	mode.end_x = 0;
+	mode.end_y = 0;
+	mode.desktop_height = yres;
+	*mode_out = mode;
+
+	return true;
+}
+
+bool BGADevice::GetCurrentMode(uint64_t connector,
+                               struct dispmsg_crtc_mode* mode)
+{
+	if ( connector != 0 )
+		return false;
+	*mode = current_mode;
+	return true;
 }
 
 bool BGADevice::SwitchMode(uint64_t connector, struct dispmsg_crtc_mode mode)
@@ -259,13 +323,6 @@ bool BGADevice::SwitchMode(uint64_t connector, struct dispmsg_crtc_mode mode)
 	if ( connector != 0 )
 		return errno = EINVAL, false;
 
-	size_t new_framesize = (size_t) mode.view_xres *
-	                       (size_t) mode.view_yres *
-	                       ((size_t) mode.fb_format + 7) / 8UL;
-	// TODO: Use a better error code than ENOSPC?
-	if ( fb_alloc.size < new_framesize )
-		return errno = ENOSPC, false;
-
 	if ( !SetVideoMode(mode.view_xres, mode.view_yres, mode.fb_format, false) )
 		return false;
 
@@ -274,7 +331,7 @@ bool BGADevice::SwitchMode(uint64_t connector, struct dispmsg_crtc_mode mode)
 	return true;
 }
 
-bool BGADevice::Supports(uint64_t connector, struct dispmsg_crtc_mode mode) const
+bool BGADevice::Supports(uint64_t connector, struct dispmsg_crtc_mode mode)
 {
 	if ( connector != 0 )
 		return errno = EINVAL, false;
@@ -303,10 +360,17 @@ bool BGADevice::Supports(uint64_t connector, struct dispmsg_crtc_mode mode) cons
 	     mode.fb_format != VBE_DISPI_BPP_32 )
 		return errno = ENOSYS, false;
 
-	return ((BGADevice*) this)->SupportsResolution(mode.view_xres, mode.view_yres, mode.fb_format);
+	size_t new_framesize = (size_t) mode.view_xres *
+	                       (size_t) mode.view_yres *
+	                       ((size_t) mode.fb_format + 7) / 8UL;
+	// TODO: Use a better error code than ENOSPC?
+	if ( fb_alloc.size < new_framesize )
+		return errno = ENOSPC, false;
+
+	return SupportsResolution(mode.view_xres, mode.view_yres, mode.fb_format);
 }
 
-struct dispmsg_crtc_mode* BGADevice::GetModes(uint64_t connector, size_t* retnum) const
+struct dispmsg_crtc_mode* BGADevice::GetModes(uint64_t connector, size_t* retnum)
 {
 	if ( connector != 0 )
 		return errno = EINVAL, (struct dispmsg_crtc_mode*) NULL;
@@ -322,7 +386,7 @@ struct dispmsg_crtc_mode* BGADevice::GetModes(uint64_t connector, size_t* retnum
 	return result;
 }
 
-off_t BGADevice::FrameSize() const
+off_t BGADevice::FrameSize()
 {
 	return (off_t) fb_alloc.size;
 }
@@ -351,7 +415,7 @@ ssize_t BGADevice::ReadAt(ioctx_t* ctx, off_t off, void* buf, size_t count)
 	return count;
 }
 
-bool BGADevice::DetectModes() const
+bool BGADevice::DetectModes()
 {
 	num_modes = 0;
 	unsigned bpp = VBE_DISPI_BPP_32;
@@ -401,15 +465,19 @@ bool BGADevice::DetectModes() const
 	return true;
 }
 
-TextBuffer* BGADevice::CreateTextBuffer(uint64_t connector)
+TextBuffer* BGADevice::CreateTextBuffer(uint64_t connector,
+                                        struct dispmsg_crtc_mode mode)
 {
+	if ( !Supports(connector, mode) )
+		return NULL;
+
 	if ( connector != 0 )
 		return errno = EINVAL, (TextBuffer*) NULL;
 
 	uint8_t* lfb = (uint8_t*) fb_alloc.from;
-	uint32_t lfbformat = current_mode.fb_format;
-	size_t scansize = current_mode.view_xres * current_mode.fb_format / 8UL;
-	return CreateLFBTextBuffer(lfb, lfbformat, current_mode.view_xres, current_mode.view_yres, scansize);
+	uint32_t lfbformat = mode.fb_format;
+	size_t scansize = mode.view_xres * mode.fb_format / 8UL;
+	return CreateLFBTextBuffer(lfb, lfbformat, mode.view_xres, mode.view_yres, scansize);
 }
 
 static void TryInitializeDevice(uint32_t devaddr)
@@ -498,6 +566,8 @@ static void TryInitializeDevice(uint32_t devaddr)
 		delete bga_device;
 		return;
 	}
+
+	Video::ConfigureDevice(bga_device);
 }
 
 void Init()

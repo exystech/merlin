@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,6 +30,7 @@ typedef struct multiboot_info multiboot_info_t;
 
 namespace Sortix {
 
+class TextBuffer;
 class TextBufferHandle;
 
 } // namespace Sortix
@@ -126,6 +127,9 @@ inline size_t PrintFV(const char* format, va_list list)
 
 void Init(multiboot_info_t* bootinfo);
 void Center(const char* string);
+void BeginReplace();
+void CancelReplace();
+void FinishReplace(TextBuffer* textbuf);
 
 } // namespace Log
 } // namespace Sortix

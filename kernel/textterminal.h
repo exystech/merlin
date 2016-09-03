@@ -41,6 +41,9 @@ public:
 	void GetCursor(size_t* column, size_t* row) const;
 	bool Sync();
 	bool Invalidate();
+	void BeginReplace();
+	void CancelReplace();
+	void FinishReplace(TextBuffer* textbuf);
 	bool EmergencyIsImpaired();
 	bool EmergencyRecoup();
 	void EmergencyReset();

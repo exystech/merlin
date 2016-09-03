@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,22 +29,24 @@ class VGATextBuffer : public TextBuffer
 public:
 	VGATextBuffer(uint16_t* vga, TextChar* chars, size_t width, size_t height);
 	virtual ~VGATextBuffer();
-	virtual size_t Width() const;
-	virtual size_t Height() const;
-	virtual TextChar GetChar(TextPos pos) const;
+	virtual size_t Width();
+	virtual size_t Height();
+	virtual TextChar GetChar(TextPos pos);
 	virtual void SetChar(TextPos pos, TextChar c);
 	virtual void Scroll(ssize_t off, TextChar fillwith);
 	virtual void Move(TextPos to, TextPos from, size_t numchars);
 	virtual void Fill(TextPos from, TextPos to, TextChar fillwith);
-	virtual bool GetCursorEnabled() const;
+	virtual bool GetCursorEnabled();
 	virtual void SetCursorEnabled(bool enablecursor);
-	virtual TextPos GetCursorPos() const;
+	virtual TextPos GetCursorPos();
 	virtual void SetCursorPos(TextPos cursorpos);
 	virtual void SpawnThreads();
 	virtual void Invalidate();
 	virtual bool EmergencyIsImpaired();
 	virtual bool EmergencyRecoup();
 	virtual void EmergencyReset();
+	virtual void Resume();
+	virtual void Pause();
 
 private:
 	bool UsablePosition(TextPos pos) const;

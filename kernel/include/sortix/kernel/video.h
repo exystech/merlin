@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -36,14 +36,19 @@ class VideoDevice
 {
 public:
 	virtual ~VideoDevice() { }
-	virtual struct dispmsg_crtc_mode GetCurrentMode(uint64_t connector) const = 0;
+	virtual uint64_t GetConnectorCount() = 0;
+	virtual bool GetDefaultMode(uint64_t connector, struct dispmsg_crtc_mode* mode) = 0;
+	virtual bool GetCurrentMode(uint64_t connector, struct dispmsg_crtc_mode* mode) = 0;
 	virtual bool SwitchMode(uint64_t connector, struct dispmsg_crtc_mode mode) = 0;
-	virtual bool Supports(uint64_t connector, struct dispmsg_crtc_mode mode) const = 0;
-	virtual struct dispmsg_crtc_mode* GetModes(uint64_t connector, size_t* nummodes) const = 0;
-	virtual off_t FrameSize() const = 0;
+	virtual bool Supports(uint64_t connector, struct dispmsg_crtc_mode mode) = 0;
+	virtual struct dispmsg_crtc_mode* GetModes(uint64_t connector, size_t* nummodes) = 0;
+	virtual off_t FrameSize() = 0;
 	virtual ssize_t WriteAt(ioctx_t* ctx, off_t off, const void* buf, size_t count) = 0;
 	virtual ssize_t ReadAt(ioctx_t* ctx, off_t off, void* buf, size_t count) = 0;
-	virtual TextBuffer* CreateTextBuffer(uint64_t connector) = 0;
+	virtual TextBuffer* CreateTextBuffer(uint64_t connector, struct dispmsg_crtc_mode mode) = 0;
+
+public:
+	uint64_t device_index;
 
 };
 
@@ -53,6 +58,9 @@ namespace Sortix {
 namespace Video {
 
 bool RegisterDevice(const char* name, VideoDevice* device);
+bool ConfigureDevice(VideoDevice* device);
+bool ResizeDisplay(uint64_t device, uint64_t connector, uint32_t xres,
+                   uint32_t yres, uint32_t bpp);
 
 } // namespace Video
 } // namespace Sortix
