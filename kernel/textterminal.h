@@ -37,6 +37,7 @@ public:
 	size_t Print(const char* string, size_t stringlen);
 	size_t Width() const;
 	size_t Height() const;
+	void OnResize(size_t new_cursor_x, size_t new_cursor_y);
 	void GetCursor(size_t* column, size_t* row) const;
 	bool Sync();
 	bool Invalidate();

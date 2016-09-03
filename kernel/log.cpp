@@ -46,6 +46,7 @@ TextBufferHandle* device_textbufhandle = NULL;
 size_t (*device_callback)(void*, const char*, size_t) = NULL;
 size_t (*device_width)(void*) = NULL;
 size_t (*device_height)(void*) = NULL;
+void (*device_on_resize)(void*, size_t, size_t) = NULL;
 void (*device_get_cursor)(void*, size_t*, size_t*) = NULL;
 bool (*device_sync)(void*) = NULL;
 void (*device_invalidate)(void*) = NULL;
@@ -73,6 +74,11 @@ static size_t TextTermWidth(void* user)
 static size_t TextTermHeight(void* user)
 {
 	return ((TextTerminal*) user)->Height();
+}
+
+static void TextTermOnResize(void* user, size_t cursor_x, size_t cursor_y)
+{
+	((TextTerminal*) user)->OnResize(cursor_x, cursor_y);
 }
 
 static void TextTermGetCursor(void* user, size_t* column, size_t* row)
@@ -194,10 +200,13 @@ void Init(multiboot_info_t* bootinfo)
 	Log::device_callback = PrintToTextTerminal;
 	Log::device_width = TextTermWidth;
 	Log::device_height = TextTermHeight;
+	Log::device_on_resize = TextTermOnResize;
 	Log::device_get_cursor = TextTermGetCursor;
 	Log::device_sync = TextTermSync;
 	Log::device_invalidate = TextTermInvalidate;
 	Log::device_pointer = textterm;
+	device_textbufhandle->on_resize = device_on_resize;
+	device_textbufhandle->on_resize_ctx = textterm;
 
 	// Register the emergency kernel log.
 	Log::emergency_device_is_impaired = EmergencyTextTermIsImpaired;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -123,10 +123,10 @@ LFBTextBuffer* CreateLFBTextBuffer(uint8_t* lfb, uint32_t lfbformat,
 #endif
 	ret->cursorenabled = true;
 	ret->cursorpos = TextPos(0, 0);
-	for ( size_t y = 0; y < yres; y++ )
-		memset(lfb + scansize * y, 0, ret->bytes_per_pixel * xres);
 	ret->emergency_state = false;
 	ret->invalidated = false;
+	ret->need_clear = true;
+	ret->exit_after_pause = false;
 
 	if ( !kernel_process )
 		return ret;
@@ -167,10 +167,21 @@ LFBTextBuffer::~LFBTextBuffer()
 {
 	if ( queue_thread )
 	{
-		TextBufferCmd cmd;
-		cmd.type = TEXTBUFCMD_EXIT;
-		IssueCommand(&cmd);
 		kthread_mutex_lock(&queue_lock);
+		if ( queue_is_paused )
+		{
+			queue_is_paused = false;
+			exit_after_pause = true;
+			kthread_cond_signal(&queue_resume);
+		}
+		else
+		{
+			TextBufferCmd cmd;
+			cmd.type = TEXTBUFCMD_EXIT;
+			kthread_mutex_unlock(&queue_lock);
+			IssueCommand(&cmd);
+			kthread_mutex_lock(&queue_lock);
+		}
 		while ( queue_thread )
 			kthread_cond_wait(&queue_exit, &queue_lock);
 		kthread_mutex_unlock(&queue_lock);
@@ -181,12 +192,12 @@ LFBTextBuffer::~LFBTextBuffer()
 	delete[] queue;
 }
 
-size_t LFBTextBuffer::Width() const
+size_t LFBTextBuffer::Width()
 {
 	return columns;
 }
 
-size_t LFBTextBuffer::Height() const
+size_t LFBTextBuffer::Height()
 {
 	return rows;
 }
@@ -381,16 +392,17 @@ void LFBTextBuffer::IssueCommand(TextBufferCmd* cmd)
 	queue[(queue_offset + queue_used++) % queue_length] = *cmd;
 }
 
-void LFBTextBuffer::StopRendering()
+bool LFBTextBuffer::StopRendering()
 {
 	if ( !queue_thread || emergency_state )
-		return;
+		return false;
 	TextBufferCmd cmd;
 	cmd.type = TEXTBUFCMD_PAUSE;
 	IssueCommand(&cmd);
 	ScopedLock lock(&queue_lock);
 	while ( !queue_is_paused )
 		kthread_cond_wait(&queue_paused, &queue_lock);
+	return true;
 }
 
 void LFBTextBuffer::ResumeRendering()
@@ -398,17 +410,20 @@ void LFBTextBuffer::ResumeRendering()
 	if ( !queue_thread || emergency_state )
 		return;
 	ScopedLock lock(&queue_lock);
+	if ( !queue_is_paused )
+		return;
 	queue_is_paused = false;
 	kthread_cond_signal(&queue_resume);
 }
 
-TextChar LFBTextBuffer::GetChar(TextPos pos) const
+TextChar LFBTextBuffer::GetChar(TextPos pos)
 {
 	if ( UsablePosition(pos) )
 	{
-		((LFBTextBuffer*) this)->StopRendering();
+		bool was_rendering = StopRendering();
 		TextChar ret = chars[pos.y * columns + pos.x];
-		((LFBTextBuffer*) this)->ResumeRendering();
+		if ( was_rendering )
+			ResumeRendering();
 		return ret;
 	}
 	return {0, 0, 0};
@@ -426,11 +441,12 @@ void LFBTextBuffer::SetChar(TextPos pos, TextChar c)
 	IssueCommand(&cmd);
 }
 
-bool LFBTextBuffer::GetCursorEnabled() const
+bool LFBTextBuffer::GetCursorEnabled()
 {
-	((LFBTextBuffer*) this)->StopRendering();
+	bool was_rendering = StopRendering();
 	bool ret = cursorenabled;
-	((LFBTextBuffer*) this)->ResumeRendering();
+	if ( was_rendering )
+		ResumeRendering();
 	return ret;
 }
 
@@ -442,11 +458,12 @@ void LFBTextBuffer::SetCursorEnabled(bool enablecursor)
 	IssueCommand(&cmd);
 }
 
-TextPos LFBTextBuffer::GetCursorPos() const
+TextPos LFBTextBuffer::GetCursorPos()
 {
-	((LFBTextBuffer*) this)->StopRendering();
+	bool was_rendering = StopRendering();
 	TextPos ret = cursorpos;
-	((LFBTextBuffer*) this)->ResumeRendering();
+	if ( was_rendering )
+		ResumeRendering();
 	return ret;
 }
 
@@ -693,6 +710,13 @@ void LFBTextBuffer::RenderThread()
 				while ( queue_is_paused )
 					kthread_cond_wait(&queue_resume, &queue_lock);
 				pause_requested = false;
+				if ( exit_after_pause )
+				{
+					queue_thread = false;
+					kthread_cond_signal(&queue_exit);
+					kthread_mutex_unlock(&queue_lock);
+					return;
+				}
 			}
 		}
 
@@ -777,6 +801,22 @@ void LFBTextBuffer::EmergencyReset()
 
 	Fill(TextPos{0, 0}, TextPos{columns-1, rows-1}, TextChar{0, 0, 0});
 	SetCursorPos(TextPos{0, 0});
+}
+
+void LFBTextBuffer::Resume()
+{
+	if ( need_clear )
+	{
+		for ( size_t y = 0; y < pixelsy; y++ )
+			memset(lfb + scansize * y, 0, bytes_per_pixel * pixelsx);
+		need_clear = false;
+	}
+	ResumeRendering();
+}
+
+void LFBTextBuffer::Pause()
+{
+	StopRendering();
 }
 
 } // namespace Sortix

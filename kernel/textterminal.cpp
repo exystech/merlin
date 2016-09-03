@@ -91,6 +91,13 @@ size_t TextTerminal::Height() const
 	return height;
 }
 
+void TextTerminal::OnResize(size_t new_cursor_x, size_t new_cursor_y)
+{
+	ScopedLock lock(&termlock);
+	column = new_cursor_x;
+	line = new_cursor_y;
+}
+
 void TextTerminal::GetCursor(size_t* column, size_t* row) const
 {
 	ScopedLock lock(&termlock);

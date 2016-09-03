@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -76,22 +76,24 @@ class TextBuffer
 {
 public:
 	virtual ~TextBuffer() { }
-	virtual size_t Width() const = 0;
-	virtual size_t Height() const = 0;
-	virtual TextChar GetChar(TextPos pos) const = 0;
+	virtual size_t Width() = 0;
+	virtual size_t Height() = 0;
+	virtual TextChar GetChar(TextPos pos) = 0;
 	virtual void SetChar(TextPos pos, TextChar c) = 0;
 	virtual void Scroll(ssize_t off, TextChar fillwith) = 0;
 	virtual void Move(TextPos to, TextPos from, size_t numchars) = 0;
 	virtual void Fill(TextPos from, TextPos to, TextChar fillwith) = 0;
-	virtual bool GetCursorEnabled() const = 0;
+	virtual bool GetCursorEnabled() = 0;
 	virtual void SetCursorEnabled(bool enablecursor) = 0;
-	virtual TextPos GetCursorPos() const = 0;
+	virtual TextPos GetCursorPos() = 0;
 	virtual void SetCursorPos(TextPos cursorpos) = 0;
 	virtual void SpawnThreads() = 0;
 	virtual void Invalidate() = 0;
 	virtual bool EmergencyIsImpaired() = 0;
 	virtual bool EmergencyRecoup() = 0;
 	virtual void EmergencyReset() = 0;
+	virtual void Resume() = 0;
+	virtual void Pause() = 0;
 
 };
 
@@ -107,12 +109,18 @@ public:
 	~TextBufferHandle();
 	TextBuffer* Acquire();
 	void Release(TextBuffer* textbuf);
-	void Replace(TextBuffer* newtextbuf);
+	void BeginReplace();
+	void CancelReplace();
+	void FinishReplace(TextBuffer* newtextbuf);
 	bool EmergencyIsImpaired();
 	bool EmergencyRecoup();
 	void EmergencyReset();
 	TextBuffer* EmergencyAcquire();
 	void EmergencyRelease(TextBuffer* textbuf);
+
+public:
+	void (*on_resize)(void*, size_t, size_t);
+	void* on_resize_ctx;
 
 private:
 	kthread_mutex_t mutex;

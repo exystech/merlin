@@ -47,6 +47,7 @@ extern TextBufferHandle* device_textbufhandle;
 extern size_t (*device_callback)(void*, const char*, size_t);
 extern size_t (*device_width)(void*);
 extern size_t (*device_height)(void*);
+extern void (*device_on_resize)(void*, size_t, size_t);
 extern void (*device_get_cursor)(void*, size_t*, size_t*);
 extern bool (*device_sync)(void*);
 extern void (*device_invalidate)(void*);
@@ -74,6 +75,11 @@ inline size_t Width()
 inline size_t Height()
 {
 	return device_height(device_pointer);
+}
+
+inline void OnResize(size_t new_cursor_x, size_t new_cursor_y)
+{
+	return device_on_resize(device_pointer, new_cursor_x, new_cursor_y);
 }
 
 inline void GetCursor(size_t* col, size_t* row)

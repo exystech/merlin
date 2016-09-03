@@ -530,10 +530,27 @@ int main(void)
 	dgdn.name.str = NULL;
 	if ( dispmsg_issue(&dgdn, sizeof(dgdn)) == 0 || errno != ENODEV )
 	{
+		struct dispmsg_get_crtc_mode get_mode;
+		memset(&get_mode, 0, sizeof(get_mode));
+		get_mode.msgid = DISPMSG_GET_CRTC_MODE;
+		get_mode.device = 0;
+		get_mode.connector = 0;
+		bool good = false;
+		if ( dispmsg_issue(&get_mode, sizeof(get_mode)) == 0 )
+		{
+			good = (get_mode.mode.control & DISPMSG_CONTROL_VALID) &&
+			       (get_mode.mode.control & DISPMSG_CONTROL_GOOD_DEFAULT);
+			if ( get_mode.mode.control & DISPMSG_CONTROL_VM_AUTO_SCALE )
+				text("The display resolution will automatically change to "
+				     "match the size of the virtual machine window. There is "
+				     "no need to set a default display resolution, unless you "
+				     "are not satisfied with the detected resolution.\n\n");
+		}
+		const char* def = good ? "no" : "yes";
 		while ( true )
 		{
 			prompt(input, sizeof(input),
-			       "Select a default display resolution? (yes/no)", "yes");
+			       "Select a default display resolution? (yes/no)", def);
 			if ( strcasecmp(input, "no") && strcasecmp(input, "yes") )
 				continue;
 			bool was_no = strcasecmp(input, "no") == 0;
@@ -542,10 +559,6 @@ int main(void)
 				break;
 			if ( execute((const char*[]) { "chvideomode", NULL }, "f") != 0 )
 				continue;
-			struct dispmsg_get_crtc_mode get_mode;
-			get_mode.msgid = DISPMSG_GET_CRTC_MODE;
-			get_mode.device = 0;
-			get_mode.connector = 0;
 			if ( dispmsg_issue(&get_mode, sizeof(get_mode)) < 0 )
 				break;
 			if ( !(get_mode.mode.control & DISPMSG_CONTROL_VALID) )

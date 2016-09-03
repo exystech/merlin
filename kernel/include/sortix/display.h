@@ -33,6 +33,9 @@ static const uint32_t DISPMSG_CONTROL_VALID = 1 << 0;
 static const uint32_t DISPMSG_CONTROL_VGA = 1 << 1;
 static const uint32_t DISPMSG_CONTROL_OTHER_RESOLUTIONS = 1 << 2;
 static const uint32_t DISPMSG_CONTROL_FALLBACK = 1 << 3;
+static const uint32_t DISPMSG_CONTROL_DEFAULT = 1 << 4;
+static const uint32_t DISPMSG_CONTROL_GOOD_DEFAULT = 1 << 5;
+static const uint32_t DISPMSG_CONTROL_VM_AUTO_SCALE = 1 << 6;
 
 struct dispmsg_string
 {
