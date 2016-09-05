@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,6 +27,9 @@ void Init();
 void Read(uint8_t* buffer, size_t size);
 void Write(const void* buffer, size_t size);
 void WriteChar(char c);
+void WriteString(const char* str);
+__attribute__((format(printf, 1, 2)))
+void WriteF(const char* format, ...);
 int TryPopChar();
 
 } // namespace UART

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -146,6 +146,25 @@ void WriteChar(char c)
 	// Wait for transmitter to become empty and restore the IER.
 	WaitForEmptyBuffers(PORT);
 	outport8(PORT + IER, ier);
+}
+
+void WriteString(const char* str)
+{
+	Write(str, strlen(str));
+}
+
+static size_t WriteCallback(void*, const char* chars, size_t size)
+{
+	Write(chars, size);
+	return size;
+}
+
+void WriteF(const char* format, ...)
+{
+	va_list list;
+	va_start(list, format);
+	vcbprintf(NULL, WriteCallback, format, list);
+	va_end(list);
 }
 
 int TryPopChar()
