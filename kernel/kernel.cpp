@@ -94,6 +94,7 @@
 #include "x86-family/float.h"
 #include "x86-family/gdt.h"
 #include "x86-family/ps2.h"
+#include "x86-family/vbox.h"
 #endif
 
 // Keep the stack size aligned with $CPU/boot.s
@@ -565,6 +566,11 @@ static void BootThread(void* /*user*/)
 
 	// Search for PCI devices and load their drivers.
 	PCI::Init();
+
+#if defined(__i386__) || defined(__x86_64__)
+	// Initialize the VirtualBox Guest Additions.
+	VBox::Init();
+#endif
 
 	// Initialize AHCI devices.
 	AHCI::Init("/dev", slashdev);
