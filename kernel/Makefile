@@ -59,6 +59,7 @@ ifdef X86FAMILY
              x86-family/pat.o \
              x86-family/float.o \
              x86-family/ps2.o \
+             x86-family/vbox.o \
              x86-family/x86-family.o
 endif
 

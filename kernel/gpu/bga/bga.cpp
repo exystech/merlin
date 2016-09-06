@@ -40,6 +40,7 @@
 
 #if defined(__i386__) || defined(__x86_64__)
 #include "x86-family/memorymanagement.h"
+#include "x86-family/vbox.h"
 #endif
 
 #include "lfbtextbuffer.h"
@@ -116,6 +117,7 @@ public:
 
 public:
 	bool Initialize();
+	void HandleGuestAdditions();
 
 private:
 	bool DetectModes();
@@ -126,6 +128,9 @@ private:
 	bool SupportsResolution(uint16_t width, uint16_t height, uint16_t depth);
 
 private:
+#if defined(__i386__) || defined(__x86_64__)
+	VBox::GuestAdditions* guest_additions;
+#endif
 	size_t num_modes;
 	struct dispmsg_crtc_mode* modes;
 	struct dispmsg_crtc_mode current_mode;
@@ -142,6 +147,9 @@ private:
 BGADevice::BGADevice(uint32_t devaddr, addralloc_t fb_alloc, addralloc_t mmio_alloc) :
 	fb_alloc(fb_alloc), mmio_alloc(mmio_alloc), devaddr(devaddr)
 {
+#if defined(__i386__) || defined(__x86_64__)
+	guest_additions = NULL;
+#endif
 	num_modes = 0;
 	modes = NULL;
 	memset(&current_mode, 0, sizeof(current_mode));
@@ -153,6 +161,10 @@ BGADevice::BGADevice(uint32_t devaddr, addralloc_t fb_alloc, addralloc_t mmio_al
 
 BGADevice::~BGADevice()
 {
+#if defined(__i386__) || defined(__x86_64__)
+	if ( guest_additions )
+		guest_additions->UnregisterVideoDevice(device_index);
+#endif
 	UnmapPCIBar(&fb_alloc);
 	UnmapPCIBar(&mmio_alloc);
 	delete[] modes;
@@ -214,6 +226,20 @@ bool BGADevice::Initialize()
 	return true;
 }
 
+void BGADevice::HandleGuestAdditions()
+{
+#if defined(__i386__) || defined(__x86_64__)
+	guest_additions = VBox::GetGuestAdditions();
+	if ( !guest_additions )
+		return;
+	if ( !guest_additions->RegisterVideoDevice(device_index) )
+	{
+		guest_additions = NULL;
+		return;
+	}
+#endif
+}
+
 bool BGADevice::SetVideoMode(uint16_t width, uint16_t height, uint16_t depth, bool keep)
 {
 	bool uselinear = true;
@@ -259,6 +285,14 @@ bool BGADevice::GetDefaultMode(uint64_t connector,
 	uint32_t xres;
 	uint32_t yres;
 	uint32_t bpp;
+#if defined(__i386__) || defined(__x86_64__)
+	if ( guest_additions &&
+	     guest_additions->GetBestVideoMode(connector, &xres, &yres, &bpp) )
+	{
+		good = true;
+	}
+	else
+#endif
 	if ( connector == 0 && Log::fallback_framebuffer &&
 	     SupportsResolution(Log::fallback_framebuffer_width,
 	                        Log::fallback_framebuffer_height,
@@ -312,6 +346,10 @@ bool BGADevice::GetCurrentMode(uint64_t connector,
 	if ( connector != 0 )
 		return false;
 	*mode = current_mode;
+#if defined(__i386__) || defined(__x86_64__)
+	if ( guest_additions )
+		mode->control |= DISPMSG_CONTROL_VM_AUTO_SCALE;
+#endif
 	return true;
 }
 
@@ -460,6 +498,11 @@ bool BGADevice::DetectModes()
 	any_mode.view_yres = 0;
 	any_mode.fb_format = 0;
 	any_mode.control = DISPMSG_CONTROL_OTHER_RESOLUTIONS;
+#if defined(__i386__) || defined(__x86_64__)
+	if ( guest_additions )
+		any_mode.control |= DISPMSG_CONTROL_VM_AUTO_SCALE;
+#endif
+
 	modes[num_modes-1] = any_mode;
 
 	return true;
@@ -566,6 +609,8 @@ static void TryInitializeDevice(uint32_t devaddr)
 		delete bga_device;
 		return;
 	}
+
+	bga_device->HandleGuestAdditions();
 
 	Video::ConfigureDevice(bga_device);
 }
