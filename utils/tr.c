@@ -562,9 +562,6 @@ int main(int argc, char* argv[])
 
 	compact_arguments(&argc, &argv);
 
-	(void) flag_delete;
-	(void) flag_squeeze;
-
 	if ( argc <= 1 )
 		error(1, 0, "missing operand");
 	const char* string_1 = argv[1];
