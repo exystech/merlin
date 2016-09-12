@@ -98,7 +98,7 @@ typedef __off_t fpos_t;
 #endif
 
 /* Size of <stdio.h> buffers. */
-#define BUFSIZ 8192UL
+#define BUFSIZ 8192
 
 /* Constants used by `fparsemode'. */
 #if __USE_SORTIX
