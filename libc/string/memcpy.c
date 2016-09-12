@@ -45,8 +45,10 @@ void* memcpy(void* restrict dst_ptr,
 	if ( dst_ptr == src_ptr || !size )
 		return dst_ptr;
 
-	if ( (dst_ptr < src_ptr && src_ptr < (const char*) dst_ptr + size) ||
-	     (src_ptr < dst_ptr && dst_ptr < (const char*) src_ptr + size) )
+	void* dst_end = (char*) dst_ptr + size;
+	const void* src_end = (const const char*) src_ptr + size;
+	if ( (dst_ptr < src_ptr && src_ptr < dst_end) ||
+	     (src_ptr < dst_ptr && dst_ptr < src_end) )
 	{
 #if defined(__is_sortix_libk)
 		libk_overlapping_memcpy();
