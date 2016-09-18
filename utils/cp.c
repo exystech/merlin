@@ -21,8 +21,8 @@
 #include <sys/types.h>
 
 #include <dirent.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -30,39 +30,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <timespec.h>
 #include <unistd.h>
-
-const char* BaseName(const char* path)
-{
-	size_t len = strlen(path);
-	while ( len-- )
-		if ( path[len] == '/' )
-			return path + len + 1;
-	return path;
-}
-
-char* AddElemToPath(const char* path, const char* elem)
-{
-	size_t pathlen = strlen(path);
-	size_t elemlen = strlen(elem);
-	if ( pathlen && path[pathlen-1] == '/' )
-	{
-		char* ret = (char*) malloc(sizeof(char) * (pathlen + elemlen + 1));
-		stpcpy(stpcpy(ret, path), elem);
-		return ret;
-	}
-	char* ret = (char*) malloc(sizeof(char) * (pathlen + 1 + elemlen + 1));
-	stpcpy(stpcpy(stpcpy(ret, path), "/"), elem);
-	return ret;
-}
-
-static const int FLAG_RECURSIVE = 1 << 0;
-static const int FLAG_VERBOSE = 1 << 1;
-static const int FLAG_TARGET_DIR = 1 << 2;
-static const int FLAG_NO_TARGET_DIR = 1 << 3;
-static const int FLAG_UPDATE = 1 << 4;
-static const int FLAG_FORCE = 1 << 5;
 
 enum symbolic_dereference
 {
@@ -72,78 +40,84 @@ enum symbolic_dereference
 	SYMBOLIC_DEREFERENCE_DEFAULT,
 };
 
-bool CopyFileContents(int srcfd, const char* srcpath,
-                      int dstfd, const char* dstpath, int flags);
-bool CopyDirectoryContents(int srcfd, const char* srcpath,
-                           int dstfd, const char* dstpath, int flags,
-                           enum symbolic_dereference symbolic_dereference);
-bool CopyToDest(int srcdirfd, const char* srcrel, const char* srcpath,
-                int dstdirfd, const char* dstrel, const char* dstpath,
-                int flags, enum symbolic_dereference symbolic_dereference);
-bool CopyIntoDirectory(int srcdirfd, const char* srcrel, const char* srcpath,
-                       int dstdirfd, const char* dstrel, const char* dstpath,
-                       int flags, enum symbolic_dereference symbolic_dereference);
-bool CopyAmbigious(int srcdirfd, const char* srcrel, const char* srcpath,
-                   int dstdirfd, const char* dstrel, const char* dstpath,
-                   int flags, enum symbolic_dereference symbolic_dereference);
+static const int FLAG_RECURSIVE = 1 << 0;
+static const int FLAG_VERBOSE = 1 << 1;
+static const int FLAG_TARGET_DIR = 1 << 2;
+static const int FLAG_NO_TARGET_DIR = 1 << 3;
+static const int FLAG_UPDATE = 1 << 4;
+static const int FLAG_FORCE = 1 << 5;
 
-bool CopyFileContents(int srcfd, const char* srcpath,
-                      int dstfd, const char* dstpath, int flags)
+static char* join_paths(const char* a, const char* b)
+{
+	size_t a_len = strlen(a);
+	bool has_slash = (a_len && a[a_len-1] == '/') || b[0] == '/';
+	char* result;
+	if ( (has_slash && asprintf(&result, "%s%s", a, b) < 0) ||
+	     (!has_slash && asprintf(&result, "%s/%s", a, b) < 0) )
+		return NULL;
+	return result;
+}
+
+static bool cp_contents(int srcfd, const char* srcpath,
+                        int dstfd, const char* dstpath, int flags)
 {
 	struct stat srcst, dstst;
 	if ( fstat(srcfd, &srcst) )
 	{
-		error(0, errno, "stat: %s", srcpath);
+		warn("stat: %s", srcpath);
 		return false;
 	}
 	if ( fstat(dstfd, &dstst) )
 	{
-		error(0, errno, "stat: %s", dstpath);
+		warn("stat: %s", dstpath);
 		return false;
 	}
 	if ( srcst.st_dev == dstst.st_dev && srcst.st_ino == dstst.st_ino )
 	{
-		error(0, 0, "`%s' and `%s' are the same file", srcpath, dstpath);
+		warnx("`%s' and `%s' are the same file", srcpath, dstpath);
 		return false;
 	}
 	if ( S_ISDIR(dstst.st_mode) )
 	{
-		error(0, 0, "cannot overwrite directory `%s' with non-directory",
-	                dstpath);
+		warnx("cannot overwrite directory `%s' with non-directory", dstpath);
 		return false;
 	}
 	if ( lseek(srcfd, 0, SEEK_SET) )
 	{
-		error(0, errno, "can't seek: %s", srcpath);
+		warn("can't seek: %s", srcpath);
 		return false;
 	}
 	if ( lseek(dstfd, 0, SEEK_SET) )
 	{
-		error(0, errno, "can't seek: %s", dstpath);
+		warn("can't seek: %s", dstpath);
 		return false;
 	}
 	if ( flags & FLAG_VERBOSE )
 		printf("`%s' -> `%s'\n", srcpath, dstpath);
-	ftruncate(dstfd, srcst.st_size);
-	size_t BUFFER_SIZE = 16 * 1024;
-	uint8_t buffer[BUFFER_SIZE];
+	if ( ftruncate(dstfd, srcst.st_size) < 0 )
+	{
+		warn("truncate: %s", dstpath);
+		return false;
+	}
+	static unsigned char buffer[64 * 1024];
 	while ( true )
 	{
-		ssize_t numbytes = read(srcfd, buffer, BUFFER_SIZE);
+		ssize_t numbytes = read(srcfd, buffer, sizeof(buffer));
 		if ( numbytes == 0 )
 			break;
 		if ( numbytes < 0 )
 		{
-			error(0, errno, "read: %s", srcpath);
+			warn("read: %s", srcpath);
 			return false;
 		}
 		size_t sofar = 0;
 		while ( sofar < (size_t) numbytes )
 		{
-			ssize_t amount = write(dstfd, buffer + sofar, numbytes - sofar);
+			size_t left = numbytes - sofar;
+			ssize_t amount = write(dstfd, buffer + sofar, left);
 			if ( amount <= 0 )
 			{
-				error(0, errno, "write: %s", dstpath);
+				warn("write: %s", dstpath);
 				return false;
 			}
 			sofar += amount;
@@ -152,208 +126,186 @@ bool CopyFileContents(int srcfd, const char* srcpath,
 	return true;
 }
 
-bool CopyDirectoryContentsInner(DIR* srcdir, const char* srcpath,
-                                DIR* dstdir, const char* dstpath, int flags,
-                                enum symbolic_dereference symbolic_dereference)
-{
-	if ( flags & FLAG_VERBOSE )
-		printf("`%s' -> `%s'\n", srcpath, dstpath);
-	bool ret = true;
-	struct dirent* entry;
-	while ( (entry = readdir(srcdir)) )
-	{
-		const char* name = entry->d_name;
-		if ( !strcmp(name, ".") || !strcmp(name, "..") )
-			continue;
-		char* srcpath_new = AddElemToPath(srcpath, name);
-		char* dstpath_new = AddElemToPath(dstpath, name);
-		bool ok = CopyToDest(dirfd(srcdir), name, srcpath_new,
-		                     dirfd(dstdir), name, dstpath_new, flags,
-                             symbolic_dereference);
-		free(srcpath_new);
-		free(dstpath_new);
-		if ( !ok )
-			ret = false;
-	}
-	return ret;
-}
-
-bool CopyDirectoryContentsOuter(int srcfd, const char* srcpath,
-                                int dstfd, const char* dstpath, int flags,
-                                enum symbolic_dereference symbolic_dereference)
-{
-	struct stat srcst, dstst;
-	if ( fstat(srcfd, &srcst) < 0 )
-	{
-		error(0, errno, "stat: %s", srcpath);
-		return false;
-	}
-	if ( fstat(dstfd, &dstst) < 0 )
-	{
-		error(0, errno, "stat: %s", dstpath);
-		return false;
-	}
-	if ( srcst.st_dev == dstst.st_dev && srcst.st_ino == dstst.st_ino )
-	{
-		error(0, 0, "error: `%s' and `%s' are the same file", srcpath, dstpath);
-		return false;
-	}
-	DIR* srcdir = fdopendir(srcfd);
-	if ( !srcdir )
-		return error(0, errno, "fdopendir()"), false;
-	DIR* dstdir = fdopendir(dstfd);
-	if ( !dstdir )
-		return error(0, errno, "fdopendir()"), closedir(srcdir), false;
-	bool ret = CopyDirectoryContentsInner(srcdir, srcpath, dstdir, dstpath,
-	                                      flags, symbolic_dereference);
-	closedir(dstdir);
-	closedir(srcdir);
-	return ret;
-}
-
-bool CopyDirectoryContents(int srcfd, const char* srcpath,
-                           int dstfd, const char* dstpath, int flags,
-                           enum symbolic_dereference symbolic_dereference)
-{
-	int srcfd_copy = dup(srcfd);
-	if ( srcfd_copy < 0 )
-		return error(0, errno, "dup"), false;
-	int dstfd_copy = dup(dstfd);
-	if ( dstfd_copy < 0 )
-		return error(0, errno, "dup"), close(srcfd_copy), false;
-	bool ret = CopyDirectoryContentsOuter(srcfd_copy, srcpath,
-	                                      dstfd_copy, dstpath, flags,
-	                                      symbolic_dereference);
-	close(dstfd_copy);
-	close(srcfd_copy);
-	return ret;
-}
-
-bool CopyToDest(int srcdirfd, const char* srcrel, const char* srcpath,
-                int dstdirfd, const char* dstrel, const char* dstpath,
-                int flags, enum symbolic_dereference symbolic_dereference)
+static bool cp(int srcdirfd, const char* srcrel, const char* srcpath,
+               int dstdirfd, const char* dstrel, const char* dstpath,
+               int flags, enum symbolic_dereference symbolic_dereference)
 {
 	struct stat srcst;
-	bool ret = false;
-	int srcfd_flags = O_RDONLY;
+	int deref_flags = O_RDONLY;
 	if ( symbolic_dereference == SYMBOLIC_DEREFERENCE_NONE )
-		srcfd_flags |= O_SYMLINK_NOFOLLOW;
-	int srcfd = openat(srcdirfd, srcrel, O_RDONLY | srcfd_flags);
+		deref_flags |= O_NOFOLLOW;
+	int srcfd = openat(srcdirfd, srcrel, O_RDONLY | deref_flags);
+	if ( srcfd < 0 &&
+	     symbolic_dereference == SYMBOLIC_DEREFERENCE_NONE &&
+	     errno == ELOOP )
+	{
+		// TODO: How to handle the update flag in this case?
+		struct stat srcst;
+		if ( fstatat(srcdirfd, srcrel, &srcst, AT_SYMLINK_NOFOLLOW) < 0 )
+		{
+			warn("%s", srcpath);
+			return false;
+		}
+		if ( (uintmax_t) SIZE_MAX <= (uintmax_t) srcst.st_size )
+		{
+			errno = EOVERFLOW;
+			warn("%s", srcpath);
+			return false;
+		}
+		size_t size = (size_t) srcst.st_size + 1;
+		char* content = (char*) malloc(size);
+		if ( !content )
+		{
+			warn("malloc: %s", srcpath);
+			return false;
+		}
+		ssize_t amount = readlinkat(srcdirfd, srcrel, content, size);
+		if ( amount < 0 )
+		{
+			warn("readlink: %s", srcpath);
+			free(content);
+			return false;
+		}
+		if ( size <= (size_t) amount )
+		{
+			errno = EOVERFLOW;
+			warn("readlink: %s", srcpath);
+			free(content);
+			return false;
+		}
+		content[amount] = '\0';
+		int ret = symlinkat(content, dstdirfd, dstrel);
+		if ( ret < 0 && errno == EEXIST )
+		{
+			if ( unlinkat(dstdirfd, dstrel, 0) == 0 )
+			{
+				if ( flags & FLAG_VERBOSE )
+					printf("removed `%s'\n", dstpath);
+				ret = symlinkat(content, dstdirfd, dstrel);
+			}
+			else if ( errno == EISDIR )
+			{
+				warnx("cannot overwrite directory `%s' with non-directory",
+	                  dstpath);
+				free(content);
+				return false;
+			}
+			else
+			{
+				warn("unlink: %s", dstpath);
+				free(content);
+				return false;
+			}
+		}
+		if ( ret < 0 )
+		{
+			warn("symlink: %s", dstpath);
+			free(content);
+			return false;
+		}
+		free(content);
+		return true;
+	}
 	if ( srcfd < 0 )
 	{
-		error(0, errno, "%s", srcpath);
+		warn("%s", srcpath);
 		return false;
 	}
 	if ( fstat(srcfd, &srcst) )
 	{
-		error(0, errno, "stat: %s", srcpath);
+		warn("stat: %s", srcpath);
 		return close(srcfd), false;
 	}
 	if ( symbolic_dereference == SYMBOLIC_DEREFERENCE_ARGUMENTS )
 		symbolic_dereference = SYMBOLIC_DEREFERENCE_NONE;
-	// TODO: I'm really not satisfied with the atomicity properties in this case.
-	if ( S_ISLNK(srcst.st_mode) )
-	{
-		// TODO: How to handle the update flag in this case?
-		struct stat dstst;
-		int dstst_ret = fstatat(dstdirfd, dstrel, &dstst, AT_SYMLINK_NOFOLLOW);
-		if ( dstst_ret < 0 && errno != ENOENT )
-		{
-			error(0, errno, "%s", dstpath);
-			return close(srcfd), false;
-		}
-		bool already_is_symlink = false;
-		if ( dstst_ret == 0 )
-		{
-			if ( S_ISLNK(dstst.st_mode) )
-			{
-				already_is_symlink = true;
-			}
-			else if ( S_ISDIR(dstst.st_mode) )
-			{
-				error(0, 0, "cannot overwrite directory `%s' with non-directory",
-	                  dstpath);
-				return close(srcfd), false;
-			}
-			else
-			{
-				if ( unlinkat(dstdirfd, dstrel, 0) == 0 )
-				{
-					if ( flags & FLAG_VERBOSE )
-						printf("removed `%s'\n", dstpath);
-				}
-				else if ( errno != ENOENT )
-				{
-					error(0, errno, "unlink: %s", dstpath);
-					return close(srcfd), false;
-				}
-			}
-		}
-		if ( !already_is_symlink )
-		{
-			if ( symlinkat("", dstdirfd, dstrel) < 0 )
-			{
-				error(0, errno, "creating symlink: %s", dstpath);
-				return close(srcfd), false;
-			}
-		}
-		int dstfd = openat(dstdirfd, dstrel, O_WRONLY | O_SYMLINK_NOFOLLOW);
-		if ( dstfd < 0 )
-		{
-			error(0, errno, "creating and opening symlink: %s", dstpath);
-			return close(srcfd), false;
-		}
-		if ( fstat(dstfd, &dstst) < 0 )
-		{
-			error(0, errno, "stat of symlink: %s", dstpath);
-			return close(dstfd), close(srcfd), false;
-		}
-		if ( !S_ISLNK(dstst.st_mode) )
-		{
-			error(0, errno, "unexpectedly not a symlink: %s", dstpath);
-			return close(dstfd), close(srcfd), false;
-		}
-		ret = CopyFileContents(srcfd, srcpath, dstfd, dstpath, flags);
-		close(dstfd);
-	}
-	else if ( S_ISDIR(srcst.st_mode) )
+	if ( S_ISDIR(srcst.st_mode) )
 	{
 		if ( !(flags & FLAG_RECURSIVE) )
 		{
-			error(0, 0, "omitting directory `%s'", srcpath);
-				return close(srcfd), false;
+			warnx("omitting directory `%s'", srcpath);
+			return close(srcfd), false;
 		}
 		int dstfd = openat(dstdirfd, dstrel, O_RDONLY | O_DIRECTORY);
 		if ( dstfd < 0 )
 		{
 			if ( errno != ENOENT )
 			{
-				error(0, errno, "%s", dstpath);
+				warn("%s", dstpath);
 				return close(srcfd), false;
 			}
 			if ( mkdirat(dstdirfd, dstrel, srcst.st_mode & 03777) )
 			{
-				error(0, errno, "cannot create directory `%s'", dstpath);
+				warn("cannot create directory `%s'", dstpath);
 				return close(srcfd), false;
 			}
-			if ( (dstfd = openat(dstdirfd, dstrel, O_RDONLY | O_DIRECTORY)) < 0 )
+			int dstfdflags = O_RDONLY | O_DIRECTORY;
+			if ( (dstfd = openat(dstdirfd, dstrel, dstfdflags)) < 0 )
 			{
-				error(0, errno, "%s", dstpath);
+				warn("%s", dstpath);
 				return close(srcfd), false;
 			}
 		}
-		ret = CopyDirectoryContents(srcfd, srcpath, dstfd, dstpath, flags,
-		                            symbolic_dereference);
+		struct stat srcst, dstst;
+		if ( fstat(srcfd, &srcst) < 0 )
+		{
+			warn("stat: %s", srcpath);
+			return close(dstfd), close(srcfd), false;
+		}
+		if ( fstat(dstfd, &dstst) < 0 )
+		{
+			warn("stat: %s", dstpath);
+			return close(dstfd), close(srcfd), false;
+		}
+		if ( srcst.st_dev == dstst.st_dev && srcst.st_ino == dstst.st_ino )
+		{
+			warnx("error: `%s' and `%s' are the same file", srcpath, dstpath);
+			return close(dstfd), close(srcfd), false;
+		}
+		DIR* srcdir = fdopendir(srcfd);
+		if ( !srcdir )
+			return warn("fdopendir: %s", srcpath), false;
+		if ( flags & FLAG_VERBOSE )
+			printf("`%s' -> `%s'\n", srcpath, dstpath);
+		bool ret = true;
+		struct dirent* entry;
+		while ( (errno = 0, entry = readdir(srcdir)) )
+		{
+			const char* name = entry->d_name;
+			if ( !strcmp(name, ".") || !strcmp(name, "..") )
+				continue;
+			char* srcpath_new = join_paths(srcpath, name);
+			if ( !srcpath_new )
+				err(1, "malloc");
+			char* dstpath_new = join_paths(dstpath, name);
+			if ( !dstpath_new )
+				err(1, "malloc");
+			bool ok = cp(dirfd(srcdir), name, srcpath_new,
+			             dstfd, name, dstpath_new,
+			             flags, symbolic_dereference);
+			free(srcpath_new);
+			free(dstpath_new);
+			ret = ret && ok;
+		}
+		if ( errno )
+		{
+			warn("readdir: %s", srcpath);
+			ret = false;
+		}
 		close(dstfd);
+		closedir(srcdir);
+		return ret;
 	}
 	else
 	{
 		if ( flags & FLAG_UPDATE )
 		{
 			struct stat dstst;
-			if ( fstatat(dstdirfd, dstrel, &dstst, 0) == 0 && S_ISREG(dstst.st_mode) )
+			if ( fstatat(dstdirfd, dstrel, &dstst, 0) == 0 &&
+			     S_ISREG(dstst.st_mode) )
 			{
-				if ( timespec_le(srcst.st_mtim, dstst.st_mtim) )
+				if ( srcst.st_mtim.tv_sec < dstst.st_mtim.tv_sec ||
+				     (srcst.st_mtim.tv_sec == dstst.st_mtim.tv_sec &&
+				      srcst.st_mtim.tv_nsec <= dstst.st_mtim.tv_nsec) )
 					return close(srcfd), true;
 			}
 		}
@@ -362,69 +314,76 @@ bool CopyToDest(int srcdirfd, const char* srcrel, const char* srcpath,
 		mode_t omode = srcst.st_mode & 03777;
 		int dstfd = openat(dstdirfd, dstrel, oflags, omode);
 		if ( dstfd < 0 &&
-		     (flags & FLAG_FORCE) &&
+		     flags & FLAG_FORCE &&
 		     faccessat(dstdirfd, dstrel, F_OK, AT_SYMLINK_NOFOLLOW) == 0 )
 		{
 			if ( unlinkat(dstdirfd, dstrel, 0) < 0 )
 			{
-				error(0, errno, "%s", dstpath);
+				warn("%s", dstpath);
 				return close(srcfd), false;
 			}
 			dstfd = openat(dstdirfd, dstrel, oflags, omode);
 		}
 		if ( dstfd < 0 )
 		{
-			error(0, errno, "%s", dstpath);
+			warn("%s", dstpath);
 			return close(srcfd), false;
 		}
-		ret = CopyFileContents(srcfd, srcpath, dstfd, dstpath, flags);
+		bool ret = cp_contents(srcfd, srcpath, dstfd, dstpath, flags);
 		close(dstfd);
+		close(srcfd);
+		return ret;
 	}
-	close(srcfd);
-	return ret;
 }
 
-bool CopyIntoDirectory(int srcdirfd, const char* srcrel, const char* srcpath,
-                       int dstdirfd, const char* dstrel, const char* dstpath,
-                       int flags, enum symbolic_dereference symbolic_dereference)
+static
+bool cp_directory(int srcdirfd, const char* srcrel, const char* srcpath,
+                  int dstdirfd, const char* dstrel, const char* dstpath,
+                  int flags, enum symbolic_dereference symbolic_dereference)
 {
-	const char* src_basename = BaseName(srcrel);
+	size_t srcrel_last_slash = strlen(srcrel);
+	while ( srcrel_last_slash && srcrel[srcrel_last_slash-1] != '/' )
+		srcrel_last_slash--;
+	const char* src_basename = srcrel + srcrel_last_slash;
 	int dstfd = openat(dstdirfd, dstrel, O_RDONLY | O_DIRECTORY);
 	if ( dstfd < 0 )
 	{
-		error(0, errno, "%s", dstpath);
+		warn("%s", dstpath);
 		return false;
 	}
-	char* dstpath_new = AddElemToPath(dstpath, src_basename);
-	bool ret = CopyToDest(srcdirfd, srcrel, srcpath,
-	                      dstfd, src_basename, dstpath_new,
-                          flags, symbolic_dereference);
+	char* dstpath_new = join_paths(dstpath, src_basename);
+	if ( !dstpath_new )
+		err(1, "malloc");
+	bool ret = cp(srcdirfd, srcrel, srcpath,
+	              dstfd, src_basename, dstpath_new,
+	              flags, symbolic_dereference);
 	free(dstpath_new);
 	return ret;
 }
 
-bool CopyAmbigious(int srcdirfd, const char* srcrel, const char* srcpath,
-                   int dstdirfd, const char* dstrel, const char* dstpath,
-                   int flags, enum symbolic_dereference symbolic_dereference)
+static
+bool cp_ambigious(int srcdirfd, const char* srcrel, const char* srcpath,
+                  int dstdirfd, const char* dstrel, const char* dstpath,
+                  int flags, enum symbolic_dereference symbolic_dereference)
 {
 	struct stat dstst;
 	if ( fstatat(dstdirfd, dstrel, &dstst, 0) < 0 )
 	{
 		if ( errno != ENOENT )
 		{
-			error(0, errno, "%s", dstpath);
+			warn("%s", dstpath);
 			return false;
 		}
 		dstst.st_mode = S_IFREG;
 	}
 	if ( S_ISDIR(dstst.st_mode) )
-		return CopyIntoDirectory(srcdirfd, srcrel, srcpath,
-	                             dstdirfd, dstrel, dstpath,
-		                         flags, symbolic_dereference);
+		return cp_directory(srcdirfd, srcrel, srcpath,
+		                    dstdirfd, dstrel, dstpath,
+		                    flags, symbolic_dereference);
 	else
-		return CopyToDest(srcdirfd, srcrel, srcpath,
-		                  dstdirfd, dstrel, dstpath,
-		                  flags, symbolic_dereference);
+		return cp(srcdirfd, srcrel, srcpath,
+		          dstdirfd, dstrel, dstpath,
+		          flags, symbolic_dereference);
 }
 
 static void compact_arguments(int* argc, char*** argv)
@@ -440,26 +399,8 @@ static void compact_arguments(int* argc, char*** argv)
 	}
 }
 
-static void help(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "Usage: %s [OPTION]... [-T] SOURCE DEST\n", argv0);
-	fprintf(fp, "  or:  %s [OPTION]... SOURCE... DIRECTORY\n", argv0);
-	fprintf(fp, "  or:  %s [OPTION]... -t DIRECTORY SOURCE...\n", argv0);
-#ifdef CP_PRETEND_TO_BE_INSTALL
-	fprintf(fp, "Copy files and set attributes.\n");
-#else
-	fprintf(fp, "Copy SOURCE to DEST, or multiple SOURCE(s) to DIRECTORY.\n");
-#endif
-}
-
-static void version(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
-}
-
 int main(int argc, char* argv[])
 {
-	const char* argv0 = argv[0];
 	int flags = 0;
 	const char* target_directory = NULL;
 	const char* preserve_list = NULL;
@@ -496,15 +437,9 @@ int main(int argc, char* argv[])
 			case 't':
 				flags |= FLAG_TARGET_DIR;
 				if ( *(arg + 1) )
-				{
 					target_directory = arg + 1;
-				}
 				else if ( i + 1 == argc )
-				{
-					error(0, 0, "option requires an argument -- '%c'", c);
-					fprintf(stderr, "Try '%s --help' for more information\n", argv0);
-					exit(1);
-				}
+					errx(1, "option requires an argument -- '%c'", c);
 				else
 				{
 					target_directory = argv[i+1];
@@ -518,18 +453,13 @@ int main(int argc, char* argv[])
 			case 'P': symbolic_dereference = SYMBOLIC_DEREFERENCE_NONE; break;
 			default:
 #ifdef CP_PRETEND_TO_BE_INSTALL
-				fprintf(stderr, "%s (fake): unknown option, ignoring -- '%c'\n", argv0, c);
+				fprintf(stderr, "%s (fake): unknown option, ignoring -- '%c'\n",
+				        argv[0], c);
 				continue;
 #endif
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				help(stderr, argv0);
-				exit(1);
+				errx(1, "unknown option -- '%c'", c);
 			}
 		}
-		else if ( !strcmp(arg, "--help") )
-			help(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--version") )
-			version(stdout, argv0), exit(0);
 		else if ( !strcmp(arg, "--dereference") )
 			symbolic_dereference = SYMBOLIC_DEREFERENCE_ALWAYS;
 		else if ( !strcmp(arg, "--recursive") )
@@ -543,11 +473,7 @@ int main(int argc, char* argv[])
 		else if ( !strcmp(arg, "--target-directory") )
 		{
 			if ( i + 1 == argc )
-			{
-				error(0, 0, "option '--target-directory' requires an argument");
-				fprintf(stderr, "Try '%s --help' for more information\n", argv0);
-				exit(1);
-			}
+				errx(1, "option '--target-directory' requires an argument");
 			target_directory = argv[++i];
 			argv[i] = NULL;
 			flags |= FLAG_TARGET_DIR;
@@ -566,17 +492,15 @@ int main(int argc, char* argv[])
 		else
 		{
 #ifdef CP_PRETEND_TO_BE_INSTALL
-			fprintf(stderr, "%s (fake): unknown option, ignoring: %s\n", argv0, arg);
+			fprintf(stderr, "%s (fake): unknown option, ignoring: %s\n", argv[0], arg);
 			continue;
 #endif
-			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			help(stderr, argv0);
-			exit(1);
+			errx(1, "unknown option: %s", arg);
 		}
 	}
 
 	if ( (flags & FLAG_TARGET_DIR) && (flags & FLAG_NO_TARGET_DIR) )
-		error(1, 0, "cannot combine --target-directory (-t) and --no-target-directory (-T)");
+		errx(1, "cannot combine --target-directory (-t) and --no-target-directory (-T)");
 
 	if ( symbolic_dereference == SYMBOLIC_DEREFERENCE_DEFAULT )
 	{
@@ -592,30 +516,30 @@ int main(int argc, char* argv[])
 	compact_arguments(&argc, &argv);
 
 	if ( argc < 2 )
-		error(1, 0, "missing file operand");
+		errx(1, "missing file operand");
 
 	if ( flags & FLAG_NO_TARGET_DIR )
 	{
 		const char* src = argv[1];
 		if ( argc < 3 )
-			error(1, 0, "missing destination file operand after `%s'", src);
+			errx(1, "missing destination file operand after `%s'", src);
 		const char* dst = argv[2];
 		if ( 3 < argc )
-			error(1, 0, "extra operand `%s'", argv[3]);
-		return CopyToDest(AT_FDCWD, src, src, AT_FDCWD, dst, dst, flags,
-		                  symbolic_dereference) ? 0 : 1;
+			errx(1, "extra operand `%s'", argv[3]);
+		return cp(AT_FDCWD, src, src,
+		          AT_FDCWD, dst, dst,
+		          flags, symbolic_dereference) ? 0 : 1;
 	}
 
 	if ( !(flags & FLAG_TARGET_DIR) && argc <= 3 )
 	{
 		const char* src = argv[1];
 		if ( argc < 3 )
-			error(1, 0, "missing destination file operand after `%s'", src);
+			errx(1, "missing destination file operand after `%s'", src);
 		const char* dst = argv[2];
-		if ( 3 < argc )
-			error(1, 0, "extra operand `%s'", argv[3]);
-		return CopyAmbigious(AT_FDCWD, src, src, AT_FDCWD, dst, dst, flags,
-		                     symbolic_dereference) ? 0 : 1;
+		return cp_ambigious(AT_FDCWD, src, src,
+		                    AT_FDCWD, dst, dst,
+		                    flags, symbolic_dereference) ? 0 : 1;
 	}
 
 	if ( !target_directory )
@@ -625,15 +549,16 @@ int main(int argc, char* argv[])
 	}
 
 	if ( argc < 2 )
-		error(1, 0, "missing file operand");
+		errx(1, "missing file operand");
 
 	bool success = true;
 	for ( int i = 1; i < argc; i++ )
 	{
 		const char* src = argv[i];
 		const char* dst = target_directory;
-		if ( !CopyIntoDirectory(AT_FDCWD, src, src, AT_FDCWD, dst, dst, flags,
-		                        symbolic_dereference) )
+		if ( !cp_directory(AT_FDCWD, src, src,
+		                   AT_FDCWD, dst, dst,
+		                   flags, symbolic_dereference) )
 			success = false;
 	}
 
