@@ -183,7 +183,7 @@ correctly implement the standard semantics customary with GNU autoconf generated
 directory options (--prefix, --exec-prefix, ...). It is also important that it
 correctly locate a cross-compiler through the --host option by using it as a
 cross-tool prefix. For instance, --host=x86_64-sortix must correctly locate
-the x86-64_sortix-gcc compiler.
+the x86_64-sortix-gcc compiler.
 
 Remembering the Compiler
 ------------------------
