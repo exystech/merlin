@@ -19,6 +19,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -33,6 +34,7 @@ enum scanmode
 	MODE_SCANINT_REAL,
 	MODE_SCANSTRING,
 	MODE_SCANSTRING_REAL,
+	MODE_SCANREPORT,
 };
 
 enum scantype
@@ -91,11 +93,14 @@ int vscanf_callback(void* fp,
 	size_t strwritten = 0;
 	char* strdest = NULL;
 	char convc;
+	int bytesparsed = 0;
 	enum scantype scantype = TYPE_INT;
 	enum scanmode scanmode = MODE_INIT;
 	while ( true )
 	{
 		ic = fgetc(fp);
+		if ( ic != EOF && bytesparsed != INT_MAX )
+			bytesparsed++;
 		unsigned char uc = ic; char c = uc;
 		switch (scanmode)
 		{
@@ -103,6 +108,8 @@ int vscanf_callback(void* fp,
 			if ( !*format )
 			{
 				ungetc(ic, fp);
+				if ( ic != EOF )
+					bytesparsed--;
 				goto break_loop;
 			}
 			if ( isspace((unsigned char) *format) )
@@ -118,10 +125,18 @@ int vscanf_callback(void* fp,
 				format++;
 				scanmode = MODE_CONVSPEC;
 				ungetc(ic, fp);
+				if ( ic != EOF )
+					bytesparsed--;
 				continue;
 			}
 			escaped = false;
-			if ( *format != c ) { ungetc(ic, fp); goto break_loop; }
+			if ( *format != c )
+			{
+				ungetc(ic, fp);
+				if ( ic != EOF )
+					bytesparsed--;
+				goto break_loop;
+			}
 			format++;
 			break;
 		case MODE_CONVSPEC:
@@ -170,8 +185,12 @@ int vscanf_callback(void* fp,
 				string = false; scanmode = MODE_SCANSTRING; break;
 			case 's':
 				string = true; scanmode = MODE_SCANSTRING; break;
+			case 'n':
+				scanmode = MODE_SCANREPORT; break;
 			}
 			ungetc(ic, fp);
+			if ( ic != EOF )
+				bytesparsed--;
 			continue;
 		case MODE_SCANINT:
 			intparsed = 0;
@@ -229,12 +248,17 @@ int vscanf_callback(void* fp,
 				if ( !intparsed )
 				{
 					while ( undoable )
+					{
 						ungetc(undodata[--undoable], fp);
+						bytesparsed--;
+					}
 					goto break_loop;
 				}
 				scanmode = MODE_INIT;
 				undoable = 0;
 				ungetc(ic, fp);
+				if ( ic != EOF )
+					bytesparsed--;
 				if ( discard ) { discard = false; continue; }
 				uintmax_t uintmaxval = intvalue;
 				// TODO: Possible truncation of INTMAX_MIN!
@@ -294,6 +318,8 @@ int vscanf_callback(void* fp,
 			     (ic == EOF || isspace(ic) || strwritten == fieldwidth) )
 			{
 				ungetc(ic, fp);
+				if ( ic != EOF )
+					bytesparsed--;
 				if ( !discard )
 					strdest[strwritten] = '\0';
 				matcheditems++;
@@ -303,6 +329,8 @@ int vscanf_callback(void* fp,
 			if ( !string && strwritten == fieldwidth )
 			{
 				ungetc(ic, fp);
+				if ( ic != EOF )
+					bytesparsed--;
 				scanmode = MODE_INIT;
 				continue;
 			}
@@ -310,6 +338,14 @@ int vscanf_callback(void* fp,
 				goto break_loop;
 			if ( !discard )
 				strdest[strwritten++] = c;
+			continue;
+		case MODE_SCANREPORT:
+			ungetc(ic, fp);
+			if ( ic != EOF )
+				bytesparsed--;
+			if ( !discard )
+				*va_arg(ap, int*) = bytesparsed;
+			scanmode = MODE_INIT;
 			continue;
 		}
 	}
