@@ -286,12 +286,6 @@ void TextTerminal::UpdateCursor(TextBuffer* textbuf)
 void TextTerminal::Newline(TextBuffer* textbuf)
 {
 	TextPos pos(column, line);
-	TextChar tc = textbuf->GetChar(pos);
-	if ( !(tc.attr & ATTR_CHAR) )
-	{
-		tc.attr |= ATTR_CHAR;
-		textbuf->SetChar(pos, tc);
-	}
 	column = 0;
 	if ( line < textbuf->Height()-1 )
 		line++;
