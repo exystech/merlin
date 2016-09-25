@@ -33,8 +33,20 @@
 
 namespace Sortix {
 
-static uint32_t ColorFromRGB(uint8_t r, uint8_t g, uint8_t b)
+static uint32_t boldify(uint32_t color)
 {
+	int b = color >>  0 & 0xFF;
+	int g = color >>  8 & 0xFF;
+	int r = color >> 16 & 0xFF;
+	b += 63;
+	if ( 255 < b )
+		b = 255;
+	g += 63;
+	if ( 255 < g )
+		g = 255;
+	r += 63;
+	if ( 255 < r )
+		r = 255;
 	return (uint32_t) b << 0 | (uint32_t) g << 8 | (uint32_t) r << 16;
 }
 
@@ -96,13 +108,6 @@ LFBTextBuffer* CreateLFBTextBuffer(uint8_t* lfb, uint32_t lfbformat,
 	ret->font = font;
 	memset(chars, 0, sizeof(chars[0]) * columns * rows);
 	ret->chars = chars;
-	for ( size_t i = 0; i < 16UL; i++ )
-	{
-		uint8_t r = i & 0b0100 ? (i & 0b1000 ? 255 : 191) : (i & 0b1000 ? 63 : 0);
-		uint8_t g = i & 0b0010 ? (i & 0b1000 ? 255 : 191) : (i & 0b1000 ? 63 : 0);
-		uint8_t b = i & 0b0001 ? (i & 0b1000 ? 255 : 191) : (i & 0b1000 ? 63 : 0);
-		ret->colors[i] = ColorFromRGB(r, g, b);
-	}
 	ret->cursorenabled = true;
 	ret->cursorpos = TextPos(0, 0);
 	ret->emergency_state = false;
@@ -216,12 +221,10 @@ void LFBTextBuffer::RenderChar(TextChar textchar, size_t posx, size_t posy)
 	if ( VGA_FONT_WIDTH != 8UL )
 		return;
 	bool drawcursor = cursorenabled && posx == cursorpos.x && posy == cursorpos.y;
-	uint8_t fgcoloridx = textchar.vgacolor >> 0 & 0x0F;
+	uint32_t fgcolor = textchar.fg;
+	uint32_t bgcolor = textchar.bg;
 	if ( textchar.attr & ATTR_BOLD )
-		fgcoloridx |= 0x08;
-	uint8_t bgcoloridx = textchar.vgacolor >> 4 & 0x0F;
-	uint32_t fgcolor = colors[fgcoloridx];
-	uint32_t bgcolor = colors[bgcoloridx];
+		fgcolor = boldify(fgcolor);
 	int remap = VGA::MapWideToVGAFont(textchar.c);
 	const uint8_t* charfont = VGA::GetCharacterFont(font, remap);
 	size_t pixelyoff = rows * VGA_FONT_HEIGHT;
@@ -408,7 +411,7 @@ TextChar LFBTextBuffer::GetChar(TextPos pos)
 			ResumeRendering();
 		return ret;
 	}
-	return {0, 0, 0};
+	return {0, 0, 0, 0, 0};
 }
 
 void LFBTextBuffer::SetChar(TextPos pos, TextChar c)
@@ -781,7 +784,7 @@ void LFBTextBuffer::EmergencyReset()
 {
 	// TODO: Reset everything here!
 
-	Fill(TextPos{0, 0}, TextPos{columns-1, rows-1}, TextChar{0, 0, 0});
+	Fill(TextPos{0, 0}, TextPos{columns-1, rows-1}, TextChar{0, 0, 0, 0, 0});
 	SetCursorPos(TextPos{0, 0});
 }
 

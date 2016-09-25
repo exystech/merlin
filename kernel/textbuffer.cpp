@@ -138,7 +138,7 @@ void TextBufferHandle::FinishReplace(TextBuffer* newtextbuf)
 				size_t src_x = dst_x;
 				TextPos src_pos{src_x, src_y};
 				TextPos dst_pos{dst_x, dst_y};
-				TextChar tc{0, 0, 0};
+				TextChar tc{0, 0, 0, 0, 0};
 				if ( src_x < src_width && src_y < src_height )
 					tc = textbuf->GetChar(src_pos);
 				else if ( src_width && src_height )

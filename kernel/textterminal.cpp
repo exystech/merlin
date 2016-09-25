@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,11 +27,19 @@
 #include <sortix/kernel/refcount.h>
 #include <sortix/kernel/textbuffer.h>
 
+#include "palette.h"
 #include "textterminal.h"
 
 namespace Sortix {
 
-static const uint16_t DEFAULT_COLOR = COLOR8_LIGHT_GREY | COLOR8_BLACK << 4;
+static const uint16_t DEFAULT_VGACOLOR = COLOR8_LIGHT_GREY | COLOR8_BLACK << 4;
+static const unsigned int DEFAULT_FOREGROUND = 7;
+static const unsigned int DEFAULT_BACKGROUND = 0;
+
+static uint32_t ColorFromRGB(uint8_t r, uint8_t g, uint8_t b)
+{
+	return (uint32_t) b << 0 | (uint32_t) g << 8 | (uint32_t) r << 16;
+}
 
 TextTerminal::TextTerminal(TextBufferHandle* textbufhandle)
 {
@@ -47,15 +55,18 @@ TextTerminal::~TextTerminal()
 
 void TextTerminal::Reset()
 {
+	attr = 0;
 	next_attr = 0;
-	vgacolor = DEFAULT_COLOR;
+	vgacolor = DEFAULT_VGACOLOR;
+	fgcolor = palette[DEFAULT_FOREGROUND];
+	bgcolor = palette[DEFAULT_BACKGROUND];
 	column = line = 0;
 	ansisavedposx = ansisavedposy = 0;
 	ansimode = NONE;
 	TextBuffer* textbuf = textbufhandle->Acquire();
 	TextPos fillfrom(0, 0);
 	TextPos fillto(textbuf->Width()-1, textbuf->Height()-1);
-	TextChar fillwith(' ', vgacolor, 0);
+	TextChar fillwith(' ', vgacolor, 0, fgcolor, bgcolor);
 	textbuf->Fill(fillfrom, fillto, fillwith);
 	textbuf->SetCursorEnabled(true);
 	UpdateCursor(textbuf);
@@ -88,7 +99,7 @@ size_t TextTerminal::PrintRaw(const char* string, size_t stringlen)
 	return stringlen;
 }
 
-size_t TextTerminal::Width() const
+size_t TextTerminal::Width()
 {
 	ScopedLock lock(&termlock);
 	TextBuffer* textbuf = textbufhandle->Acquire();
@@ -97,7 +108,7 @@ size_t TextTerminal::Width() const
 	return width;
 }
 
-size_t TextTerminal::Height() const
+size_t TextTerminal::Height()
 {
 	ScopedLock lock(&termlock);
 	TextBuffer* textbuf = textbufhandle->Acquire();
@@ -106,7 +117,7 @@ size_t TextTerminal::Height() const
 	return height;
 }
 
-void TextTerminal::GetCursor(size_t* column, size_t* row) const
+void TextTerminal::GetCursor(size_t* column, size_t* row)
 {
 	ScopedLock lock(&termlock);
 	*column = this->column;
@@ -253,7 +264,7 @@ size_t TextTerminal::EmergencyPrintRaw(const char* string, size_t stringlen)
 	return stringlen;
 }
 
-size_t TextTerminal::EmergencyWidth() const
+size_t TextTerminal::EmergencyWidth()
 {
 	// This is during a kernel emergency where preemption has been disabled and
 	// this is the only thread running. Another thread may have been interrupted
@@ -266,7 +277,7 @@ size_t TextTerminal::EmergencyWidth() const
 	return width;
 }
 
-size_t TextTerminal::EmergencyHeight() const
+size_t TextTerminal::EmergencyHeight()
 {
 	// This is during a kernel emergency where preemption has been disabled and
 	// this is the only thread running. Another thread may have been interrupted
@@ -279,7 +290,7 @@ size_t TextTerminal::EmergencyHeight() const
 	return height;
 }
 
-void TextTerminal::EmergencyGetCursor(size_t* column, size_t* row) const
+void TextTerminal::EmergencyGetCursor(size_t* column, size_t* row)
 {
 	// This is during a kernel emergency where preemption has been disabled and
 	// this is the only thread running. Another thread may have been interrupted
@@ -308,6 +319,7 @@ void TextTerminal::PutChar(TextBuffer* textbuf, char c)
 	{
 		switch ( c )
 		{
+		case '\a': return;
 		case '\n': Newline(textbuf); return;
 		case '\r': column = 0; return;
 		case '\b': Backspace(textbuf); return;
@@ -336,7 +348,23 @@ void TextTerminal::PutChar(TextBuffer* textbuf, char c)
 		Newline(textbuf);
 	}
 	TextPos pos(column++, line);
-	TextChar tc(wc, vgacolor, ATTR_CHAR | next_attr);
+	uint16_t tcvgacolor;
+	uint16_t tcattr = attr | next_attr;
+	uint32_t tcfgcolor;
+	uint32_t tcbgcolor;
+	if ( !(tcattr & ATTR_INVERSE) )
+	{
+		tcvgacolor = vgacolor;
+		tcfgcolor = fgcolor;
+		tcbgcolor = bgcolor;
+	}
+	else
+	{
+		tcvgacolor = (vgacolor >> 4 & 0xF) << 0 | (vgacolor >> 0 & 0xF) << 4;
+		tcfgcolor = bgcolor;
+		tcbgcolor = fgcolor;
+	}
+	TextChar tc(wc, tcvgacolor, tcattr, tcfgcolor, tcbgcolor);
 	textbuf->SetChar(pos, tc);
 	next_attr = 0;
 }
@@ -353,11 +381,14 @@ void TextTerminal::Newline(TextBuffer* textbuf)
 		line++;
 	else
 	{
-		textbuf->Scroll(1, TextChar(' ', vgacolor, 0));
+		uint32_t fillfg = attr & ATTR_INVERSE ? bgcolor : fgcolor;
+		uint32_t fillbg = attr & ATTR_INVERSE ? fgcolor : bgcolor;
+		textbuf->Scroll(1, TextChar(' ', vgacolor, 0, fillfg, fillbg));
 		line = textbuf->Height()-1;
 	}
 }
 
+#if 0
 static TextPos DecrementTextPos(TextBuffer* textbuf, TextPos pos)
 {
 	if ( !pos.x && !pos.y )
@@ -366,27 +397,23 @@ static TextPos DecrementTextPos(TextBuffer* textbuf, TextPos pos)
 		return TextPos(textbuf->Width(), pos.y-1);
 	return TextPos(pos.x-1, pos.y);
 }
+#endif
 
 void TextTerminal::Backspace(TextBuffer* textbuf)
 {
-	TextPos pos(column, line);
-	while ( pos.x || pos.y )
+	if ( column )
 	{
-		pos = DecrementTextPos(textbuf, pos);
+		column--;
+		TextPos pos(column, line);
 		TextChar tc = textbuf->GetChar(pos);
 		next_attr = tc.attr & (ATTR_BOLD | ATTR_UNDERLINE);
 		if ( tc.c == L'_' )
 			next_attr |= ATTR_UNDERLINE;
 		else if ( tc.c == L' ' )
-			next_attr &= ~(ATTR_BOLD | ATTR_CHAR);
+			next_attr &= ~ATTR_BOLD;
 		else
 			next_attr |= ATTR_BOLD;
-		textbuf->SetChar(pos, TextChar(' ', vgacolor, 0));
-		if ( tc.attr & ATTR_CHAR )
-			break;
 	}
-	column = pos.x;
-	line = pos.y;
 }
 
 void TextTerminal::Tab(TextBuffer* textbuf)
@@ -396,15 +423,11 @@ void TextTerminal::Tab(TextBuffer* textbuf)
 		column = 0;
 		Newline(textbuf);
 	}
-	unsigned int count = 8 - (column % 8);
-	for ( unsigned int i = 0; i < count; i++ )
-	{
-		if ( column == textbuf->Width() )
-			break;
-		TextPos pos(column++, line);
-		TextChar tc(' ', vgacolor, i == 0 ? ATTR_CHAR : 0);
-		textbuf->SetChar(pos, tc);
-	}
+	column++;
+	column = -(-column & ~0x7U);
+	size_t width = textbuf->Width();
+	if ( width <= column )
+		column = width;
 }
 
 // TODO: This implementation of the 'Ansi Escape Codes' is incomplete and hacky.
@@ -412,9 +435,7 @@ void TextTerminal::AnsiReset()
 {
 	next_attr = 0;
 	ansiusedparams = 0;
-	currentparamindex = 0;
 	ansiparams[0] = 0;
-	paramundefined = true;
 	ignoresequence = false;
 	ansimode = CSI;
 }
@@ -424,32 +445,47 @@ void TextTerminal::PutAnsiEscaped(TextBuffer* textbuf, char c)
 	// Check the proper prefixes are used.
 	if ( ansimode == CSI )
 	{
-		if ( c != '[' ) { ansimode = NONE; return; }
-		ansimode = COMMAND;
+		if ( c == '[' )
+			ansimode = COMMAND;
+		else if ( c == '(' || c == ')' || c == '*' || c == '+' ||
+		          c == '-' || c == '.' || c == '/' )
+			ansimode = CHARSET;
+		// TODO: Enter and exit alternatve keypad mode.
+		else if ( c == '=' || c == '>' )
+			ansimode = NONE;
+		else
+		{
+			ansimode = NONE;
+			ansimode = NONE;
+		}
+		return;
+	}
+
+	if ( ansimode == CHARSET )
+	{
+		ansimode = NONE;
 		return;
 	}
 
 	// Read part of a parameter.
 	if ( '0' <= c && c <= '9' )
 	{
-		if ( paramundefined )
+		if ( ansiusedparams == 0 )
 			ansiusedparams++;
-		paramundefined = false;
 		unsigned val = c - '0';
-		ansiparams[currentparamindex] *= 10;
-		ansiparams[currentparamindex] += val;
+		ansiparams[ansiusedparams-1] *= 10;
+		ansiparams[ansiusedparams-1] += val;
 	}
 
 	// Parameter delimiter.
 	else if ( c == ';' )
 	{
-		if ( currentparamindex == ANSI_NUM_PARAMS - 1 )
+		if ( ansiusedparams == ANSI_NUM_PARAMS )
 		{
 			ansimode = NONE;
 			return;
 		}
-		paramundefined = true;
-		ansiparams[++currentparamindex] = 0;
+		ansiparams[ansiusedparams++] = 0;
 	}
 
 	// Left for future standardization, so discard this sequence.
@@ -458,11 +494,35 @@ void TextTerminal::PutAnsiEscaped(TextBuffer* textbuf, char c)
 		ignoresequence = true;
 	}
 
+	else if ( c == '>' )
+	{
+		ansimode = GREATERTHAN;
+	}
+
 	// Run a command.
 	else if ( 64 <= c && c <= 126 )
 	{
 		if ( !ignoresequence )
-			RunAnsiCommand(textbuf, c);
+		{
+			if ( ansimode == COMMAND )
+				RunAnsiCommand(textbuf, c);
+			else if ( ansimode == GREATERTHAN )
+			{
+				// Send Device Attributes
+				if ( c == 'c' )
+				{
+					// TODO: Send an appropriate response through the terminal.
+				}
+				else
+				{
+					ansimode = NONE;
+					return;
+				}
+				ansimode = NONE;
+			}
+		}
+		else
+			ansimode = NONE;
 	}
 
 	// Something I don't understand, and ignore intentionally.
@@ -573,7 +633,9 @@ void TextTerminal::RunAnsiCommand(TextBuffer* textbuf, char c)
 			from = TextPos{0, 0},
 			to = TextPos{width-1, height-1};
 
-		textbuf->Fill(from, to, TextChar(' ', vgacolor, 0));
+		uint32_t fillfg = attr & ATTR_INVERSE ? bgcolor : fgcolor;
+		uint32_t fillbg = attr & ATTR_INVERSE ? fgcolor : bgcolor;
+		textbuf->Fill(from, to, TextChar(' ', vgacolor, 0, fillfg, fillbg));
 	} break;
 	case 'K': // Erase parts of the current line.
 	{
@@ -593,17 +655,34 @@ void TextTerminal::RunAnsiCommand(TextBuffer* textbuf, char c)
 			from = TextPos{0, line},
 			to = TextPos{width-1, line};
 
-		textbuf->Fill(from, to, TextChar(' ', vgacolor, 0));
+		uint32_t fillfg = attr & ATTR_INVERSE ? bgcolor : fgcolor;
+		uint32_t fillbg = attr & ATTR_INVERSE ? fgcolor : bgcolor;
+		textbuf->Fill(from, to, TextChar(' ', vgacolor, 0, fillfg, fillbg));
 	} break;
+	// TODO: CSI Ps M  Delete Ps Line(s) (default = 1) (DL).
+	//       (delete those lines and move the rest of the lines upwards).
+	// TODO: CSI Ps P  Delete Ps Character(s) (default = 1) (DCH).
+	//       (delete those characters and move the rest of the line leftward).
 	case 'S': // Scroll a line up and place a new line at the buttom.
 	{
-		textbuf->Scroll(1, TextChar(' ', vgacolor, 0));
+		uint32_t fillfg = attr & ATTR_INVERSE ? bgcolor : fgcolor;
+		uint32_t fillbg = attr & ATTR_INVERSE ? fgcolor : bgcolor;
+		textbuf->Scroll(1, TextChar(' ', vgacolor, 0, fillfg, fillbg));
 		line = height-1;
 	} break;
 	case 'T': // Scroll a line up and place a new line at the top.
 	{
-		textbuf->Scroll(-1, TextChar(' ', vgacolor, 0));
+		uint32_t fillfg = attr & ATTR_INVERSE ? bgcolor : fgcolor;
+		uint32_t fillbg = attr & ATTR_INVERSE ? fgcolor : bgcolor;
+		textbuf->Scroll(-1, TextChar(' ', vgacolor, 0, fillfg, fillbg));
 		line = 0;
+	} break;
+	case 'd': // Move the cursor to line N.
+	{
+		unsigned posy = 0 < ansiusedparams ? ansiparams[0]-1 : 0;
+		if ( height <= posy )
+			posy = height-1;
+		line = posy;
 	} break;
 	case 'm': // Change how the text is rendered.
 	{
@@ -616,8 +695,12 @@ void TextTerminal::RunAnsiCommand(TextBuffer* textbuf, char c)
 		// Convert from the ANSI color scheme to the VGA color scheme.
 		const unsigned conversion[8] =
 		{
+#if 0
+			0, 4, 2, 6, 1, 5, 3, 7
+#else
 			COLOR8_BLACK, COLOR8_RED, COLOR8_GREEN, COLOR8_BROWN,
 			COLOR8_BLUE, COLOR8_MAGENTA, COLOR8_CYAN, COLOR8_LIGHT_GREY,
+#endif
 		};
 
 		for ( size_t i = 0; i < ansiusedparams; i++ )
@@ -626,20 +709,72 @@ void TextTerminal::RunAnsiCommand(TextBuffer* textbuf, char c)
 			// Turn all attributes off.
 			if ( cmd == 0 )
 			{
-				vgacolor = DEFAULT_COLOR;
+				vgacolor = DEFAULT_VGACOLOR;
+				attr = 0;
+				fgcolor = palette[DEFAULT_FOREGROUND];
+				bgcolor = palette[DEFAULT_BACKGROUND];
 			}
+			// Boldness.
+			else if ( cmd == 1 )
+				attr |= ATTR_BOLD;
+			// TODO: 2, Faint
+			// TODO: 3, Italicized
+			// Underline.
+			else if ( cmd == 4 )
+				attr |= ATTR_UNDERLINE;
+			// TODO: 5, Blink (appears as Bold)
+			// Inverse.
+			else if ( cmd == 7 )
+				attr |= ATTR_INVERSE;
+			// TODO: 8, Invisible
+			// TODO: 9, Crossed-out
+			// TODO: 21, Doubly-underlined
+			// Normal (neither bold nor faint).
+			else if ( cmd == 22 )
+				attr &= ~ATTR_BOLD;
+			// TODO: 23, Not italicized
+			// Not underlined.
+			else if ( cmd == 24 )
+				attr &= ~ATTR_UNDERLINE;
+			// TODO: 25, Steady (not blinking)
+			// Positive (not inverse).
+			else if ( cmd == 27 )
+				attr &= ~ATTR_INVERSE;
+			// TODO: 28, Visible (not hidden)
 			// Set text color.
 			else if ( 30 <= cmd && cmd <= 37 )
 			{
 				unsigned val = cmd - 30;
 				vgacolor &= 0xF0;
 				vgacolor |= conversion[val] << 0;
+				fgcolor = palette[val];
+			}
+			// Set text color.
+			else if ( cmd == 38 )
+			{
+				if ( 5 <= ansiusedparams - i && ansiparams[i+1] == 2 )
+				{
+					uint8_t r = ansiparams[i+2];
+					uint8_t g = ansiparams[i+3];
+					uint8_t b = ansiparams[i+4];
+					i += 5 - 1;
+					fgcolor = ColorFromRGB(r, g, b);
+					// TODO: Approxpiate vgacolor.
+				}
+				else if ( 3 <= ansiusedparams - i && ansiparams[i+1] == 5 )
+				{
+					uint8_t index = ansiparams[i+2];
+					i += 3 - 1;
+					fgcolor = palette[index];
+					// TODO: Approxpiate vgacolor.
+				}
 			}
 			// Set default text color.
 			else if ( cmd == 39 )
 			{
 				vgacolor &= 0xF0;
-				vgacolor |= DEFAULT_COLOR & 0x0F;
+				vgacolor |= DEFAULT_VGACOLOR & 0x0F;
+				fgcolor = palette[DEFAULT_FOREGROUND];
 			}
 			// Set background color.
 			else if ( 40 <= cmd && cmd <= 47 )
@@ -647,32 +782,60 @@ void TextTerminal::RunAnsiCommand(TextBuffer* textbuf, char c)
 				unsigned val = cmd - 40;
 				vgacolor &= 0x0F;
 				vgacolor |= conversion[val] << 4;
+				bgcolor = palette[val];
+			}
+			// Set background color.
+			else if ( cmd == 48 )
+			{
+				if ( 5 <= ansiusedparams - i && ansiparams[i+1] == 2 )
+				{
+					uint8_t r = ansiparams[i+2];
+					uint8_t g = ansiparams[i+3];
+					uint8_t b = ansiparams[i+4];
+					i += 5 - 1;
+					bgcolor = ColorFromRGB(r, g, b);
+					// TODO: Approxpiate vgacolor.
+				}
+				else if ( 3 <= ansiusedparams - i && ansiparams[i+1] == 5 )
+				{
+					uint8_t index = ansiparams[i+2];
+					i += 3 - 1;
+					bgcolor = palette[index];
+					// TODO: Approxpiate vgacolor.
+				}
 			}
 			// Set default background color.
 			else if ( cmd == 49 )
 			{
 				vgacolor &= 0x0F;
-				vgacolor |= DEFAULT_COLOR & 0xF0;
+				vgacolor |= DEFAULT_VGACOLOR & 0xF0;
+				bgcolor = palette[DEFAULT_BACKGROUND];
 			}
 			// Set text color.
 			else if ( 90 <= cmd && cmd <= 97 )
 			{
-				unsigned val = cmd - 90;
+				unsigned val = cmd - 90 + 8;
 				vgacolor &= 0xF0;
-				vgacolor |= (0x8 | conversion[val]) << 0;
+				vgacolor |= (0x8 | conversion[val - 8]) << 0;
+				fgcolor = palette[val];
 			}
 			// Set background color.
 			else if ( 100 <= cmd && cmd <= 107 )
 			{
-				unsigned val = cmd - 100;
+				unsigned val = cmd - 100 + 8;
 				vgacolor &= 0x0F;
-				vgacolor |= (0x8 | conversion[val]) << 4;
+				vgacolor |= (0x8 | conversion[val - 8]) << 4;
+				bgcolor = palette[val];
 			}
-			// TODO: There are many other things we don't support.
+			else
+			{
+				ansimode = NONE;
+			}
 		}
 	} break;
 	case 'n': // Request special information from terminal.
 	{
+		ansimode = NONE;
 		// TODO: Handle this code.
 	} break;
 	case 's': // Save cursor position.
@@ -694,13 +857,21 @@ void TextTerminal::RunAnsiCommand(TextBuffer* textbuf, char c)
 		// TODO: This is somehow related to the special char '?'.
 		if ( 0 < ansiusedparams && ansiparams[0] == 25 )
 			textbuf->SetCursorEnabled(false);
+		if ( 0 < ansiusedparams && ansiparams[0] == 1049 )
+			{}; // TODO: Save scrollback.
 	} break;
 	case 'h': // Show cursor.
 	{
 		// TODO: This is somehow related to the special char '?'.
 		if ( 0 < ansiusedparams && ansiparams[0] == 25 )
 			textbuf->SetCursorEnabled(true);
+		if ( 0 < ansiusedparams && ansiparams[0] == 1049 )
+			{}; // TODO: Restore scrollback.
 	} break;
+	default:
+	{
+		ansimode = NONE;
+	}
 	// TODO: Handle other cases.
 	}
 

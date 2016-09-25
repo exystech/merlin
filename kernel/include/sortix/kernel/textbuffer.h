@@ -30,7 +30,7 @@
 
 namespace Sortix {
 
-static const uint16_t ATTR_CHAR = 1 << 0;
+static const uint16_t ATTR_INVERSE = 1 << 0;
 static const uint16_t ATTR_BOLD = 1 << 1;
 static const uint16_t ATTR_UNDERLINE = 1 << 2;
 
@@ -47,19 +47,23 @@ struct TextCharPOD
 	wchar_t c;
 	uint8_t vgacolor; // Format of <sortix/vga.h>
 	uint16_t attr;
+	uint32_t fg;
+	uint32_t bg;
 };
 
 struct TextChar
 {
 	TextChar() { }
 	TextChar(const TextCharPOD& o) :
-		c(o.c), vgacolor(o.vgacolor), attr(o.attr)  { }
-	TextChar(wchar_t c, uint8_t vgacolor, uint16_t attr) :
-		c(c), vgacolor(vgacolor), attr(attr) { }
-	operator TextCharPOD() { return TextCharPOD{c, vgacolor, attr}; }
+		c(o.c), vgacolor(o.vgacolor), attr(o.attr), fg(o.fg), bg(o.bg)  { }
+	TextChar(wchar_t c, uint8_t vgacolor, uint16_t attr, uint32_t fg, uint32_t bg) :
+		c(c), vgacolor(vgacolor), attr(attr), fg(fg), bg(bg) { }
+	operator TextCharPOD() { return TextCharPOD{c, vgacolor, attr, fg, bg}; }
 	wchar_t c;
 	uint8_t vgacolor; // Format of <sortix/vga.h>
 	uint16_t attr;
+	uint32_t fg; // 32-bit foreground color.
+	uint32_t bg; // 32-bit background color.
 };
 
 static inline bool IsTextPosBeforeTextPos(const TextPos& a, const TextPos& b)

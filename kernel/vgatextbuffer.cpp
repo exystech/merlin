@@ -88,7 +88,7 @@ TextChar VGATextBuffer::GetChar(TextPos pos)
 {
 	if ( UsablePosition(pos) )
 		return chars[OffsetOfPos(pos)];
-	return {0, 0, 0};
+	return {0, 0, 0, 0, 0};
 }
 
 void VGATextBuffer::SetChar(TextPos pos, TextChar c)
@@ -203,7 +203,7 @@ bool VGATextBuffer::EmergencyRecoup()
 
 void VGATextBuffer::EmergencyReset()
 {
-	Fill(TextPos{0, 0}, TextPos{width-1, height-1}, TextChar{0, 0, 0});
+	Fill(TextPos{0, 0}, TextPos{width-1, height-1}, TextChar{0, 0, 0, 0, 0});
 	SetCursorPos(TextPos{0, 0});
 }
 

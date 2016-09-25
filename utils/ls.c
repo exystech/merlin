@@ -298,7 +298,7 @@ static void color(const char** pre,
 
 	if ( failure )
 	{
-		*pre = "\e[31m";
+		*pre = "\e[1;31m";
 		*post = "\e[m";
 		return;
 	}
@@ -306,16 +306,16 @@ static void color(const char** pre,
 	*post = "\e[m";
 	switch ( mode_to_dt(st->st_mode) )
 	{
-	case DT_UNKNOWN: *pre = "\e[91m"; break;
-	case DT_BLK: *pre = "\e[93m"; break;
-	case DT_CHR: *pre = "\e[93m"; break;
-	case DT_DIR: *pre = "\e[36m"; break;
+	case DT_UNKNOWN: *pre = "\e[1;31m"; break;
+	case DT_BLK: *pre = "\e[1;33m"; break;
+	case DT_CHR: *pre = "\e[1;33m"; break;
+	case DT_DIR: *pre = "\e[1;34m"; break;
 	case DT_FIFO: *pre = "\e[33m"; break;
-	case DT_LNK: *pre = "\e[96m"; break;
-	case DT_SOCK: *pre = "\e[35m"; break;
+	case DT_LNK: *pre = "\e[1;36m"; break;
+	case DT_SOCK: *pre = "\e[1;35m"; break;
 	case DT_REG:
 		if ( st->st_mode & 0111 )
-			*pre = "\e[32m";
+			*pre = "\e[1;32m";
 		else
 			*post = "";
 		break;

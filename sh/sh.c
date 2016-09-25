@@ -1833,7 +1833,7 @@ void read_command_interactive(struct sh_read_command* sh_read_command)
 	}
 
 	char* ps1;
-	asprintf(&ps1, "\e[32m%s@%s \e[36m%s%s %c\e[37m ",
+	asprintf(&ps1, "\e[;1;32m%s@%s \e[1;34m%s%s %c\e[m ",
 		print_username,
 		print_hostname,
 		print_dir_1,
