@@ -54,6 +54,7 @@ sleep \
 sort \
 stat \
 tail \
+tee \
 time \
 touch \
 tr \
