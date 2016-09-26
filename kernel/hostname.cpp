@@ -32,7 +32,7 @@ namespace Sortix {
 
 static kthread_mutex_t hostname_lock = KTHREAD_MUTEX_INITIALIZER;
 
-static char hostname[HOST_NAME_MAX + 1] = "sortix";
+static char hostname[HOST_NAME_MAX + 1] = BRAND_DEFAULT_HOSTNAME;
 static size_t hostname_length = 6;
 
 int sys_gethostname(char* dst_name, size_t dst_name_size)
