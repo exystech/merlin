@@ -715,7 +715,7 @@ ssize_t sys_readlinkat(int dirfd, const char* path, char* buf, size_t size)
 	delete[] pathcopy;
 	if ( !desc )
 		return -1;
-	return (int) desc->readlink(&ctx, buf, size);
+	return desc->readlink(&ctx, buf, size);
 }
 
 int sys_fsync(int fd)
