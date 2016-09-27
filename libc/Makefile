@@ -373,6 +373,8 @@ ioleast/readall.o \
 ioleast/readleast.o \
 ioleast/writeall.o \
 ioleast/writeleast.o \
+langinfo/nl_langinfo_l.o \
+langinfo/nl_langinfo.o \
 locale/localeconv.o \
 locale/setlocale.o \
 msr/rdmsr.o \
