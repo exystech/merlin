@@ -74,7 +74,8 @@ $(BINARIES_EXCEPT_INSTALL) \
 xinstall
 
 MANPAGES=\
-readlink.1
+chkblayout.1 \
+readlink.1 \
 
 all: $(BINARIES)
 
