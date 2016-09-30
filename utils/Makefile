@@ -47,6 +47,7 @@ passwd \
 ps \
 pstree \
 pwd \
+readlink \
 realpath \
 rm \
 rmdir \
@@ -72,6 +73,9 @@ BINARIES=\
 $(BINARIES_EXCEPT_INSTALL) \
 xinstall
 
+MANPAGES=\
+readlink.1
+
 all: $(BINARIES)
 
 .PHONY: all install clean
@@ -80,6 +84,8 @@ install: all
 	mkdir -p $(DESTDIR)$(BINDIR)
 	install $(BINARIES_EXCEPT_INSTALL) $(DESTDIR)$(BINDIR)
 	install xinstall $(DESTDIR)$(BINDIR)/install
+	mkdir -p $(DESTDIR)$(MANDIR)/man1
+	cp $(MANPAGES) $(DESTDIR)$(MANDIR)/man1
 
 %: %.c
 	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< -o $@
