@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,7 +21,7 @@
 
 #include <err.h>
 #include <errno.h>
-#include <error.h>
+#include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,32 +48,37 @@ int main(int argc, char* argv[])
 		else
 			errx(1, "unknown option: %s\n", arg);
 	}
-	size_t bufsize = 32;
-	char* buf = (char*) malloc(bufsize);
-	if ( !buf )
-		error(1, errno, "malloc");
+	size_t size = 32;
+	char* buffer = (char*) malloc(size);
+	if ( !buffer )
+		err(1, "malloc");
 	for ( int i = 1; i < argc; i++ )
 	{
-		ssize_t ret;
-retry:
-		ret = kernelinfo(argv[i], buf, bufsize);
-		if ( ret < 0 )
+		while ( true )
 		{
-			if ( errno == EINVAL )
+			ssize_t needed = kernelinfo(argv[i], buffer, size);
+			if ( needed < 0 )
 			{
-				error(1, 0, "%s: No such kernel string", argv[i]);
+				if ( errno == EINVAL )
+				{
+					warn("%s: No such kernel information", argv[i]);
+					break;
+				}
+				err(1, "kernelinfo: %s", argv[i]);
 			}
-			error(1, errno, "kernelinfo(\"%s\")", argv[i]);
+			if ( 0 < needed )
+			{
+				size = needed + 1;
+				buffer = (char*) realloc(buffer, size);
+				if ( !buffer )
+					err(1, "malloc");
+				continue;
+			}
+			printf("%s\n", buffer);
+			break;
 		}
-		if ( ret )
-		{
-			buf = (char*) realloc(buf, ret);
-			if ( !buf )
-				error(1, errno, "realloc");
-			bufsize = ret;
-			goto retry;
-		}
-		printf("%s\n", buf);
 	}
+	if ( ferror(stdout) || fflush(stdout) == EOF )
+		err(1, "stdout");
 	return 0;
 }
