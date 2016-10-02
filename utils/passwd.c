@@ -68,16 +68,6 @@ static void compact_arguments(int* argc, char*** argv)
 	}
 }
 
-static void version(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
-}
-
-static void help(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "Usage: %s [OPTION]... [LOGIN]\n", argv0);
-}
-
 int main(int argc, char* argv[])
 {
 	const char* cipher = "blowfish,a";
@@ -100,31 +90,19 @@ int main(int argc, char* argv[])
 				if ( !*(cipher = arg + 1) )
 				{
 					if ( i + 1 == argc )
-					{
-						warnx("option requires an argument -- 'c'");
-						fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
-						exit(125);
-					}
+						errx(125, "option requires an argument -- 'c'");
 					cipher = argv[i+1];
 					argv[++i] = NULL;
 				}
 				arg = "c";
 				break;
 			default:
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				help(stderr, argv0);
-				exit(1);
+				errx(1, "%s: unknown option -- '%c'", argv0, c);
 			}
 		}
-		else if ( !strcmp(arg, "--version") )
-			version(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--help") )
-			help(stdout, argv0), exit(0);
 		else
 		{
-			fprintf(stderr, "%s: unrecognized option: %s\n", argv0, arg);
-			help(stderr, argv0);
-			exit(1);
+			errx(1, "%s: unrecognized option: %s", argv0, arg);
 		}
 	}
 

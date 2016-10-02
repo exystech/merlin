@@ -1,0 +1,33 @@
+.Dd October 02, 2016
+.Dt PASSWD 1
+.Os
+.Sh NAME
+.Nm passwd
+.Nd change user password
+.Sh SYNOPSIS
+.Nm
+.Op Fl c Ar cipher
+.Op Ar user
+.Sh DESCRIPTION
+.Nm
+changes the password for the specified
+.Ar user ,
+or the current user if none is specified.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl c Ar cipher
+Hash the password using the specified
+.Ar cipher .
+.El
+.Sh FILES
+.Bl -tag -width "/etc/passwd" -compact
+.It Pa /etc/passwd
+Password information for all users.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr crypt_newpass 3 ,
+.Xr passwd 5
