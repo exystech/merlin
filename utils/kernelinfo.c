@@ -42,11 +42,11 @@ int main(int argc, char* argv[])
 			while ( (c = *++arg) ) switch ( c )
 			{
 			default:
-				errx(1, "unknown option -- '%c'\n", c);
+				errx(1, "unknown option -- '%c'", c);
 			}
 		}
 		else
-			errx(1, "unknown option: %s\n", arg);
+			errx(1, "unknown option: %s", arg);
 	}
 	size_t size = 32;
 	char* buffer = (char*) malloc(size);

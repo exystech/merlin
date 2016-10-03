@@ -51,7 +51,7 @@ bool get_option_variable(const char* option, const char** varptr,
 	if ( arg[option_len] != '\0' )
 		return false;
 	if ( *ip + 1 == argc )
-		errx(1, "expected operand after `%s'\n", option);
+		errx(1, "expected operand after `%s'", option);
 	*varptr = argv[++*ip];
 	argv[*ip] = NULL;
 	return true;
@@ -128,7 +128,7 @@ int main(int argc, char* argv[])
 			case 't': GET_SHORT_OPTION_VARIABLE('t', &type); arg = "t"; break;
 			case 'v': flag_volatile = true; break;
 			default:
-				errx(1, "unknown option -- '%c'\n", c);
+				errx(1, "unknown option -- '%c'", c);
 			}
 		}
 		else if ( !strcmp(arg, "--const") )
@@ -172,7 +172,7 @@ int main(int argc, char* argv[])
 		else if ( GET_OPTION_VARIABLE("--output", &output) ) { }
 		else if ( GET_OPTION_VARIABLE("--type", &type) ) { }
 		else
-			errx(1, "unknown option: %s\n", arg);
+			errx(1, "unknown option: %s", arg);
 	}
 
 	compact_arguments(&argc, &argv);
