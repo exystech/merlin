@@ -21,6 +21,7 @@
 #include <sys/termmode.h>
 
 #include <assert.h>
+#include <err.h>
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
@@ -604,17 +605,6 @@ static void compact_arguments(int* argc, char*** argv)
 	}
 }
 
-static void help(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "Usage: %s [OPTION]... [FILES]...\n", argv0);
-	fprintf(fp, "Displays files one page at a time.\n");
-}
-
-static void version(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
-}
-
 int main(int argc, char* argv[])
 {
 	setlocale(LC_ALL, "");
@@ -638,7 +628,6 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	const char* argv0 = argv[0];
 	for ( int i = 1; i < argc; i++ )
 	{
 		const char* arg = argv[i];
@@ -655,21 +644,11 @@ int main(int argc, char* argv[])
 			case 'r': pager.flag_raw_control_chars = true; break;
 			case 'R': pager.flag_color_sequences = true; break;
 			default:
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				help(stderr, argv0);
-				exit(1);
+				errx(1, "unknown option -- '%c'", c);
 			}
 		}
-		else if ( !strcmp(arg, "--help") )
-			help(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--version") )
-			version(stdout, argv0), exit(0);
 		else
-		{
-			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			help(stderr, argv0);
-			exit(1);
-		}
+			errx(1, "unknown option: %s", arg);
 	}
 
 	compact_arguments(&argc, &argv);

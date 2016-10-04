@@ -1,0 +1,51 @@
+.Dd October 05, 2016
+.Dt PAGER 1
+.Os
+.Sh NAME
+.Nm pager
+.Nd display files one page at a time
+.Sh SYNOPSIS
+.Nm
+.Op Fl Rr
+.Ar file ...
+.Sh DESCRIPTION
+.Nm
+displays the input one page at a time.  The input is the concatenation of the
+input files, or the standard input if no files were specified and the
+standard input is not a terminal.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl R
+Output only escape sequences that change font properties such as color and
+boldness.
+.It Fl r
+Causes raw control characters to be dumped directly onto the terminal.  Usage
+of this option may cause output to be misleading for suspicious files, as the
+escape codes in the file are rendered and can be used to hide parts of the
+input.  Avoid the -r option if you want to see the actual bytes in the file,
+or use -R to show only selected escape codes.
+.Sh COMMANDS
+.Nm
+supports the following key commands:
+.Bl -tag -width "12345678"
+.It Enter or Down Arrow
+Scroll the file one line down.
+.It Up Arrow
+Scroll the file one line up.
+.It Space or Page Down
+Scroll the file one page down.
+.It Page Up
+Scroll the file one page up.
+.It End
+Scroll all the way down to the end of the file.
+.It Home
+Scroll all the way up to the beginning of the file.
+.It q or Q
+Exit the pager.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr editor 1
