@@ -26,12 +26,12 @@ format of files and directories.
 Every specified
 .Ar directory
 is used as a root directory and is recursively searched for files and
-directories matching the filter. If multiple directories are specified, the
-directories are merged together. In case two files with the same path conflict,
+directories matching the filter.  If multiple directories are specified, the
+directories are merged together.  In case two files with the same path conflict,
 precedence is given to the file in the root directory specified first.
 .Pp
 Hardlinks are detected and preserved to avoid data duplication.
-Inode times are truncated to second precision due to format limitations.  Inode
+Inode times are truncated to second precision due to format limitations.  Inodes
 are stored with uid 0 and gid 0 of the root user.  The format is not compressed
 but can be compressed externally if it is decompressed during bootloading.
 .Pp
@@ -70,11 +70,11 @@ at the specified
 .Ar destination .
 .El
 .Sh FILTER RULES
-The rule format is line based and leading whitespace is skipped. Lines starting
+The rule format is line based and leading whitespace is skipped.  Lines starting
 with a
 .Li #
-character are ignored as comments. The first word on a line must be one of
-the following commands and the rest of the line is its parameter. Trailing
+character are ignored as comments.  The first word on a line must be one of
+the following commands and the rest of the line is its parameter.  Trailing
 whitespace is not ignored.
 .Bl -tag -width "12345678"
 .It Sy default Ar boolean
