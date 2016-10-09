@@ -25,7 +25,7 @@
 #endif
 
 #ifndef __is_sortix_libk
-pthread_mutex_t __heap_mutex;
+extern pthread_mutex_t __heap_mutex;
 #endif
 
 void __heap_unlock(void)
