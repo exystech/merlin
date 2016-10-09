@@ -15,7 +15,6 @@ basename \
 cat \
 chkblayout \
 chmod \
-chroot \
 chvideomode \
 clear \
 colormake \
@@ -63,7 +62,6 @@ true \
 type \
 uname \
 uniq \
-unmount \
 uptime \
 wc \
 which \
@@ -73,7 +71,7 @@ BINARIES=\
 $(BINARIES_EXCEPT_INSTALL) \
 xinstall
 
-MANPAGES=\
+MANPAGES1=\
 chkblayout.1 \
 kernelinfo.1 \
 memstat.1 \
@@ -81,7 +79,13 @@ pager.1 \
 passwd.1 \
 readlink.1 \
 
-all: $(BINARIES)
+SBINS=\
+chroot \
+unmount \
+
+MANPAGES8=\
+
+all: $(BINARIES) $(SBINS)
 
 .PHONY: all install clean
 
@@ -89,11 +93,15 @@ install: all
 	mkdir -p $(DESTDIR)$(BINDIR)
 	install $(BINARIES_EXCEPT_INSTALL) $(DESTDIR)$(BINDIR)
 	install xinstall $(DESTDIR)$(BINDIR)/install
+	mkdir -p $(DESTDIR)$(SBINDIR)
+	install $(SBINS) $(DESTDIR)$(SBINDIR)
 	mkdir -p $(DESTDIR)$(MANDIR)/man1
-	cp $(MANPAGES) $(DESTDIR)$(MANDIR)/man1
+	cp $(MANPAGES1) $(DESTDIR)$(MANDIR)/man1
+	#mkdir -p $(DESTDIR)$(MANDIR)/man8
+	#cp $(MANPAGES8) $(DESTDIR)$(MANDIR)/man8
 
 %: %.c
 	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< -o $@
 
 clean:
-	rm -f $(BINARIES) *.o
+	rm -f $(BINARIES) $(SBINS) *.o
