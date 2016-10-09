@@ -1,5 +1,5 @@
-#!/bin/sh -e
-# Copyright (c) 2015 Jonas 'Sortie' Termansen.
+#!/bin/sh
+# Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -16,27 +16,7 @@
 # update-initrd
 # Generate a mkinitrd that locates and chain boots the real root filesystem.
 
-show_version() {
-  cat << EOF
-$0 (Sortix)
-EOF
-  exit 0
-}
-
-
-show_help() {
-  cat << EOF
-Usage: $0 [OPTION]...
-
-Generate a mkinitrd that locates and chain boots the real root filesystem.
-
-Configuration:
-  --help              display this help and exit
-  --version           display version information and exit
-  --sysroot=DIR       operate on this root filesystem [/]
-EOF
-  exit 0
-}
+set -e
 
 sysroot=
 
@@ -66,15 +46,21 @@ for argument do
   esac
 done
 
-if [ ! -e "$sysroot/etc/fstab" ]; then
-  echo "$0: $sysroot/etc/fstab: Need a filesystem table to make an initrd" >&2
-  exit 1
-fi
 sysmerge=false
 exec_prefix="$sysroot"
 if [ -d "$sysroot/sysmerge" ]; then
+  # If an upgrade is pending, invoke the update-initrd of the new system, if
+  # we're not already it.
+  if [ "$(realpath -- "$(which -- "$0")")" != \
+       "$(realpath -- "$sysroot/sysmerge/sbin/update-initrd")" ]; then
+    exec "$sysroot/sysmerge/sbin/update-initrd" "$@"
+  fi
   sysmerge=true
   exec_prefix="$sysroot/sysmerge"
+fi
+if [ ! -e "$sysroot/etc/fstab" ]; then
+  echo "$0: $sysroot/etc/fstab: Need a filesystem table to make an initrd" >&2
+  exit 1
 fi
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT HUP INT QUIT TERM
