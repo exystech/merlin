@@ -72,7 +72,6 @@ int main(int argc, char* argv[])
 {
 	const char* cipher = "blowfish,a";
 
-	const char* argv0 = argv[0];
 	for ( int i = 1; i < argc; i++ )
 	{
 		const char* arg = argv[i];
@@ -97,12 +96,12 @@ int main(int argc, char* argv[])
 				arg = "c";
 				break;
 			default:
-				errx(1, "%s: unknown option -- '%c'", argv0, c);
+				errx(1, "unknown option -- '%c'", c);
 			}
 		}
 		else
 		{
-			errx(1, "%s: unrecognized option: %s", argv0, arg);
+			errx(1, "unrecognized option: %s", arg);
 		}
 	}
 
