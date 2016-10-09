@@ -342,7 +342,8 @@ int sys_exit_thread(int requested_exit_code,
 	if ( !(flags & EXIT_THREAD_ONLY_IF_OTHERS) || is_others )
 		thread->pledged_destruction = true;
 	bool are_threads_exiting = false;
-	if ( (flags & EXIT_THREAD_PROCESS) || !is_others )
+	bool do_exit = (flags & EXIT_THREAD_PROCESS) || !is_others;
+	if ( do_exit )
 		process->threads_exiting = true;
 	else if ( process->threads_exiting )
 		are_threads_exiting = true;
@@ -381,7 +382,7 @@ int sys_exit_thread(int requested_exit_code,
 	if ( flags & EXIT_THREAD_ZERO )
 		ZeroUser(extended.zero_from, extended.zero_size);
 
-	if ( !is_others )
+	if ( do_exit )
 	{
 		// Validate the requested exit code such that the process can't exit
 		// with an impossible exit status or that it wasn't actually terminated.
