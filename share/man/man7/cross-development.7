@@ -13,6 +13,15 @@ similar operating system such as Linux with the GNU tools installed.  The build
 system assumes the presence of some GNU extensions in the standard command line
 tools.  This document will detail the process of bootstrapping a Sortix system
 from another operating system.
+.Pp
+Be sure you are reading the latest version of this document, rather than an old
+copy installed on the system or on an online manual page viewer, if you want to
+build the latest development code rather than the stable release.  To view the
+instructions for the latest source code using the command line:
+.Bd -literal
+    cd /latest/source/code &&
+    man share/man/man7/cross-development.7
+.Ed
 .Ss Overview
 To build Sortix you need to get these programs from your operating system vendor
 or compile them yourself:
@@ -258,7 +267,7 @@ cross-compiler you can run:
 .Pp
 This creates a bootable
 .Pa sortix.iso .
-.Pp
+.Ss Additional Required Reading
 The
 .Xr development 7
 manual page documents how to develop Sortix and how to use the build system.
@@ -267,6 +276,12 @@ and is not sufficient to develop Sortix, or to make a fully functional and
 installable Sortix system.  The above instructions only gives you a
 cross-compilation of the base system without any of the nessesary ports of third
 party software.
+.Pp
+The
+.Xr following-development 7
+manual page documents what needs to be done to stay updated with the latest
+developments.  You will need to read the new version of that document whenever
+you update the source code.
 .Ss Troubleshooting
 If producing a bootable cdrom with
 .Xr grub-mkrescue 1
@@ -282,6 +297,7 @@ in your case.
 .Sh SEE ALSO
 .Xr make 1 ,
 .Xr development 7 ,
+.Xr following-development 7 ,
 .Xr installation 7 ,
 .Xr porting-guide 7 ,
 .Xr sysinstall 8

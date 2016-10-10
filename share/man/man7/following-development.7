@@ -1,0 +1,140 @@
+.Dd $Mdocdate: October 10 2016 $
+.Dt FOLLOWING-DEVELOPMENT 7
+.Os
+.Sh NAME
+.Nm following-development
+.Nd instructions for following development
+.Sh DESCRIPTION
+This document is a list of changes that affect the ability to build and run the
+latest Sortix source code, when doing native
+.Xr development 7
+or
+.Xr cross-development 7 .
+The list is in reverse chronological order.  The system has policies that handle
+incompatible changes gracefully.
+.Pp
+If you are updating to new source code, be sure you are reading the new version
+of this document, rather than an old copy installed on the system or on an
+online manual page viewer.  To view the new version from the command line:
+.Bd -literal
+    cd /src  # system source code location
+    mandoc share/man/man7/following-development.7 | pager  # natively
+    man share/man/man7/following-development.7             # non-natively
+.Ed
+.Pp
+The
+.Xr sysmerge 8
+and
+.Xr sysupgrade 8
+programs automatically handles compatibility issues when upgrading an existing
+system to a new build.  They can handle incompatible ABI changes and
+automatically fix configuration files and other issues.
+.Pp
+When building the system from source code, you must have the latest build tools
+installed as detailed in
+.Xr development 7
+and
+.Xr cross-development 7 .
+After upgrading to newer source code, you must first install the new build tools
+before building.  If this is needed, there will be a notice in this document.
+Build tools will likely complain about missing options or invalid parameters if
+they are not up to date.  Automatic build scripts should use the
+.Sy install-build-tools
+target provided by the root makefile.
+.Pp
+Changes to the source code may rely on the newest build tools, but the build
+tools must retain the ability to build all the way back to the latest stable
+release.  The build tools of release N+1 must be able to build release N.  The
+build tools must be portable to the latest stable release and the supported
+.Xr cross-development 7
+systems.  If a build tool needs an incompatible change, there must be added a
+way to opt into the new behavior, and the build system must use that option and
+not use the old behavior any more.  This forward compatibility will allow the
+removal of the old behavior after the next release.  Temporary compatibility
+must be mentioned with a condition for when it can be removed and it must have
+instructions for what needs to be done.  Use a comment in the format
+"TODO: After
+.\" Line break so this occurrence doesn't make a false positive when I grep.
+releasing Sortix x.y, foo." to allow the maintainer to easily
+.Xr grep 1
+for it after a release.
+.Sh CHANGES
+.Ss Seed kernel entropy with randomness from the previous boot
+Entropy from the previous boot is now stored in
+.Pa /boot/random.seed .
+The bootloader is supposed to load this file as a multiboot module with the
+command line option
+.Fl \-random-seed .
+The kernel will issue a security warning if it was booted without a random seed,
+unless the kernel command line contains
+.Fl \-no-random-seed .
+The GRUB port has been updated with an improved
+.Pa /etc/grub.d/10_sortix
+script that will automatically emit the appropriate GRUB commands.
+.Pp
+Users using the included GRUB will need to update to the latest GRUB port
+and then run
+.Xr update-initrd 8
+to regenerate
+.Pa /etc/grub/grub.cfg .
+All of this will be handled automatically if upgrading with
+.Xr sysupgrade 8
+and the new build contains the new GRUB, or if upgrading with
+.Xr sysmerge 8
+and the source system root contains the new GRUB.
+.Pp
+Users not using the included GRUB, but still using GRUB from another
+installation, will need to reconfigure that bootloader installation.  In the
+boot commands of this system, add after the initrd load:
+.Bd -literal
+    module /boot/random.seed --random-seed
+.Ed
+.Pp
+If the GRUB port is installed, but not used, then if that port is updated with
+.Xr sysupgrade 8
+or
+.Xr sysmerge 8
+or manually, the
+.Pa /etc/grub.d/10_sortix
+script can be invoked, which will generate a
+.Pa /etc/grub.d/10_sortix.cache
+fragment that can be spliced into the configuration of another GRUB
+installation.
+.Pp
+Users not using GRUB will need to configure their bootloader
+to load
+.Pa /boot/random.seed
+appropriately.
+.Pp
+.Xr sysmerge 8
+and
+.Xr sysupgrade 8
+will automatically create
+.Pa /boot/random.seed
+if it doesn't exist.  If using neither to upgrade, manually create that file
+owned by user root and group root with mode 600 containing 256 bytes of entropy.
+.Ss Modernize carray(1) and fix missing allocation checks
+The
+.Xr carray 1
+build tool has gained the
+.Fl EGHot
+options and the build system now relies on this.
+.Xr carray 1
+must be upgraded before building the system.
+.Bd -literal
+    cd /src/carray &&
+    make clean &&
+    make install
+.Ed
+.Pp
+If not developing natively, set
+.Ev PREFIX
+to the desired location.
+.Ss Remove compatibility with Sortix 0.9
+Sortix 1.0 has been released.  The build tools are no longer capable of building
+anything prior to the Sortix 1.0 release.
+.Sh SEE ALSO
+.Xr cross-development 7 ,
+.Xr development 7 ,
+.Xr sysmerge 8 ,
+.Xr sysupgrade 8
