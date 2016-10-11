@@ -84,6 +84,7 @@ chroot \
 unmount \
 
 MANPAGES8=\
+unmount.8 \
 
 all: $(BINARIES) $(SBINS)
 
@@ -97,8 +98,8 @@ install: all
 	install $(SBINS) $(DESTDIR)$(SBINDIR)
 	mkdir -p $(DESTDIR)$(MANDIR)/man1
 	cp $(MANPAGES1) $(DESTDIR)$(MANDIR)/man1
-	#mkdir -p $(DESTDIR)$(MANDIR)/man8
-	#cp $(MANPAGES8) $(DESTDIR)$(MANDIR)/man8
+	mkdir -p $(DESTDIR)$(MANDIR)/man8
+	cp $(MANPAGES8) $(DESTDIR)$(MANDIR)/man8
 
 %: %.c
 	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< -o $@

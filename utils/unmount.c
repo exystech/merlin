@@ -19,8 +19,7 @@
 
 #include <sys/mount.h>
 
-#include <errno.h>
-#include <error.h>
+#include <err.h>
 #include <locale.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -40,22 +39,6 @@ static void compact_arguments(int* argc, char*** argv)
 	}
 }
 
-static void help(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "Usage: %s [OPTION]... DIRECTORY...\n", argv0);
-	fprintf(fp, "Unmounts filesystems mounted at directories..\n");
-	fprintf(fp, "\n");
-	fprintf(fp, "Mandatory arguments to long options are mandatory for short options too.\n");
-	fprintf(fp, "  -f, --force   unmount even though still in use\n");
-	fprintf(fp, "  -l, --lazy    remove mountpoint but delay unmounting until no longer used");
-
-}
-
-static void version(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
-}
-
 int main(int argc, char* argv[])
 {
 	setlocale(LC_ALL, "");
@@ -63,7 +46,6 @@ int main(int argc, char* argv[])
 	bool force = false;
 	bool lazy = false;
 
-	const char* argv0 = argv[0];
 	for ( int i = 1; i < argc; i++ )
 	{
 		const char* arg = argv[i];
@@ -80,25 +62,15 @@ int main(int argc, char* argv[])
 			case 'f': force = true; break;
 			case 'l': lazy = true; break;
 			default:
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				help(stderr, argv0);
-				exit(1);
+				errx(1, "unknown option -- '%c'", c);
 			}
 		}
-		else if ( !strcmp(arg, "--help") )
-			help(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--version") )
-			version(stdout, argv0), exit(0);
 		else if ( !strcmp(arg, "--force") )
 			force = true;
 		else if ( !strcmp(arg, "--lazy") )
 			lazy = true;
 		else
-		{
-			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			help(stderr, argv0);
-			exit(1);
-		}
+			errx(1, "unknown option: %s", arg);
 	}
 
 	compact_arguments(&argc, &argv);
@@ -113,7 +85,7 @@ int main(int argc, char* argv[])
 	{
 		const char* path = argv[i];
 		if ( unmount(path, flags) < 0 )
-			error(1, errno, "`%s'", path);
+			err(1, "%s", path);
 	}
 
 	return 0;
