@@ -1,0 +1,55 @@
+.Dd September 29, 2016
+.Dt CHROOT 8
+.Os
+.Sh NAME
+.Nm chroot
+.Nd run command with changed root directory
+.Sh SYNOPSIS
+.Nm
+.Op Fl d
+.Ar newroot
+.Oo
+.Ar command
+.Oo
+.Ar arguments ...
+.Oc
+.Oc
+.Sh DESCRIPTION
+.Nm
+changes the root directory to
+.Ar newroot
+and runs
+.Ar command
+with the given
+.Ar arguments .
+.Ar command
+defaults to
+.Xr sh 1 .
+The working directory for
+.Ar command
+is changed to
+.Pa / .
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl d, Fl \-devices
+Mount
+.Pa /dev
+from the host system into the
+.Pa /dev
+inside
+.Ar newroot .
+The mountpoint is removed when
+.Ar command
+completes.  This option is useful for running installations.
+.El
+.Sh ENVIRONMENT
+The environment is preserved.
+.Ev PATH
+is used to search for
+.Ar command .
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr chroot 2

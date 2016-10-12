@@ -84,6 +84,7 @@ chroot \
 unmount \
 
 MANPAGES8=\
+chroot.8 \
 unmount.8 \
 
 all: $(BINARIES) $(SBINS)
