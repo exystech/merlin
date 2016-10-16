@@ -25,6 +25,7 @@ help
 kernelinfo
 kill
 ln
+logname
 ls
 memstat
 mkdir

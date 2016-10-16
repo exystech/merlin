@@ -36,6 +36,7 @@ id \
 kernelinfo \
 kill \
 ln \
+logname \
 ls \
 memstat \
 mkdir \
@@ -74,6 +75,7 @@ xinstall
 MANPAGES1=\
 chkblayout.1 \
 kernelinfo.1 \
+logname.1 \
 memstat.1 \
 pager.1 \
 passwd.1 \
