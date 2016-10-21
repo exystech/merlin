@@ -59,6 +59,25 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Add German keyboard layout.
+The
+.Xr kblayout-compiler 1
+build tool has gained support for modifier combinations used by the German
+keyboard layout, and the new German keyboard layout relies on this.
+.Xr kblayout-compiler 1
+must be upgraded before building the system.
+.Bd -literal
+    cd /src/kblayout-compiler &&
+    make clean &&
+    make install
+.Ed
+.Pp
+If not developing natively, set
+.Ev PREFIX
+to the desired location.
+.Pp
+If the new program isn't used, the build will still complete successfully but an
+incorrect German keyboard layout will be installed.
 .Ss Seed kernel entropy with randomness from the previous boot
 Entropy from the previous boot is now stored in
 .Pa /boot/random.seed .

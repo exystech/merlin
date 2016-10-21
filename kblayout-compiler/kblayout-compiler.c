@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -74,6 +74,28 @@ bool accept_no_shift_alt_gr(uint32_t combination)
 	return true;
 }
 
+bool accept_no_shift_alt_gr_no_caps(uint32_t combination)
+{
+	if ( (combination & 0b0010) )
+		return false;
+	if ( combination & 0b0001 )
+		return false;
+	if ( !(combination & 0b0100) )
+		return false;
+	return true;
+}
+
+bool accept_no_shift_alt_gr_caps(uint32_t combination)
+{
+	if ( !(combination & 0b0010) )
+		return false;
+	if ( combination & 0b0001 )
+		return false;
+	if ( !(combination & 0b0100) )
+		return false;
+	return true;
+}
+
 bool accept_shift_alt_gr(uint32_t combination)
 {
 	if ( !(combination & 0b0001) )
@@ -97,6 +119,28 @@ bool accept_lower_no_altgr(uint32_t combination)
 bool accept_upper_no_altgr(uint32_t combination)
 {
 	if ( (combination & 0b0100) )
+		return false;
+	if ( (combination & 0b0001) && (combination & 0b0010) )
+		return false;
+	if ( !(combination & 0b0001) && !(combination & 0b0010) )
+		return false;
+	return true;
+}
+
+bool accept_lower_altgr(uint32_t combination)
+{
+	if ( !(combination & 0b0100) )
+		return false;
+	if ( (combination & 0b0001) && !(combination & 0b0010) )
+		return false;
+	if ( !(combination & 0b0001) && (combination & 0b0010) )
+		return false;
+	return true;
+}
+
+bool accept_upper_altgr(uint32_t combination)
+{
+	if ( !(combination & 0b0100) )
 		return false;
 	if ( (combination & 0b0001) && (combination & 0b0010) )
 		return false;
@@ -491,16 +535,24 @@ int main(int argc, char* argv[])
 				condition = accept_shift_no_alt_gr;
 			else if ( !strcmp(line, "-shift & +altgr") )
 				condition = accept_no_shift_alt_gr;
+			else if ( !strcmp(line, "-shift & +altgr & -caps") )
+				condition = accept_no_shift_alt_gr_no_caps;
+			else if ( !strcmp(line, "-shift & +altgr & +caps") )
+				condition = accept_no_shift_alt_gr_caps;
 			else if ( !strcmp(line, "+shift & +altgr") )
 				condition = accept_shift_alt_gr;
 			else if ( !strcmp(line, "shift = caps & -altgr") )
 				condition = accept_lower_no_altgr;
 			else if ( !strcmp(line, "shift ^ caps & -altgr") )
 				condition = accept_upper_no_altgr;
+			else if ( !strcmp(line, "shift = caps & +altgr") )
+				condition = accept_lower_altgr;
+			else if ( !strcmp(line, "shift ^ caps & +altgr") )
+				condition = accept_upper_altgr;
 			else if ( !strcmp(line, "+numlock") )
 				condition = accept_numlock;
 			else
-				printf("%s\n", line);
+				fprintf(stderr, "Unsupported modifier combination: %s\n", line);
 			continue;
 		}
 
