@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -354,6 +354,12 @@ void show_line(struct show_line* show_state, const char* line, size_t cursor)
 	show_state->invalidated = false;
 }
 
+void show_line_end(struct show_line* show_state, const char* line)
+{
+	size_t cursor = line ? strlen(line) : 0;
+	show_line(show_state, line, cursor);
+}
+
 void show_line_clear(struct show_line* show_state)
 {
 	dprintf(show_state->out_fd, "\e[H\e[2J");
@@ -362,7 +368,7 @@ void show_line_clear(struct show_line* show_state)
 	show_state->wcp_start.wcp_col = 0;
 	show_state->invalidated = true;
 
-	show_line(show_state, show_state->current_line, strlen(show_state->current_line));
+	show_line_end(show_state, show_state->current_line);
 }
 
 void show_line_abort(struct show_line* show_state)
@@ -374,7 +380,7 @@ void show_line_abort(struct show_line* show_state)
 
 void show_line_finish(struct show_line* show_state)
 {
-	show_line(show_state, show_state->current_line, strlen(show_state->current_line));
+	show_line_end(show_state, show_state->current_line);
 	dprintf(show_state->out_fd, "\n");
 
 	show_line_abort(show_state);
