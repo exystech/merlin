@@ -214,6 +214,8 @@ public:
 	                            size_t size, off_t start);
 	virtual Ref<Inode> open(ioctx_t* ctx, const char* filename, int flags,
 	                        mode_t mode);
+	virtual Ref<Inode> factory(ioctx_t* ctx, const char* filename, int flags,
+	                           mode_t mode);
 	virtual int mkdir(ioctx_t* ctx, const char* filename, mode_t mode);
 	virtual int link(ioctx_t* ctx, const char* filename, Ref<Inode> node);
 	virtual int link_raw(ioctx_t* ctx, const char* filename, Ref<Inode> node);
@@ -1063,6 +1065,12 @@ Ref<Inode> Unode::open(ioctx_t* ctx, const char* filename, int flags,
 		ret = server->OpenNode(resp.ino, resp.type);
 	channel->KernelClose();
 	return ret;
+}
+
+Ref<Inode> Unode::factory(ioctx_t* /*ctx*/, const char* /*filename*/,
+                          int /*flags*/, mode_t /*mode*/)
+{
+	return errno = EBADF, Ref<Inode>(NULL);
 }
 
 int Unode::mkdir(ioctx_t* ctx, const char* filename, mode_t mode)

@@ -98,6 +98,13 @@ Ref<Vnode> Vnode::open(ioctx_t* ctx, const char* filename, int flags, mode_t mod
 	Ref<Inode> retinode = inode->open(ctx, filename, flags, mode);
 	if ( !retinode )
 		return Ref<Vnode>(NULL);
+	if ( retinode->type & S_IFFACTORY &&
+	     !(retinode->type & S_IFFACTORY_NOSTAT && flags & O_IS_STAT) )
+	{
+		retinode = retinode->factory(ctx, filename, flags, mode);
+		if ( !retinode )
+			return Ref<Vnode>(NULL);
+	}
 	Ref<Vnode> retmountedat = mountedat;
 	ino_t retrootino = rootino;
 	dev_t retrootdev = rootdev;

@@ -73,6 +73,8 @@ public:
 	                            size_t size, off_t start) = 0;
 	virtual Ref<Inode> open(ioctx_t* ctx, const char* filename, int flags,
 	                        mode_t mode) = 0;
+	virtual Ref<Inode> factory(ioctx_t* ctx, const char* filename, int flags,
+	                           mode_t mode) = 0;
 	virtual int mkdir(ioctx_t* ctx, const char* filename, mode_t mode) = 0;
 	virtual int link(ioctx_t* ctx, const char* filename, Ref<Inode> node) = 0;
 	virtual int link_raw(ioctx_t* ctx, const char* filename, Ref<Inode> node) = 0;
@@ -166,6 +168,8 @@ public:
 	                            size_t size, off_t start);
 	virtual Ref<Inode> open(ioctx_t* ctx, const char* filename, int flags,
 	                        mode_t mode);
+	virtual Ref<Inode> factory(ioctx_t* ctx, const char* filename, int flags,
+	                           mode_t mode);
 	virtual int mkdir(ioctx_t* ctx, const char* filename, mode_t mode);
 	virtual int link(ioctx_t* ctx, const char* filename, Ref<Inode> node);
 	virtual int link_raw(ioctx_t* ctx, const char* filename, Ref<Inode> node);

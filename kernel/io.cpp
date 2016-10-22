@@ -205,7 +205,8 @@ int sys_faccessat(int dirfd, const char* path, int mode, int flags)
 	ioctx_t ctx; SetupUserIOCtx(&ctx);
 	Ref<Descriptor> from = PrepareLookup(pathcopy, dirfd);
 	if ( !from ) { delete[] pathcopy; return -1; }
-	int open_flags = O_READ | (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
+	int open_flags = O_READ | O_IS_STAT |
+	                 (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
 	Ref<Descriptor> desc = from->open(&ctx, pathcopy, open_flags);
 	delete[] pathcopy;
 	if ( !desc )
@@ -290,7 +291,8 @@ int sys_fstatat(int dirfd, const char* path, struct stat* st, int flags)
 	ioctx_t ctx; SetupUserIOCtx(&ctx);
 	Ref<Descriptor> from = PrepareLookup(pathcopy, dirfd);
 	if ( !from ) { delete[] pathcopy; return -1; }
-	int open_flags = O_READ | (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
+	int open_flags = O_READ | O_IS_STAT |
+	                 (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
 	Ref<Descriptor> desc = from->open(&ctx, pathcopy, open_flags);
 	delete[] pathcopy;
 	if ( !desc )
@@ -326,7 +328,8 @@ int sys_fstatvfsat(int dirfd, const char* path, struct statvfs* stvfs, int flags
 	ioctx_t ctx; SetupUserIOCtx(&ctx);
 	Ref<Descriptor> from = PrepareLookup(pathcopy, dirfd);
 	if ( !from ) { delete[] pathcopy; return -1; }
-	int open_flags = O_READ | (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
+	int open_flags = O_READ | O_IS_STAT |
+	                 (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
 	Ref<Descriptor> desc = from->open(&ctx, pathcopy, open_flags);
 	delete[] pathcopy;
 	if ( !desc )

@@ -84,6 +84,11 @@ struct stat
 #define S_ISCHR(mode) (((mode) & S_IFMT) == S_IFCHR)
 #define S_ISFIFO(mode) (((mode) & S_IFMT) == S_IFIFO)
 
+#ifdef __is_sortix_kernel
+#define S_IFFACTORY 0x10000
+#define S_IFFACTORY_NOSTAT 0x20000
+#endif
+
 #define UTIME_NOW  0x3FFFFFFF
 #define UTIME_OMIT 0x3FFFFFFE
 

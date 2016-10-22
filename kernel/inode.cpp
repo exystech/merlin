@@ -217,6 +217,14 @@ Ref<Inode> AbstractInode::open(ioctx_t* /*ctx*/, const char* /*filename*/,
 	return errno = ENOTDIR, Ref<Inode>(NULL);
 }
 
+Ref<Inode> AbstractInode::factory(ioctx_t* /*ctx*/, const char* /*filename*/,
+                                  int /*flags*/, mode_t /*mode*/)
+{
+	if ( inode_type == INODE_TYPE_DIR )
+		return errno = EBADF, Ref<Inode>(NULL);
+	return errno = ENOTDIR, Ref<Inode>(NULL);
+}
+
 int AbstractInode::mkdir(ioctx_t* /*ctx*/, const char* /*filename*/,
                          mode_t /*mode*/)
 {

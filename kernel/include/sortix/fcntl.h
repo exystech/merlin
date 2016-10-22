@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -44,6 +44,9 @@ extern "C" {
 #define O_SYMLINK_NOFOLLOW (1<<13)
 #define O_NOCTTY (1<<14)
 #define O_TTY_INIT (1<<15)
+#ifdef __is_sortix_kernel
+#define O_IS_STAT (1<<30)
+#endif
 
 #define O_ACCMODE (O_READ | O_WRITE | O_EXEC | O_SEARCH)
 
