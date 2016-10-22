@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -193,7 +193,9 @@ ssize_t DevCOMPort::read(ioctx_t* ctx, uint8_t* dest, size_t count)
 				continue;
 			if ( attempt <= 15 && !(ctx->dflags & O_NONBLOCK) )
 			{
+				kthread_mutex_unlock(&port_lock);
 				kthread_yield();
+				kthread_mutex_lock(&port_lock);
 				continue;
 			}
 			if ( i )
@@ -202,7 +204,9 @@ ssize_t DevCOMPort::read(ioctx_t* ctx, uint8_t* dest, size_t count)
 				return errno = EWOULDBLOCK, -1;
 			if ( Signal::IsPending() )
 				return errno = EINTR, -1;
+			kthread_mutex_unlock(&port_lock);
 			kthread_yield();
+			kthread_mutex_lock(&port_lock);
 		}
 
 		uint8_t value = has_pending_input_byte ?
@@ -235,7 +239,9 @@ ssize_t DevCOMPort::write(ioctx_t* ctx, const uint8_t* src, size_t count)
 				continue;
 			if ( attempt <= 15 && !(ctx->dflags & O_NONBLOCK) )
 			{
+				kthread_mutex_unlock(&port_lock);
 				kthread_yield();
+				kthread_mutex_lock(&port_lock);
 				continue;
 			}
 			if ( i )
