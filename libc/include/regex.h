@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -140,6 +140,9 @@ typedef struct
 
 #define REG_NOTBOL (1 << 0)
 #define REG_NOTEOL (1 << 1)
+#if __USE_SORTIX
+#define REG_STARTEND (1 << 2)
+#endif
 
 #define REG_NOMATCH 1
 #define REG_BADPAT 2
@@ -154,6 +157,9 @@ typedef struct
 #define REG_ERANGE 11
 #define REG_ESPACE 12
 #define REG_BADRPT 13
+#if __USE_SORTIX
+#define REG_INVARG 14
+#endif
 
 #ifdef __cplusplus
 extern "C" {

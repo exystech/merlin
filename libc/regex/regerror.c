@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -43,6 +43,7 @@ size_t regerror(int errnum,
 	case REG_ERANGE: msg = "Invalid endpoint in range expression"; break;
 	case REG_ESPACE: msg = "Out of memory"; break;
 	case REG_BADRPT: msg = "'?', '*', or '+' not preceded by valid regular expression"; break;
+	case REG_INVARG: msg = "Invalid arguments"; break;
 	}
 	if ( errbuf_size )
 		strlcpy(errbuf, msg, errbuf_size);

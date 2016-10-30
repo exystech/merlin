@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,6 +21,7 @@
 #include <pthread.h>
 #include <regex.h>
 #include <stdbool.h>
+#include <string.h>
 
 #define QUEUE_CURRENT_STATE(new_state) \
 { \
@@ -105,6 +106,21 @@ int regexec(const regex_t* restrict regex_const,
 	if ( regex->re_cflags & REG_NOSUB )
 		nmatch = 0;
 
+	size_t start;
+	size_t end;
+	if ( eflags & REG_STARTEND )
+	{
+		if ( pmatch[0].rm_so < 0 || pmatch[0].rm_eo < pmatch[0].rm_so )
+			return REG_INVARG;
+		start = pmatch[0].rm_so;
+		end = pmatch[0].rm_eo;
+	}
+	else
+	{
+		start = 0;
+		end = strlen(string);
+	}
+
 	for ( size_t i = 0; i < nmatch; i++ )
 	{
 		pmatch[i].rm_so = -1;
@@ -123,7 +139,7 @@ int regexec(const regex_t* restrict regex_const,
 
 	regex->re->re_is_current = 0;
 
-	for ( size_t i = 0; true; i++ )
+	for ( size_t i = start; i <= end; i++ )
 	{
 		if ( !regex->re->re_is_current && result == REG_NOMATCH )
 		{
@@ -143,7 +159,7 @@ int regexec(const regex_t* restrict regex_const,
 				regex->re->re_matches[m].rm_eo = -1;
 			}
 		}
-		char c = string[i];
+		char c = i < end ? string[i] : '\0';
 		for ( struct re* state = current_states;
 		      state;
 		      state = state->re_current_state_next )
@@ -236,9 +252,6 @@ int regexec(const regex_t* restrict regex_const,
 		eflags |= REG_NOTBOL;
 
 		if ( current_states == NULL && result == 0 )
-			break;
-
-		if ( c == '\0' )
 			break;
 	}
 
