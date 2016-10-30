@@ -353,7 +353,6 @@ interrupt_handler_prepare:
 	pushq %rcx
 	pushq %rdx
 	pushq %rbx
-	pushq %rsp
 	pushq %rbp
 	pushq %rsi
 	pushq %rdi
@@ -409,7 +408,6 @@ load_interrupted_registers:
 	popq %rdi
 	popq %rsi
 	popq %rbp
-	addq $8, %rsp # Don't pop %rsp, may not be defined.
 	popq %rbx
 	popq %rdx
 	popq %rcx

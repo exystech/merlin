@@ -70,7 +70,6 @@ struct interrupt_context
 	uint32_t edi;
 	uint32_t esi;
 	uint32_t ebp;
-	uint32_t not_esp;
 	uint32_t ebx;
 	uint32_t edx;
 	uint32_t ecx;
@@ -134,7 +133,6 @@ struct interrupt_context
 	uint64_t rdi;
 	uint64_t rsi;
 	uint64_t rbp;
-	uint64_t not_rsp;
 	uint64_t rbx;
 	uint64_t rdx;
 	uint64_t rcx;

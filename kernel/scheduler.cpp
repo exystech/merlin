@@ -197,7 +197,6 @@ static void FakeInterruptedContext(struct interrupt_context* intctx, int int_no)
 	intctx->edi = intctx->edi;
 	intctx->esi = intctx->esi;
 	intctx->ebp = intctx->signal_pending;
-	intctx->not_esp = intctx->not_esp;
 	intctx->ebx = (uintptr_t) fakectx;
 	intctx->edx = intctx->edx;
 	intctx->ecx = intctx->ecx;
@@ -225,7 +224,6 @@ static void FakeInterruptedContext(struct interrupt_context* intctx, int int_no)
 	intctx->rdi = (uintptr_t) fakectx;
 	intctx->rsi = intctx->rsi;
 	intctx->rbp = intctx->signal_pending;
-	intctx->not_rsp = intctx->not_rsp;
 	intctx->rbx = (uintptr_t) fakectx;
 	intctx->rdx = intctx->rdx;
 	intctx->rcx = intctx->rcx;

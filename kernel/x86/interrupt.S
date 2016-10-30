@@ -350,7 +350,6 @@ fixup_relocate_stack_complete:
 	pushl %ecx
 	pushl %edx
 	pushl %ebx
-	pushl %esp
 	pushl %ebp
 	pushl %esi
 	pushl %edi
@@ -407,7 +406,6 @@ load_interrupted_registers:
 	popl %edi
 	popl %esi
 	popl %ebp
-	addl $4, %esp # Don't pop %esp, may not be defined.
 	popl %ebx
 	popl %edx
 	popl %ecx
