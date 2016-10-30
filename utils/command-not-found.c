@@ -27,6 +27,8 @@
 void suggest_editor(const char* filename)
 {
 	fprintf(stderr, "No command '%s' found, did you mean:\n", filename);
+	if ( access("/bin/ed", X_OK) == 0 )
+		fprintf(stderr, " Command 'ed' from package 'ed'\n");
 	fprintf(stderr, " Command 'editor' from package 'editor'\n");
 	if ( access("/bin/vim", X_OK) == 0 )
 		fprintf(stderr, " Command 'vim' from package 'vim'\n");
