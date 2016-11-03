@@ -382,6 +382,12 @@ void LogTerminal::ProcessKeystroke(int kbkey)
 	if ( kbkey < 0 )
 		return;
 
+	if ( kbkey == KBKEY_ESC )
+	{
+		ProcessByte('\e');
+		return;
+	}
+
 	const struct kbkey_sequence* seq = LookupKeystrokeSequence(kbkey);
 	if ( !seq )
 		return;
