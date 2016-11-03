@@ -624,14 +624,48 @@ ssize_t LogTerminal::read(ioctx_t* ctx, uint8_t* userbuf, size_t count)
 	{
 		while ( !(linebuffer.CanPop() || numeofs) )
 		{
-			if ( sofar )
-				return sofar;
-			if ( nonblocking )
-				return errno = EWOULDBLOCK, -1;
-			if ( !kthread_cond_wait_signal(&datacond, &termlock) )
-				return errno = EINTR, -1;
+			if ( tio.c_lflag & ICANON )
+			{
+				if ( sofar )
+					return sofar;
+				if ( nonblocking )
+					return errno = EWOULDBLOCK, -1;
+				if ( !kthread_cond_wait_signal(&datacond, &termlock) )
+					return sofar ? sofar : (errno = EINTR, -1);
+			}
+			else
+			{
+				// TODO: Study POSIX 11.1.7 Non-Canonical Mode Input Processing.
+				if ( tio.c_cc[VMIN] <= sofar )
+					return sofar;
+				if ( 0 < tio.c_cc[VMIN] )
+				{
+					if ( nonblocking )
+						return errno = EWOULDBLOCK, -1;
+					if ( 0 < sofar && 0 < tio.c_cc[VTIME] )
+					{
+						// TODO: Only wait up until tio.c_cc[VTIME] * 0.1
+						// seconds between bytes.
+					}
+					if ( !kthread_cond_wait_signal(&datacond, &termlock) )
+						return sofar ? sofar : (errno = EINTR, -1);
+				}
+				else if ( tio.c_cc[VMIN] == 0 && 0 < tio.c_cc[VTIME] )
+				{
+					if ( sofar || true /* tio.c_cc[VTIME] * 0.1 seconds passed
+					                      since start of read function */ )
+						return sofar;
+					if ( nonblocking )
+						return errno = EWOULDBLOCK, -1;
+					// TODO: Only wait up until tio.c_cc[VTIME] * 0.1 seconds.
+					if ( !kthread_cond_wait_signal(&datacond, &termlock) )
+						return sofar ? sofar : (errno = EINTR, -1);
+				}
+				else
+					return sofar;
+			}
 			if ( !RequireForeground(SIGTTIN) )
-				return errno = EINTR, -1;
+				return sofar ? sofar : -1;
 		}
 		if ( numeofs )
 		{
