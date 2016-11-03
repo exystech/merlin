@@ -30,6 +30,8 @@ void suggest_editor(const char* filename)
 	if ( access("/bin/ed", X_OK) == 0 )
 		fprintf(stderr, " Command 'ed' from package 'ed'\n");
 	fprintf(stderr, " Command 'editor' from package 'editor'\n");
+	if ( access("/bin/nano", X_OK) == 0 )
+		fprintf(stderr, " Command 'nano' from package 'nano'\n");
 	if ( access("/bin/vim", X_OK) == 0 )
 		fprintf(stderr, " Command 'vim' from package 'vim'\n");
 }
