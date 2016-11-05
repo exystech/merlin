@@ -671,7 +671,7 @@ ssize_t LogTerminal::read(ioctx_t* ctx, uint8_t* userbuf, size_t count)
 					return sofar;
 			}
 			if ( !RequireForeground(SIGTTIN) )
-				return sofar ? sofar : -1;
+				return sofar ? sofar : (errno = EINTR, -1);
 		}
 		if ( numeofs )
 		{
