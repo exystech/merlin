@@ -44,6 +44,7 @@ size_t fallback_framebuffer_height = 0;
 
 TextBufferHandle* device_textbufhandle = NULL;
 size_t (*device_callback)(void*, const char*, size_t) = NULL;
+size_t (*device_writeraw)(void*, const char*, size_t) = NULL;
 size_t (*device_width)(void*) = NULL;
 size_t (*device_height)(void*) = NULL;
 void (*device_get_cursor)(void*, size_t*, size_t*) = NULL;
@@ -54,6 +55,7 @@ bool (*emergency_device_is_impaired)(void*) = NULL;
 bool (*emergency_device_recoup)(void*) = NULL;
 void (*emergency_device_reset)(void*) = NULL;
 size_t (*emergency_device_callback)(void*, const char*, size_t) = NULL;
+size_t (*emergency_device_writeraw)(void*, const char*, size_t) = NULL;
 size_t (*emergency_device_width)(void*) = NULL;
 void (*emergency_device_get_cursor)(void*, size_t*, size_t*) = NULL;
 size_t (*emergency_device_height)(void*) = NULL;
@@ -63,6 +65,11 @@ void* emergency_device_pointer = NULL;
 static size_t PrintToTextTerminal(void* user, const char* str, size_t len)
 {
 	return ((TextTerminal*) user)->Print(str, len);
+}
+
+static size_t PrintRawToTextTerminal(void* user, const char* str, size_t len)
+{
+	return ((TextTerminal*) user)->PrintRaw(str, len);
 }
 
 static size_t TextTermWidth(void* user)
@@ -109,6 +116,12 @@ static
 size_t EmergencyPrintToTextTerminal(void* user, const char* str, size_t len)
 {
 	return ((TextTerminal*) user)->EmergencyPrint(str, len);
+}
+
+static
+size_t EmergencyPrintRawToTextTerminal(void* user, const char* str, size_t len)
+{
+	return ((TextTerminal*) user)->EmergencyPrintRaw(str, len);
 }
 
 static size_t EmergencyTextTermWidth(void* user)
@@ -192,6 +205,7 @@ void Init(multiboot_info_t* bootinfo)
 
 	// Register the text terminal as the kernel log.
 	Log::device_callback = PrintToTextTerminal;
+	Log::device_writeraw = PrintRawToTextTerminal;
 	Log::device_width = TextTermWidth;
 	Log::device_height = TextTermHeight;
 	Log::device_get_cursor = TextTermGetCursor;
@@ -204,6 +218,7 @@ void Init(multiboot_info_t* bootinfo)
 	Log::emergency_device_recoup = EmergencyTextTermRecoup;
 	Log::emergency_device_reset = EmergencyTextTermReset;
 	Log::emergency_device_callback = EmergencyPrintToTextTerminal;
+	Log::emergency_device_writeraw = EmergencyPrintRawToTextTerminal;
 	Log::emergency_device_width = EmergencyTextTermWidth;
 	Log::emergency_device_height = EmergencyTextTermHeight;
 	Log::emergency_device_get_cursor = EmergencyTextTermGetCursor;

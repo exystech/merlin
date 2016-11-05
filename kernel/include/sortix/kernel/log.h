@@ -45,6 +45,7 @@ extern size_t fallback_framebuffer_height;
 
 extern TextBufferHandle* device_textbufhandle;
 extern size_t (*device_callback)(void*, const char*, size_t);
+extern size_t (*device_writeraw)(void*, const char*, size_t);
 extern size_t (*device_width)(void*);
 extern size_t (*device_height)(void*);
 extern void (*device_get_cursor)(void*, size_t*, size_t*);
@@ -55,6 +56,7 @@ extern bool (*emergency_device_is_impaired)(void*);
 extern bool (*emergency_device_recoup)(void*);
 extern void (*emergency_device_reset)(void*);
 extern size_t (*emergency_device_callback)(void*, const char*, size_t);
+extern size_t (*emergency_device_writeraw)(void*, const char*, size_t);
 extern size_t (*emergency_device_width)(void*);
 extern size_t (*emergency_device_height)(void*);
 extern void (*emergency_device_get_cursor)(void*, size_t*, size_t*);
@@ -98,7 +100,7 @@ inline size_t Print(const char* str)
 
 inline size_t PrintData(const void* ptr, size_t size)
 {
-	return device_callback(device_pointer, (const char*) ptr, size);
+	return device_writeraw(device_pointer, (const char*) ptr, size);
 }
 
 __attribute__((format(printf, 1, 2)))

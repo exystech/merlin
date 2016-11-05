@@ -50,6 +50,10 @@
 #define PARMRK (1U << 11)
 
 #define OPOST (1U << 0)
+#if __USE_SORTIX || __USE_XOPEN
+#define ONLCR (1U << 1)
+#define OCRNL (1U << 2)
+#endif
 
 #define B0 0
 #define B50 50

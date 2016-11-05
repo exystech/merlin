@@ -63,7 +63,10 @@ static const unsigned int SUPPORTED_TERMMODES = TERMMODE_KBKEY
                                               | TERMMODE_ECHO
                                               | TERMMODE_NONBLOCK
                                               | TERMMODE_TERMIOS
-                                              | TERMMODE_DISABLE;
+                                              | TERMMODE_DISABLE
+                                              | TERMMODE_NOOPOST
+                                              | TERMMODE_NOONLCR
+                                              | TERMMODE_OCRNL;
 
 static inline bool IsByteUnescaped(unsigned char byte)
 {
@@ -89,7 +92,7 @@ TTY::TTY(dev_t dev, mode_t mode, uid_t owner, gid_t group)
 	this->stat_gid = group;
 	memset(&tio, 0, sizeof(tio));
 	tio.c_iflag = BRKINT | ICRNL | IXANY | IXON;
-	tio.c_oflag = OPOST;
+	tio.c_oflag = OPOST | ONLCR;
 	tio.c_cflag = CS8 /*| CREAD*/ | HUPCL; // CREAD unset for boot security.
 	tio.c_lflag = ECHO | ECHOE | ECHOK | ICANON | IEXTEN | ISIG;
 	tio.c_cc[VEOF] = CONTROL('D');
@@ -127,6 +130,8 @@ int TTY::settermmode(ioctx_t* /*ctx*/, unsigned int termmode)
 	tcflag_t new_cflag = old_cflag;
 	tcflag_t old_lflag = tio.c_lflag;
 	tcflag_t new_lflag = old_lflag;
+	tcflag_t old_oflag = tio.c_oflag;
+	tcflag_t new_oflag = old_oflag;
 	if ( termmode & TERMMODE_KBKEY )
 		new_lflag |= ISORTIX_KBKEY;
 	else
@@ -163,12 +168,25 @@ int TTY::settermmode(ioctx_t* /*ctx*/, unsigned int termmode)
 		new_cflag |= CREAD;
 	else
 		new_cflag &= ~CREAD;
+	if ( !(termmode & TERMMODE_NOOPOST) )
+		new_oflag |= OPOST;
+	else
+		new_oflag &= ~OPOST;
+	if ( !(termmode & TERMMODE_NOONLCR) )
+		new_oflag |= ONLCR;
+	else
+		new_oflag &= ~ONLCR;
+	if ( termmode & TERMMODE_OCRNL )
+		new_oflag |= OCRNL;
+	else
+		new_oflag &= ~OCRNL;
 	bool oldnoutf8 = old_lflag & ISORTIX_32BIT;
 	bool newnoutf8 = new_lflag & ISORTIX_32BIT;
 	if ( oldnoutf8 != newnoutf8 )
 		memset(&read_ps, 0, sizeof(read_ps));
 	tio.c_cflag = new_cflag;
 	tio.c_lflag = new_lflag;
+	tio.c_oflag = new_oflag;
 	if ( !(tio.c_lflag & ICANON) )
 		CommitLineBuffer();
 	return 0;
@@ -196,6 +214,12 @@ int TTY::gettermmode(ioctx_t* ctx, unsigned int* mode)
 		termmode |= TERMMODE_TERMIOS;
 	if ( !(tio.c_cflag & CREAD) )
 		termmode |= TERMMODE_DISABLE;
+	if ( !(tio.c_oflag & OPOST) )
+		termmode |= TERMMODE_NOOPOST;
+	if ( !(tio.c_oflag & ONLCR) )
+		termmode |= TERMMODE_NOONLCR;
+	if ( tio.c_oflag & OCRNL )
+		termmode |= TERMMODE_OCRNL;
 	if ( !ctx->copy_to_dest(mode, &termmode, sizeof(termmode)) )
 		return -1;
 	return 0;
@@ -418,7 +442,16 @@ void TTY::ProcessByte(unsigned char byte, uint32_t control_unicode)
 
 	if ( tio.c_lflag & ECHO )
 	{
-		if ( IsByteUnescaped(byte) )
+		if ( byte == '\n' )
+		{
+			if ( tio.c_oflag & OPOST && tio.c_oflag & ONLCR )
+				Log::PrintData("\r\n", 2);
+			else if ( tio.c_oflag & OPOST && tio.c_oflag & OCRNL )
+				Log::PrintData("\r", 1);
+			else
+				Log::PrintData("\n", 1);
+		}
+		else if ( IsByteUnescaped(byte) )
 			Log::PrintData(&byte, 1);
 		else
 			Log::PrintF("^%c", CONTROL(byte));
@@ -556,26 +589,59 @@ ssize_t TTY::write(ioctx_t* ctx, const uint8_t* io_buffer, size_t count)
 	if ( tio.c_lflag & TOSTOP && !RequireForeground(SIGTTOU) )
 		return errno = EINTR, -1;
 	// TODO: Add support for ioctx to the kernel log.
-	const size_t BUFFER_SIZE = 64UL;
-	char buffer[BUFFER_SIZE];
+	unsigned char buffer[256];
+	size_t max_incoming = sizeof(buffer);
+	if ( tio.c_oflag & OPOST && tio.c_oflag & ONLCR )
+		max_incoming = sizeof(buffer) / 2;
 	size_t sofar = 0;
+	size_t rounds = 0;
 	while ( sofar < count )
 	{
-		size_t amount = count - sofar;
-		if ( BUFFER_SIZE < amount )
-			amount = BUFFER_SIZE;
-		if ( !ctx->copy_from_src(buffer, io_buffer + sofar, amount) )
+		size_t incoming = count - sofar;
+		if ( max_incoming < incoming )
+			incoming = max_incoming;
+		if ( !ctx->copy_from_src(buffer, io_buffer + sofar, incoming) )
 			return -1;
-		Log::PrintData(buffer, amount);
-		sofar += amount;
-		if ( sofar < count )
+		size_t offset;
+		size_t outgoing;
+		if ( tio.c_oflag & OPOST && tio.c_oflag & ONLCR )
+		{
+			offset = sizeof(buffer);
+			outgoing = incoming;
+			for ( size_t ii = incoming; ii; ii-- )
+			{
+				size_t i = ii - 1;
+				if ( buffer[i] == '\n' )
+				{
+					buffer[--offset] = '\n';
+					buffer[--offset] = '\r';
+					outgoing++;
+				}
+				else
+					buffer[--offset] = buffer[i];
+			}
+		}
+		else
+		{
+			offset = 0;
+			outgoing = incoming;
+			if ( tio.c_oflag & OPOST && tio.c_oflag & OCRNL )
+			{
+				for ( size_t i = 0; i < incoming; i++ )
+					if ( buffer[i] == '\r' )
+						buffer[i] = '\n';
+			}
+		}
+		Log::PrintData(buffer + offset, outgoing);
+		sofar += incoming;
+		if ( ++rounds % 16 == 0 )
 		{
 			kthread_mutex_unlock(&termlock);
 			kthread_yield();
 			kthread_mutex_lock(&termlock);
-			if ( Signal::IsPending() )
-				return sofar;
 		}
+		if ( Signal::IsPending() )
+			return sofar;
 	}
 	return (ssize_t) sofar;
 }

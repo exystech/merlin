@@ -67,6 +67,21 @@ size_t TextTerminal::Print(const char* string, size_t stringlen)
 	ScopedLock lock(&termlock);
 	TextBuffer* textbuf = textbufhandle->Acquire();
 	for ( size_t i = 0; i < stringlen; i++ )
+	{
+		if ( string[i] == '\n' )
+			PutChar(textbuf, '\r');
+		PutChar(textbuf, string[i]);
+	}
+	UpdateCursor(textbuf);
+	textbufhandle->Release(textbuf);
+	return stringlen;
+}
+
+size_t TextTerminal::PrintRaw(const char* string, size_t stringlen)
+{
+	ScopedLock lock(&termlock);
+	TextBuffer* textbuf = textbufhandle->Acquire();
+	for ( size_t i = 0; i < stringlen; i++ )
 		PutChar(textbuf, string[i]);
 	UpdateCursor(textbuf);
 	textbufhandle->Release(textbuf);
@@ -187,6 +202,25 @@ size_t TextTerminal::EmergencyPrint(const char* string, size_t stringlen)
 
 	TextBuffer* textbuf = textbufhandle->EmergencyAcquire();
 	for ( size_t i = 0; i < stringlen; i++ )
+	{
+		if ( string[i] == '\n' )
+			PutChar(textbuf, '\r');
+		PutChar(textbuf, string[i]);
+	}
+	UpdateCursor(textbuf);
+	textbufhandle->EmergencyRelease(textbuf);
+	return stringlen;
+}
+
+size_t TextTerminal::EmergencyPrintRaw(const char* string, size_t stringlen)
+{
+	// This is during a kernel emergency where preemption has been disabled and
+	// this is the only thread running. Another thread may have been interrupted
+	// while it held the terminal lock. The best case is if the terminal lock is
+	// currently unused, which would mean everything is safe.
+
+	TextBuffer* textbuf = textbufhandle->EmergencyAcquire();
+	for ( size_t i = 0; i < stringlen; i++ )
 		PutChar(textbuf, string[i]);
 	UpdateCursor(textbuf);
 	textbufhandle->EmergencyRelease(textbuf);
@@ -271,7 +305,10 @@ void TextTerminal::PutChar(TextBuffer* textbuf, char c)
 		wc = L' ';
 
 	if ( textbuf->Width() <= column )
+	{
+		column = 0;
 		Newline(textbuf);
+	}
 	TextPos pos(column++, line);
 	TextChar tc(wc, vgacolor, ATTR_CHAR | next_attr);
 	textbuf->SetChar(pos, tc);
@@ -286,7 +323,6 @@ void TextTerminal::UpdateCursor(TextBuffer* textbuf)
 void TextTerminal::Newline(TextBuffer* textbuf)
 {
 	TextPos pos(column, line);
-	column = 0;
 	if ( line < textbuf->Height()-1 )
 		line++;
 	else
@@ -330,7 +366,10 @@ void TextTerminal::Backspace(TextBuffer* textbuf)
 void TextTerminal::Tab(TextBuffer* textbuf)
 {
 	if ( column == textbuf->Width() )
+	{
+		column = 0;
 		Newline(textbuf);
+	}
 	unsigned int count = 8 - (column % 8);
 	for ( unsigned int i = 0; i < count; i++ )
 	{

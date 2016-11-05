@@ -35,6 +35,7 @@ public:
 	TextTerminal(TextBufferHandle* textbufhandle);
 	~TextTerminal();
 	size_t Print(const char* string, size_t stringlen);
+	size_t PrintRaw(const char* string, size_t stringlen);
 	size_t Width() const;
 	size_t Height() const;
 	void GetCursor(size_t* column, size_t* row) const;
@@ -44,6 +45,7 @@ public:
 	bool EmergencyRecoup();
 	void EmergencyReset();
 	size_t EmergencyPrint(const char* string, size_t stringlen);
+	size_t EmergencyPrintRaw(const char* string, size_t stringlen);
 	size_t EmergencyWidth() const;
 	size_t EmergencyHeight() const;
 	void EmergencyGetCursor(size_t* column, size_t* row) const;
