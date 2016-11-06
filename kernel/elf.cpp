@@ -44,10 +44,7 @@ namespace ELF {
 
 static bool is_power_of_two(uintptr_t value)
 {
-	for ( uintptr_t i = 0; i < sizeof(uintptr_t) * 8; i++ )
-		if ( (uintptr_t) 1 << i == value )
-			return true;
-	return false;
+	return value && !(value & (value - 1));
 }
 
 uintptr_t Load(const void* file_ptr, size_t file_size, Auxiliary* aux)
