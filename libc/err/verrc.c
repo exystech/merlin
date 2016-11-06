@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016 Nicholas De Nova.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,17 +13,16 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * err/vwarn.c
+ * err/verrc.c
  * Print an error message to stderr.
  */
 
 #include <err.h>
-#include <errno.h>
 #include <stdarg.h>
-#include <stdio.h>
-#include <string.h>
+#include <stdlib.h>
 
-void vwarn(const char* fmt, va_list ap)
+void verrc(int exitcode, int errnum, const char* fmt, va_list ap)
 {
-	vwarnc(errno, fmt, ap);
+	vwarnc(errnum, fmt, ap);
+	exit(exitcode);
 }

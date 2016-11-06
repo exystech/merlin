@@ -331,13 +331,17 @@ dirent/rewinddir.o \
 dirent/scandir.o \
 dlfcn/dlfcn.o \
 err/err.o \
+err/errc.o \
 err/errx.o \
 error/gnu_error.o \
 err/verr.o \
+err/verrc.o \
 err/verrx.o \
 err/vwarn.o \
+err/vwarnc.o \
 err/vwarnx.o \
 err/warn.o \
+err/warnc.o \
 err/warnx.o \
 fcntl/creat.o \
 fcntl/fcntl.o \
