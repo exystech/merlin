@@ -93,6 +93,7 @@ struct record
 	char* symlink_path;
 	struct stat symlink_st;
 	int symlink_stat_attempt;
+	bool no_recurse;
 };
 
 static int order_normal(int comparison)
@@ -255,9 +256,11 @@ static int sort_files_then_dirs(const void* a_ptr, const void* b_ptr)
 	struct record* b = (struct record*) b_ptr;
 	if ( !option_directory )
 	{
-		if ( S_ISDIR(a->st.st_mode) && !S_ISDIR(b->st.st_mode) )
+		bool a_as_dir = S_ISDIR(a->st.st_mode) && !a->no_recurse;
+		bool b_as_dir = S_ISDIR(b->st.st_mode) && !b->no_recurse;
+		if ( a_as_dir && !b_as_dir )
 			return 1;
-		if ( !S_ISDIR(a->st.st_mode) && S_ISDIR(b->st.st_mode) )
+		if ( !a_as_dir && b_as_dir )
 			return -1;
 	}
 	return sort_records(a_ptr, b_ptr);
@@ -732,8 +735,12 @@ static int show_recursive(int fd, const char* path,
 	if ( !option_directory )
 	{
 		for ( nondir_count = 0; nondir_count < count; nondir_count++ )
+		{
+			if ( records[nondir_count].no_recurse )
+				continue;
 			if ( S_ISDIR(records[nondir_count].st.st_mode) )
 				break;
+		}
 	}
 	if ( !(option_recursive && path) )
 		show(records, nondir_count);
@@ -809,6 +816,7 @@ static int ls_directory(int parentfd, const char* relpath, const char* path)
 			err(1, "malloc");
 		if ( stat_record(dir, path, record) < 0 )
 			ret = 1;
+		record->no_recurse = isdotdot;
 	}
 
 	// TODO: Stupid /dev/net/fs fake directory, so ignore ENOTDIR for now.
