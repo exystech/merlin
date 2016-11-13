@@ -18,6 +18,7 @@ TESTS:=\
 test-fmemopen \
 test-pthread-argv \
 test-pthread-basic \
+test-pthread-main-exit \
 test-pthread-main-join \
 test-pthread-once \
 test-pthread-self \
