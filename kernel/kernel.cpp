@@ -85,6 +85,7 @@
 #include "multiboot.h"
 #include "net/fs.h"
 #include "poll.h"
+#include "pty.h"
 #include "uart.h"
 #include "vga.h"
 
@@ -491,6 +492,21 @@ static void BootThread(void* /*user*/)
 		Panic("Could not allocate a kernel terminal factory");
 	if ( LinkInodeInDir(&ctx, slashdev, "tty", tty) != 0 )
 		Panic("Unable to link /dev/tty to kernel terminal factory.");
+
+	// Register the psuedo terminal filesystem as /dev/pts.
+	pts = Ref<PTS>(new PTS(0755, 0, 0));
+	if ( !pts )
+		Panic("Could not allocate a psuedo terminal filesystem");
+	if ( slashdev->mkdir(&ctx, "pts", 0755) < 0 )
+		Panic("Could not mkdir /dev/pts");
+	Ref<Descriptor> ptsdir =
+		slashdev->open(&ctx, "pts", O_DIRECTORY | O_READ | O_WRITE);
+	if ( !ptsdir )
+		Panic("Could not open /dev/pts");
+	if ( !mtable->AddMount(ptsdir->ino, ptsdir->dev, pts, true) )
+		Panic("Could not mount pseudo terminal filesystem on /dev/pts");
+	if ( slashdev->symlink(&ctx, "pts/ptmx", "ptmx") < 0 )
+		Panic("Could not symlink /dev/ptmx -> pts/ptmx");
 
 	// Register the kernel terminal as /dev/tty1.
 	Ref<Inode> tty1(new LogTerminal(slashdev->dev, 0666, 0, 0,

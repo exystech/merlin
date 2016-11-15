@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -69,6 +69,7 @@ int tcsetattr(int, int, const struct termios*);
 
 /* Functions that are Sortix extensions. */
 #if __USE_SORTIX
+int mkpty(int*, int*, int);
 ssize_t tcgetblob(int, const char*, void*, size_t);
 ssize_t tcsetblob(int, const char*, const void*, size_t);
 int tcgetwincurpos(int, struct wincurpos*);
