@@ -51,6 +51,27 @@ static char* get_program_path_of_pid(pid_t pid)
 	}
 }
 
+static char* get_ttyname_of_pid(pid_t pid)
+{
+	struct psctl_ttyname ctl;
+	memset(&ctl, 0, sizeof(ctl));
+	ctl.buffer = NULL;
+	ctl.size = 0;
+	if ( psctl(pid, PSCTL_TTYNAME, &ctl) < 0 )
+		return NULL;
+	while ( true )
+	{
+		char* new_buffer = (char*) realloc(ctl.buffer, ctl.size);
+		if ( !new_buffer )
+			return free(ctl.buffer), (char*) NULL;
+		ctl.buffer = new_buffer;
+		if ( psctl(pid, PSCTL_TTYNAME, &ctl) == 0 )
+			return ctl.buffer;
+		if ( errno != ERANGE )
+			return free(ctl.buffer), (char*) NULL;
+	}
+}
+
 static void compact_arguments(int* argc, char*** argv)
 {
 	for ( int i = 0; i < *argc; i++ )
@@ -140,8 +161,12 @@ int main(int argc, char* argv[])
 	if ( show_full || show_long )
 		printf("PPID\t");
 	if ( show_long )
-		printf("NI  ");
-	printf("TTY  ");
+		printf("PGID\t");
+	if ( show_long )
+		printf("SID\t");
+	if ( show_long )
+		printf("NI\t");
+	printf("TTY\t");
 	printf("TIME\t   ");
 	printf("CMD\n");
 	pid_t pid = 0;
@@ -175,8 +200,16 @@ int main(int argc, char* argv[])
 		if ( show_full || show_long )
 			printf("%" PRIiPID "\t", psst.ppid);
 		if ( show_long )
-			printf("%-4i", psst.nice);
-		printf("tty  ");
+			printf("%" PRIiPID "\t", psst.pgid);
+		if ( show_long )
+			printf("%" PRIiPID "\t", psst.sid);
+		if ( show_long )
+			printf("%-4i\t", psst.nice);
+		char* ttyname = get_ttyname_of_pid(pid);
+		// TODO: Strip special characters from the ttyname lest an attacker
+		//       do things to the user's terminal.
+		printf("%s\t", ttyname ? ttyname : "?");
+		free(ttyname);
 		time_t time = psst.tmns.tmns_utime.tv_sec;
 		int hours = (time / (60 * 60)) % 24;
 		int minutes = (time / 60) % 60;

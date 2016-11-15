@@ -69,6 +69,8 @@
 
 namespace Sortix {
 
+kthread_mutex_t process_family_lock = KTHREAD_MUTEX_INITIALIZER;
+
 Process::Process()
 {
 	program_image_path = NULL;
@@ -84,6 +86,7 @@ Process::Process()
 	umask = 0022;
 
 	ptrlock = KTHREAD_MUTEX_INITIALIZER;
+	// tty set to null reference in the member constructor.
 	// root set to null reference in the member constructor.
 	// cwd set to null reference in the member constructor.
 	// mtable set to null reference in the member constructor.
@@ -115,22 +118,19 @@ Process::Process()
 	nextsibling = NULL;
 	firstchild = NULL;
 	zombiechild = NULL;
-	childlock = KTHREAD_MUTEX_INITIALIZER;
-	parentlock = KTHREAD_MUTEX_INITIALIZER;
-	zombiecond = KTHREAD_COND_INITIALIZER;
-	iszombie = false;
-	nozombify = false;
-	exit_code = -1;
-
 	group = NULL;
 	groupprev = NULL;
 	groupnext = NULL;
 	groupfirst = NULL;
-
-	groupparentlock = KTHREAD_MUTEX_INITIALIZER;
-	groupchildlock = KTHREAD_MUTEX_INITIALIZER;
-	groupchildleft = KTHREAD_COND_INITIALIZER;
-	grouplimbo = false;
+	session = NULL;
+	sessionprev = NULL;
+	sessionnext = NULL;
+	sessionfirst = NULL;
+	zombiecond = KTHREAD_COND_INITIALIZER;
+	iszombie = false;
+	nozombify = false;
+	limbo = false;
+	exit_code = -1;
 
 	firstthread = NULL;
 	threadlock = KTHREAD_MUTEX_INITIALIZER;
@@ -153,12 +153,17 @@ Process::Process()
 	alarm_timer.Attach(Time::GetClock(CLOCK_MONOTONIC));
 }
 
-Process::~Process()
+Process::~Process() // process_family_lock taken
 {
 	if ( alarm_timer.IsAttached() )
 		alarm_timer.Detach();
 	delete[] program_image_path;
 	assert(!zombiechild);
+	assert(!session);
+	assert(!group);
+	assert(!parent);
+	assert(!sessionfirst);
+	assert(!groupfirst);
 	assert(!firstchild);
 	assert(!addrspace);
 	assert(!segments);
@@ -170,6 +175,7 @@ Process::~Process()
 	assert(ptable);
 	ptable->Free(pid);
 	ptable.Reset();
+	tty.Reset();
 }
 
 void Process::BootstrapTables(Ref<DescriptorTable> dtable, Ref<MountTable> mtable)
@@ -280,6 +286,7 @@ void Process::LastPrayer()
 
 	ResetAddressSpace();
 
+	// tty is kept alive in session leader until no longer in limbo.
 	if ( dtable ) dtable.Reset();
 	if ( cwd ) cwd.Reset();
 	if ( root ) root.Reset();
@@ -290,14 +297,15 @@ void Process::LastPrayer()
 	Memory::DestroyAddressSpace(prevaddrspace);
 	addrspace = 0;
 
+	ScopedLock family_lock(&process_family_lock);
+
+	iszombie = true;
+
 	// Init is nice and will gladly raise our orphaned children and zombies.
 	Process* init = Scheduler::GetInitProcess();
 	assert(init);
-	kthread_mutex_lock(&childlock);
 	while ( firstchild )
 	{
-		ScopedLock firstchildlock(&firstchild->parentlock);
-		ScopedLock initlock(&init->childlock);
 		Process* process = firstchild;
 		firstchild = process->nextsibling;
 		process->parent = init;
@@ -322,39 +330,32 @@ void Process::LastPrayer()
 		zombie->nozombify = true;
 		zombie->WaitedFor();
 	}
-	kthread_mutex_unlock(&childlock);
-
-	iszombie = true;
+	// Remove ourself from our process group.
+	if ( group )
+		group->GroupRemoveMember(this);
+	// Remove ourself from our session.
+	if ( session )
+		session->SessionRemoveMember(this);
 
 	bool zombify = !nozombify;
 
-	// Remove ourself from our process group.
-	kthread_mutex_lock(&groupchildlock);
-	if ( group )
-		group->NotifyMemberExit(this);
-	kthread_mutex_unlock(&groupchildlock);
-
 	// This class instance will be destroyed by our parent process when it
 	// has received and acknowledged our death.
-	kthread_mutex_lock(&parentlock);
 	if ( parent )
 		parent->NotifyChildExit(this, zombify);
-	kthread_mutex_unlock(&parentlock);
 
 	// If nobody is waiting for us, then simply commit suicide.
 	if ( !zombify )
 		WaitedFor();
 }
 
-void Process::WaitedFor()
+void Process::WaitedFor() // process_family_lock taken
 {
-	kthread_mutex_lock(&parentlock);
 	parent = NULL;
-	kthread_mutex_unlock(&parentlock);
-	kthread_mutex_lock(&groupparentlock);
-	bool in_limbo = groupfirst && (grouplimbo = true);
-	kthread_mutex_unlock(&groupparentlock);
-	if ( !in_limbo )
+	limbo = false;
+	if ( groupfirst || sessionfirst )
+		limbo = true;
+	if ( !limbo )
 		delete this;
 }
 
@@ -375,37 +376,48 @@ void Process::ResetAddressSpace()
 	segments = NULL;
 }
 
-void Process::NotifyMemberExit(Process* child)
+void Process::GroupRemoveMember(Process* child) // process_family_lock taken
 {
 	assert(child->group == this);
-	kthread_mutex_lock(&groupparentlock);
 	if ( child->groupprev )
 		child->groupprev->groupnext = child->groupnext;
 	else
 		groupfirst = child->groupnext;
 	if ( child->groupnext )
 		child->groupnext->groupprev = child->groupprev;
-	kthread_cond_signal(&groupchildleft);
-	kthread_mutex_unlock(&groupparentlock);
-
 	child->group = NULL;
-
-	NotifyLeftProcessGroup();
+	if ( IsLimboDone() )
+		delete this;
 }
 
-void Process::NotifyLeftProcessGroup()
+void Process::SessionRemoveMember(Process* child) // process_family_lock taken
 {
-	ScopedLock parentlock(&groupparentlock);
-	if ( !grouplimbo || groupfirst )
-		return;
-	grouplimbo = false;
-	delete this;
+	assert(child->session == this);
+	if ( child->sessionprev )
+		child->sessionprev->sessionnext = child->sessionnext;
+	else
+		sessionfirst = child->sessionnext;
+	if ( child->sessionnext )
+		child->sessionnext->sessionprev = child->sessionprev;
+	child->session = NULL;
+	if ( !sessionfirst )
+	{
+		// Remove reference to tty when session is empty.
+		ScopedLock lock(&ptrlock);
+		tty.Reset();
+	}
+	if ( IsLimboDone() )
+		delete this;
 }
 
+bool Process::IsLimboDone() // process_family_lock taken
+{
+	return limbo && !groupfirst && !sessionfirst;
+}
+
+// process_family_lock taken
 void Process::NotifyChildExit(Process* child, bool zombify)
 {
-	kthread_mutex_lock(&childlock);
-
 	if ( child->prevsibling )
 		child->prevsibling->nextsibling = child->nextsibling;
 	if ( child->nextsibling )
@@ -424,17 +436,11 @@ void Process::NotifyChildExit(Process* child, bool zombify)
 		zombiechild = child;
 	}
 
-	kthread_mutex_unlock(&childlock);
-
 	if ( zombify )
-		NotifyNewZombies();
-}
-
-void Process::NotifyNewZombies()
-{
-	ScopedLock lock(&childlock);
-	DeliverSignal(SIGCHLD);
-	kthread_cond_broadcast(&zombiecond);
+	{
+		DeliverSignal(SIGCHLD);
+		kthread_cond_broadcast(&zombiecond);
+	}
 }
 
 pid_t Process::Wait(pid_t thepid, int* status_ptr, int options)
@@ -443,7 +449,7 @@ pid_t Process::Wait(pid_t thepid, int* status_ptr, int options)
 	if ( thepid < -1 || thepid == 0 )
 		return errno = ENOSYS, -1;
 
-	ScopedLock lock(&childlock);
+	ScopedLock lock(&process_family_lock);
 
 	// A process can only wait if it has children.
 	if ( !firstchild && !zombiechild )
@@ -475,7 +481,7 @@ pid_t Process::Wait(pid_t thepid, int* status_ptr, int options)
 			break;
 		if ( options & WNOHANG )
 			return 0;
-		if ( !kthread_cond_wait_signal(&zombiecond, &childlock) )
+		if ( !kthread_cond_wait_signal(&zombiecond, &process_family_lock) )
 			return errno = EINTR, -1;
 	}
 
@@ -536,21 +542,6 @@ void Process::ExitWithCode(int requested_exit_code)
 		t->DeliverSignal(SIGKILL);
 }
 
-void Process::AddChildProcess(Process* child)
-{
-	ScopedLock mylock(&childlock);
-	ScopedLock itslock(&child->parentlock);
-	assert(!child->parent);
-	assert(!child->nextsibling);
-	assert(!child->prevsibling);
-	child->parent = this;
-	child->nextsibling = firstchild;
-	child->prevsibling = NULL;
-	if ( firstchild )
-		firstchild->prevsibling = child;
-	firstchild = child;
-}
-
 Ref<MountTable> Process::GetMTable()
 {
 	ScopedLock lock(&ptrlock);
@@ -572,6 +563,12 @@ Ref<ProcessTable> Process::GetPTable()
 	return ptable;
 }
 
+Ref<Descriptor> Process::GetTTY()
+{
+	ScopedLock lock(&ptrlock);
+	return tty;
+}
+
 Ref<Descriptor> Process::GetRoot()
 {
 	ScopedLock lock(&ptrlock);
@@ -584,6 +581,12 @@ Ref<Descriptor> Process::GetCWD()
 	ScopedLock lock(&ptrlock);
 	assert(cwd);
 	return cwd;
+}
+
+void Process::SetTTY(Ref<Descriptor> newtty)
+{
+	ScopedLock lock(&ptrlock);
+	tty = newtty;
 }
 
 void Process::SetRoot(Ref<Descriptor> newroot)
@@ -611,18 +614,9 @@ Process* Process::Fork()
 {
 	assert(CurrentProcess() == this);
 
-	// TODO: This adds the new process to the process table, but it's not ready
-	//       and functions that access this new process will be surprised that
-	//       it's not fully constructed and really bad things will happen.
 	Process* clone = new Process;
 	if ( !clone )
 		return NULL;
-
-	if ( (clone->pid = (clone->ptable = ptable)->Allocate(clone)) < 0 )
-	{
-		delete clone;
-		return NULL;
-	}
 
 	struct segment* clone_segments = NULL;
 
@@ -653,19 +647,38 @@ Process* Process::Fork()
 	clone->segments_used = segments_used;
 	clone->segments_length = segments_used;
 
+	kthread_mutex_lock(&process_family_lock);
+
+	if ( (clone->pid = (clone->ptable = ptable)->Allocate(clone)) < 0 )
+	{
+		kthread_mutex_unlock(&process_family_lock);
+		clone->AbortConstruction();
+		return NULL;
+	}
+
 	// Remember the relation to the child process.
-	AddChildProcess(clone);
+	clone->parent = this;
+	clone->nextsibling = firstchild;
+	clone->prevsibling = NULL;
+	if ( firstchild )
+		firstchild->prevsibling = clone;
+	firstchild = clone;
 
 	// Add the new process to the current process group.
-	kthread_mutex_lock(&groupchildlock);
-	kthread_mutex_lock(&group->groupparentlock);
 	clone->group = group;
 	clone->groupprev = NULL;
 	if ( (clone->groupnext = group->groupfirst) )
 		group->groupfirst->groupprev = clone;
 	group->groupfirst = clone;
-	kthread_mutex_unlock(&group->groupparentlock);
-	kthread_mutex_unlock(&groupchildlock);
+
+	// Add the new process to the current session.
+	clone->session = session;
+	clone->sessionprev = NULL;
+	if ( (clone->sessionnext = session->sessionfirst) )
+		session->sessionfirst->sessionprev = clone;
+	session->sessionfirst = clone;
+
+	kthread_mutex_unlock(&process_family_lock);
 
 	// Initialize everything that is safe and can't fail.
 	kthread_mutex_lock(&resource_limits_lock);
@@ -1495,36 +1508,42 @@ pid_t sys_getpid(void)
 	return CurrentProcess()->pid;
 }
 
-pid_t Process::GetParentProcessId()
-{
-	ScopedLock lock(&parentlock);
-	if( !parent )
-		return 0;
-	return parent->pid;
-}
-
 pid_t sys_getppid(void)
 {
-	return CurrentProcess()->GetParentProcessId();
+	Process* process = CurrentProcess();
+	ScopedLock lock(&process_family_lock);
+	if ( !process->parent )
+		return 0;
+	return process->parent->pid;
 }
 
 pid_t sys_getpgid(pid_t pid)
 {
+	ScopedLock lock(&process_family_lock);
 	Process* process = !pid ? CurrentProcess() : CurrentProcess()->GetPTable()->Get(pid);
 	if ( !process )
 		return errno = ESRCH, -1;
-
-	// Prevent the process group from changing while we read it.
-	ScopedLock childlock(&process->groupchildlock);
-	assert(process->group);
-
+	if ( !process->group )
+		return errno = ESRCH, -1;
 	return process->group->pid;
+}
+
+pid_t sys_getsid(pid_t pid)
+{
+	ScopedLock lock(&process_family_lock);
+	Process* process = !pid ? CurrentProcess() : CurrentProcess()->GetPTable()->Get(pid);
+	if ( !process )
+		return errno = ESRCH, -1;
+	if ( !process->session )
+		return errno = ESRCH, -1;
+	return process->session->pid;
 }
 
 int sys_setpgid(pid_t pid, pid_t pgid)
 {
-	// TODO: Prevent changing the process group of zombies and other volatile
-	//       things that are about to implode.
+	if ( pid < 0 || pgid < 0 )
+		return errno = EINVAL, -1;
+
 	// TODO: Either prevent changing the process group after an exec or provide
 	//       a version of this system call with a flags parameter that lets you
 	//       decide if you want this behavior. This will fix a race condition
@@ -1534,6 +1553,10 @@ int sys_setpgid(pid_t pid, pid_t pgid)
 	//       process group, and then the shell gets around to change the process
 	//       group. This probably unlikely, but correctness over all!
 
+	Process* current_process = CurrentProcess();
+
+	ScopedLock lock(&process_family_lock);
+
 	// Find the processes in question.
 	Process* process = !pid ? CurrentProcess() : CurrentProcess()->GetPTable()->Get(pid);
 	if ( !process )
@@ -1542,45 +1565,76 @@ int sys_setpgid(pid_t pid, pid_t pgid)
 	if ( !group )
 		return errno = ESRCH, -1;
 
-	// Prevent the current group from being changed while we also change it
-	ScopedLock childlock(&process->groupchildlock);
-	assert(process->group);
+	// The process must be this one or a direct child.
+	if ( process != current_process && process->parent != current_process )
+		return errno = EPERM, -1;
+	// The process must be in this session.
+	if ( process->session != current_process->session )
+		return errno = EPERM, -1;
+	// The new group must be in the same session as the process.
+	if ( group->session != process->session )
+		return errno = EPERM, -1;
+	// The process must not be a process group leader.
+	// TODO: Maybe POSIX actually allows this.
+	if ( process->groupfirst )
+		return errno = EPERM, -1;
+	// The process must not be a session leader.
+	if ( process->sessionfirst )
+		return errno = EPERM, -1;
+	// The group must either exist or be the process itself.
+	if ( !group->groupfirst && group != process )
+		return errno = EPERM, -1;
 
 	// Exit early if this is a noop.
 	if ( process->group == group )
 		return 0;
 
-	// Prevent changing the process group of a process group leader.
-	if ( process->group == process )
-		return errno = EPERM, -1;
-
 	// Remove the process from its current process group.
-	kthread_mutex_lock(&process->group->groupparentlock);
-	if ( process->groupprev )
-		process->groupprev->groupnext = process->groupnext;
-	else
-		process->group->groupfirst = process->groupnext;
-	if ( process->groupnext )
-		process->groupnext->groupprev = process->groupprev;
-	kthread_cond_signal(&process->group->groupchildleft);
-	kthread_mutex_unlock(&process->group->groupparentlock);
-	process->group->NotifyLeftProcessGroup();
-	process->group = NULL;
-
-	// TODO: Somehow prevent joining a zombie group, or worse yet, one that is
-	//       currently being deleted by its parent!
+	if ( process->group )
+		process->group->GroupRemoveMember(process);
 
 	// Insert the process into its new process group.
-	kthread_mutex_lock(&group->groupparentlock);
 	process->groupprev = NULL;
 	process->groupnext = group->groupfirst;
 	if ( group->groupfirst )
 		group->groupfirst->groupprev = process;
 	group->groupfirst = process;
 	process->group = group;
-	kthread_mutex_unlock(&group->groupparentlock);
 
 	return 0;
+}
+
+pid_t sys_setsid(void)
+{
+	Process* process = CurrentProcess();
+
+	ScopedLock lock(&process_family_lock);
+
+	// Test if already a process group leader.
+	if ( process->group == process )
+		return errno = EPERM, -1;
+
+	// Remove the process from its current process group.
+	if ( process->group )
+		process->group->GroupRemoveMember(process);
+
+	// Remove the process from its current session.
+	if ( process->session )
+		process->session->SessionRemoveMember(process);
+
+	// Insert the process into its new session.
+	process->sessionprev = NULL;
+	process->sessionnext = NULL;
+	process->sessionfirst = process;
+	process->session = process;
+
+	// Insert the process into its new process group.
+	process->groupprev = NULL;
+	process->groupnext = NULL;
+	process->groupfirst = process;
+	process->group = process;
+
+	return process->pid;
 }
 
 size_t sys_getpagesize(void)

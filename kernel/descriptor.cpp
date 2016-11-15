@@ -694,9 +694,13 @@ int Descriptor::tcgetwincurpos(ioctx_t* ctx, struct wincurpos* wcp)
 	return vnode->tcgetwincurpos(ctx, wcp);
 }
 
-int Descriptor::tcgetwinsize(ioctx_t* ctx, struct winsize* ws)
+int Descriptor::ioctl(ioctx_t* ctx, int cmd, uintptr_t arg)
 {
-	return vnode->tcgetwinsize(ctx, ws);
+	int old_ctx_dflags = ctx->dflags;
+	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
+	int result = vnode->ioctl(ctx, cmd, arg);
+	ctx->dflags = old_ctx_dflags;
+	return result;
 }
 
 int Descriptor::tcsetpgrp(ioctx_t* ctx, pid_t pgid)

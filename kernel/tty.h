@@ -20,8 +20,12 @@
 #ifndef SORTIX_TTY_H
 #define SORTIX_TTY_H
 
+#include <string.h>
 #include <wchar.h>
 
+#if !defined(TTY_NAME_MAX)
+#include <sortix/limits.h>
+#endif
 #include <sortix/termios.h>
 
 #include <sortix/kernel/kthread.h>
@@ -35,17 +39,29 @@
 
 namespace Sortix {
 
+class DevTTY : public AbstractInode
+{
+public:
+	DevTTY(dev_t dev, mode_t mode, uid_t owner, gid_t group);
+	virtual ~DevTTY();
+
+public:
+	virtual Ref<Inode> factory(ioctx_t* ctx, const char* filename, int flags,
+	                           mode_t mode);
+
+};
+
 class TTY : public AbstractInode
 {
 public:
-	TTY(dev_t dev, mode_t mode, uid_t owner, gid_t group);
+	TTY(dev_t dev, ino_t ino, mode_t mode, uid_t owner, gid_t group,
+	    const char* name);
 	virtual ~TTY();
 
 public:
 	virtual ssize_t read(ioctx_t* ctx, uint8_t* buf, size_t count);
 	virtual ssize_t write(ioctx_t* ctx, const uint8_t* buf, size_t count);
 	virtual int tcgetwincurpos(ioctx_t* ctx, struct wincurpos* wcp);
-	virtual int tcgetwinsize(ioctx_t* ctx, struct winsize* ws);
 	virtual int tcsetpgrp(ioctx_t* ctx, pid_t pgid);
 	virtual pid_t tcgetpgrp(ioctx_t* ctx);
 	virtual int settermmode(ioctx_t* ctx, unsigned termmode);
@@ -58,6 +74,17 @@ public:
 	virtual pid_t tcgetsid(ioctx_t* ctx);
 	virtual int tcsendbreak(ioctx_t* ctx, int duration);
 	virtual int tcsetattr(ioctx_t* ctx, int actions, const struct termios* tio);
+	virtual int ioctl(ioctx_t* ctx, int cmd, uintptr_t arg);
+
+public:
+	void hup();
+
+protected:
+	void tty_output(const char* str)
+	{
+		tty_output((const unsigned char*) str, strlen(str));
+	}
+	virtual void tty_output(const unsigned char* buffer, size_t length) = 0;
 
 protected:
 	void ProcessUnicode(uint32_t unicode);
@@ -66,17 +93,21 @@ protected:
 	short PollEventStatus();
 	bool CheckForeground();
 	bool RequireForeground(int sig);
+	bool RequireForegroundUnlocked(int sig);
 	bool CheckHandledByte(tcflag_t lflags, unsigned char key, unsigned char byte);
 
 protected:
 	PollChannel poll_channel;
-	mutable kthread_mutex_t termlock;
+	kthread_mutex_t termlock;
 	kthread_cond_t datacond;
 	mbstate_t read_ps;
 	size_t numeofs;
 	LineBuffer linebuffer;
 	struct termios tio;
 	pid_t foreground_pgid;
+	pid_t sid;
+	bool hungup;
+	char ttyname[TTY_NAME_MAX-5+1];
 
 };
 

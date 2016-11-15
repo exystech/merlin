@@ -440,7 +440,7 @@ ssize_t read(int, void*, size_t);
 int rmdir(const char*);
 int setgid(gid_t);
 int setpgid(pid_t, pid_t);
-/* TODO: pid_t setsid(void); */
+pid_t setsid(void);
 int setuid(uid_t);
 unsigned sleep(unsigned);
 long sysconf(int);
@@ -494,7 +494,7 @@ int symlink(const char*, const char*);
 #if __USE_SORTIX || 200809L <= __USE_POSIX || 420 <= __USE_XOPEN
 int fchdir(int);
 int fchown(int, uid_t, gid_t);
-/* TODO: pid_t getsid(void); */
+pid_t getsid(pid_t);
 int lchown(const char*, uid_t, gid_t);
 int truncate(const char*, off_t);
 #endif

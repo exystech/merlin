@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -183,6 +183,8 @@
 #define SYSCALL_TCSENDBREAK 160
 #define SYSCALL_TCSETATTR 161
 #define SYSCALL_SCRAM 162
-#define SYSCALL_MAX_NUM 163 /* index of highest constant + 1 */
+#define SYSCALL_GETSID 163
+#define SYSCALL_SETSID 164
+#define SYSCALL_MAX_NUM 165 /* index of highest constant + 1 */
 
 #endif

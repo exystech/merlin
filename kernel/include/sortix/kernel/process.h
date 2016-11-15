@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 205, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -77,6 +77,7 @@ public:
 
 private:
 	kthread_mutex_t ptrlock;
+	Ref<Descriptor> tty;
 	Ref<Descriptor> root;
 	Ref<Descriptor> cwd;
 	Ref<MountTable> mtable;
@@ -101,37 +102,35 @@ public:
 	Ref<DescriptorTable> GetDTable();
 	Ref<MountTable> GetMTable();
 	Ref<ProcessTable> GetPTable();
+	Ref<Descriptor> GetTTY();
 	Ref<Descriptor> GetRoot();
 	Ref<Descriptor> GetCWD();
 	Ref<Descriptor> GetDescriptor(int fd);
+	void SetTTY(Ref<Descriptor> tty);
 	void SetRoot(Ref<Descriptor> newroot);
 	void SetCWD(Ref<Descriptor> newcwd);
 
 public:
-// A process may only access its parent if parentlock is locked. A process
-// may only use its list of children if childlock is locked. A process may
-// not access its sibling processes.
 	Process* parent;
 	Process* prevsibling;
 	Process* nextsibling;
 	Process* firstchild;
 	Process* zombiechild;
+	Process* group;
+	Process* groupprev;
+	Process* groupnext;
+	Process* groupfirst;
+	Process* session;
+	Process* sessionprev;
+	Process* sessionnext;
+	Process* sessionfirst;
 	kthread_mutex_t childlock;
 	kthread_mutex_t parentlock;
 	kthread_cond_t zombiecond;
 	bool iszombie;
 	bool nozombify;
+	bool limbo;
 	int exit_code;
-
-public:
-	Process* group;
-	Process* groupprev;
-	Process* groupnext;
-	Process* groupfirst;
-	kthread_mutex_t groupchildlock;
-	kthread_mutex_t groupparentlock;
-	kthread_cond_t groupchildleft;
-	bool grouplimbo;
 
 public:
 	Thread* firstthread;
@@ -165,13 +164,14 @@ public:
 	pid_t Wait(pid_t pid, int* status, int options);
 	bool DeliverSignal(int signum);
 	bool DeliverGroupSignal(int signum);
+	bool DeliverSessionSignal(int signum);
 	void OnThreadDestruction(Thread* thread);
-	pid_t GetParentProcessId();
-	void AddChildProcess(Process* child);
 	void ScheduleDeath();
 	void AbortConstruction();
 	bool MapSegment(struct segment* result, void* hint, size_t size, int flags,
 	                int prot);
+	void GroupRemoveMember(Process* child);
+	void SessionRemoveMember(Process* child);
 
 public:
 	Process* Fork();
@@ -180,18 +180,16 @@ private:
 	void OnLastThreadExit();
 	void LastPrayer();
 	void WaitedFor();
-	void NotifyMemberExit(Process* child);
 	void NotifyChildExit(Process* child, bool zombify);
-	void NotifyNewZombies();
 	void DeleteTimers();
-
-public:
-	void NotifyLeftProcessGroup();
+	bool IsLimboDone();
 
 public:
 	void ResetForExecute();
 
 };
+
+extern kthread_mutex_t process_family_lock;
 
 Process* CurrentProcess();
 

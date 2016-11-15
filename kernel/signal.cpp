@@ -279,7 +279,8 @@ int sys_kill(pid_t pid, int signum)
 	// TODO: Implement that pid == -1 means all processes!
 	bool process_group = pid < 0 ? (pid = -pid, true) : false;
 
-	// TODO: Race condition: The process could be deleted while we use it.
+	ScopedLock lock(&process_family_lock);
+
 	Process* process = CurrentProcess()->GetPTable()->Get(pid);
 	if ( !process )
 		return errno = ESRCH, -1;
@@ -300,12 +301,27 @@ int sys_kill(pid_t pid, int signum)
 	return errno = 0, 0;
 }
 
-bool Process::DeliverGroupSignal(int signum)
+bool Process::DeliverGroupSignal(int signum) // process_family_lock held
 {
-	ScopedLock lock(&groupparentlock);
 	if ( !groupfirst )
 		return errno = ESRCH, false;
 	for ( Process* iter = groupfirst; iter; iter = iter->groupnext )
+	{
+		int saved_errno = errno;
+		if ( !iter->DeliverSignal(signum) && errno != ESIGPENDING )
+		{
+			// This is not currently an error condition.
+		}
+		errno = saved_errno;
+	}
+	return true;
+}
+
+bool Process::DeliverSessionSignal(int signum) // process_family_lock held
+{
+	if ( !sessionfirst )
+		return errno = ESRCH, false;
+	for ( Process* iter = sessionfirst; iter; iter = iter->sessionnext )
 	{
 		int saved_errno = errno;
 		if ( !iter->DeliverSignal(signum) && errno != ESIGPENDING )

@@ -27,6 +27,7 @@
 #include <wchar.h>
 
 #include <sortix/fcntl.h>
+#include <sortix/ioctl.h>
 #include <sortix/keycodes.h>
 #include <sortix/poll.h>
 #include <sortix/signal.h>
@@ -107,8 +108,9 @@ static inline const struct kbkey_sequence* LookupKeystrokeSequence(int kbkey)
 }
 
 LogTerminal::LogTerminal(dev_t dev, mode_t mode, uid_t owner, gid_t group,
-                         Keyboard* keyboard, KeyboardLayoutExecutor* kblayout)
-	: TTY(dev, mode, owner, group)
+                         Keyboard* keyboard, KeyboardLayoutExecutor* kblayout,
+                         const char* name)
+	: TTY(dev, 0, mode, owner, group, name)
 {
 	this->keyboard = keyboard;
 	this->kblayout = kblayout;
@@ -122,9 +124,16 @@ LogTerminal::~LogTerminal()
 	delete kblayout;
 }
 
+void LogTerminal::tty_output(const unsigned char* buffer, size_t length)
+{
+	Log::PrintData(buffer, length);
+}
+
 int LogTerminal::sync(ioctx_t* /*ctx*/)
 {
 	ScopedLock lock(&termlock);
+	if ( hungup )
+		return errno = EIO, -1;
 	return Log::Sync() ? 0 : -1;
 }
 
@@ -239,6 +248,9 @@ void LogTerminal::ProcessKeystroke(int kbkey)
 
 ssize_t LogTerminal::tcgetblob(ioctx_t* ctx, const char* name, void* buffer, size_t count)
 {
+	ScopedLockSignal lock(&termlock);
+	if ( hungup )
+		return errno = EIO, -1;
 	if ( !name )
 	{
 		static const char index[] = "kblayout\0";
@@ -251,7 +263,6 @@ ssize_t LogTerminal::tcgetblob(ioctx_t* ctx, const char* name, void* buffer, siz
 	}
 	else if ( !strcmp(name, "kblayout") )
 	{
-		ScopedLockSignal lock(&termlock);
 		const uint8_t* data;
 		size_t size;
 		if ( !kblayout->Download(&data, &size) )
@@ -268,6 +279,9 @@ ssize_t LogTerminal::tcgetblob(ioctx_t* ctx, const char* name, void* buffer, siz
 
 ssize_t LogTerminal::tcsetblob(ioctx_t* ctx, const char* name, const void* buffer, size_t count)
 {
+	ScopedLockSignal lock(&termlock);
+	if ( hungup )
+		return errno = EIO, -1;
 	if ( !name )
 		return errno = EPERM, -1;
 	else if ( !strcmp(name, "kblayout") )
@@ -277,7 +291,6 @@ ssize_t LogTerminal::tcsetblob(ioctx_t* ctx, const char* name, const void* buffe
 			return -1;
 		if ( !ctx->copy_from_src(data, buffer, count) )
 			return -1;
-		ScopedLockSignal lock(&termlock);
 		if ( !kblayout->Upload(data, count) )
 			return -1;
 		delete[] data;
@@ -285,6 +298,42 @@ ssize_t LogTerminal::tcsetblob(ioctx_t* ctx, const char* name, const void* buffe
 	}
 	else
 		return errno = ENOENT, -1;
+}
+
+int LogTerminal::tcgetwincurpos(ioctx_t* ctx, struct wincurpos* wcp)
+{
+	ScopedLock lock(&termlock);
+	if ( hungup )
+		return errno = EIO, -1;
+	struct wincurpos retwcp;
+	memset(&retwcp, 0, sizeof(retwcp));
+	size_t cursor_column, cursor_row;
+	Log::GetCursor(&cursor_column, &cursor_row);
+	retwcp.wcp_col = cursor_column;
+	retwcp.wcp_row = cursor_row;
+	if ( !ctx->copy_to_dest(wcp, &retwcp, sizeof(retwcp)) )
+		return -1;
+	return 0;
+}
+
+int LogTerminal::ioctl(ioctx_t* ctx, int cmd, uintptr_t arg)
+{
+	ScopedLock lock(&termlock);
+	if ( hungup )
+		return errno = EIO, -1;
+	if ( cmd == TIOCGWINSZ )
+	{
+		struct winsize* ws = (struct winsize*) arg;
+		struct winsize retws;
+		memset(&retws, 0, sizeof(retws));
+		retws.ws_col = Log::Width();
+		retws.ws_row = Log::Height();
+		if ( !ctx->copy_to_dest(ws, &retws, sizeof(retws)) )
+			return -1;
+		return 0;
+	}
+	lock.Reset();
+	return TTY::ioctl(ctx, cmd, arg);
 }
 
 } // namespace Sortix

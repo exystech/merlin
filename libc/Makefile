@@ -688,6 +688,7 @@ unistd/getpagesize.o \
 unistd/getpgid.o \
 unistd/getpid.o \
 unistd/getppid.o \
+unistd/getsid.o \
 unistd/getuid.o \
 unistd/isatty.o \
 unistd/lchown.o \
@@ -710,6 +711,7 @@ unistd/seteuid.o \
 unistd/setgid.o \
 unistd/sethostname.o \
 unistd/setpgid.o \
+unistd/setsid.o \
 unistd/setuid.o \
 unistd/sfork.o \
 unistd/sleep.o \

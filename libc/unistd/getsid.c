@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,18 +13,17 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * sortix/limits.h
- * System limits.
+ * unistd/getsid.c
+ * Get the current session.
  */
 
-#ifndef INCLUDE_SORTIX_LIMITS_H
-#define INCLUDE_SORTIX_LIMITS_H
+#include <sys/syscall.h>
 
-#include <sys/cdefs.h>
+#include <unistd.h>
 
-#if __USE_SORTIX || __USE_POSIX
-#define HOST_NAME_MAX 255
-#define TTY_NAME_MAX 32
-#endif
+DEFN_SYSCALL1(pid_t, sys_getsid, SYSCALL_GETSID, pid_t);
 
-#endif
+pid_t getsid(pid_t pid)
+{
+	return sys_getsid(pid);
+}

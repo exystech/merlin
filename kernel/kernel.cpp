@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,6 +18,7 @@
  * initial process from the init ramdisk, allowing a full operating system.
  */
 
+#include <sys/ioctl.h>
 #include <sys/types.h>
 
 #include <assert.h>
@@ -342,6 +343,10 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 	system->groupprev = NULL;
 	system->groupnext = NULL;
 	system->groupfirst = system;
+	system->session = system;
+	system->sessionprev = NULL;
+	system->sessionnext = NULL;
+	system->sessionfirst = system;
 
 	if ( !(system->program_image_path = String::Clone("<kernel process>")) )
 		Panic("Unable to clone string for system process name");
@@ -480,12 +485,20 @@ static void BootThread(void* /*user*/)
 	// Initialize the PS/2 controller.
 	PS2::Init(keyboard, mouse);
 
-	// Register the kernel terminal as /dev/tty.
-	Ref<Inode> tty(new LogTerminal(slashdev->dev, 0666, 0, 0, keyboard, kblayout));
+	// Register /dev/tty as the current-terminal factory.
+	Ref<Inode> tty(new DevTTY(slashdev->dev, 0666, 0, 0));
 	if ( !tty )
-		Panic("Could not allocate a kernel terminal");
+		Panic("Could not allocate a kernel terminal factory");
 	if ( LinkInodeInDir(&ctx, slashdev, "tty", tty) != 0 )
-		Panic("Unable to link /dev/tty to kernel terminal.");
+		Panic("Unable to link /dev/tty to kernel terminal factory.");
+
+	// Register the kernel terminal as /dev/tty1.
+	Ref<Inode> tty1(new LogTerminal(slashdev->dev, 0666, 0, 0,
+	                keyboard, kblayout, "tty1"));
+	if ( !tty1 )
+		Panic("Could not allocate a kernel terminal");
+	if ( LinkInodeInDir(&ctx, slashdev, "tty1", tty1) != 0 )
+		Panic("Unable to link /dev/tty1 to kernel terminal.");
 
 	// Register the mouse as /dev/mouse.
 	Ref<Inode> mousedev(new PS2MouseDevice(slashdev->dev, 0666, 0, 0, mouse));
@@ -562,12 +575,24 @@ static void BootThread(void* /*user*/)
 		Panic("Could not allocate init process");
 	if ( (init->pid = (init->ptable = CurrentProcess()->ptable)->Allocate(init)) < 0 )
 		Panic("Could not allocate init a pid");
+
+	kthread_mutex_lock(&process_family_lock);
+	Process* kernel_process = CurrentProcess();
+	init->parent = kernel_process;
+	init->nextsibling = kernel_process->firstchild;
+	init->prevsibling = NULL;
+	if ( kernel_process->firstchild )
+		kernel_process->firstchild->prevsibling = init;
+	kernel_process->firstchild = init;
 	init->group = init;
 	init->groupprev = NULL;
 	init->groupnext = NULL;
 	init->groupfirst = init;
-
-	CurrentProcess()->AddChildProcess(init);
+	init->session = init;
+	init->sessionprev = NULL;
+	init->sessionnext = NULL;
+	init->sessionfirst = init;
+	kthread_mutex_unlock(&process_family_lock);
 
 	// TODO: Why don't we fork from pid=0 and this is done for us?
 	// TODO: Fork dtable and mtable, don't share them!
@@ -582,7 +607,7 @@ static void BootThread(void* /*user*/)
 	if ( !initthread )
 		Panic("Could not create init thread");
 
-	// Wait until init init is done and then shut down the computer.
+	// Wait until init is done and then shut down the computer.
 	int status;
 	pid_t pid = CurrentProcess()->Wait(init->pid, &status, 0);
 	if ( pid != init->pid )
@@ -617,6 +642,13 @@ static void InitThread(void* /*user*/)
 	Ref<Descriptor> root = CurrentProcess()->GetRoot();
 
 	Ref<DescriptorTable> dtable = process->GetDTable();
+
+	Ref<Descriptor> tty1 = root->open(&ctx, "/dev/tty1", O_READ | O_WRITE);
+	if ( !tty1 )
+		PanicF("/dev/tty1: %m");
+	if ( tty1->ioctl(&ctx, TIOCSCTTY, 0) < 0 )
+		PanicF("/dev/tty1: ioctl: TIOCSCTTY: %m");
+	tty1.Reset();
 
 	Ref<Descriptor> tty_stdin = root->open(&ctx, "/dev/tty", O_READ);
 	if ( !tty_stdin || dtable->Allocate(tty_stdin, 0) != 0 )

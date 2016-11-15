@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -92,6 +92,13 @@ struct psctl_stat
 
 #define PSCTL_PROGRAM_PATH __PSCTL(psctl_program_path, 4)
 struct psctl_program_path
+{
+	char* buffer;
+	size_t size;
+};
+
+#define PSCTL_TTYNAME __PSCTL(psctl_program_path, 5)
+struct psctl_ttyname
 {
 	char* buffer;
 	size_t size;

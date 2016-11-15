@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -36,8 +36,6 @@ static int GetProcessPriority(pid_t who)
 {
 	if ( who < 0 )
 		return errno = EINVAL, -1;
-	// TODO: If who isn't the current process, then it could self-destruct at
-	//       any time while we use it; there is no safe way to do this yet.
 	Process* process = who ? CurrentProcess()->GetPTable()->Get(who) : CurrentProcess();
 	if ( !process )
 		return errno = ESRCH, -1;
@@ -49,8 +47,6 @@ static int SetProcessPriority(pid_t who, int prio)
 {
 	if ( who < 0 )
 		return errno = EINVAL, -1;
-	// TODO: If who isn't the current process, then it could self-destruct at
-	//       any time while we use it; there is no safe way to do this yet.
 	Process* process = who ? CurrentProcess()->GetPTable()->Get(who) : CurrentProcess();
 	if ( !process )
 		return errno = ESRCH, -1;
@@ -61,24 +57,17 @@ static int SetProcessPriority(pid_t who, int prio)
 
 static Process* CurrentProcessGroup()
 {
-	Process* process = CurrentProcess();
-	ScopedLock lock(&process->groupchildlock);
-	// TODO: The process group can change when this call returns, additionally
-	//       the current process leader could self-destruct.
-	return process->group;
+	return CurrentProcess()->group;
 }
 
 static int GetProcessGroupPriority(pid_t who)
 {
 	if ( who < 0 )
 		return errno = EINVAL, -1;
-	// TODO: If who isn't the current process, then it could self-destruct at
-	//       any time while we use it; there is no safe way to do this yet.
 	Process* group = who ? CurrentProcess()->GetPTable()->Get(who) : CurrentProcessGroup();
 	if ( !group )
 		return errno = ESRCH, -1;
 	int lowest = INT_MAX;
-	ScopedLock group_parent_lock(&group->groupparentlock);
 	for ( Process* process = group->groupfirst; process; process = process->groupnext )
 	{
 		ScopedLock lock(&process->nicelock);
@@ -92,12 +81,9 @@ static int SetProcessGroupPriority(pid_t who, int prio)
 {
 	if ( who < 0 )
 		return errno = EINVAL, -1;
-	// TODO: If who isn't the current process, then it could self-destruct at
-	//       any time while we use it; there is no safe way to do this yet.
 	Process* group = who ? CurrentProcess()->GetPTable()->Get(who) : CurrentProcessGroup();
 	if ( !group )
 		return errno = ESRCH, -1;
-	ScopedLock group_parent_lock(&group->groupparentlock);
 	for ( Process* process = group->groupfirst; process; process = process->groupnext )
 	{
 		ScopedLock lock(&process->nicelock);
@@ -108,20 +94,17 @@ static int SetProcessGroupPriority(pid_t who, int prio)
 
 static int GetUserPriority(uid_t /*who*/)
 {
-	// TODO: There is currently no easy way to iterate all processes without
-	//       dire race conditions being possible.
 	return errno = ENOSYS, -1;
 }
 
 static int SetUserPriority(uid_t /*who*/, int /*prio*/)
 {
-	// TODO: There is currently no easy way to iterate all processes without
-	//       dire race conditions being possible.
 	return errno = ENOSYS, -1;
 }
 
 int sys_getpriority(int which, id_t who)
 {
+	ScopedLock lock(&process_family_lock);
 	switch ( which )
 	{
 	case PRIO_PROCESS: return GetProcessPriority(who);
@@ -133,6 +116,7 @@ int sys_getpriority(int which, id_t who)
 
 int sys_setpriority(int which, id_t who, int prio)
 {
+	ScopedLock lock(&process_family_lock);
 	switch ( which )
 	{
 	case PRIO_PROCESS: return SetProcessPriority(who, prio);
@@ -151,8 +135,7 @@ int sys_prlimit(pid_t pid,
 		return errno = EINVAL, -1;
 	if ( resource < 0 || RLIMIT_NUM_DECLARED <= resource )
 		return errno = EINVAL, -1;
-	// TODO: If pid isn't the current process, then it could self-destruct at
-	//       any time while we use it; there is no safe way to do this yet.
+	ScopedLock family_lock(&process_family_lock);
 	Process* process = pid ? CurrentProcess()->GetPTable()->Get(pid) : CurrentProcess();
 	if ( !process )
 		return errno = ESRCH, -1;

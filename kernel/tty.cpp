@@ -17,9 +17,11 @@
  * Terminal line discipline.
  */
 
+#include <sys/ioctl.h>
 #include <sys/types.h>
 
 #include <errno.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -28,6 +30,9 @@
 
 #include <sortix/fcntl.h>
 #include <sortix/keycodes.h>
+#if !defined(TTY_NAME_MAX)
+#include <sortix/limits.h>
+#endif
 #include <sortix/poll.h>
 #include <sortix/signal.h>
 #include <sortix/stat.h>
@@ -35,6 +40,7 @@
 #include <sortix/termmode.h>
 #include <sortix/winsize.h>
 
+#include <sortix/kernel/descriptor.h>
 #include <sortix/kernel/inode.h>
 #include <sortix/kernel/interlock.h>
 #include <sortix/kernel/ioctx.h>
@@ -47,6 +53,7 @@
 #include <sortix/kernel/refcount.h>
 #include <sortix/kernel/scheduler.h>
 #include <sortix/kernel/thread.h>
+#include <sortix/kernel/vnode.h>
 
 #include "tty.h"
 
@@ -79,13 +86,50 @@ static inline bool IsUTF8Continuation(unsigned char byte)
 	return (byte & 0b11000000) == 0b10000000;
 }
 
-TTY::TTY(dev_t dev, mode_t mode, uid_t owner, gid_t group)
+DevTTY::DevTTY(dev_t dev, mode_t mode, uid_t owner, gid_t group)
 {
 	if ( !dev )
 		dev = (dev_t) this;
 	inode_type = INODE_TYPE_TTY;
 	this->dev = dev;
 	this->ino = (ino_t) this;
+	this->type = S_IFFACTORY;
+	this->stat_mode = (mode & S_SETABLE) | this->type;
+	this->stat_uid = owner;
+	this->stat_gid = group;
+}
+
+DevTTY::~DevTTY()
+{
+}
+
+Ref<Inode> DevTTY::factory(ioctx_t* ctx, const char* filename, int flags,
+	                       mode_t mode)
+{
+	(void) ctx;
+	(void) filename;
+	(void) flags;
+	(void) mode;
+	ScopedLock lock(&process_family_lock);
+	Process* process = CurrentProcess();
+	if ( !process->session )
+		return errno = ENOTTY, Ref<Inode>(NULL);
+	Ref<Descriptor> tty_desc = process->session->GetTTY();
+	if ( !tty_desc )
+		return errno = ENOTTY, Ref<Inode>(NULL);
+	return tty_desc->vnode->inode;
+}
+
+TTY::TTY(dev_t dev, ino_t ino, mode_t mode, uid_t owner, gid_t group,
+         const char* name)
+{
+	if ( !dev )
+		dev = (dev_t) this;
+	if ( !ino )
+		ino = (ino_t) this;
+	inode_type = INODE_TYPE_TTY;
+	this->dev = dev;
+	this->ino = ino;
 	this->type = S_IFCHR;
 	this->stat_mode = (mode & S_SETABLE) | this->type;
 	this->stat_uid = owner;
@@ -109,10 +153,13 @@ TTY::TTY(dev_t dev, mode_t mode, uid_t owner, gid_t group)
 	tio.c_cc[VWERASE] = CONTROL('W');
 	tio.c_ispeed = B38400;
 	tio.c_ospeed = B38400;
-	this->termlock = KTHREAD_MUTEX_INITIALIZER;
-	this->datacond = KTHREAD_COND_INITIALIZER;
-	this->numeofs = 0;
-	this->foreground_pgid = 0;
+	termlock = KTHREAD_MUTEX_INITIALIZER;
+	datacond = KTHREAD_COND_INITIALIZER;
+	numeofs = 0;
+	foreground_pgid = -1;
+	sid = -1;
+	hungup = false;
+	snprintf(ttyname, sizeof(ttyname), "%s", name);
 }
 
 TTY::~TTY()
@@ -122,8 +169,10 @@ TTY::~TTY()
 int TTY::settermmode(ioctx_t* /*ctx*/, unsigned int termmode)
 {
 	ScopedLock lock(&termlock);
+	if ( hungup )
+		return errno = EIO, -1;
 	if ( !RequireForeground(SIGTTOU) )
-		return errno = EINTR, -1;
+		return -1;
 	if ( termmode & ~SUPPORTED_TERMMODES )
 		return errno = EINVAL, -1;
 	tcflag_t old_cflag = tio.c_cflag;
@@ -195,6 +244,8 @@ int TTY::settermmode(ioctx_t* /*ctx*/, unsigned int termmode)
 int TTY::gettermmode(ioctx_t* ctx, unsigned int* mode)
 {
 	ScopedLock lock(&termlock);
+	if ( hungup )
+		return errno = EIO, -1;
 	unsigned int termmode = 0;
 	if ( tio.c_lflag & ISORTIX_KBKEY )
 		termmode |= TERMMODE_KBKEY;
@@ -225,46 +276,25 @@ int TTY::gettermmode(ioctx_t* ctx, unsigned int* mode)
 	return 0;
 }
 
-int TTY::tcgetwincurpos(ioctx_t* ctx, struct wincurpos* wcp)
+int TTY::tcgetwincurpos(ioctx_t* /*ctx*/, struct wincurpos* /*wcp*/)
 {
-	ScopedLock lock(&termlock);
-	struct wincurpos retwcp;
-	memset(&retwcp, 0, sizeof(retwcp));
-	size_t cursor_column, cursor_row;
-	Log::GetCursor(&cursor_column, &cursor_row);
-	retwcp.wcp_col = cursor_column;
-	retwcp.wcp_row = cursor_row;
-	if ( !ctx->copy_to_dest(wcp, &retwcp, sizeof(retwcp)) )
-		return -1;
-	return 0;
-}
-
-int TTY::tcgetwinsize(ioctx_t* ctx, struct winsize* ws)
-{
-	ScopedLock lock(&termlock);
-	struct winsize retws;
-	memset(&retws, 0, sizeof(retws));
-	retws.ws_col = Log::Width();
-	retws.ws_row = Log::Height();
-	if ( !ctx->copy_to_dest(ws, &retws, sizeof(retws)) )
-		return -1;
-	return 0;
+	return errno = ENOTSUP, -1;
 }
 
 int TTY::tcsetpgrp(ioctx_t* /*ctx*/, pid_t pgid)
 {
 	ScopedLock lock(&termlock);
-	if ( !RequireForeground(SIGTTOU) )
-		return errno = EINTR, -1;
+	if ( hungup )
+		return errno = EIO, -1;
+	ScopedLock family_lock(&process_family_lock);
+	if ( !RequireForegroundUnlocked(SIGTTOU) )
+		return -1;
 	if ( pgid <= 0 )
 		return errno = ESRCH, -1;
 	Process* process = CurrentProcess()->GetPTable()->Get(pgid);
 	if ( !process )
 		return errno = ESRCH, -1;
-	kthread_mutex_lock(&process->groupparentlock);
-	bool is_process_group = process->group == process;
-	kthread_mutex_unlock(&process->groupparentlock);
-	if ( !is_process_group )
+	if ( !process->groupfirst )
 		return errno = EINVAL, -1;
 	foreground_pgid = pgid;
 	return 0;
@@ -273,7 +303,24 @@ int TTY::tcsetpgrp(ioctx_t* /*ctx*/, pid_t pgid)
 pid_t TTY::tcgetpgrp(ioctx_t* /*ctx*/)
 {
 	ScopedLock lock(&termlock);
+	if ( hungup )
+		return errno = EIO, -1;
 	return foreground_pgid;
+}
+
+void TTY::hup()
+{
+	ScopedLock lock(&termlock);
+	ScopedLock family_lock(&process_family_lock);
+	hungup = true;
+	if ( 0 < sid )
+	{
+		Process* process = CurrentProcess()->GetPTable()->Get(sid);
+		if ( process )
+			process->DeliverSessionSignal(SIGHUP);
+	}
+	kthread_cond_broadcast(&datacond);
+	poll_channel.Signal(POLLHUP);
 }
 
 void TTY::ProcessUnicode(uint32_t unicode)
@@ -311,6 +358,7 @@ void TTY::ProcessByte(unsigned char byte, uint32_t control_unicode)
 	{
 		while ( linebuffer.CanBackspace() )
 			linebuffer.Backspace();
+		ScopedLock lock(&process_family_lock);
 		if ( Process* process = CurrentProcess()->GetPTable()->Get(foreground_pgid) )
 			process->DeliverGroupSignal(SIGQUIT);
 		return;
@@ -320,6 +368,7 @@ void TTY::ProcessByte(unsigned char byte, uint32_t control_unicode)
 	{
 		while ( linebuffer.CanBackspace() )
 			linebuffer.Backspace();
+		ScopedLock lock(&process_family_lock);
 		if ( Process* process = CurrentProcess()->GetPTable()->Get(foreground_pgid) )
 			process->DeliverGroupSignal(SIGINT);
 		return;
@@ -340,6 +389,7 @@ void TTY::ProcessByte(unsigned char byte, uint32_t control_unicode)
 	{
 		while ( linebuffer.CanBackspace() )
 			linebuffer.Backspace();
+		ScopedLock lock(&process_family_lock);
 		if ( Process* process = CurrentProcess()->GetPTable()->Get(foreground_pgid) )
 			process->DeliverGroupSignal(SIGQUIT);
 		return;
@@ -359,9 +409,9 @@ void TTY::ProcessByte(unsigned char byte, uint32_t control_unicode)
 			{
 				// TODO: Handle tab specially. (Is that even possible without
 				//       knowing cursor position?).
-				Log::Print("\b \b");
+				tty_output("\b \b");
 				if ( !IsByteUnescaped(delchar) )
-					Log::Print("\b \b");
+					tty_output("\b \b");
 			}
 			break;
 		}
@@ -388,9 +438,9 @@ void TTY::ProcessByte(unsigned char byte, uint32_t control_unicode)
 			linebuffer.Backspace();
 			if ( tio.c_lflag & ECHOE )
 			{
-				Log::Print("\b \b");
+				tty_output("\b \b");
 				if ( !IsByteUnescaped(delchar) )
-					Log::Print("\b \b");
+					tty_output("\b \b");
 			}
 		}
 		return;
@@ -407,9 +457,9 @@ void TTY::ProcessByte(unsigned char byte, uint32_t control_unicode)
 				continue;
 			if ( tio.c_lflag & ECHOE )
 			{
-				Log::Print("\b \b");
+				tty_output("\b \b");
 				if ( !IsByteUnescaped(delchar) )
-					Log::Print("\b \b");
+					tty_output("\b \b");
 			}
 		}
 		return;
@@ -422,7 +472,7 @@ void TTY::ProcessByte(unsigned char byte, uint32_t control_unicode)
 		ProcessUnicode(KBKEY_ENCODE(KBKEY_ENTER));
 		ProcessByte('\n');
 		ProcessUnicode(KBKEY_ENCODE(-KBKEY_ENTER));
-		Log::PrintF("\e[H\e[2J");
+		tty_output("\e[H\e[2J");
 		return;
 	}
 
@@ -445,16 +495,19 @@ void TTY::ProcessByte(unsigned char byte, uint32_t control_unicode)
 		if ( byte == '\n' )
 		{
 			if ( tio.c_oflag & OPOST && tio.c_oflag & ONLCR )
-				Log::PrintData("\r\n", 2);
+				tty_output("\r\n");
 			else if ( tio.c_oflag & OPOST && tio.c_oflag & OCRNL )
-				Log::PrintData("\r", 1);
+				tty_output("\r");
 			else
-				Log::PrintData("\n", 1);
+				tty_output("\n");
 		}
 		else if ( IsByteUnescaped(byte) )
-			Log::PrintData(&byte, 1);
+			tty_output(&byte, 1);
 		else
-			Log::PrintF("^%c", CONTROL(byte));
+		{
+			unsigned char cs[2] = { '^', (unsigned char) CONTROL(byte) };
+			tty_output(cs, sizeof(cs));
+		}
 	}
 
 	if ( !(tio.c_lflag & ICANON) || byte == '\n' )
@@ -476,8 +529,10 @@ ssize_t TTY::read(ioctx_t* ctx, uint8_t* userbuf, size_t count)
 	ScopedLockSignal lock(&termlock);
 	if ( !lock.IsAcquired() )
 		return errno = EINTR, -1;
+	if ( hungup )
+		return errno = EIO, -1;
 	if ( !RequireForeground(SIGTTIN) )
-		return errno = EINTR, -1;
+		return -1;
 	size_t sofar = 0;
 	size_t left = count;
 	bool nonblocking = tio.c_lflag & ISORTIX_NONBLOCK ||
@@ -494,6 +549,8 @@ ssize_t TTY::read(ioctx_t* ctx, uint8_t* userbuf, size_t count)
 					return errno = EWOULDBLOCK, -1;
 				if ( !kthread_cond_wait_signal(&datacond, &termlock) )
 					return sofar ? sofar : (errno = EINTR, -1);
+				if ( hungup )
+					return sofar ? sofar : (errno = EIO, -1);
 			}
 			else
 			{
@@ -511,6 +568,8 @@ ssize_t TTY::read(ioctx_t* ctx, uint8_t* userbuf, size_t count)
 					}
 					if ( !kthread_cond_wait_signal(&datacond, &termlock) )
 						return sofar ? sofar : (errno = EINTR, -1);
+					if ( hungup )
+						return sofar ? sofar : (errno = EIO, -1);
 				}
 				else if ( tio.c_cc[VMIN] == 0 && 0 < tio.c_cc[VTIME] )
 				{
@@ -522,6 +581,8 @@ ssize_t TTY::read(ioctx_t* ctx, uint8_t* userbuf, size_t count)
 					// TODO: Only wait up until tio.c_cc[VTIME] * 0.1 seconds.
 					if ( !kthread_cond_wait_signal(&datacond, &termlock) )
 						return sofar ? sofar : (errno = EINTR, -1);
+					if ( hungup )
+						return sofar ? sofar : (errno = EIO, -1);
 				}
 				else
 					return sofar;
@@ -586,8 +647,10 @@ ssize_t TTY::read(ioctx_t* ctx, uint8_t* userbuf, size_t count)
 ssize_t TTY::write(ioctx_t* ctx, const uint8_t* io_buffer, size_t count)
 {
 	ScopedLockSignal lock(&termlock);
+	if ( hungup )
+		return errno = EIO, -1;
 	if ( tio.c_lflag & TOSTOP && !RequireForeground(SIGTTOU) )
-		return errno = EINTR, -1;
+		return -1;
 	// TODO: Add support for ioctx to the kernel log.
 	unsigned char buffer[256];
 	size_t max_incoming = sizeof(buffer);
@@ -632,13 +695,15 @@ ssize_t TTY::write(ioctx_t* ctx, const uint8_t* io_buffer, size_t count)
 						buffer[i] = '\n';
 			}
 		}
-		Log::PrintData(buffer + offset, outgoing);
+		tty_output(buffer + offset, outgoing);
 		sofar += incoming;
 		if ( ++rounds % 16 == 0 )
 		{
 			kthread_mutex_unlock(&termlock);
 			kthread_yield();
 			kthread_mutex_lock(&termlock);
+			if ( hungup )
+				return sofar;
 		}
 		if ( Signal::IsPending() )
 			return sofar;
@@ -649,6 +714,8 @@ ssize_t TTY::write(ioctx_t* ctx, const uint8_t* io_buffer, size_t count)
 short TTY::PollEventStatus()
 {
 	short status = 0;
+	if ( hungup )
+		status |= POLLHUP;
 	if ( linebuffer.CanPop() || numeofs )
 		status |= POLLIN | POLLRDNORM;
 	if ( true /* can always write */ )
@@ -672,8 +739,10 @@ int TTY::poll(ioctx_t* /*ctx*/, PollNode* node)
 int TTY::tcdrain(ioctx_t* /*ctx*/)
 {
 	ScopedLockSignal lock(&termlock);
+	if ( hungup )
+		return errno = EIO, -1;
 	if ( !RequireForeground(SIGTTOU) )
-		return errno = EINTR, -1;
+		return -1;
 	return 0;
 }
 
@@ -681,7 +750,7 @@ int TTY::tcflow(ioctx_t* /*ctx*/, int action)
 {
 	ScopedLockSignal lock(&termlock);
 	if ( !RequireForeground(SIGTTOU) )
-		return errno = EINTR, -1;
+		return -1;
 	switch ( action )
 	{
 	case TCOOFF: break; // TODO: Suspend output.
@@ -698,8 +767,10 @@ int TTY::tcflush(ioctx_t* /*ctx*/, int queue_selector)
 	if ( queue_selector & ~TCIOFLUSH )
 		return errno = EINVAL, -1;
 	ScopedLockSignal lock(&termlock);
+	if ( hungup )
+		return errno = EIO, -1;
 	if ( !RequireForeground(SIGTTOU) )
-		return errno = EINTR, -1;
+		return -1;
 	if ( queue_selector & TCIFLUSH )
 		linebuffer.Flush();
 	return 0;
@@ -708,6 +779,8 @@ int TTY::tcflush(ioctx_t* /*ctx*/, int queue_selector)
 int TTY::tcgetattr(ioctx_t* ctx, struct termios* io_tio)
 {
 	ScopedLockSignal lock(&termlock);
+	if ( hungup )
+		return errno = EIO, -1;
 	if ( !ctx->copy_to_dest(io_tio, &tio, sizeof(tio)) )
 		return -1;
 	return 0;
@@ -715,23 +788,29 @@ int TTY::tcgetattr(ioctx_t* ctx, struct termios* io_tio)
 
 pid_t TTY::tcgetsid(ioctx_t* /*ctx*/)
 {
-	// TODO: Implement sessions.
-	return 1;
+	ScopedLockSignal lock(&termlock);
+	if ( hungup )
+		return errno = EIO, -1;
+	return sid;
 }
 
 int TTY::tcsendbreak(ioctx_t* /*ctx*/, int /*duration*/)
 {
 	ScopedLockSignal lock(&termlock);
+	if ( hungup )
+		return errno = EIO, -1;
 	if ( !RequireForeground(SIGTTOU) )
-		return errno = EINTR, -1;
+		return -1;
 	return 0;
 }
 
 int TTY::tcsetattr(ioctx_t* ctx, int actions, const struct termios* io_tio)
 {
 	ScopedLockSignal lock(&termlock);
+	if ( hungup )
+		return errno = EIO, -1;
 	if ( !RequireForeground(SIGTTOU) )
-		return errno = EINTR, -1;
+		return -1;
 	switch ( actions )
 	{
 	case TCSANOW: break;
@@ -739,18 +818,88 @@ int TTY::tcsetattr(ioctx_t* ctx, int actions, const struct termios* io_tio)
 	case TCSAFLUSH: linebuffer.Flush(); break;
 	default: return errno = EINVAL, -1;
 	}
+	tcflag_t old_lflag = tio.c_lflag;
 	if ( !ctx->copy_from_src(&tio, io_tio, sizeof(tio)) )
 		return -1;
-	// TODO: Potentially take action here if something changed.
+	tcflag_t new_lflag = tio.c_lflag;
+	bool oldnoutf8 = old_lflag & ISORTIX_32BIT;
+	bool newnoutf8 = new_lflag & ISORTIX_32BIT;
+	if ( oldnoutf8 != newnoutf8 )
+		memset(&read_ps, 0, sizeof(read_ps));
+	if ( !(tio.c_lflag & ICANON) )
+		CommitLineBuffer();
 	return 0;
+}
+
+int TTY::ioctl(ioctx_t* ctx, int cmd, uintptr_t arg)
+{
+	ScopedLockSignal lock(&termlock);
+	if ( hungup )
+		return errno = EIO, -1;
+	if ( cmd == TIOCSCTTY )
+	{
+		ScopedLock family_lock(&process_family_lock);
+		if ( 0 <= sid )
+			return errno = EPERM, -1;
+		Process* process = CurrentProcess();
+		if ( !process->sessionfirst )
+			return errno = EPERM, -1;
+		if ( (ctx->dflags & (O_READ | O_WRITE)) != (O_READ | O_WRITE) )
+			return errno = EPERM, -1;
+		Ref<Vnode> vnode(new Vnode(Ref<Inode>(this), Ref<Vnode>(NULL), 0, 0));
+		if ( !vnode )
+			return -1;
+		Ref<Descriptor> desc(new Descriptor(vnode, O_READ | O_WRITE));
+		if ( !desc )
+			return -1;
+		sid = process->pid;
+		foreground_pgid = process->pid;
+		process->SetTTY(desc);
+		return 0;
+	}
+	else if ( cmd == TIOCSPTLCK )
+	{
+		// TODO: Figure out what locked ptys are and implement it if sensible.
+		const int* arg_ptr = (const int*) arg;
+		int new_locked;
+		if ( !ctx->copy_from_src(&new_locked, arg_ptr, sizeof(new_locked)) )
+			return -1;
+		return 0;
+	}
+	else if ( cmd == TIOCGPTLCK )
+	{
+		// TODO: Figure out what locked ptys are and implement it if sensible.
+		int* arg_ptr = (int*) arg;
+		int locked = 0;
+		if ( !ctx->copy_to_dest(arg_ptr, &locked, sizeof(locked)) )
+			return -1;
+		return 0;
+	}
+	else if ( cmd == TIOCGNAME )
+	{
+		char* arg_ptr = (char*) arg;
+		size_t ttynamesize = strlen(ttyname) + 1;
+		if ( !ctx->copy_to_dest(arg_ptr, ttyname, ttynamesize) )
+			return -1;
+		return 0;
+	}
+	lock.Reset();
+	return AbstractInode::ioctl(ctx, cmd, arg);
 }
 
 bool TTY::RequireForeground(int sig)
 {
+	ScopedLock family_lock(&process_family_lock);
+	return RequireForegroundUnlocked(sig);
+}
+
+bool TTY::RequireForegroundUnlocked(int sig) // process_family_lock held
+{
 	Thread* thread = CurrentThread();
 	Process* process = thread->process;
-	ScopedLock group_lock(&process->groupparentlock);
-	if ( process->group->pid == foreground_pgid )
+	if ( !process->session || process->session->pid != sid || !process->group )
+		return true;
+	if ( foreground_pgid < 1 || process->group->pid == foreground_pgid )
 		return true;
 	if ( sigismember(&thread->signal_mask, sig) )
 		return true;
@@ -758,8 +907,8 @@ bool TTY::RequireForeground(int sig)
 	if ( process->signal_actions[sig].sa_handler == SIG_IGN )
 		return true;
 	signal_lock.Reset();
-	group_lock.Reset();
 	process->group->DeliverGroupSignal(sig);
+	errno = EINTR;
 	return false;
 }
 

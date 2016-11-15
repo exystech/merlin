@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,16 +17,23 @@
  * Process control interface.
  */
 
+#include <sys/ioctl.h>
 #include <sys/types.h>
 
 #include <errno.h>
+#include <limits.h>
 #include <string.h>
 
+#if !defined(TTY_NAME_MAX)
+#include <sortix/limits.h>
+#endif
 #include <sortix/psctl.h>
 
 #include <sortix/kernel/clock.h>
+#include <sortix/kernel/descriptor.h>
 #include <sortix/kernel/interrupt.h>
 #include <sortix/kernel/copy.h>
+#include <sortix/kernel/ioctx.h>
 #include <sortix/kernel/kthread.h>
 #include <sortix/kernel/process.h>
 #include <sortix/kernel/ptable.h>
@@ -37,6 +44,7 @@ namespace Sortix {
 
 int sys_psctl(pid_t pid, int request, void* ptr)
 {
+	ScopedLock lock(&process_family_lock);
 	Ref<ProcessTable> ptable = CurrentProcess()->GetPTable();
 	if ( request == PSCTL_PREV_PID )
 	{
@@ -52,7 +60,6 @@ int sys_psctl(pid_t pid, int request, void* ptr)
 		resp.next_pid = ptable->Next(pid);
 		return CopyToUser(ptr, &resp, sizeof(resp)) ? 0 : -1;
 	}
-	// TODO: Scoped lock that prevents zombies from terminating.
 	Process* process = ptable->Get(pid);
 	if ( !process )
 		return errno = ESRCH, -1;
@@ -61,55 +68,48 @@ int sys_psctl(pid_t pid, int request, void* ptr)
 		struct psctl_stat psst;
 		memset(&psst, 0, sizeof(psst));
 		psst.pid = pid;
-		kthread_mutex_lock(&process->parentlock);
 		if ( process->parent )
 		{
 			Process* parent = process->parent;
 			psst.ppid = parent->pid;
-			kthread_mutex_unlock(&process->parentlock);
-			// TODO: Is there a risk of getting a new parent here?
-			kthread_mutex_lock(&parent->childlock);
 			psst.ppid_prev = process->prevsibling ? process->prevsibling->pid : -1;
 			psst.ppid_next = process->nextsibling ? process->nextsibling->pid : -1;
-			kthread_mutex_unlock(&parent->childlock);
 		}
 		else
 		{
-			kthread_mutex_unlock(&process->parentlock);
 			psst.ppid = -1;
 			psst.ppid_prev = -1;
 			psst.ppid_next = -1;
 		}
-		kthread_mutex_lock(&process->childlock);
 		psst.ppid_first = process->firstchild ? process->firstchild->pid : -1;
-		kthread_mutex_unlock(&process->childlock);
-		kthread_mutex_lock(&process->groupparentlock);
 		if ( process->group )
 		{
 			Process* group = process->group;
 			psst.pgid = group->pid;
-			kthread_mutex_unlock(&process->groupparentlock);
-			// TODO: Is there a risk of getting a new group here?
-			kthread_mutex_lock(&group->groupchildlock);
 			psst.pgid_prev = process->groupprev ? process->groupprev->pid : -1;
 			psst.pgid_next = process->groupnext ? process->groupnext->pid : -1;
-			kthread_mutex_unlock(&group->groupchildlock);
 		}
 		else
 		{
-			kthread_mutex_unlock(&process->groupparentlock);
 			psst.pgid = -1;
 			psst.pgid_prev = -1;
 			psst.pgid_next = -1;
 		}
-		kthread_mutex_lock(&process->groupchildlock);
 		psst.pgid_first = process->groupfirst ? process->groupfirst->pid : -1;
-		kthread_mutex_unlock(&process->groupchildlock);
-		// TODO: Implement sessions.
-		psst.sid = 1;
-		psst.sid_prev = ptable->Prev(pid);
-		psst.sid_next = ptable->Next(pid);
-		psst.sid_first = pid == 1 ? 1 : -1;
+		if ( process->session )
+		{
+			Process* session = process->session;
+			psst.sid = session->pid;
+			psst.sid_prev = process->sessionprev ? process->sessionprev->pid : -1;
+			psst.sid_next = process->sessionnext ? process->sessionnext->pid : -1;
+		}
+		else
+		{
+			psst.sid = -1;
+			psst.sid_prev = -1;
+			psst.sid_next = -1;
+		}
+		psst.sid_first = process->sessionfirst ? process->sessionfirst->pid : -1;
 		// TODO: Implement init groupings.
 		psst.init = 1;
 		psst.init_prev = ptable->Prev(pid);
@@ -151,6 +151,34 @@ int sys_psctl(pid_t pid, int request, void* ptr)
 			if ( ctl.size < size )
 				return errno = ERANGE, -1;
 			if ( !CopyToUser(ctl.buffer, path, size) )
+				return -1;
+		}
+		return 0;
+	}
+	else if ( request == PSCTL_TTYNAME )
+	{
+		struct psctl_ttyname ctl;
+		if ( !CopyFromUser(&ctl, ptr, sizeof(ctl)) )
+			return -1;
+		ioctx_t kctx; SetupKernelIOCtx(&kctx);
+		if ( !process->session )
+			return errno = ENOTTY, -1;
+		Ref<Descriptor> tty = process->session->GetTTY();
+		if ( !tty )
+			return errno = ENOTTY, -1;
+		char ttyname[TTY_NAME_MAX-5+1];
+		if ( tty->ioctl(&kctx, TIOCGNAME, (uintptr_t) ttyname) < 0 )
+			return -1;
+		size_t size = strlen(ttyname) + 1;
+		struct psctl_ttyname resp = ctl;
+		resp.size = size;
+		if ( !CopyToUser(ptr, &resp, sizeof(resp)) )
+			return -1;
+		if ( ctl.buffer )
+		{
+			if ( ctl.size < size )
+				return errno = ERANGE, -1;
+			if ( !CopyToUser(ctl.buffer, ttyname, size) )
 				return -1;
 		}
 		return 0;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,24 +17,24 @@
  * Returns the pathname of a terminal.
  */
 
-#include <errno.h>
-#include <stdlib.h>
+#include <sys/ioctl.h>
+
+#include <limits.h>
 #include <unistd.h>
+
+#if !defined(TTY_NAME_MAX)
+#include <sortix/limits.h>
+#endif
 
 char* ttyname(int fd)
 {
-	static char* result = NULL;
-	static size_t result_size = 0;
-	while ( ttyname_r(fd, result, result_size) < 0 )
-	{
-		if ( errno != ERANGE )
-			return NULL;
-		size_t new_result_size = result_size ? 2 * result_size : 16;
-		char* new_result = (char*) realloc(result, new_result_size);
-		if ( !new_result )
-			return NULL;
-		result = new_result;
-		result_size = new_result_size;
-	}
-	return result;
+	static char name[TTY_NAME_MAX+1];
+	name[0] = '/';
+	name[1] = 'd';
+	name[2] = 'e';
+	name[3] = 'v';
+	name[4] = '/';
+	if ( ioctl(fd, TIOCGNAME, name + 5) < 0 )
+		return NULL;
+	return name;
 }
