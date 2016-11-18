@@ -462,6 +462,7 @@ pwd/getpwuid_r.o \
 pwd/openpw.o \
 pwd/setpwent.o \
 sched/sched_yield.o \
+pty/openpty.o \
 scram/scram.o \
 semaphore/sem_destroy.o \
 semaphore/sem_getvalue.o \
