@@ -405,7 +405,7 @@ int main(void)
 	if ( !isatty(1) )
 	{
 		close(1);
-		if ( open("/dev/tty", O_WRONLY) != 0 )
+		if ( open("/dev/tty", O_WRONLY) != 1 )
 			err(2, "/dev/tty");
 	}
 	if ( !isatty(2) )
