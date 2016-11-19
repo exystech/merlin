@@ -166,11 +166,11 @@ void setkey(const char*);
 char* setstate(char*);
 void srand48(long);
 void srandom(unsigned);
-int unlockpt(int);
 #endif
 
 #if __USE_SORTIX || __USE_XOPEN
 int grantpt(int);
+int unlockpt(int);
 #endif
 
 #if __USE_SORTIX || 600 <= __USE_XOPEN

@@ -541,6 +541,7 @@ stdlib/rand.o \
 stdlib/realpath.o \
 stdlib/setenv.o \
 stdlib/system.o \
+stdlib/unlockpt.o \
 stdlib/unsetenv.o \
 sys/display/dispmsg_issue.o \
 sys/ioctl/ioctl.o \
