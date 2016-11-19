@@ -52,11 +52,11 @@ void text(const char* str)
 	struct winsize ws;
 	if ( tcgetwinsize(1, &ws) < 0 )
 		err(2, "tcgetwinsize");
-	struct wincurpos wcp;
-	if ( tcgetwincurpos(1, &wcp) < 0 )
-		err(2, "tcgetwinsize");
 	size_t columns = ws.ws_col;
-	size_t column = wcp.wcp_col;
+	size_t column = 0;
+	struct wincurpos wcp;
+	if ( tcgetwincurpos(1, &wcp) == 0 )
+		column = wcp.wcp_col;
 	bool blank = false;
 	while ( str[0] )
 	{
