@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -159,7 +159,6 @@ long lrand48(void);
 long mrand48(void);
 long nrand48(unsigned short[3]);
 int posix_memalign(void**, size_t, size_t);
-int posix_openpt(int);
 char* ptsname(int);
 long random(void);
 int rand_r(unsigned *);
@@ -169,6 +168,10 @@ char* setstate(char*);
 void srand48(long);
 void srandom(unsigned);
 int unlockpt(int);
+#endif
+
+#if __USE_SORTIX || 600 <= __USE_XOPEN
+int posix_openpt(int);
 #endif
 
 /* Functions copied from elsewhere. */
