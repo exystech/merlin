@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,12 +18,14 @@
  */
 
 #include <sys/display.h>
+#include <sys/ioctl.h>
 #include <sys/keycodes.h>
 #include <sys/termmode.h>
 #include <sys/wait.h>
 
 #include <errno.h>
 #include <error.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -33,6 +35,9 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+
+static uint64_t device;
+static uint64_t connector;
 
 bool SetCurrentMode(struct dispmsg_crtc_mode mode)
 {
@@ -323,6 +328,22 @@ int main(int argc, char* argv[])
 	}
 
 	compact_arguments(&argc, &argv);
+
+	int tty_fd = open("/dev/tty", O_RDWR);
+	if ( tty_fd < 0 )
+		error(1, errno, "/dev/tty");
+	struct tiocgdisplay display;
+	struct tiocgdisplays gdisplays;
+	memset(&gdisplays, 0, sizeof(gdisplays));
+	gdisplays.count = 1;
+	gdisplays.displays = &display;
+	if ( ioctl(1, TIOCGDISPLAYS, &gdisplays) < 0 || gdisplays.count == 0 )
+	{
+		fprintf(stderr, "No video devices are associated with this terminal.\n");
+		exit(13);
+	}
+	device = display.device;
+	connector = display.connector;
 
 	size_t num_modes = 0;
 	struct dispmsg_crtc_mode* modes = GetAvailableModes(&num_modes);

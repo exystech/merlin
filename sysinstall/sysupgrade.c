@@ -18,6 +18,7 @@
  */
 
 #include <sys/display.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
@@ -32,6 +33,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <termios.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -379,7 +381,8 @@ int main(void)
 	prompt(input, sizeof(input), "Ready?", ready);
 	text("\n");
 
-	while ( true )
+	bool kblayout_setable = 0 <= tcgetblob(0, "kblayout", NULL, 0);
+	while ( kblayout_setable )
 	{
 		// TODO: Detect the name of the current keyboard layout.
 		prompt(input, sizeof(input),
@@ -417,15 +420,24 @@ int main(void)
 		if ( execute(argv, "f") == 0 )
 			break;
 	}
-	text("\n");
+	if ( kblayout_setable )
+		text("\n");
 
+	struct tiocgdisplay display;
+	struct tiocgdisplays gdisplays;
+	memset(&gdisplays, 0, sizeof(gdisplays));
+	gdisplays.count = 1;
+	gdisplays.displays = &display;
 	struct dispmsg_get_driver_name dgdn = { 0 };
 	dgdn.msgid = DISPMSG_GET_DRIVER_NAME;
 	dgdn.device = 0;
 	dgdn.driver_index = 0;
 	dgdn.name.byte_size = 0;
 	dgdn.name.str = NULL;
-	if ( dispmsg_issue(&dgdn, sizeof(dgdn)) == 0 || errno != ENODEV )
+	if ( ioctl(1, TIOCGDISPLAYS, &gdisplays) == 0 &&
+	     1 < gdisplays.count &&
+	     (dgdn.device = display.device, true) &&
+	     (dispmsg_issue(&dgdn, sizeof(dgdn)) == 0 || errno != ENODEV) )
 	{
 		while ( true )
 		{
@@ -439,8 +451,8 @@ int main(void)
 				continue;
 			break;
 		}
+		text("\n");
 	}
-	text("\n");
 
 	struct release new_release;
 	if ( !os_release_load(&new_release, "/etc/sortix-release",

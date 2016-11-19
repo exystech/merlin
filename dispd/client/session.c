@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,9 +17,10 @@
  * Handles session management.
  */
 
-#include <sys/types.h>
+#include <sys/ioctl.h>
 #include <sys/display.h>
 #include <sys/wait.h>
+#include <sys/types.h>
 
 #include <error.h>
 #include <fcntl.h>
@@ -34,9 +35,6 @@
 
 #include "session.h"
 
-static const uint64_t ONE_AND_ONLY_DEVICE = 0;
-static const uint64_t ONE_AND_ONLY_CONNECTOR = 0;
-
 struct dispd_session* global_session = NULL;
 
 bool dispd__session_initialize(int* argc, char*** argv)
@@ -48,8 +46,21 @@ bool dispd__session_initialize(int* argc, char*** argv)
 	if ( !global_session )
 		return false;
 	memset(global_session, 0, sizeof(*global_session));
-	global_session->device = ONE_AND_ONLY_DEVICE;
-	global_session->connector = ONE_AND_ONLY_CONNECTOR;
+	int tty_fd = open("/dev/tty", O_RDWR);
+	if ( tty_fd < 0 )
+		return free(global_session), false;
+	struct tiocgdisplay display;
+	struct tiocgdisplays gdisplays;
+	memset(&gdisplays, 0, sizeof(gdisplays));
+	gdisplays.count = 1;
+	gdisplays.displays = &display;
+	bool fail = ioctl(tty_fd, TIOCGDISPLAYS, &gdisplays) < 0 ||
+	            gdisplays.count == 0;
+	close(tty_fd);
+	if ( fail )
+		return free(global_session), false;
+	global_session->device = display.device;
+	global_session->connector = display.connector;
 	return true;
 }
 

@@ -26,6 +26,7 @@
 #include <string.h>
 #include <wchar.h>
 
+#include <sortix/display.h>
 #include <sortix/fcntl.h>
 #include <sortix/ioctl.h>
 #include <sortix/keycodes.h>
@@ -329,6 +330,27 @@ int LogTerminal::ioctl(ioctx_t* ctx, int cmd, uintptr_t arg)
 		retws.ws_col = Log::Width();
 		retws.ws_row = Log::Height();
 		if ( !ctx->copy_to_dest(ws, &retws, sizeof(retws)) )
+			return -1;
+		return 0;
+	}
+	else if ( cmd == TIOCGDISPLAYS )
+	{
+		struct tiocgdisplays* input = (struct tiocgdisplays*) arg;
+		struct tiocgdisplays gdisplays;
+		if ( !ctx->copy_from_src(&gdisplays, input, sizeof(gdisplays)) )
+			return -1;
+		if ( 0 < gdisplays.count )
+		{
+			struct tiocgdisplay display;
+			memset(&display, 0, sizeof(display));
+			display.device = 0;
+			display.connector = 0;
+			if ( !ctx->copy_to_dest(gdisplays.displays, &display,
+			                        sizeof(display)) )
+				return -1;
+		}
+		gdisplays.count = 1;
+		if ( !ctx->copy_to_dest(input, &gdisplays, sizeof(gdisplays)) )
 			return -1;
 		return 0;
 	}

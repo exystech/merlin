@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,8 +17,8 @@
  * Handles windows.
  */
 
-#include <sys/types.h>
 #include <sys/display.h>
+#include <sys/types.h>
 
 #include <fcntl.h>
 #include <ioleast.h>
@@ -102,6 +102,7 @@ struct dispd_framebuffer* dispd_begin_render(struct dispd_window* window)
 	fb->pitch = fb->width * fb->bpp / 8;
 	fb->datasize = fb->pitch * fb->height;
 	fb->data = (uint8_t*) request_buffer(window, fb->datasize);
+	fb->fb_location = msg.mode.fb_location;
 	if ( !fb->data ) { free(fb); return NULL; }
 	return fb;
 }
@@ -113,7 +114,7 @@ bool dispd_finish_render(struct dispd_framebuffer* fb)
 	struct dispmsg_write_memory msg;
 	msg.msgid = DISPMSG_WRITE_MEMORY;
 	msg.device = window->session->device;
-	msg.offset = 0;
+	msg.offset = fb->fb_location;
 	msg.size = fb->datasize;
 	msg.src = fb->data;
 	if ( dispmsg_issue(&msg, sizeof(msg)) == 0 )

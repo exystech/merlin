@@ -20,6 +20,7 @@
 #include <sys/display.h>
 #include <sys/display.h>
 #include <sys/kernelinfo.h>
+#include <sys/ioctl.h>
 #include <sys/termmode.h>
 
 #include <assert.h>
@@ -106,17 +107,21 @@ struct glogin
 	bool pointer_working;
 	struct termios old_tio;
 	bool has_old_tio;
+	uint64_t device;
+	uint64_t connector;
 };
 
 static struct glogin state;
 
-static bool get_graphical_mode(struct dispmsg_crtc_mode* mode)
+static bool get_graphical_mode(uint64_t device,
+                               uint64_t connector,
+                               struct dispmsg_crtc_mode* mode)
 {
 	struct dispmsg_get_crtc_mode msg;
 	memset(&msg, 0, sizeof(msg));
 	msg.msgid = DISPMSG_GET_CRTC_MODE;
-	msg.device = 0; // TODO: Multi-screen support!
-	msg.connector = 0; // TODO: Multi-screen support!
+	msg.device = device;
+	msg.connector = connector;
 	if ( dispmsg_issue(&msg, sizeof(msg)) != 0 )
 	{
 		warn("dispmsg_issue: DISPMSG_GET_CRTC_MODE");
@@ -496,8 +501,8 @@ static bool screen_capture(struct glogin* state, struct framebuffer* fb)
 	struct dispmsg_write_memory msg;
 	memset(&msg, 0, sizeof(msg));
 	msg.msgid = DISPMSG_READ_MEMORY;
-	msg.device = 0; // TODO: Multi-screen support!
-	msg.offset = 0; // TODO: mode.fb_location!
+	msg.device = state->device;
+	msg.offset = state->mode.fb_location;
 	msg.size = fb->xres * fb->yres * sizeof(fb->buffer[0]);
 	msg.src = (uint8_t*) fb->buffer;
 	if ( dispmsg_issue(&msg, sizeof(msg)) != 0 )
@@ -510,7 +515,7 @@ static bool screen_capture(struct glogin* state, struct framebuffer* fb)
 
 static bool begin_render(struct glogin* state, struct framebuffer* fb)
 {
-	if ( !get_graphical_mode(&state->mode) )
+	if ( !get_graphical_mode(state->device, state->connector, &state->mode) )
 		return false;
 	fb->xres = state->mode.view_xres;
 	fb->yres = state->mode.view_yres;
@@ -530,8 +535,8 @@ static bool finish_render(struct glogin* state, struct framebuffer* fb)
 	struct dispmsg_write_memory msg;
 	memset(&msg, 0, sizeof(msg));
 	msg.msgid = DISPMSG_WRITE_MEMORY;
-	msg.device = 0; // TODO: Multi-screen support!
-	msg.offset = 0; // TODO: mode.fb_location!
+	msg.device = state->device;
+	msg.offset = state->mode.fb_location;
 	msg.size = sizeof(uint32_t) * fb->xres * fb->yres;
 	msg.src = (uint8_t*) fb->buffer;
 	if ( dispmsg_issue(&msg, sizeof(msg)) != 0 )
@@ -730,8 +735,19 @@ bool glogin_init(struct glogin* state)
 {
 	memset(state, 0, sizeof(*state));
 	state->fd_mouse = -1;
-
-	if ( !get_graphical_mode(&state->mode) )
+	struct tiocgdisplay display;
+	struct tiocgdisplays gdisplays;
+	memset(&gdisplays, 0, sizeof(gdisplays));
+	gdisplays.count = 1;
+	gdisplays.displays = &display;
+	if ( ioctl(1, TIOCGDISPLAYS, &gdisplays) < 0 || gdisplays.count == 0 )
+	{
+		glogin_destroy(state);
+		return false;
+	}
+	state->device = display.device;
+	state->connector = display.connector;
+	if ( !get_graphical_mode(state->device, state->connector, &state->mode) )
 	{
 		warn("dispmsg_issue");
 		glogin_destroy(state);

@@ -18,6 +18,7 @@
  */
 
 #include <sys/display.h>
+#include <sys/ioctl.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -429,6 +430,14 @@ static void set_hostname(void)
 
 static void set_kblayout(void)
 {
+	int tty_fd = open("/dev/tty", O_RDWR);
+	if ( !tty_fd )
+		return warning("unable to set keyboard layout: /dev/tty: %m");
+	bool unsupported = tcgetblob(tty_fd, "kblayout", NULL, 0) < 0 &&
+	                   (errno == ENOTTY || errno == ENOENT);
+	close(tty_fd);
+	if ( unsupported )
+		return;
 	FILE* fp = fopen("/etc/kblayout", "r");
 	if ( !fp && errno == ENOENT )
 		return;
@@ -440,7 +449,11 @@ static void set_kblayout(void)
 		return warning("unable to set keyboard layout: /etc/kblayout: %m");
 	pid_t child_pid = fork();
 	if ( child_pid < 0 )
-		return warning("unable to set keyboard layout: fork: %m");
+	{
+		free(kblayout);
+		warning("unable to set keyboard layout: fork: %m");
+		return;
+	}
 	if ( !child_pid )
 	{
 		execlp("chkblayout", "chkblayout", "--", kblayout, (const char*) NULL);
@@ -454,6 +467,19 @@ static void set_kblayout(void)
 
 static void set_videomode(void)
 {
+	int tty_fd = open("/dev/tty", O_RDWR);
+	if ( !tty_fd )
+		return warning("unable to set video mode: /dev/tty: %m");
+	struct tiocgdisplay display;
+	struct tiocgdisplays gdisplays;
+	memset(&gdisplays, 0, sizeof(gdisplays));
+	gdisplays.count = 1;
+	gdisplays.displays = &display;
+	bool unsupported = ioctl(tty_fd, TIOCGDISPLAYS, &gdisplays) < 0 ||
+	                   gdisplays.count == 0;
+	close(tty_fd);
+	if ( unsupported )
+		return;
 	FILE* fp = fopen("/etc/videomode", "r");
 	if ( !fp && errno == ENOENT )
 		return;
@@ -476,8 +502,8 @@ static void set_videomode(void)
 	struct dispmsg_get_crtc_mode get_mode;
 	memset(&get_mode, 0, sizeof(get_mode));
 	get_mode.msgid = DISPMSG_GET_CRTC_MODE;
-	get_mode.device = 0;
-	get_mode.connector = 0;
+	get_mode.device = display.device;
+	get_mode.connector = display.connector;
 	// Don't set the resolution if it's already correct.
 	if ( dispmsg_issue(&get_mode, sizeof(get_mode)) == 0 )
 	{
@@ -529,10 +555,6 @@ static void init_early(void)
 
 	// Set up the PATH variable.
 	if ( setenv("PATH", "/bin:/sbin", 1) < 0 )
-		fatal("setenv: %m");
-
-	// Set the terminal type.
-	if ( setenv("TERM", "sortix", 1) < 0 )
 		fatal("setenv: %m");
 }
 

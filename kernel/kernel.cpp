@@ -719,8 +719,8 @@ static void InitThread(void* /*user*/)
 
 	Log::PrintF("\r\e[m\e[J");
 
-	int envc = 0;
-	const char* envp[] = { NULL };
+	int envc = 1;
+	const char* envp[] = { "TERM=sortix", NULL };
 	struct thread_registers regs;
 	assert((((uintptr_t) &regs) & (alignof(regs)-1)) == 0);
 

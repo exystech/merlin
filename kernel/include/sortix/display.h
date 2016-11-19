@@ -161,6 +161,18 @@ struct dispmsg_read_memory
 	uint8_t* dst; // in, *out
 };
 
+struct tiocgdisplay
+{
+	uint64_t device;
+	uint64_t connector;
+};
+
+struct tiocgdisplays
+{
+	size_t count; // in, out
+	struct tiocgdisplay* displays; // in, *out
+};
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

@@ -18,6 +18,7 @@
  */
 
 #include <sys/display.h>
+#include <sys/ioctl.h>
 #include <sys/kernelinfo.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
@@ -37,6 +38,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <termios.h>
 #include <unistd.h>
 
 // Sortix libc doesn't have its own proper <limits.h> at this time.
@@ -472,7 +474,8 @@ int main(void)
 
 	install_configurationf("upgrade.conf", "a", "src = yes\n");
 
-	while ( true )
+	bool kblayout_setable = 0 <= tcgetblob(0, "kblayout", NULL, 0);
+	while ( kblayout_setable )
 	{
 		// TODO: Detect the name of the current keyboard layout.
 		prompt(input, sizeof(input),
@@ -510,25 +513,36 @@ int main(void)
 		if ( execute(argv, "f") == 0 )
 			break;
 	}
-	if ( !input[0] || !strcmp(input, "default") )
-		text("/etc/kblayout will not be created (default).\n");
-	else
+	if ( kblayout_setable )
 	{
-		textf("/etc/kblayout will be set to \"%s\".\n", input);
-		mode_t old_umask = getumask();
-		umask(022);
-		install_configurationf("kblayout", "w", "%s\n", input);
-		umask(old_umask);
+		if ( !input[0] || !strcmp(input, "default") )
+			text("/etc/kblayout will not be created (default).\n");
+		else
+		{
+			textf("/etc/kblayout will be set to \"%s\".\n", input);
+			mode_t old_umask = getumask();
+			umask(022);
+			install_configurationf("kblayout", "w", "%s\n", input);
+			umask(old_umask);
+		}
+		text("\n");
 	}
-	text("\n");
 
+	struct tiocgdisplay display;
+	struct tiocgdisplays gdisplays;
+	memset(&gdisplays, 0, sizeof(gdisplays));
+	gdisplays.count = 1;
+	gdisplays.displays = &display;
 	struct dispmsg_get_driver_name dgdn = { 0 };
 	dgdn.msgid = DISPMSG_GET_DRIVER_NAME;
 	dgdn.device = 0;
 	dgdn.driver_index = 0;
 	dgdn.name.byte_size = 0;
 	dgdn.name.str = NULL;
-	if ( dispmsg_issue(&dgdn, sizeof(dgdn)) == 0 || errno != ENODEV )
+	if ( ioctl(1, TIOCGDISPLAYS, &gdisplays) == 0 &&
+	     1 < gdisplays.count &&
+	     (dgdn.device = display.device, true) &&
+	     (dispmsg_issue(&dgdn, sizeof(dgdn)) == 0 || errno != ENODEV) )
 	{
 		while ( true )
 		{
