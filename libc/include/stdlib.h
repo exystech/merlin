@@ -158,7 +158,6 @@ long lrand48(void);
 long mrand48(void);
 long nrand48(unsigned short[3]);
 int posix_memalign(void**, size_t, size_t);
-char* ptsname(int);
 long random(void);
 int rand_r(unsigned *);
 unsigned short *seed48(unsigned short [3]);
@@ -171,6 +170,7 @@ void srandom(unsigned);
 #if __USE_SORTIX || __USE_XOPEN
 int grantpt(int);
 int unlockpt(int);
+char* ptsname(int);
 #endif
 
 #if __USE_SORTIX || 600 <= __USE_XOPEN
