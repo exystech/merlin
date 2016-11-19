@@ -538,6 +538,7 @@ stdlib/mkstemps.o \
 stdlib/on_exit.o \
 stdlib/posix_openpt.o \
 stdlib/ptsname.o \
+stdlib/ptsname_r.o \
 stdlib/rand.o \
 stdlib/realpath.o \
 stdlib/setenv.o \

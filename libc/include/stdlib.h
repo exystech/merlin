@@ -183,6 +183,7 @@ uint32_t arc4random(void);
 void arc4random_buf(void*, size_t);
 uint32_t arc4random_uniform(uint32_t);
 void* reallocarray(void*, size_t, size_t);
+int ptsname_r(int, char*, size_t);
 #endif
 
 #ifdef __cplusplus
