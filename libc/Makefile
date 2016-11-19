@@ -528,6 +528,7 @@ stdlib/clearenv.o \
 stdlib/_Exit.o \
 stdlib/exit.o \
 stdlib/getenv.o \
+stdlib/grantpt.o \
 stdlib/mkdtemp.o \
 stdlib/mkdtemps.o \
 stdlib/mkostemp.o \

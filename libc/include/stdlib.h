@@ -150,7 +150,6 @@ long a64l(const char* s);
 double drand48(void);
 double erand48(unsigned short [3]);
 int getsubopt(char**, char* const *, char**);
-int grantpt(int);
 char* initstate(unsigned, char*, size_t);
 long jrand48(unsigned short [3]);
 char* l64a(long);
@@ -168,6 +167,10 @@ char* setstate(char*);
 void srand48(long);
 void srandom(unsigned);
 int unlockpt(int);
+#endif
+
+#if __USE_SORTIX || __USE_XOPEN
+int grantpt(int);
 #endif
 
 #if __USE_SORTIX || 600 <= __USE_XOPEN
