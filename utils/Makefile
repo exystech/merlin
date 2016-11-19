@@ -60,6 +60,7 @@ time \
 touch \
 tr \
 true \
+tty \
 type \
 uname \
 uniq \
