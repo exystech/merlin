@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -104,6 +104,8 @@ struct glogin
 	bool animating;
 	const char* warning;
 	bool pointer_working;
+	struct termios old_tio;
+	bool has_old_tio;
 };
 
 static struct glogin state;
@@ -720,6 +722,8 @@ void glogin_destroy(struct glogin* state)
 		close(state->fd_mouse);
 	if ( state->fading_from )
 		free(state->fade_from_fb.buffer);
+	if ( state->has_old_tio )
+		tcsetattr(0, TCSADRAIN, &state->old_tio);
 }
 
 bool glogin_init(struct glogin* state)
@@ -747,6 +751,12 @@ bool glogin_init(struct glogin* state)
 		return false;
 	}
     state->fd_mouse = open("/dev/mouse", O_RDONLY | O_CLOEXEC);
+	if ( tcgetattr(0, &state->old_tio) < 0 )
+	{
+		warn("tcgetattr");
+		return false;
+	}
+	state->has_old_tio = true;
 	if ( settermmode(0, TERMMODE_KBKEY | TERMMODE_UNICODE | TERMMODE_NONBLOCK) < 0 )
 	{
 		warn("settermmode");
