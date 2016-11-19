@@ -1822,6 +1822,7 @@ void read_command_interactive(struct sh_read_command* sh_read_command)
 
 	const char* print_dir_1 = print_dir;
 	const char* print_dir_2 = "";
+	char prompt_char = getuid() == 0 ? '#' : '$';
 
 	size_t home_dir_len = strlen(home_dir);
 	if ( home_dir_len && strncmp(print_dir, home_dir, home_dir_len) == 0 )
@@ -1831,11 +1832,12 @@ void read_command_interactive(struct sh_read_command* sh_read_command)
 	}
 
 	char* ps1;
-	asprintf(&ps1, "\e[32m%s@%s \e[36m%s%s #\e[37m ",
+	asprintf(&ps1, "\e[32m%s@%s \e[36m%s%s %c\e[37m ",
 		print_username,
 		print_hostname,
 		print_dir_1,
-		print_dir_2);
+		print_dir_2,
+		prompt_char);
 
 	free(current_dir);
 
