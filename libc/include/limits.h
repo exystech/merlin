@@ -13,17 +13,18 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * sortix/limits.h
- * System limits.
+ * limits.h
+ * Implementation constants.
  */
 
-#ifndef INCLUDE_SORTIX_LIMITS_H
-#define INCLUDE_SORTIX_LIMITS_H
+#ifndef INCLUDE_LIMITS_H
+#define INCLUDE_LIMITS_H
 
 #include <sys/cdefs.h>
 
-#if __USE_SORTIX || __USE_POSIX
-#define HOST_NAME_MAX 255
-#endif
+/* The compiler provides a bulk of the declarations. */
+#include_next <limits.h>
+
+#include <sortix/limits.h>
 
 #endif
