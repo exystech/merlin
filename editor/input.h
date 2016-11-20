@@ -48,7 +48,6 @@ struct editor_input
 	char termseq[MAX_TERMSEQ_SIZE];
 	size_t termseq_used;
 	size_t termseq_seen;
-	bool ambiguous_escape;
 };
 
 void editor_input_begin(struct editor_input* editor_input);

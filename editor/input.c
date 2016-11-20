@@ -260,38 +260,11 @@ void editor_input_begin(struct editor_input* editor_input)
 void editor_input_process(struct editor_input* editor_input,
                           struct editor* editor)
 {
-	bool was_ambiguous_escape = editor_input->ambiguous_escape;
-	editor_input->ambiguous_escape = false;
-
-	if ( was_ambiguous_escape )
-		fcntl(0, F_SETFL, fcntl(0, F_GETFL, (void*) NULL) | O_NONBLOCK);
-
 	unsigned char uc;
 	ssize_t amount_read = read(0, &uc, sizeof(uc));
 
-	if ( was_ambiguous_escape )
-		fcntl(0, F_SETFL, fcntl(0, F_GETFL, (void*) NULL) &~ O_NONBLOCK);
-
 	if ( amount_read != sizeof(uc) )
-	{
-		if ( was_ambiguous_escape &&
-		     (errno == EWOULDBLOCK || errno == EAGAIN) )
-			uc = ':';
-		else
-			return;
-	}
-
-#if 0
-	if ( 1 <= uc && uc <= 26 )
-		fprintf(stderr, "Input: ^%c\n", 'A' + uc - 1);
-	else if ( uc == '\e' )
-		fprintf(stderr, "Input: ^[\n");
-	else
-		fprintf(stderr, "Input: '%c'\n", uc);
-#endif
-#if 0
-	fputc(uc, stderr);
-#endif
+		return;
 
 	if ( editor_input->termseq_used < MAX_TERMSEQ_SIZE )
 		editor_input->termseq[editor_input->termseq_used++] = (char) uc;
@@ -352,19 +325,6 @@ void editor_input_process(struct editor_input* editor_input,
 		if ( partial_match )
 		{
 			editor_input->termseq_seen = editor_input->termseq_used;
-
-			// HACK: We can't reliably tell an actual escape press apart from
-			//       the beginning of an escape sequence. However, we could use
-			//       timing to get close to the truth, through the assumption
-			//       that a following non-blocking read will fail only if this
-			//       was a single escape press.
-			if ( editor_input->termseq_used == 1 &&
-			     editor_input->termseq[0] == '\e' )
-			{
-				editor_input->ambiguous_escape = true;
-				return editor_input_process(editor_input, editor);
-			}
-
 			continue;
 		}
 
