@@ -540,7 +540,7 @@ int main(void)
 	dgdn.name.byte_size = 0;
 	dgdn.name.str = NULL;
 	if ( ioctl(1, TIOCGDISPLAYS, &gdisplays) == 0 &&
-	     1 < gdisplays.count &&
+	     0 < gdisplays.count &&
 	     (dgdn.device = display.device, true) &&
 	     (dispmsg_issue(&dgdn, sizeof(dgdn)) == 0 || errno != ENODEV) )
 	{
