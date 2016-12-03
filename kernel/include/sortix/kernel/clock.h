@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -55,6 +55,7 @@ public:
 	void Register(Timer* timer);
 	void Unlink(Timer* timer);
 	void Cancel(Timer* timer);
+	bool TryCancel(Timer* timer);
 	void LockClock();
 	void UnlockClock();
 	struct timespec SleepDelay(struct timespec duration);

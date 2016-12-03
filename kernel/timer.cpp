@@ -77,6 +77,13 @@ void Timer::Cancel()
 		clock->Cancel(this);
 }
 
+bool Timer::TryCancel()
+{
+	if ( clock )
+		return clock->TryCancel(this);
+	return true;
+}
+
 void Timer::GetInternal(struct itimerspec* current)
 {
 	if ( !(this->flags & TIMER_ACTIVE ) )
@@ -103,6 +110,8 @@ void Timer::Set(struct itimerspec* new_value, struct itimerspec* old_value,
                 void* new_user)
 {
 	assert(clock);
+	assert(!(flags & TIMER_FUNC_MAY_DEALLOCATE_TIMER) ||
+	       timespec_le(new_value->it_interval, timespec_nul()));
 
 	clock->LockClock();
 

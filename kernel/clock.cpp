@@ -235,6 +235,17 @@ void Clock::Cancel(Timer* timer)
 	UnlockClock();
 }
 
+bool Clock::TryCancel(Timer* timer)
+{
+	LockClock();
+	bool active = timer->flags & TIMER_ACTIVE;
+	if ( active )
+		Unlink(timer);
+	UnlockClock();
+	return active;
+}
+
+
 // TODO: We need some method for threads to sleep for real but still be
 //       interrupted by signals.
 struct timespec Clock::SleepDelay(struct timespec duration)
@@ -350,9 +361,15 @@ static void Clock__FireTimer(void* timer_ptr)
 	timer->clock->LockClock();
 	timer->num_overrun_events = timer->num_firings_scheduled;
 	timer->num_firings_scheduled = 0;
+	bool may_deallocate = timer->flags & TIMER_FUNC_MAY_DEALLOCATE_TIMER;
 	timer->clock->UnlockClock();
 
 	Clock__DoFireTimer(timer);
+
+	// The handler may have deallocated the storage for the timer, don't touch
+	// it again.
+	if ( may_deallocate )
+		return;
 
 	// If additional events happened during the time of the event handler, we'll
 	// have to handle them because the firing bit is set. We'll schedule another
@@ -376,6 +393,7 @@ static void Clock__FireTimer_InterruptWorker(void* timer_ptr, void*, size_t)
 void Clock::FireTimer(Timer* timer)
 {
 	timer->flags &= ~TIMER_ACTIVE;
+	bool may_deallocate = timer->flags & TIMER_FUNC_MAY_DEALLOCATE_TIMER;
 
 	// If the CPU is currently interrupted, we call the timer callback directly
 	// only if it is known to work when the interrupts are disabled on this CPU.
@@ -389,7 +407,8 @@ void Clock::FireTimer(Timer* timer)
 			timer->num_firings_scheduled++;
 		else
 		{
-			timer->flags |= TIMER_FIRING;
+			if ( !may_deallocate )
+				timer->flags |= TIMER_FIRING;
 			Interrupt::ScheduleWork(Clock__FireTimer_InterruptWorker, timer, NULL, 0);
 		}
 	}
@@ -405,13 +424,15 @@ void Clock::FireTimer(Timer* timer)
 			timer->num_firings_scheduled++;
 		else
 		{
-			timer->flags |= TIMER_FIRING;
+			if ( !may_deallocate )
+				timer->flags |= TIMER_FIRING;
 			Worker::Schedule(Clock__FireTimer, timer);
 		}
 	}
 
 	// Rearm the timer only if it is periodic.
-	if ( timespec_le(timer->value.it_interval, timespec_nul()) )
+	if ( may_deallocate ||
+	     timespec_le(timer->value.it_interval, timespec_nul()) )
 		return;
 
 	// TODO: If the period is too short (such a single nanosecond) on a delay
