@@ -84,7 +84,7 @@ const char* sortix_strerror(int errnum)
 	case EADDRNOTAVAIL: return "Address not available";
 	case EISCONN: return "Socket is connected";
 	case EFAULT: return "Bad address";
-	case EDESTADDRREQ: return "Destinatiohn address required";
+	case EDESTADDRREQ: return "Destination address required";
 	case EHOSTUNREACH: return "Host is unreachable";
 	case EMSGSIZE: return "Message too long";
 	case ENETDOWN: return "Network is down";
