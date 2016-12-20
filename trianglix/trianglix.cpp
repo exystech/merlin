@@ -1753,11 +1753,11 @@ static void HandleEvents(int kbfd, struct Desktop* desktop)
 		if ( 0 <= xtime_sec && xtime_sec < 15 )
 			desktop->warning = "Press F1 for basic usage help";
 		if ( 20 <= xtime_sec && xtime_sec < 30 )
-			desktop->warning = "Runes has not been configured";
+			desktop->warning = "Runes have not been configured";
 		if ( 45 <= xtime_sec && xtime_sec < 60 )
-			desktop->warning = "Note: Runes has not been configured";
+			desktop->warning = "Note: Runes have not been configured";
 		if ( 80 <= xtime_sec && xtime_sec < 100 )
-			desktop->warning = "Warning: Runes has not been configured",
+			desktop->warning = "Warning: Runes have not been configured",
 			desktop->critical_warning = true;
 		if ( 110 <= xtime_sec && xtime_sec < 130 )
 		{
