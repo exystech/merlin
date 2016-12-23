@@ -19,10 +19,23 @@
  * of a typo.
  */
 
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+const char* tty_name(void)
+{
+	int tty_fd = open("/dev/tty", O_RDONLY);
+	const char* result = NULL;
+	if ( 0 <= tty_fd )
+	{
+		result = ttyname(tty_fd);
+		close(tty_fd);
+	}
+	return result ? result : "/dev/tty";
+}
 
 void suggest_editor(const char* filename)
 {
@@ -63,7 +76,11 @@ void suggest_logout(const char* filename)
 void suggest_poweroff(const char* filename)
 {
 	fprintf(stderr, "No command '%s' found, did you mean:\n", filename);
-	if ( getenv("LOGIN_PID") )
+	if ( strcmp(tty_name(), "/dev/tty1") != 0 )
+	{
+		fprintf(stderr, " Powering off on /dev/tty1.\n");
+	}
+	else if ( getenv("LOGIN_PID") )
 	{
 		fprintf(stderr, " Exiting your shell normally to logout.\n");
 		fprintf(stderr, " Login as user 'poweroff' to power off computer.\n");
@@ -77,7 +94,11 @@ void suggest_poweroff(const char* filename)
 void suggest_reboot(const char* filename)
 {
 	fprintf(stderr, "No command '%s' found, did you mean:\n", filename);
-	if ( getenv("LOGIN_PID") )
+	if ( strcmp(tty_name(), "/dev/tty1") != 0 )
+	{
+		fprintf(stderr, " Rebooting on /dev/tty1.\n");
+	}
+	else if ( getenv("LOGIN_PID") )
 	{
 		fprintf(stderr, " Exiting your shell normally to logout.\n");
 		fprintf(stderr, " Login as user 'reboot' to reboot computer.\n");

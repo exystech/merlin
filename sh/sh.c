@@ -1551,6 +1551,9 @@ bool does_line_editing_need_another_line(void* ctx, const char* line)
 
 bool is_outermost_shell(void)
 {
+	char* name = ttyname(0);
+	if ( !name || strcmp(name, "/dev/tty1") != 0 )
+		return false;
 	const char* shlvl_str = getenv("SHLVL");
 	if ( !shlvl_str )
 		return true;
