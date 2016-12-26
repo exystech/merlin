@@ -84,8 +84,8 @@ fi
 get_package_dependencies_raw() {(
   PACKAGE_DIR=$(echo $1 | grep -Eo '^[^\.]*')
   ! [ -f "$SORTIX_PORTS_DIR/$PACKAGE_DIR/tixbuildinfo" ] ||
-  grep -E "^pkg\.build-libraries=.*" "$SORTIX_PORTS_DIR/$PACKAGE_DIR/tixbuildinfo" | \
-  sed 's/^pkg\.build-libraries=//'
+  grep -E "^(pkg\.build-libraries|pkg\.alias-of)=.*" "$SORTIX_PORTS_DIR/$PACKAGE_DIR/tixbuildinfo" | \
+  sed 's/^[^=]*=//'
 )}
 
 # Detect the build-time dependencies for a package with missing optional
@@ -151,12 +151,15 @@ strip_tix() {
 # Build all the packages (if needed) and otherwise install them.
 for PACKAGE in $PACKAGES; do
   if ! [ -f "$SORTIX_REPOSITORY_DIR/$PACKAGE.tix.tar.xz" ]; then
+    SOURCE_PACKAGE=$(grep -E "^pkg.source-package=" "$SORTIX_PORTS_DIR/$PACKAGE/tixbuildinfo" | \
+                     sed 's/^[^=]*=//')
     tix-build \
       --sysroot="$SYSROOT" \
       --host=$HOST \
       --prefix= \
       --destination="$SORTIX_REPOSITORY_DIR" \
       --generation=2 \
+      ${SOURCE_PACKAGE:+--source-package "$SORTIX_PORTS_DIR/$SOURCE_PACKAGE"} \
       "$SORTIX_PORTS_DIR/$PACKAGE"
     strip_tix "$SORTIX_REPOSITORY_DIR/$PACKAGE.tix.tar.xz"
   fi

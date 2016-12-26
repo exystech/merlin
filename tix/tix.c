@@ -105,6 +105,8 @@ string_array_t GetPackageDependencies(params_t* params, const char* pkg_name)
 
 	const char* deps = dictionary_get_def(&tixinfo, "pkg.runtime-deps", "");
 	string_array_append_token_string(&ret, deps);
+	const char* alias = dictionary_get_def(&tixinfo, "pkg.alias-of", "");
+	string_array_append_token_string(&ret, alias);
 
 	string_array_reset(&tixinfo);
 

@@ -59,6 +59,45 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Add split packages and cross-bootstrapping support to tix-build(8)
+.Xr tix-build 8
+has gained a number of features that will soon be required in order to build
+certain ports.  In particular, it now supports the
+.Sy pkg.use-bootstrap ,
+.Sy pkg.source-package ,
+and
+.Sy pkg.alias-of
+variables; bugs in the
+.Sy pkg.subdir
+variable have been fixed; and a
+.Fl \-source-directory
+option has been added.
+.Xr tix-build 8
+must be upgraded before building ports using any of those feature.
+.Bd -literal
+    cd /src/tix &&
+    make clean &&
+    make install
+.Ed
+.Pp
+If not developing natively, set
+.Ev PREFIX
+to the desired location.
+.Pp
+If the new program isn't used, ports may fail to build due to local software not
+being the exact same version
+.Sy ( pkg.use-bootstrap ) ,
+clean or post-install in the wrong subdirectory
+.Sy ( pkg.subdir) ,
+the
+.Fl \-source-directory
+option not being recognized or failing to locate the source code
+.Sy ( pkg.source-package) ,
+stopping because
+.Sy pkg.build-system
+isn't set
+.Sy ( pkg.alias-of) ,
+or other mysterious circumstances.
 .Ss Add German keyboard layout.
 The
 .Xr kblayout-compiler 1
