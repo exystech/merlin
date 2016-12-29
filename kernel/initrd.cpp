@@ -752,15 +752,15 @@ static void ExtractModule(struct multiboot_mod_list* module,
 	ctx->initrd_unmap_start = module->mod_start;
 	ctx->initrd_unmap_end = Page::AlignDown(module->mod_end);
 
+	const unsigned char xz_magic[] = { 0xFD, '7', 'z', 'X', 'Z', 0x00 };
+	const unsigned char bzip2_magic[] = { 'B', 'Z' };
+	const unsigned char gz_magic[] = { 0x1F, 0x8B };
+
 	if ( !strncmp(cmdline, "--to ", strlen("--to ")) )
-	{
 		ExtractTo(desc, ctx, cmdline + strlen("--to "));
-	}
 	else if ( sizeof(struct initrd_superblock) <= ctx->initrd_size &&
 	          !memcmp(ctx->initrd, "sortix-initrd-2", strlen("sortix-initrd-2")) )
-	{
 		ExtractInitrd(desc, ctx);
-	}
 	else if ( sizeof(struct tar) <= ctx->initrd_size &&
 	          !memcmp(ctx->initrd + offsetof(struct tar, magic), "ustar", 5) )
 	{
@@ -773,10 +773,20 @@ static void ExtractModule(struct multiboot_mod_list* module,
 		else
 			ExtractTar(desc, ctx);
 	}
+	else if ( sizeof(xz_magic) <= ctx->initrd_size &&
+	          !memcmp(ctx->initrd, xz_magic, sizeof(xz_magic)) )
+		Panic("Bootloader failed to decompress an xz initrd, "
+		      "or try the --to <path> option");
+	else if ( sizeof(gz_magic) <= ctx->initrd_size &&
+	          !memcmp(ctx->initrd, gz_magic, sizeof(gz_magic)) )
+		Panic("Bootloader failed to decompress a gzip initrd, "
+		      "or try the --to <path> option");
+	else if ( sizeof(bzip2_magic) <= ctx->initrd_size &&
+	          !memcmp(ctx->initrd, bzip2_magic, sizeof(bzip2_magic)) )
+		Panic("Bootloader failed to decompress a bzip2 initrd, "
+		      "or try the --to <path> option");
 	else
-	{
 		Panic("Unsupported initrd format, or try the --to <path> option");
-	}
 
 	// Unmap the pages and return the physical frames for reallocation.
 	for ( size_t i = 0; i < mod_size; i += Page::Size() )
