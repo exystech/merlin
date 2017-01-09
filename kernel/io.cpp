@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -786,165 +786,40 @@ ssize_t sys_send(int fd, const void* buffer, size_t count, int flags)
 	return desc->send(&ctx, (const uint8_t*) buffer, count, flags);
 }
 
-// TODO: We need to move these vector operations into the file descriptors or
-//       inodes themselves to ensure that they are atomic. Currently these
-//       operations may overlap and cause nasty bugs/race conditions when
-//       multiple threads concurrently operates on a file.
-// TODO: There is quite a bit of boiler plate code here. Can we do better?
-
-static struct iovec* FetchIOV(const struct iovec* user_iov, int iovcnt)
-{
-	if ( iovcnt < 0 )
-		return errno = EINVAL, (struct iovec*) NULL;
-	struct iovec* ret = new struct iovec[iovcnt];
-	if ( !ret )
-		return NULL;
-	if ( !CopyFromUser(ret, user_iov, sizeof(struct iovec) * (size_t) iovcnt) )
-	{
-		delete[] ret;
-		return NULL;
-	}
-	return ret;
-}
-
-ssize_t sys_readv(int fd, const struct iovec* user_iov, int iovcnt)
+ssize_t sys_readv(int fd, const struct iovec* iov, int iovcnt)
 {
 	Ref<Descriptor> desc = CurrentProcess()->GetDescriptor(fd);
 	if ( !desc )
 		return -1;
 	ioctx_t ctx; SetupUserIOCtx(&ctx);
-	struct iovec* iov = FetchIOV(user_iov, iovcnt);
-	if ( !iov )
-		return -1;
-	ssize_t so_far = 0;
-	for ( int i = 0; i < iovcnt && so_far != SSIZE_MAX; i++ )
-	{
-		uint8_t* buffer = (uint8_t*) iov[i].iov_base;
-		size_t amount = iov[i].iov_len;
-		ssize_t max_left = SSIZE_MAX - so_far;
-		if ( (size_t) max_left < amount )
-			amount = (size_t) max_left;
-		ssize_t num_bytes = desc->read(&ctx, buffer, amount);
-		if ( num_bytes < 0 )
-		{
-			delete[] iov;
-			return so_far ? so_far : -1;
-		}
-		if ( num_bytes == 0 )
-			break;
-		so_far += num_bytes;
-
-		// TODO: Is this the correct behavior?
-		if ( (size_t) num_bytes != amount )
-			break;
-	}
-	delete[] iov;
-	return so_far;
+	return desc->readv(&ctx, iov, iovcnt);
 }
 
-ssize_t sys_preadv(int fd, const struct iovec* user_iov, int iovcnt, off_t offset)
+ssize_t sys_preadv(int fd, const struct iovec* iov, int iovcnt, off_t offset)
 {
 	Ref<Descriptor> desc = CurrentProcess()->GetDescriptor(fd);
 	if ( !desc )
 		return -1;
 	ioctx_t ctx; SetupUserIOCtx(&ctx);
-	struct iovec* iov = FetchIOV(user_iov, iovcnt);
-	if ( !iov )
-		return -1;
-	ssize_t so_far = 0;
-	for ( int i = 0; i < iovcnt && so_far != SSIZE_MAX; i++ )
-	{
-		uint8_t* buffer = (uint8_t*) iov[i].iov_base;
-		size_t amount = iov[i].iov_len;
-		ssize_t max_left = SSIZE_MAX - so_far;
-		if ( (size_t) max_left < amount )
-			amount = (size_t) max_left;
-		ssize_t num_bytes = desc->pread(&ctx, buffer, amount, offset + so_far);
-		if ( num_bytes < 0 )
-		{
-			delete[] iov;
-			return so_far ? so_far : -1;
-		}
-		if ( num_bytes == 0 )
-			break;
-		so_far += num_bytes;
-
-		// TODO: Is this the correct behavior?
-		if ( (size_t) num_bytes != amount )
-			break;
-	}
-	delete[] iov;
-	return so_far;
+	return desc->preadv(&ctx, iov, iovcnt, offset);
 }
 
-ssize_t sys_writev(int fd, const struct iovec* user_iov, int iovcnt)
+ssize_t sys_writev(int fd, const struct iovec* iov, int iovcnt)
 {
 	Ref<Descriptor> desc = CurrentProcess()->GetDescriptor(fd);
 	if ( !desc )
 		return -1;
 	ioctx_t ctx; SetupUserIOCtx(&ctx);
-	struct iovec* iov = FetchIOV(user_iov, iovcnt);
-	if ( !iov )
-		return -1;
-	ssize_t so_far = 0;
-	for ( int i = 0; i < iovcnt && so_far != SSIZE_MAX; i++ )
-	{
-		const uint8_t* buffer = (const uint8_t*) iov[i].iov_base;
-		size_t amount = iov[i].iov_len;
-		ssize_t max_left = SSIZE_MAX - so_far;
-		if ( (size_t) max_left < amount )
-			amount = (size_t) max_left;
-		ssize_t num_bytes = desc->write(&ctx, buffer, amount);
-		if ( num_bytes < 0 )
-		{
-			delete[] iov;
-			return so_far ? so_far : -1;
-		}
-		if ( num_bytes == 0 )
-			break;
-		so_far += num_bytes;
-
-		// TODO: Is this the correct behavior?
-		if ( (size_t) num_bytes != amount )
-			break;
-	}
-	delete[] iov;
-	return so_far;
+	return desc->writev(&ctx, iov, iovcnt);
 }
 
-ssize_t sys_pwritev(int fd, const struct iovec* user_iov, int iovcnt, off_t offset)
+ssize_t sys_pwritev(int fd, const struct iovec* iov, int iovcnt, off_t offset)
 {
 	Ref<Descriptor> desc = CurrentProcess()->GetDescriptor(fd);
 	if ( !desc )
 		return -1;
 	ioctx_t ctx; SetupUserIOCtx(&ctx);
-	struct iovec* iov = FetchIOV(user_iov, iovcnt);
-	if ( !iov )
-		return -1;
-	ssize_t so_far = 0;
-	for ( int i = 0; i < iovcnt && so_far != SSIZE_MAX; i++ )
-	{
-		const uint8_t* buffer = (const uint8_t*) iov[i].iov_base;
-		size_t amount = iov[i].iov_len;
-		ssize_t max_left = SSIZE_MAX - so_far;
-		if ( (size_t) max_left < amount )
-			amount = (size_t) max_left;
-		ssize_t num_bytes = desc->pwrite(&ctx, buffer, amount, offset + so_far);
-		if ( num_bytes < 0 )
-		{
-			delete[] iov;
-			return so_far ? so_far : -1;
-		}
-		if ( num_bytes == 0 )
-			break;
-		so_far += num_bytes;
-
-		// TODO: Is this the correct behavior?
-		if ( (size_t) num_bytes != amount )
-			break;
-	}
-	delete[] iov;
-	return so_far;
+	return desc->pwritev(&ctx, iov, iovcnt, offset);
 }
 
 int sys_mkpartition(int fd, off_t start, off_t length, int flags)
@@ -979,45 +854,22 @@ int sys_mkpartition(int fd, off_t start, off_t length, int flags)
 	return CurrentProcess()->GetDTable()->Allocate(partition_desc, fdflags);
 }
 
-ssize_t sys_sendmsg(int fd, const struct msghdr* user_msg, int flags)
+ssize_t sys_sendmsg(int fd, const struct msghdr* msg, int flags)
 {
-	struct msghdr msg;
-	if ( !CopyFromUser(&msg, user_msg, sizeof(msg)) )
-		return -1;
-	// TODO: MSG_DONTWAIT and MSG_NOSIGNAL aren't actually supported here!
-	if ( flags & ~(MSG_EOR | MSG_DONTWAIT | MSG_NOSIGNAL) )
-		return errno = EINVAL, -1;
-	if ( msg.msg_name )
-		return errno = EINVAL, -1;
-	if ( msg.msg_control && msg.msg_controllen )
-		return errno = EINVAL, -1;
-	return sys_writev(fd, msg.msg_iov, msg.msg_iovlen);
-}
-
-ssize_t sys_recvmsg(int fd, struct msghdr* user_msg, int flags)
-{
-	struct msghdr msg;
-	if ( !CopyFromUser(&msg, user_msg, sizeof(msg)) )
-		return -1;
-	if ( flags & ~(MSG_CMSG_CLOEXEC | MSG_DONTWAIT) )
-		return errno = EINVAL, -1;
-	if ( msg.msg_name )
-		return errno = EINVAL, -1;
 	Ref<Descriptor> desc = CurrentProcess()->GetDescriptor(fd);
 	if ( !desc )
 		return -1;
+	ioctx_t ctx; SetupUserIOCtx(&ctx);
+	return desc->sendmsg(&ctx, msg, flags);
+}
 
-	// TODO: This is not atomic.
-	int old_flags = desc->GetFlags();
-	desc->SetFlags(old_flags | O_NONBLOCK);
-	ssize_t result = sys_readv(fd, msg.msg_iov, msg.msg_iovlen);
-	desc->SetFlags(old_flags);
-
-	msg.msg_flags = 0;
-	if ( !CopyToUser(&user_msg->msg_flags, &msg.msg_flags, sizeof(msg.msg_flags)) )
+ssize_t sys_recvmsg(int fd, struct msghdr* msg, int flags)
+{
+	Ref<Descriptor> desc = CurrentProcess()->GetDescriptor(fd);
+	if ( !desc )
 		return -1;
-
-	return result;
+	ioctx_t ctx; SetupUserIOCtx(&ctx);
+	return desc->recvmsg(&ctx, msg, flags);
 }
 
 int sys_getsockopt(int fd, int level, int option_name,

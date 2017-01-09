@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,6 +18,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/uio.h>
 
 #include <assert.h>
 #include <errno.h>
@@ -309,91 +310,118 @@ void FileCache::InitializeFileData(off_t to_where)
 	}
 }
 
-ssize_t FileCache::pread(ioctx_t* ctx, uint8_t* buf, size_t count, off_t off)
+ssize_t FileCache::preadv(ioctx_t* ctx, const struct iovec* iovs, int iovcnt,
+                          off_t off)
 {
 	ScopedLock lock(&fcache_mutex);
-	if ( off < 0 )
-		return errno = EINVAL, -1;
-	if ( file_size <= off )
-		return 0;
-	off_t available_bytes = file_size - off;
-	if ( (uintmax_t) available_bytes < (uintmax_t) count )
-		count = available_bytes;
-	if ( (size_t) SSIZE_MAX < count )
-		count = (size_t) SSIZE_MAX;
-	size_t sofar = 0;
-	while ( sofar < count )
+	ssize_t so_far = 0;
+	int iov_i = 0;
+	size_t iov_offset = 0;
+	while ( iov_i < iovcnt && so_far < SSIZE_MAX )
 	{
-		off_t current_off = off + (off_t) sofar;
-		size_t left = count - sofar;
+		off_t current_off = off + (off_t) so_far;
+		if ( file_size <= current_off )
+			break;
+		size_t maxcount = SSIZE_MAX - so_far;
+		if ( (uintmax_t) (file_size - current_off) < maxcount )
+			maxcount = file_size - current_off;
+		if ( maxcount == 0 )
+			break;
+		const struct iovec* iov = &iovs[iov_i];
+		uint8_t* buf = (uint8_t*) iov->iov_base + iov_offset;
+		size_t count = iov->iov_len - iov_offset;
+		if ( maxcount < count )
+			count = maxcount;
+		if ( count == 0 )
+		{
+			iov_i++;
+			iov_offset = 0;
+			continue;
+		}
 		size_t block_off = (size_t) (current_off % Page::Size());
 		size_t block_num = (size_t) (current_off / Page::Size());
 		size_t block_left = Page::Size() - block_off;
-		size_t amount_to_copy = left < block_left ? left : block_left;
+		size_t amount = count < block_left ? count : block_left;
 		assert(block_num < blocks_used);
 		BlockCacheBlock* block = blocks[block_num];
 		const uint8_t* block_data = kernel_block_cache->BlockData(block);
 		const uint8_t* src_data = block_data + block_off;
-		uint8_t* dest_buf = buf + sofar;
-		off_t end_at = current_off + (off_t) amount_to_copy;
-		if ( file_written < end_at )
-			InitializeFileData(end_at);
-		if ( !ctx->copy_to_dest(dest_buf, src_data, amount_to_copy) )
-			return sofar ? (ssize_t) sofar : -1;
-		sofar += amount_to_copy;
+		if ( file_written < current_off + (off_t) amount )
+			InitializeFileData(current_off + (off_t) amount);
+		if ( !ctx->copy_to_dest(buf, src_data, amount) )
+			return so_far ? (ssize_t) so_far : -1;
+		so_far += amount;
 		kernel_block_cache->MarkUsed(block);
+		iov_offset += amount;
+		if ( iov_offset == iov->iov_len )
+		{
+			iov_i++;
+			iov_offset = 0;
+		}
 	}
-	return (ssize_t) sofar;
+	return so_far;
 }
 
-ssize_t FileCache::pwrite(ioctx_t* ctx, const uint8_t* buf, size_t count, off_t off)
+ssize_t FileCache::pwritev(ioctx_t* ctx, const struct iovec* iovs, int iovcnt,
+                           off_t off)
 {
 	ScopedLock lock(&fcache_mutex);
-	if ( off < 0 )
-		return errno = EINVAL, -1;
-	off_t available_growth = OFF_MAX - off;
-	if ( (uintmax_t) available_growth < (uintmax_t) count )
-		count = (size_t) available_growth;
-	// TODO: Rather than doing an EOF - shouldn't errno be set to something like
-	//       "Hey, the filesize limit has been reached"?
-	if ( (size_t) SSIZE_MAX < count )
-		count = (size_t) SSIZE_MAX;
-	off_t write_end = off + (off_t) count;
-	if ( file_size < write_end && !ChangeSize(write_end, false) )
+	ssize_t so_far = 0;
+	int iov_i = 0;
+	size_t iov_offset = 0;
+	while ( iov_i < iovcnt && so_far < SSIZE_MAX )
 	{
-		if ( file_size < off )
-			return -1;
-		count = (size_t) (file_size - off);
-		write_end = off + (off_t) count;
-	}
-	assert(write_end <= file_size);
-	size_t sofar = 0;
-	while ( sofar < count )
-	{
-		off_t current_off = off + (off_t) sofar;
-		size_t left = count - sofar;
+		off_t current_off = off + (off_t) so_far;
+		size_t maxcount = SSIZE_MAX - so_far;
+		if ( (uintmax_t) (OFF_MAX - current_off) < maxcount )
+			maxcount = OFF_MAX - current_off;
+		const struct iovec* iov = &iovs[iov_i];
+		uint8_t* buf = (uint8_t*) iov->iov_base + iov_offset;
+		size_t count = iov->iov_len - iov_offset;
+		if ( maxcount < count )
+			count = maxcount;
+		if ( count == 0 )
+		{
+			if ( so_far == 0 && maxcount == 0 && iov->iov_len != 0 )
+				return errno = ENOSPC, -1;
+			iov_i++;
+			iov_offset = 0;
+			continue;
+		}
+		off_t write_end = current_off + count;
+		if ( file_size < write_end && !ChangeSize(write_end, false) )
+		{
+			if ( file_size <= current_off )
+				return -1;
+			if ( (uintmax_t) (file_size - current_off) < count )
+				count = file_size - current_off;
+		}
 		size_t block_off = (size_t) (current_off % Page::Size());
 		size_t block_num = (size_t) (current_off / Page::Size());
 		size_t block_left = Page::Size() - block_off;
-		size_t amount_to_copy = left < block_left ? left : block_left;
+		size_t amount = count < block_left ? count : block_left;
 		assert(block_num < blocks_used);
 		BlockCacheBlock* block = blocks[block_num];
 		uint8_t* block_data = kernel_block_cache->BlockData(block);
 		uint8_t* data = block_data + block_off;
-		const uint8_t* src_buf = buf + sofar;
-		off_t begin_at = off + (off_t) sofar;
-		off_t end_at = current_off + (off_t) amount_to_copy;
-		if ( file_written < begin_at )
-			InitializeFileData(begin_at);
+		if ( file_written < current_off )
+			InitializeFileData(current_off);
+		assert(amount);
 		modified = true; /* Unconditionally - copy_from_src can fail midway. */
-		if ( !ctx->copy_from_src(data, src_buf, amount_to_copy) )
-			return sofar ? (ssize_t) sofar : -1;
-		if ( file_written < end_at )
-			file_written = end_at;
-		sofar += amount_to_copy;
+		if ( !ctx->copy_from_src(data, buf, amount) )
+			return so_far ? (ssize_t) so_far : -1;
+		if ( file_written < current_off + (off_t) amount )
+			file_written = current_off + (off_t) amount;
+		so_far += amount;
 		kernel_block_cache->MarkModified(block);
+		iov_offset += amount;
+		if ( iov_offset == iov->iov_len )
+		{
+			iov_i++;
+			iov_offset = 0;
+		}
 	}
-	return (ssize_t) sofar;
+	return so_far;
 }
 
 int FileCache::truncate(ioctx_t* /*ctx*/, off_t length)

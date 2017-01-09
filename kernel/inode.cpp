@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,7 +17,10 @@
  * Interfaces and utility classes for implementing inodes.
  */
 
+#include <sys/uio.h>
+
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <string.h>
 
@@ -49,6 +52,7 @@ AbstractInode::AbstractInode()
 	stat_mtim = Time::Get(CLOCK_REALTIME);
 	stat_blksize = 0;
 	stat_blocks = 0;
+	supports_iovec = false;
 }
 
 AbstractInode::~AbstractInode()
@@ -147,32 +151,186 @@ off_t AbstractInode::lseek(ioctx_t* /*ctx*/, off_t /*offset*/, int /*whence*/)
 	return errno = EBADF, -1;
 }
 
-ssize_t AbstractInode::read(ioctx_t* /*ctx*/, uint8_t* /*buf*/,
-                            size_t /*count*/)
+ssize_t AbstractInode::read(ioctx_t* ctx, uint8_t* buf, size_t count)
 {
-	return errno = EBADF, -1;
+	if ( !supports_iovec )
+		return errno = EBADF, -1;
+	struct iovec iov;
+	memset(&iov, 0, sizeof(iov));
+	iov.iov_base = (void*) buf;
+	iov.iov_len = count;
+	return readv(ctx, &iov, 1);
 }
 
-ssize_t AbstractInode::pread(ioctx_t* /*ctx*/, uint8_t* /*buf*/,
-                             size_t /*count*/, off_t /*off*/)
+ssize_t AbstractInode::readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt)
 {
-	if ( inode_type == INODE_TYPE_STREAM || inode_type == INODE_TYPE_TTY )
-		return errno = ESPIPE, -1;
-	return errno = EBADF, -1;
+	if ( supports_iovec )
+		return errno = EBADF, -1;
+	ssize_t sofar = 0;
+	for ( int i = 0; i < iovcnt && sofar < SSIZE_MAX; i++ )
+	{
+		size_t maxcount = SSIZE_MAX - sofar;
+		uint8_t* buf = (uint8_t*) iov[i].iov_base;
+		size_t count = iov[i].iov_len;
+		if ( maxcount < count )
+			count = maxcount;
+		int old_dflags = ctx->dflags;
+		if ( sofar )
+			ctx->dflags |= O_NONBLOCK;
+		ssize_t amount = read(ctx, buf, count);
+		ctx->dflags = old_dflags;
+		if ( amount < 0 )
+			return sofar ? sofar : -1;
+		if ( amount == 0 )
+			break;
+		sofar += amount;
+		if ( (size_t) amount < count )
+			break;
+	}
+	return sofar;
 }
 
-ssize_t AbstractInode::write(ioctx_t* /*ctx*/, const uint8_t* /*buf*/,
-                             size_t /*count*/)
+ssize_t AbstractInode::pread(ioctx_t* ctx, uint8_t* buf, size_t count,
+                             off_t off)
 {
-	return errno = EBADF, -1;
+	if ( !supports_iovec )
+	{
+		if ( inode_type == INODE_TYPE_STREAM || inode_type == INODE_TYPE_TTY )
+			return errno = ESPIPE, -1;
+		return errno = EBADF, -1;
+	}
+	struct iovec iov;
+	memset(&iov, 0, sizeof(iov));
+	iov.iov_base = (void*) buf;
+	iov.iov_len = count;
+	return preadv(ctx, &iov, 1, off);
 }
 
-ssize_t AbstractInode::pwrite(ioctx_t* /*ctx*/, const uint8_t* /*buf*/,
-                              size_t /*count*/, off_t /*off*/)
+ssize_t AbstractInode::preadv(ioctx_t* ctx, const struct iovec* iov, int iovcnt,
+	                          off_t off)
 {
-	if ( inode_type == INODE_TYPE_STREAM || inode_type == INODE_TYPE_TTY )
-		return errno = ESPIPE, -1;
-	return errno = EBADF, -1;
+	if ( supports_iovec )
+	{
+		if ( inode_type == INODE_TYPE_STREAM || inode_type == INODE_TYPE_TTY )
+			return errno = ESPIPE, -1;
+		return errno = EBADF, -1;
+	}
+	ssize_t sofar = 0;
+	for ( int i = 0; i < iovcnt && sofar < SSIZE_MAX; i++ )
+	{
+		size_t maxcount = SSIZE_MAX - sofar;
+		uint8_t* buf = (uint8_t*) iov[i].iov_base;
+		size_t count = iov[i].iov_len;
+		if ( maxcount < count )
+			count = maxcount;
+		off_t offset;
+		if ( __builtin_add_overflow(off, sofar, &offset) )
+			return sofar ? sofar : (errno = EOVERFLOW, -1);
+		int old_dflags = ctx->dflags;
+		if ( sofar )
+			ctx->dflags |= O_NONBLOCK;
+		ssize_t amount = pread(ctx, buf, count, offset);
+		ctx->dflags = old_dflags;
+		if ( amount < 0 )
+			return sofar ? sofar : -1;
+		if ( amount == 0 )
+			break;
+		sofar += amount;
+		if ( (size_t) amount < count )
+			break;
+	}
+	return sofar;
+}
+
+ssize_t AbstractInode::write(ioctx_t* ctx, const uint8_t* buf, size_t count)
+{
+	if ( !supports_iovec )
+		return errno = EBADF, -1;
+	struct iovec iov;
+	memset(&iov, 0, sizeof(iov));
+	iov.iov_base = (void*) buf;
+	iov.iov_len = count;
+	return writev(ctx, &iov, 1);
+}
+
+ssize_t AbstractInode::writev(ioctx_t* ctx, const struct iovec* iov, int iovcnt)
+{
+	if ( supports_iovec )
+		return errno = EBADF, -1;
+	ssize_t sofar = 0;
+	for ( int i = 0; i < iovcnt && sofar < SSIZE_MAX; i++ )
+	{
+		size_t maxcount = SSIZE_MAX - sofar;
+		const uint8_t* buf = (uint8_t*) iov[i].iov_base;
+		size_t count = iov[i].iov_len;
+		if ( maxcount < count )
+			count = maxcount;
+		int old_dflags = ctx->dflags;
+		if ( sofar )
+			ctx->dflags |= O_NONBLOCK;
+		ssize_t amount = write(ctx, buf, count);
+		ctx->dflags = old_dflags;
+		if ( amount < 0 )
+			return sofar ? sofar : -1;
+		if ( amount == 0 )
+			break;
+		sofar += amount;
+		if ( (size_t) amount < count )
+			break;
+	}
+	return sofar;
+}
+
+ssize_t AbstractInode::pwrite(ioctx_t* ctx, const uint8_t* buf, size_t count,
+                              off_t off)
+{
+	if ( !supports_iovec )
+	{
+		if ( inode_type == INODE_TYPE_STREAM || inode_type == INODE_TYPE_TTY )
+			return errno = ESPIPE, -1;
+		return errno = EBADF, -1;
+	}
+	struct iovec iov;
+	memset(&iov, 0, sizeof(iov));
+	iov.iov_base = (void*) buf;
+	iov.iov_len = count;
+	return pwritev(ctx, &iov, 1, off);
+}
+
+ssize_t AbstractInode::pwritev(ioctx_t* ctx, const struct iovec* iov,
+                               int iovcnt, off_t off)
+{
+	if ( supports_iovec )
+	{
+		if ( inode_type == INODE_TYPE_STREAM || inode_type == INODE_TYPE_TTY )
+			return errno = ESPIPE, -1;
+		return errno = EBADF, -1;
+	}
+	ssize_t sofar = 0;
+	for ( int i = 0; i < iovcnt && sofar < SSIZE_MAX; i++ )
+	{
+		size_t maxcount = SSIZE_MAX - sofar;
+		uint8_t* buf = (uint8_t*) iov[i].iov_base;
+		size_t count = iov[i].iov_len;
+		if ( maxcount < count )
+			count = maxcount;
+		off_t offset;
+		if ( __builtin_add_overflow(off, sofar, &offset) )
+			return sofar ? sofar : (errno = EOVERFLOW, -1);
+		int old_dflags = ctx->dflags;
+		if ( sofar )
+			ctx->dflags |= O_NONBLOCK;
+		ssize_t amount = pwrite(ctx, buf, count, offset);
+		ctx->dflags = old_dflags;
+		if ( amount < 0 )
+			return sofar ? sofar : -1;
+		if ( amount == 0 )
+			break;
+		sofar += amount;
+		if ( (size_t) amount < count )
+			break;
+	}
+	return sofar;
 }
 
 int AbstractInode::utimens(ioctx_t* /*ctx*/, const struct timespec* times)
@@ -383,8 +541,20 @@ ssize_t AbstractInode::recv(ioctx_t* /*ctx*/, uint8_t* /*buf*/,
 	return errno = ENOTSOCK, -1;
 }
 
+ssize_t AbstractInode::recvmsg(ioctx_t* /*ctx*/, struct msghdr* /*msg*/,
+                               int /*flags*/)
+{
+	return errno = ENOTSOCK, -1;
+}
+
 ssize_t AbstractInode::send(ioctx_t* /*ctx*/, const uint8_t* /*buf*/,
                             size_t /*count*/, int /*flags*/)
+{
+	return errno = ENOTSOCK, -1;
+}
+
+ssize_t AbstractInode::sendmsg(ioctx_t* /*ctx*/, const struct msghdr* /*msg*/,
+                               int /*flags*/)
 {
 	return errno = ENOTSOCK, -1;
 }

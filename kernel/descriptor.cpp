@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,16 +17,22 @@
  * A file descriptor.
  */
 
+#include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/uio.h>
 
 #include <assert.h>
 #include <errno.h>
 #include <fsmarshall-msg.h>
+#include <limits.h>
 #include <stdint.h>
 #include <string.h>
 
 #include <sortix/dirent.h>
 #include <sortix/fcntl.h>
+#ifndef IOV_MAX
+#include <sortix/limits.h>
+#endif
 #include <sortix/mount.h>
 #include <sortix/seek.h>
 #include <sortix/stat.h>
@@ -293,6 +299,36 @@ ssize_t Descriptor::read(ioctx_t* ctx, uint8_t* buf, size_t count)
 	return ret;
 }
 
+ssize_t Descriptor::readv(ioctx_t* ctx, const struct iovec* iov_ptr, int iovcnt)
+{
+	if ( !(dflags & O_READ) )
+		return errno = EPERM, -1;
+	if ( iovcnt < 0 || IOV_MAX < iovcnt )
+		return errno = EINVAL, -1;
+	struct iovec* iov = new struct iovec[iovcnt];
+	if ( !iov )
+		return -1;
+	size_t iov_size = sizeof(struct iovec) * iovcnt;
+	if ( !ctx->copy_from_src(iov, iov_ptr, iov_size) )
+		return delete[] iov, -1;
+	int old_ctx_dflags = ctx->dflags;
+	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
+	if ( !IsSeekable() )
+	{
+		ssize_t result = vnode->readv(ctx, iov, iovcnt);
+		ctx->dflags = old_ctx_dflags;
+		delete[] iov;
+		return result;
+	}
+	ScopedLock lock(&current_offset_lock);
+	ssize_t ret = vnode->preadv(ctx, iov, iovcnt, current_offset);
+	if ( 0 <= ret )
+		current_offset += ret;
+	ctx->dflags = old_ctx_dflags;
+	delete[] iov;
+	return ret;
+}
+
 ssize_t Descriptor::pread(ioctx_t* ctx, uint8_t* buf, size_t count, off_t off)
 {
 	if ( !(dflags & O_READ) )
@@ -307,6 +343,27 @@ ssize_t Descriptor::pread(ioctx_t* ctx, uint8_t* buf, size_t count, off_t off)
 	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
 	ssize_t result = vnode->pread(ctx, buf, count, off);
 	ctx->dflags = old_ctx_dflags;
+	return result;
+}
+
+ssize_t Descriptor::preadv(ioctx_t* ctx, const struct iovec* iov_ptr,
+                           int iovcnt, off_t off)
+{
+	if ( !(dflags & O_READ) )
+		return errno = EPERM, -1;
+	if ( off < 0 || iovcnt < 0 || IOV_MAX < iovcnt )
+		return errno = EINVAL, -1;
+	struct iovec* iov = new struct iovec[iovcnt];
+	if ( !iov )
+		return -1;
+	size_t iov_size = sizeof(struct iovec) * iovcnt;
+	if ( !ctx->copy_from_src(iov, iov_ptr, iov_size) )
+		return delete[] iov, -1;
+	int old_ctx_dflags = ctx->dflags;
+	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
+	ssize_t result = vnode->preadv(ctx, iov, iovcnt, off);
+	ctx->dflags = old_ctx_dflags;
+	delete[] iov;
 	return result;
 }
 
@@ -344,7 +401,49 @@ ssize_t Descriptor::write(ioctx_t* ctx, const uint8_t* buf, size_t count)
 	return ret;
 }
 
-ssize_t Descriptor::pwrite(ioctx_t* ctx, const uint8_t* buf, size_t count, off_t off)
+ssize_t Descriptor::writev(ioctx_t* ctx, const struct iovec* iov_ptr,
+                           int iovcnt)
+{
+	if ( !(dflags & O_WRITE) )
+		return errno = EPERM, -1;
+	if ( iovcnt < 0 || IOV_MAX < iovcnt )
+		return errno = EINVAL, -1;
+	struct iovec* iov = new struct iovec[iovcnt];
+	if ( !iov )
+		return -1;
+	size_t iov_size = sizeof(struct iovec) * iovcnt;
+	if ( !ctx->copy_from_src(iov, iov_ptr, iov_size) )
+		return delete[] iov, -1;
+	int old_ctx_dflags = ctx->dflags;
+	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
+	if ( !IsSeekable() )
+	{
+		ssize_t result = vnode->writev(ctx, iov, iovcnt);
+		ctx->dflags = old_ctx_dflags;
+		delete[] iov;
+		return result;
+	}
+	ScopedLock lock(&current_offset_lock);
+	if ( ctx->dflags & O_APPEND )
+	{
+		off_t end = vnode->lseek(ctx, 0, SEEK_END);
+		if ( end < 0 )
+		{
+			ctx->dflags = old_ctx_dflags;
+			return -1;
+		}
+		current_offset = end;
+	}
+	ssize_t ret = vnode->pwritev(ctx, iov, iovcnt, current_offset);
+	if ( 0 <= ret )
+		current_offset += ret;
+	ctx->dflags = old_ctx_dflags;
+	delete[] iov;
+	return ret;
+}
+
+ssize_t Descriptor::pwrite(ioctx_t* ctx, const uint8_t* buf, size_t count,
+                           off_t off)
 {
 	if ( !(dflags & O_WRITE) )
 		return errno = EPERM, -1;
@@ -358,6 +457,27 @@ ssize_t Descriptor::pwrite(ioctx_t* ctx, const uint8_t* buf, size_t count, off_t
 	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
 	ssize_t result = vnode->pwrite(ctx, buf, count, off);
 	ctx->dflags = old_ctx_dflags;
+	return result;
+}
+
+ssize_t Descriptor::pwritev(ioctx_t* ctx, const struct iovec* iov_ptr,
+                            int iovcnt, off_t off)
+{
+	if ( !(dflags & O_WRITE) )
+		return errno = EPERM, -1;
+	if ( off < 0 || iovcnt < 0 || IOV_MAX < iovcnt )
+		return errno = EINVAL, -1;
+	struct iovec* iov = new struct iovec[iovcnt];
+	if ( !iov )
+		return -1;
+	size_t iov_size = sizeof(struct iovec) * iovcnt;
+	if ( !ctx->copy_from_src(iov, iov_ptr, iov_size) )
+		return delete[] iov, -1;
+	int old_ctx_dflags = ctx->dflags;
+	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
+	ssize_t result = vnode->pwritev(ctx, iov, iovcnt, off);
+	ctx->dflags = old_ctx_dflags;
+	delete[] iov;
 	return result;
 }
 
@@ -755,18 +875,52 @@ int Descriptor::listen(ioctx_t* ctx, int backlog)
 
 ssize_t Descriptor::recv(ioctx_t* ctx, uint8_t* buf, size_t count, int flags)
 {
+	if ( SIZE_MAX < count )
+		count = SSIZE_MAX;
 	int old_ctx_dflags = ctx->dflags;
 	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
+	if ( flags & MSG_DONTWAIT )
+		ctx->dflags |= O_NONBLOCK;
+	flags &= ~MSG_DONTWAIT;
 	ssize_t result = vnode->recv(ctx, buf, count, flags);
+	ctx->dflags = old_ctx_dflags;
+	return result;
+}
+
+ssize_t Descriptor::recvmsg(ioctx_t* ctx, struct msghdr* msg, int flags)
+{
+	int old_ctx_dflags = ctx->dflags;
+	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
+	if ( flags & MSG_DONTWAIT )
+		ctx->dflags |= O_NONBLOCK;
+	flags &= ~MSG_DONTWAIT;
+	ssize_t result = vnode->recvmsg(ctx, msg, flags);
 	ctx->dflags = old_ctx_dflags;
 	return result;
 }
 
 ssize_t Descriptor::send(ioctx_t* ctx, const uint8_t* buf, size_t count, int flags)
 {
+	if ( SIZE_MAX < count )
+		count = SSIZE_MAX;
 	int old_ctx_dflags = ctx->dflags;
 	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
+	if ( flags & MSG_DONTWAIT )
+		ctx->dflags |= O_NONBLOCK;
+	flags &= ~MSG_DONTWAIT;
 	ssize_t result = vnode->send(ctx, buf, count, flags);
+	ctx->dflags = old_ctx_dflags;
+	return result;
+}
+
+ssize_t Descriptor::sendmsg(ioctx_t* ctx, const struct msghdr* msg, int flags)
+{
+	int old_ctx_dflags = ctx->dflags;
+	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
+	if ( flags & MSG_DONTWAIT )
+		ctx->dflags |= O_NONBLOCK;
+	flags &= ~MSG_DONTWAIT;
+	ssize_t result = vnode->sendmsg(ctx, msg, flags);
 	ctx->dflags = old_ctx_dflags;
 	return result;
 }

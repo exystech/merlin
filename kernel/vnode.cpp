@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -256,9 +256,20 @@ ssize_t Vnode::read(ioctx_t* ctx, uint8_t* buf, size_t count)
 	return inode->read(ctx, buf, count);
 }
 
+ssize_t Vnode::readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt)
+{
+	return inode->readv(ctx, iov, iovcnt);
+}
+
 ssize_t Vnode::pread(ioctx_t* ctx, uint8_t* buf, size_t count, off_t off)
 {
 	return inode->pread(ctx, buf, count, off);
+}
+
+ssize_t Vnode::preadv(ioctx_t* ctx, const struct iovec* iov, int iovcnt,
+                      off_t off)
+{
+	return inode->preadv(ctx, iov, iovcnt, off);
 }
 
 ssize_t Vnode::write(ioctx_t* ctx, const uint8_t* buf, size_t count)
@@ -266,9 +277,20 @@ ssize_t Vnode::write(ioctx_t* ctx, const uint8_t* buf, size_t count)
 	return inode->write(ctx, buf, count);
 }
 
+ssize_t Vnode::writev(ioctx_t* ctx, const struct iovec* iov, int iovcnt)
+{
+	return inode->writev(ctx, iov, iovcnt);
+}
+
 ssize_t Vnode::pwrite(ioctx_t* ctx, const uint8_t* buf, size_t count, off_t off)
 {
 	return inode->pwrite(ctx, buf, count, off);
+}
+
+ssize_t Vnode::pwritev(ioctx_t* ctx, const struct iovec* iov, int iovcnt,
+                       off_t off)
+{
+	return inode->pwritev(ctx, iov, iovcnt, off);
 }
 
 int Vnode::utimens(ioctx_t* ctx, const struct timespec* times)
@@ -397,9 +419,19 @@ ssize_t Vnode::recv(ioctx_t* ctx, uint8_t* buf, size_t count, int flags)
 	return inode->recv(ctx, buf, count, flags);
 }
 
+ssize_t Vnode::recvmsg(ioctx_t* ctx, struct msghdr* msg, int flags)
+{
+	return inode->recvmsg(ctx, msg, flags);
+}
+
 ssize_t Vnode::send(ioctx_t* ctx, const uint8_t* buf, size_t count, int flags)
 {
 	return inode->send(ctx, buf, count, flags);
+}
+
+ssize_t Vnode::sendmsg(ioctx_t* ctx, const struct msghdr* msg, int flags)
+{
+	return inode->sendmsg(ctx, msg, flags);
 }
 
 int Vnode::getsockopt(ioctx_t* ctx, int level, int option_name,

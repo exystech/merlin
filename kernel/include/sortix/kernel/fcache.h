@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,6 +28,8 @@
 #include <sortix/kernel/addralloc.h>
 #include <sortix/kernel/kthread.h>
 #include <sortix/kernel/memorymanagement.h>
+
+struct iovec;
 
 namespace Sortix {
 
@@ -102,8 +104,10 @@ public:
 	FileCache(/*FileCacheBackend* backend = NULL*/);
 	~FileCache();
 	int sync(ioctx_t* ctx);
-	ssize_t pread(ioctx_t* ctx, uint8_t* buf, size_t count, off_t off);
-	ssize_t pwrite(ioctx_t* ctx, const uint8_t* buf, size_t count, off_t off);
+	ssize_t preadv(ioctx_t* ctx, const struct iovec* iov, int iovcnt,
+	               off_t off);
+	ssize_t pwritev(ioctx_t* ctx, const struct iovec* iov, int iovcnt,
+	                off_t off);
 	int truncate(ioctx_t* ctx, off_t length);
 	off_t lseek(ioctx_t* ctx, off_t offset, int whence);
 	//bool ChangeBackend(FileCacheBackend* backend, bool sync_old);

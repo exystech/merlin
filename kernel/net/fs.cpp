@@ -90,10 +90,14 @@ public:
 	virtual int connect(ioctx_t* ctx, const uint8_t* addr, size_t addrsize);
 	virtual int listen(ioctx_t* ctx, int backlog);
 	virtual ssize_t recv(ioctx_t* ctx, uint8_t* buf, size_t count, int flags);
+	virtual ssize_t recvmsg(ioctx_t* ctx, struct msghdr* msg, int flags);
 	virtual ssize_t send(ioctx_t* ctx, const uint8_t* buf, size_t count,
 	                     int flags);
+	virtual ssize_t sendmsg(ioctx_t* ctx, const struct msghdr* msg, int flags);
 	virtual ssize_t read(ioctx_t* ctx, uint8_t* buf, size_t count);
+	virtual ssize_t readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
 	virtual ssize_t write(ioctx_t* ctx, const uint8_t* buf, size_t count);
+	virtual ssize_t writev(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
 	virtual int poll(ioctx_t* ctx, PollNode* node);
 	virtual int getsockopt(ioctx_t* ctx, int level, int option_name,
 	                       void* option_value, size_t* option_size_ptr);
@@ -171,6 +175,7 @@ StreamSocket::StreamSocket(uid_t owner, gid_t group, mode_t mode,
 	this->socket_lock = KTHREAD_MUTEX_INITIALIZER;
 	this->pending_cond = KTHREAD_COND_INITIALIZER;
 	this->accepted_cond = KTHREAD_COND_INITIALIZER;
+	this->supports_iovec = true;
 }
 
 StreamSocket::~StreamSocket()
@@ -254,21 +259,37 @@ int StreamSocket::listen(ioctx_t* /*ctx*/, int /*backlog*/)
 }
 
 ssize_t StreamSocket::recv(ioctx_t* ctx, uint8_t* buf, size_t count,
-                           int /*flags*/)
+                           int flags)
 {
 	ScopedLock lock(&socket_lock);
 	if ( !is_connected )
 		return errno = ENOTCONN, -1;
-	return incoming.read(ctx, buf, count);
+	return incoming.recv(ctx, buf, count, flags);
+}
+
+ssize_t StreamSocket::recvmsg(ioctx_t* ctx, struct msghdr* msg, int flags)
+{
+	ScopedLock lock(&socket_lock);
+	if ( !is_connected )
+		return errno = ENOTCONN, -1;
+	return incoming.recvmsg(ctx, msg, flags);
 }
 
 ssize_t StreamSocket::send(ioctx_t* ctx, const uint8_t* buf, size_t count,
-                           int /*flags*/)
+                           int flags)
 {
 	ScopedLock lock(&socket_lock);
 	if ( !is_connected )
 		return errno = ENOTCONN, -1;
-	return outgoing.write(ctx, buf, count);
+	return outgoing.send(ctx, buf, count, flags);
+}
+
+ssize_t StreamSocket::sendmsg(ioctx_t* ctx, const struct msghdr* msg, int flags)
+{
+	ScopedLock lock(&socket_lock);
+	if ( !is_connected )
+		return errno = ENOTCONN, -1;
+	return outgoing.sendmsg(ctx, msg, flags);
 }
 
 ssize_t StreamSocket::read(ioctx_t* ctx, uint8_t* buf, size_t count)
@@ -276,9 +297,25 @@ ssize_t StreamSocket::read(ioctx_t* ctx, uint8_t* buf, size_t count)
 	return recv(ctx, buf, count, 0);
 }
 
+ssize_t StreamSocket::readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt)
+{
+	ScopedLock lock(&socket_lock);
+	if ( !is_connected )
+		return errno = ENOTCONN, -1;
+	return outgoing.readv(ctx, iov, iovcnt);
+}
+
 ssize_t StreamSocket::write(ioctx_t* ctx, const uint8_t* buf, size_t count)
 {
 	return send(ctx, buf, count, 0);
+}
+
+ssize_t StreamSocket::writev(ioctx_t* ctx, const struct iovec* iov, int iovcnt)
+{
+	ScopedLock lock(&socket_lock);
+	if ( !is_connected )
+		return errno = ENOTCONN, -1;
+	return outgoing.writev(ctx, iov, iovcnt);
 }
 
 int StreamSocket::poll(ioctx_t* ctx, PollNode* node)

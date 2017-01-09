@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,6 +29,8 @@
 #include <sortix/kernel/refcount.h>
 
 struct dirent;
+struct iovec;
+struct msghdr;
 struct stat;
 struct statvfs;
 struct termios;
@@ -61,9 +63,15 @@ public:
 	int truncate(ioctx_t* ctx, off_t length);
 	off_t lseek(ioctx_t* ctx, off_t offset, int whence);
 	ssize_t read(ioctx_t* ctx, uint8_t* buf, size_t count);
+	ssize_t readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
 	ssize_t pread(ioctx_t* ctx, uint8_t* buf, size_t count, off_t off);
+	ssize_t preadv(ioctx_t* ctx, const struct iovec* iov, int iovcnt,
+	               off_t off);
 	ssize_t write(ioctx_t* ctx, const uint8_t* buf, size_t count);
+	ssize_t writev(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
 	ssize_t pwrite(ioctx_t* ctx, const uint8_t* buf, size_t count, off_t off);
+	ssize_t pwritev(ioctx_t* ctx, const struct iovec* iov, int iovcnt,
+	                off_t off);
 	int utimens(ioctx_t* ctx, const struct timespec* times);
 	int isatty(ioctx_t* ctx);
 	ssize_t readdirents(ioctx_t* ctx, struct dirent* dirent, size_t size,
@@ -90,7 +98,9 @@ public:
 	int connect(ioctx_t* ctx, const uint8_t* addr, size_t addrlen);
 	int listen(ioctx_t* ctx, int backlog);
 	ssize_t recv(ioctx_t* ctx, uint8_t* buf, size_t count, int flags);
+	ssize_t recvmsg(ioctx_t* ctx, struct msghdr* msg, int flags);
 	ssize_t send(ioctx_t* ctx, const uint8_t* buf, size_t count, int flags);
+	ssize_t sendmsg(ioctx_t* ctx, const struct msghdr* msg, int flags);
 	int getsockopt(ioctx_t* ctx, int level, int option_name,
 	               void* option_value, size_t* option_size_ptr);
 	int setsockopt(ioctx_t* ctx, int level, int option_name,

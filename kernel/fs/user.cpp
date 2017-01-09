@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -204,11 +204,17 @@ public:
 	virtual int truncate(ioctx_t* ctx, off_t length);
 	virtual off_t lseek(ioctx_t* ctx, off_t offset, int whence);
 	virtual ssize_t read(ioctx_t* ctx, uint8_t* buf, size_t count);
-	virtual ssize_t pread(ioctx_t* ctx, uint8_t* buf, size_t count,
-	                      off_t off);
+	virtual ssize_t readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
+	virtual ssize_t pread(ioctx_t* ctx, uint8_t* buf, size_t count, off_t off);
+	virtual ssize_t preadv(ioctx_t* ctx, const struct iovec* iov, int iovcnt,
+	                       off_t off);
 	virtual ssize_t write(ioctx_t* ctx, const uint8_t* buf, size_t count);
+	virtual ssize_t writev(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
 	virtual ssize_t pwrite(ioctx_t* ctx, const uint8_t* buf, size_t count,
 	                       off_t off);
+	virtual ssize_t pwritev(ioctx_t* ctx, const struct iovec* iov, int iovcnt,
+	                       off_t off);
+
 	virtual int utimens(ioctx_t* ctx, const struct timespec* times);
 	virtual int isatty(ioctx_t* ctx);
 	virtual ssize_t readdirents(ioctx_t* ctx, struct dirent* dirent,
@@ -242,8 +248,10 @@ public:
 	virtual int connect(ioctx_t* ctx, const uint8_t* addr, size_t addrlen);
 	virtual int listen(ioctx_t* ctx, int backlog);
 	virtual ssize_t recv(ioctx_t* ctx, uint8_t* buf, size_t count, int flags);
+	virtual ssize_t recvmsg(ioctx_t* ctx, struct msghdr* msg, int flags);
 	virtual ssize_t send(ioctx_t* ctx, const uint8_t* buf, size_t count,
 	                     int flags);
+	virtual ssize_t sendmsg(ioctx_t* ctx, const struct msghdr* msg, int flags);
 	virtual int getsockopt(ioctx_t* ctx, int level, int option_name,
 	                       void* option_value, size_t* option_size_ptr);
 	virtual int setsockopt(ioctx_t* ctx, int level, int option_name,
@@ -898,6 +906,32 @@ ssize_t Unode::read(ioctx_t* ctx, uint8_t* buf, size_t count)
 	return ret;
 }
 
+ssize_t Unode::readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt)
+{
+	ssize_t sofar = 0;
+	for ( int i = 0; i < iovcnt && sofar < SSIZE_MAX; i++ )
+	{
+		size_t maxcount = SSIZE_MAX - sofar;
+		uint8_t* buf = (uint8_t*) iov[i].iov_base;
+		size_t count = iov[i].iov_len;
+		if ( maxcount < count )
+			count = maxcount;
+		int old_dflags = ctx->dflags;
+		if ( sofar )
+			ctx->dflags |= O_NONBLOCK;
+		ssize_t amount = read(ctx, buf, count);
+		ctx->dflags = old_dflags;
+		if ( amount < 0 )
+			return sofar ? sofar : -1;
+		if ( amount == 0 )
+			break;
+		sofar += amount;
+		if ( (size_t) amount < count )
+			break;
+	}
+	return sofar;
+}
+
 ssize_t Unode::pread(ioctx_t* ctx, uint8_t* buf, size_t count, off_t off)
 {
 	Channel* channel = server->Connect(ctx);
@@ -919,6 +953,36 @@ ssize_t Unode::pread(ioctx_t* ctx, uint8_t* buf, size_t count, off_t off)
 	}
 	channel->KernelClose();
 	return ret;
+}
+
+ssize_t Unode::preadv(ioctx_t* ctx, const struct iovec* iov, int iovcnt,
+	                  off_t off)
+{
+	ssize_t sofar = 0;
+	for ( int i = 0; i < iovcnt && sofar < SSIZE_MAX; i++ )
+	{
+		size_t maxcount = SSIZE_MAX - sofar;
+		uint8_t* buf = (uint8_t*) iov[i].iov_base;
+		size_t count = iov[i].iov_len;
+		if ( maxcount < count )
+			count = maxcount;
+		off_t offset;
+		if ( __builtin_add_overflow(off, sofar, &offset) )
+			return sofar ? sofar : (errno = EOVERFLOW, -1);
+		int old_dflags = ctx->dflags;
+		if ( sofar )
+			ctx->dflags |= O_NONBLOCK;
+		ssize_t amount = pread(ctx, buf, count, offset);
+		ctx->dflags = old_dflags;
+		if ( amount < 0 )
+			return sofar ? sofar : -1;
+		if ( amount == 0 )
+			break;
+		sofar += amount;
+		if ( (size_t) amount < count )
+			break;
+	}
+	return sofar;
 }
 
 ssize_t Unode::write(ioctx_t* ctx, const uint8_t* buf, size_t count)
@@ -945,6 +1009,32 @@ ssize_t Unode::write(ioctx_t* ctx, const uint8_t* buf, size_t count)
 	return ret;
 }
 
+ssize_t Unode::writev(ioctx_t* ctx, const struct iovec* iov, int iovcnt)
+{
+	ssize_t sofar = 0;
+	for ( int i = 0; i < iovcnt && sofar < SSIZE_MAX; i++ )
+	{
+		size_t maxcount = SSIZE_MAX - sofar;
+		const uint8_t* buf = (uint8_t*) iov[i].iov_base;
+		size_t count = iov[i].iov_len;
+		if ( maxcount < count )
+			count = maxcount;
+		int old_dflags = ctx->dflags;
+		if ( sofar )
+			ctx->dflags |= O_NONBLOCK;
+		ssize_t amount = write(ctx, buf, count);
+		ctx->dflags = old_dflags;
+		if ( amount < 0 )
+			return sofar ? sofar : -1;
+		if ( amount == 0 )
+			break;
+		sofar += amount;
+		if ( (size_t) amount < count )
+			break;
+	}
+	return sofar;
+}
+
 ssize_t Unode::pwrite(ioctx_t* ctx, const uint8_t* buf, size_t count, off_t off)
 {
 	Channel* channel = server->Connect(ctx);
@@ -968,6 +1058,36 @@ ssize_t Unode::pwrite(ioctx_t* ctx, const uint8_t* buf, size_t count, off_t off)
 		ret = (ssize_t) resp.count;
 	channel->KernelClose();
 	return ret;
+}
+
+ssize_t Unode::pwritev(ioctx_t* ctx, const struct iovec* iov, int iovcnt,
+                       off_t off)
+{
+	ssize_t sofar = 0;
+	for ( int i = 0; i < iovcnt && sofar < SSIZE_MAX; i++ )
+	{
+		size_t maxcount = SSIZE_MAX - sofar;
+		uint8_t* buf = (uint8_t*) iov[i].iov_base;
+		size_t count = iov[i].iov_len;
+		if ( maxcount < count )
+			count = maxcount;
+		off_t offset;
+		if ( __builtin_add_overflow(off, sofar, &offset) )
+			return sofar ? sofar : (errno = EOVERFLOW, -1);
+		int old_dflags = ctx->dflags;
+		if ( sofar )
+			ctx->dflags |= O_NONBLOCK;
+		ssize_t amount = pwrite(ctx, buf, count, offset);
+		ctx->dflags = old_dflags;
+		if ( amount < 0 )
+			return sofar ? sofar : -1;
+		if ( amount == 0 )
+			break;
+		sofar += amount;
+		if ( (size_t) amount < count )
+			break;
+	}
+	return sofar;
 }
 
 int Unode::utimens(ioctx_t* ctx, const struct timespec* times)
@@ -1368,8 +1488,19 @@ ssize_t Unode::recv(ioctx_t* /*ctx*/, uint8_t* /*buf*/, size_t /*count*/,
 	return errno = ENOTSOCK, -1;
 }
 
+ssize_t Unode::recvmsg(ioctx_t* /*ctx*/, struct msghdr* /*msg*/, int /*flags*/)
+{
+	return errno = ENOTSOCK, -1;
+}
+
 ssize_t Unode::send(ioctx_t* /*ctx*/, const uint8_t* /*buf*/, size_t /*count*/,
                     int /*flags*/)
+{
+	return errno = ENOTSOCK, -1;
+}
+
+ssize_t Unode::sendmsg(ioctx_t* /*ctx*/, const struct msghdr* /*msg*/,
+                       int /*flags*/)
 {
 	return errno = ENOTSOCK, -1;
 }

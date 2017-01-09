@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +25,9 @@
 #include <sortix/kernel/ioctx.h>
 #include <sortix/kernel/poll.h>
 
+struct msghdr;
+struct iovec;
+
 namespace Sortix {
 
 class PipeChannel;
@@ -40,8 +43,12 @@ public:
 	bool SetSIGPIPEDelivery(bool deliver_sigpipe);
 	size_t Size();
 	bool Resize(size_t new_size);
-	ssize_t read(ioctx_t* ctx, uint8_t* buf, size_t count);
-	ssize_t write(ioctx_t* ctx, const uint8_t* buf, size_t count);
+	ssize_t readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
+	ssize_t recv(ioctx_t* ctx, uint8_t* buf, size_t count, int flags);
+	ssize_t recvmsg(ioctx_t* ctx, struct msghdr* msg, int flags);
+	ssize_t send(ioctx_t* ctx, const uint8_t* buf, size_t count, int flags);
+	ssize_t sendmsg(ioctx_t* ctx, const struct msghdr* msg, int flags);
+	ssize_t writev(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
 	int poll(ioctx_t* ctx, PollNode* node);
 
 private:

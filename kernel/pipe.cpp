@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,10 +19,14 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <limits.h>
 #include <stdint.h>
 #include <string.h>
 
 #include <sortix/fcntl.h>
+#ifndef IOV_MAX
+#include <sortix/limits.h>
+#endif
 #include <sortix/poll.h>
 #include <sortix/signal.h>
 #include <sortix/stat.h>
@@ -60,8 +64,14 @@ public:
 	size_t WriteSize();
 	bool ReadResize(size_t new_size);
 	bool WriteResize(size_t new_size);
-	ssize_t read(ioctx_t* ctx, uint8_t* buf, size_t count);
-	ssize_t write(ioctx_t* ctx, const uint8_t* buf, size_t count);
+	ssize_t readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
+	ssize_t recv(ioctx_t* ctx, uint8_t* buf, size_t count, int flags);
+	ssize_t recvmsg(ioctx_t* ctx, struct msghdr* msg, int flags);
+	ssize_t recvmsg_internal(ioctx_t* ctx, struct msghdr* msg, int flags);
+	ssize_t send(ioctx_t* ctx, const uint8_t* buf, size_t count, int flags);
+	ssize_t sendmsg(ioctx_t* ctx, const struct msghdr* msg, int flags);
+	ssize_t sendmsg_internal(ioctx_t* ctx, const struct msghdr* msg, int flags);
+	ssize_t writev(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
 	int read_poll(ioctx_t* ctx, PollNode* node);
 	int write_poll(ioctx_t* ctx, PollNode* node);
 
@@ -139,21 +149,83 @@ void PipeChannel::CloseWriting()
 		delete this;
 }
 
-ssize_t PipeChannel::read(ioctx_t* ctx, uint8_t* buf, size_t count)
+ssize_t PipeChannel::recv(ioctx_t* ctx, uint8_t* buf, size_t count,
+                          int flags)
 {
-	if ( SSIZE_MAX < count )
-		count = SSIZE_MAX;
+	struct iovec iov;
+	memset(&iov, 0, sizeof(iov));
+	iov.iov_base = (void*) buf;
+	iov.iov_len = count;
+	struct msghdr msg;
+	memset(&msg, 0, sizeof(msg));
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	return recvmsg_internal(ctx, &msg, flags);
+}
+
+ssize_t PipeChannel::readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt)
+{
+	struct msghdr msg;
+	memset(&msg, 0, sizeof(msg));
+	msg.msg_iov = (struct iovec*) iov;
+	msg.msg_iovlen = iovcnt;
+	return recvmsg_internal(ctx, &msg, 0);
+}
+
+ssize_t PipeChannel::recvmsg(ioctx_t* ctx, struct msghdr* msg_ptr, int flags)
+{
+	struct msghdr msg;
+	if ( !ctx->copy_from_src(&msg, msg_ptr, sizeof(msg)) )
+		return -1;
+	if ( msg.msg_iovlen < 0 || IOV_MAX < msg.msg_iovlen )
+		return errno = EINVAL, -1;
+	size_t iov_size = msg.msg_iovlen * sizeof(struct iovec);
+	struct iovec* iov = new struct iovec[msg.msg_iovlen];
+	if ( !iov )
+		return -1;
+	if ( !ctx->copy_from_src(&iov, msg.msg_iov, iov_size) )
+		return delete[] iov, -1;
+	msg.msg_iov = iov;
+	size_t result = recvmsg_internal(ctx, &msg, flags);
+	delete[] iov;
+	if ( !ctx->copy_to_dest(msg_ptr, &msg, sizeof(msg)) )
+		return -1;
+	return result;
+}
+
+ssize_t PipeChannel::recvmsg_internal(ioctx_t* ctx, struct msghdr* msg,
+                                      int flags)
+{
+	if ( flags & ~(MSG_PEEK | MSG_WAITALL) )
+		return errno = EINVAL, -1;
 	Thread* this_thread = CurrentThread();
 	this_thread->yield_to_tid = sender_system_tid;
 	ScopedLockSignal lock(&pipelock);
 	if ( !lock.IsAcquired() )
 		return errno = EINTR, -1;
-	size_t so_far = 0;
-	while ( count )
+	ssize_t so_far = 0;
+	size_t peeked = 0;
+	int iov_i = 0;
+	size_t iov_offset = 0;
+	while ( iov_i < msg->msg_iovlen && so_far < SSIZE_MAX )
 	{
-		receiver_system_tid = this_thread->system_tid;
-		while ( anywriting && !bufferused )
+		size_t maxcount = SSIZE_MAX - so_far;
+		struct iovec* iov = &msg->msg_iov[iov_i];
+		uint8_t* buf = (uint8_t*) iov->iov_base + iov_offset;
+		size_t count = iov->iov_len - iov_offset;
+		if ( maxcount < count )
+			count = maxcount;
+		if ( count == 0 )
 		{
+			iov_i++;
+			iov_offset = 0;
+			continue;
+		}
+		receiver_system_tid = this_thread->system_tid;
+		while ( anywriting && bufferused <= peeked )
+		{
+			if ( (flags & MSG_PEEK) && so_far )
+				return so_far;
 			this_thread->yield_to_tid = sender_system_tid;
 			if ( pledged_read )
 			{
@@ -164,7 +236,7 @@ ssize_t PipeChannel::read(ioctx_t* ctx, uint8_t* buf, size_t count)
 				pledged_write--;
 				continue;
 			}
-			if ( so_far )
+			if ( !(flags & MSG_WAITALL) && so_far )
 				return so_far;
 			if ( ctx->dflags & O_NONBLOCK )
 				return errno = EWOULDBLOCK, -1;
@@ -172,44 +244,115 @@ ssize_t PipeChannel::read(ioctx_t* ctx, uint8_t* buf, size_t count)
 			bool interrupted = !kthread_cond_wait_signal(&readcond, &pipelock);
 			pledged_write--;
 			if ( interrupted )
-				return errno = EINTR, -1;
+				return so_far ? so_far : (errno = EINTR, -1);
 		}
-		if ( !bufferused && !anywriting )
-			return (ssize_t) so_far;
+		size_t used = bufferused - peeked;
+		if ( !used && !anywriting )
+			return so_far;
 		size_t amount = count;
-		if ( bufferused < amount )
-			amount = bufferused;
-		size_t linear = buffersize - bufferoffset;
+		if ( used < amount )
+			amount = used;
+		size_t offset = bufferoffset;
+		if ( peeked )
+			offset = (bufferoffset + peeked) % buffersize;
+		size_t linear = buffersize - offset;
 		if ( linear < amount )
 			amount = linear;
 		assert(amount);
-		if ( !ctx->copy_to_dest(buf, buffer + bufferoffset, amount) )
-			return so_far ? (ssize_t) so_far : -1;
-		bufferoffset = (bufferoffset + amount) % buffersize;
-		bufferused -= amount;
-		buf += amount;
-		count -= amount;
+		if ( !ctx->copy_to_dest(buf, buffer + offset, amount) )
+			return so_far ? so_far : -1;
 		so_far += amount;
-		kthread_cond_broadcast(&writecond);
-		read_poll_channel.Signal(ReadPollEventStatus());
-		write_poll_channel.Signal(WritePollEventStatus());
+		if ( flags & MSG_PEEK )
+			peeked += amount;
+		else
+		{
+			bufferoffset = (bufferoffset + amount) % buffersize;
+			bufferused -= amount;
+			kthread_cond_broadcast(&writecond);
+			read_poll_channel.Signal(ReadPollEventStatus());
+			write_poll_channel.Signal(WritePollEventStatus());
+		}
+		iov_offset += amount;
+		if ( iov_offset == iov->iov_len )
+		{
+			iov_i++;
+			iov_offset = 0;
+		}
 	}
-	return (ssize_t) so_far;
+	return so_far;
 }
 
-ssize_t PipeChannel::write(ioctx_t* ctx, const uint8_t* buf, size_t count)
+ssize_t PipeChannel::send(ioctx_t* ctx, const uint8_t* buf, size_t count,
+                          int flags)
 {
-	if ( SSIZE_MAX < count )
-		count = SSIZE_MAX;
+	struct iovec iov;
+	memset(&iov, 0, sizeof(iov));
+	iov.iov_base = (void*) buf;
+	iov.iov_len = count;
+	struct msghdr msg;
+	memset(&msg, 0, sizeof(msg));
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	return sendmsg_internal(ctx, &msg, flags);
+}
+
+ssize_t PipeChannel::writev(ioctx_t* ctx, const struct iovec* iov, int iovcnt)
+{
+	struct msghdr msg;
+	memset(&msg, 0, sizeof(msg));
+	msg.msg_iov = (struct iovec*) iov;
+	msg.msg_iovlen = iovcnt;
+	return sendmsg_internal(ctx, &msg, 0);
+}
+
+ssize_t PipeChannel::sendmsg(ioctx_t* ctx, const struct msghdr* msg_ptr,
+                             int flags)
+{
+	struct msghdr msg;
+	if ( !ctx->copy_from_src(&msg, msg_ptr, sizeof(msg)) )
+		return -1;
+	if ( msg.msg_iovlen < 0 || IOV_MAX < msg.msg_iovlen )
+		return errno = EINVAL, -1;
+	size_t iov_size = msg.msg_iovlen * sizeof(struct iovec);
+	struct iovec* iov = new struct iovec[msg.msg_iovlen];
+	if ( !iov )
+		return -1;
+	if ( !ctx->copy_from_src(&iov, msg.msg_iov, iov_size) )
+		return delete[] iov, -1;
+	msg.msg_iov = iov;
+	size_t result = sendmsg_internal(ctx, &msg, flags);
+	delete[] iov;
+	return result;
+}
+
+ssize_t PipeChannel::sendmsg_internal(ioctx_t* ctx, const struct msghdr* msg,
+                                      int flags)
+{
+	if ( flags & ~(MSG_WAITALL | MSG_NOSIGNAL) )
+		return errno = EINVAL, -1;
 	Thread* this_thread = CurrentThread();
 	this_thread->yield_to_tid = receiver_system_tid;
 	ScopedLockSignal lock(&pipelock);
 	if ( !lock.IsAcquired() )
 		return errno = EINTR, -1;
 	sender_system_tid = this_thread->system_tid;
-	size_t so_far = 0;
-	while ( count )
+	ssize_t so_far = 0;
+	int iov_i = 0;
+	size_t iov_offset = 0;
+	while ( iov_i < msg->msg_iovlen && so_far < SSIZE_MAX )
 	{
+		size_t maxcount = SSIZE_MAX - so_far;
+		struct iovec* iov = &msg->msg_iov[iov_i];
+		const uint8_t* buf = (const uint8_t*) iov->iov_base + iov_offset;
+		size_t count = iov->iov_len - iov_offset;
+		if ( maxcount < count )
+			count = maxcount;
+		if ( count == 0 )
+		{
+			iov_i++;
+			iov_offset = 0;
+			continue;
+		}
 		sender_system_tid = this_thread->system_tid;
 		while ( anyreading && bufferused == buffersize )
 		{
@@ -223,7 +366,7 @@ ssize_t PipeChannel::write(ioctx_t* ctx, const uint8_t* buf, size_t count)
 				pledged_read--;
 				continue;
 			}
-			if ( so_far )
+			if ( so_far && !(flags & MSG_WAITALL) )
 				return so_far;
 			if ( ctx->dflags & O_NONBLOCK )
 				return errno = EWOULDBLOCK, -1;
@@ -236,8 +379,8 @@ ssize_t PipeChannel::write(ioctx_t* ctx, const uint8_t* buf, size_t count)
 		if ( !anyreading )
 		{
 			if ( so_far )
-				return (ssize_t) so_far;
-			if ( is_sigpipe_enabled )
+				return so_far;
+			if ( is_sigpipe_enabled && !(flags & MSG_NOSIGNAL) )
 				CurrentThread()->DeliverSignal(SIGPIPE);
 			return errno = EPIPE, -1;
 		}
@@ -250,16 +393,20 @@ ssize_t PipeChannel::write(ioctx_t* ctx, const uint8_t* buf, size_t count)
 			amount = linear;
 		assert(amount);
 		if ( !ctx->copy_from_src(buffer + writeoffset, buf, amount) )
-			return so_far ? (ssize_t) so_far : -1;
+			return so_far ? so_far : -1;
 		bufferused += amount;
-		buf += amount;
-		count -= amount;
 		so_far += amount;
 		kthread_cond_broadcast(&readcond);
 		read_poll_channel.Signal(ReadPollEventStatus());
 		write_poll_channel.Signal(WritePollEventStatus());
+		iov_offset += amount;
+		if ( iov_offset == iov->iov_len )
+		{
+			iov_i++;
+			iov_offset = 0;
+		}
 	}
-	return (ssize_t) so_far;
+	return so_far;
 }
 
 short PipeChannel::ReadPollEventStatus()
@@ -405,21 +552,62 @@ void PipeEndpoint::Disconnect()
 	reading = false;
 }
 
-ssize_t PipeEndpoint::read(ioctx_t* ctx, uint8_t* buf, size_t count)
+ssize_t PipeEndpoint::recv(ioctx_t* ctx, uint8_t* buf, size_t count, int flags)
 {
 	if ( !reading )
 		return errno = EBADF, -1;
-	ssize_t result = channel->read(ctx, buf, count);
+	ssize_t result = channel->recv(ctx, buf, count, flags);
 	CurrentThread()->yield_to_tid = 0;
 	Scheduler::ScheduleTrueThread();
 	return result;
 }
 
-ssize_t PipeEndpoint::write(ioctx_t* ctx, const uint8_t* buf, size_t count)
+ssize_t PipeEndpoint::recvmsg(ioctx_t* ctx, struct msghdr* msg, int flags)
+{
+	if ( !reading )
+		return errno = EBADF, -1;
+	ssize_t result = channel->recvmsg(ctx, msg, flags);
+	CurrentThread()->yield_to_tid = 0;
+	Scheduler::ScheduleTrueThread();
+	return result;
+}
+
+ssize_t PipeEndpoint::send(ioctx_t* ctx, const uint8_t* buf, size_t count,
+                           int flags)
 {
 	if ( reading )
 		return errno = EBADF, -1;
-	ssize_t result = channel->write(ctx, buf, count);
+	ssize_t result = channel->send(ctx, buf, count, flags);
+	CurrentThread()->yield_to_tid = 0;
+	Scheduler::ScheduleTrueThread();
+	return result;
+}
+
+ssize_t PipeEndpoint::sendmsg(ioctx_t* ctx, const struct msghdr* msg, int flags)
+{
+	if ( reading )
+		return errno = EBADF, -1;
+	ssize_t result = channel->sendmsg(ctx, msg, flags);
+	CurrentThread()->yield_to_tid = 0;
+	Scheduler::ScheduleTrueThread();
+	return result;
+}
+
+ssize_t PipeEndpoint::readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt)
+{
+	if ( !reading )
+		return errno = EBADF, -1;
+	ssize_t result = channel->readv(ctx, iov, iovcnt);
+	CurrentThread()->yield_to_tid = 0;
+	Scheduler::ScheduleTrueThread();
+	return result;
+}
+
+ssize_t PipeEndpoint::writev(ioctx_t* ctx, const struct iovec* iov, int iovcnt)
+{
+	if ( reading )
+		return errno = EBADF, -1;
+	ssize_t result = channel->writev(ctx, iov, iovcnt);
 	CurrentThread()->yield_to_tid = 0;
 	Scheduler::ScheduleTrueThread();
 	return result;
@@ -462,8 +650,8 @@ class PipeNode : public AbstractInode
 public:
 	PipeNode(dev_t dev, uid_t owner, gid_t group, mode_t mode);
 	virtual ~PipeNode();
-	virtual ssize_t read(ioctx_t* ctx, uint8_t* buf, size_t count);
-	virtual ssize_t write(ioctx_t* ctx, const uint8_t* buf, size_t count);
+	virtual ssize_t readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
+	virtual ssize_t writev(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
 	virtual int poll(ioctx_t* ctx, PollNode* node);
 
 public:
@@ -488,20 +676,21 @@ PipeNode::PipeNode(dev_t dev, uid_t owner, gid_t group, mode_t mode)
 	this->stat_gid = group;
 	this->type = S_IFCHR;
 	this->stat_mode = (mode & S_SETABLE) | this->type;
+	supports_iovec = true;
 }
 
 PipeNode::~PipeNode()
 {
 }
 
-ssize_t PipeNode::read(ioctx_t* ctx, uint8_t* buf, size_t count)
+ssize_t PipeNode::readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt)
 {
-	return endpoint.read(ctx, buf, count);
+	return endpoint.readv(ctx, iov, iovcnt);
 }
 
-ssize_t PipeNode::write(ioctx_t* ctx, const uint8_t* buf, size_t count)
+ssize_t PipeNode::writev(ioctx_t* ctx, const struct iovec* iov, int iovcnt)
 {
-	return endpoint.write(ctx, buf, count);
+	return endpoint.writev(ctx, iov, iovcnt);
 }
 
 int PipeNode::poll(ioctx_t* ctx, PollNode* node)

@@ -18,6 +18,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/uio.h>
 
 #include <assert.h>
 #include <errno.h>
@@ -124,6 +125,7 @@ File::File(InodeType inode_type, mode_t type, dev_t dev, ino_t ino, uid_t owner,
 	this->stat_blksize = 1;
 	this->dev = dev;
 	this->ino = ino;
+	this->supports_iovec = true;
 }
 
 File::~File()
@@ -147,14 +149,16 @@ off_t File::lseek(ioctx_t* ctx, off_t offset, int whence)
 	return fcache.lseek(ctx, offset, whence);
 }
 
-ssize_t File::pread(ioctx_t* ctx, uint8_t* dest, size_t count, off_t off)
+ssize_t File::preadv(ioctx_t* ctx, const struct iovec* iov, int iovcnt,
+                     off_t off)
 {
-	return fcache.pread(ctx, dest, count, off);
+	return fcache.preadv(ctx, iov, iovcnt, off);
 }
 
-ssize_t File::pwrite(ioctx_t* ctx, const uint8_t* src, size_t count, off_t off)
+ssize_t File::pwritev(ioctx_t* ctx, const struct iovec* iov, int iovcnt,
+                      off_t off)
 {
-	ssize_t ret = fcache.pwrite(ctx, src, count, off);
+	ssize_t ret = fcache.pwritev(ctx, iov, iovcnt, off);
 	if ( 0 < ret )
 	{
 		ScopedLock lock(&metalock);
@@ -170,7 +174,11 @@ ssize_t File::readlink(ioctx_t* ctx, char* buf, size_t bufsize)
 		return errno = EINVAL, -1;
 	if ( (size_t) SSIZE_MAX < bufsize )
 		bufsize = SSIZE_MAX;
-	return fcache.pread(ctx, (uint8_t*) buf, bufsize, 0);
+	struct iovec iov;
+	memset(&iov, 0, sizeof(iov));
+	iov.iov_base = buf;
+	iov.iov_len = bufsize;
+	return fcache.preadv(ctx, &iov, 1, 0);
 }
 
 ssize_t File::tcgetblob(ioctx_t* ctx, const char* name, void* buffer, size_t count)

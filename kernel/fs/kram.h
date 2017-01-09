@@ -41,10 +41,10 @@ public:
 	virtual ~File();
 	virtual int truncate(ioctx_t* ctx, off_t length);
 	virtual off_t lseek(ioctx_t* ctx, off_t offset, int whence);
-	virtual ssize_t pread(ioctx_t* ctx, uint8_t* buf, size_t count,
-	                      off_t off);
-	virtual ssize_t pwrite(ioctx_t* ctx, const uint8_t* buf, size_t count,
+	virtual ssize_t preadv(ioctx_t* ctx, const struct iovec* iov, int iovcnt,
 	                       off_t off);
+	virtual ssize_t pwritev(ioctx_t* ctx, const struct iovec* iov, int iovcnt,
+	                        off_t off);
 	virtual ssize_t readlink(ioctx_t* ctx, char* buf, size_t bufsiz);
 	virtual ssize_t tcgetblob(ioctx_t* ctx, const char* name, void* buffer,
 	                          size_t count);

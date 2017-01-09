@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,6 +30,8 @@
 #include <sortix/kernel/refcount.h>
 
 struct dirent;
+struct iovec;
+struct msghdr;
 struct stat;
 struct statvfs;
 struct termios;
@@ -62,10 +64,18 @@ public:
 	virtual int truncate(ioctx_t* ctx, off_t length) = 0;
 	virtual off_t lseek(ioctx_t* ctx, off_t offset, int whence) = 0;
 	virtual ssize_t read(ioctx_t* ctx, uint8_t* buf, size_t count) = 0;
+	virtual ssize_t readv(ioctx_t* ctx, const struct iovec* iov,
+	                      int iovcnt) = 0;
 	virtual ssize_t pread(ioctx_t* ctx, uint8_t* buf, size_t count,
 	                      off_t off) = 0;
+	virtual ssize_t preadv(ioctx_t* ctx, const struct iovec* iov, int iovcnt,
+	                       off_t off) = 0;
 	virtual ssize_t write(ioctx_t* ctx, const uint8_t* buf, size_t count) = 0;
+	virtual ssize_t writev(ioctx_t* ctx, const struct iovec* iov,
+	                       int iovcnt) = 0;
 	virtual ssize_t pwrite(ioctx_t* ctx, const uint8_t* buf, size_t count,
+	                       off_t off) = 0;
+	virtual ssize_t pwritev(ioctx_t* ctx, const struct iovec* iov, int iovcnt,
 	                       off_t off) = 0;
 	virtual int utimens(ioctx_t* ctx, const struct timespec* times) = 0;
 	virtual int isatty(ioctx_t* ctx) = 0;
@@ -100,8 +110,11 @@ public:
 	virtual int connect(ioctx_t* ctx, const uint8_t* addr, size_t addrlen) = 0;
 	virtual int listen(ioctx_t* ctx, int backlog) = 0;
 	virtual ssize_t recv(ioctx_t* ctx, uint8_t* buf, size_t count, int flags) = 0;
+	virtual ssize_t recvmsg(ioctx_t* ctx, struct msghdr* msg, int flags) = 0;
 	virtual ssize_t send(ioctx_t* ctx, const uint8_t* buf, size_t count,
 	                     int flags) = 0;
+	virtual ssize_t sendmsg(ioctx_t* ctx, const struct msghdr* msg,
+	                        int flags) = 0;
 	virtual int getsockopt(ioctx_t* ctx, int level, int option_name,
 	                       void* option_value, size_t* option_size_ptr) = 0;
 	virtual int setsockopt(ioctx_t* ctx, int level, int option_name,
@@ -144,6 +157,7 @@ protected:
 	struct timespec stat_ctim;
 	blksize_t stat_blksize;
 	blkcnt_t stat_blocks;
+	bool supports_iovec;
 
 public:
 	AbstractInode();
@@ -158,9 +172,15 @@ public:
 	virtual int truncate(ioctx_t* ctx, off_t length);
 	virtual off_t lseek(ioctx_t* ctx, off_t offset, int whence);
 	virtual ssize_t read(ioctx_t* ctx, uint8_t* buf, size_t count);
+	virtual ssize_t readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
 	virtual ssize_t pread(ioctx_t* ctx, uint8_t* buf, size_t count, off_t off);
+	virtual ssize_t preadv(ioctx_t* ctx, const struct iovec* iov, int iovcnt,
+	                       off_t off);
 	virtual ssize_t write(ioctx_t* ctx, const uint8_t* buf, size_t count);
+	virtual ssize_t writev(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
 	virtual ssize_t pwrite(ioctx_t* ctx, const uint8_t* buf, size_t count,
+	                       off_t off);
+	virtual ssize_t pwritev(ioctx_t* ctx, const struct iovec* iov, int iovcnt,
 	                       off_t off);
 	virtual int utimens(ioctx_t* ctx, const struct timespec* times);
 	virtual int isatty(ioctx_t* ctx);
@@ -195,8 +215,10 @@ public:
 	virtual int connect(ioctx_t* ctx, const uint8_t* addr, size_t addrlen);
 	virtual int listen(ioctx_t* ctx, int backlog);
 	virtual ssize_t recv(ioctx_t* ctx, uint8_t* buf, size_t count, int flags);
+	virtual ssize_t recvmsg(ioctx_t* ctx, struct msghdr* msg, int flags);
 	virtual ssize_t send(ioctx_t* ctx, const uint8_t* buf, size_t count,
 	                     int flags);
+	virtual ssize_t sendmsg(ioctx_t* ctx, const struct msghdr* msg, int flags);
 	virtual int getsockopt(ioctx_t* ctx, int level, int option_name,
 	                       void* option_value, size_t* option_size_ptr);
 	virtual int setsockopt(ioctx_t* ctx, int level, int option_name,

@@ -16,6 +16,7 @@ regress \
 
 TESTS:=\
 test-fmemopen \
+test-pipe-one-byte \
 test-pthread-argv \
 test-pthread-basic \
 test-pthread-main-exit \
