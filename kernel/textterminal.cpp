@@ -841,12 +841,12 @@ void TextTerminal::RunAnsiCommand(TextBuffer* textbuf, char c)
 	case 's': // Save cursor position.
 	{
 		ansisavedposx = column;
-		ansisavedposx = line;
+		ansisavedposy = line;
 	} break;
 	case 'u': // Restore cursor position.
 	{
 		column = ansisavedposx;
-		line = ansisavedposx;
+		line = ansisavedposy;
 		if ( width <= column )
 			column = width-1;
 		if ( height <= line )
