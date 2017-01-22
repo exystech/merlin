@@ -231,13 +231,9 @@ bool BGADevice::Initialize()
 
 #if defined(__i386__) || defined(__x86_64__)
 	guest_additions = VBox::GetGuestAdditions();
-	if ( !guest_additions )
-		return false;
-	if ( !guest_additions->RegisterVideoDevice(device_index) )
-	{
+	if ( guest_additions &&
+	     !guest_additions->RegisterVideoDevice(device_index) )
 		guest_additions = NULL;
-		return false;
-	}
 #endif
 
 	Video::ConfigureDevice(this);
