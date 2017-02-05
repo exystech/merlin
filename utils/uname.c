@@ -14,13 +14,13 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  * uname.c
- * Print system information.
+ * Write system information.
  */
 
 #include <sys/utsname.h>
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -55,20 +55,8 @@ static void compact_arguments(int* argc, char*** argv)
 	}
 }
 
-static void help(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "Usage: %s [OPTION]...\n", argv0);
-	fprintf(fp, "Print certain system information.\n");
-}
-
-static void version(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
-}
-
 int main(int argc, char* argv[])
 {
-	const char* argv0 = argv[0];
 	int flags = 0;
 	for ( int i = 1; i < argc; i++ )
 	{
@@ -92,9 +80,7 @@ int main(int argc, char* argv[])
 			case 't': flags |= PRINT_TAGLINE; break;
 			case 'v': flags |= PRINT_KERNELVER; break;
 			default:
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				help(stderr, argv0);
-				exit(1);
+				errx(1, "unknown option -- '%c'", c);
 			}
 		}
 		else if ( !strcmp(arg, "--kernel-name") )
@@ -111,26 +97,18 @@ int main(int argc, char* argv[])
 			flags |= PRINT_PROCESSOR;
 		else if ( !strcmp(arg, "--tagline") )
 			flags |= PRINT_TAGLINE;
-		else if ( !strcmp(arg, "--help") )
-			help(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--version") )
-			version(stdout, argv0), exit(0);
 		else
-		{
-			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			help(stderr, argv0);
-			exit(1);
-		}
+			errx(1, "unknown option: %s", arg);
 	}
 
 	compact_arguments(&argc, &argv);
 
 	if ( 1 < argc )
-		error(1, 0, "extra operand");
+		errx(1, "extra operand");
 
 	static struct utsname utsname;
 	if ( uname(&utsname) < 0 )
-		error(1, errno, "uname");
+		err(1,"uname");
 
 	if ( !flags )
 		flags = PRINT_KERNELNAME;

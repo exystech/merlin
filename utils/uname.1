@@ -1,0 +1,43 @@
+.Dd January 27, 2017
+.Dt UNAME 1
+.Os
+.Sh NAME
+.Nm uname
+.Nd write system information
+.Sh SYNOPSIS
+.Nm
+.Op Fl amnprstv
+.Sh DESCRIPTION
+.Nm
+writes the system information specified by its options.
+If no options were passed,
+.Nm
+writes the kernel name.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl a
+Write all available information.
+.It Fl m , \-machine
+Write the system architecture.
+.It Fl n , \-nodename
+Write the network node name.
+.It Fl p , \-processor
+Write the processor architecture.
+.It Fl r , \-kernel-release
+Write the kernel release version.
+.It Fl s , \-kernel-name
+Write the kernel name.
+.It Fl t , \-tagline
+Write the release tagline.
+.It Fl v , \-kernel-version
+Write the kernel build date.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr kernelinfo 1 ,
+.Xr uname 2 ,
+.Xr machine 4 ,
+.Xr sortix-release 4
