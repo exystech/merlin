@@ -10,6 +10,7 @@ KBLAYOUT_COMPILER?=kblayout-compiler
 LAYOUTS=\
 de \
 dk \
+uk \
 us \
 
 .PHONY: all install clean
