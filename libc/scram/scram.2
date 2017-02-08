@@ -1,0 +1,113 @@
+.Dd February 8, 2017
+.Dt SCRAM 2
+.Os
+.Sh NAME
+.Nm scram
+.Nd emergency process shutdown
+.Sh SYNOPSIS
+.In scram.h
+.Ft void
+.Fn scram "int event" "const void *info"
+.Sh DESCRIPTION
+.Fn scram
+unconditionally terminates the process abnormally due to the specified event.
+It is designed for use when the process has potentially been compromised and
+therefore can’t possibly continue safely.
+Its use does not necessarily mean the process was compromised, but it does imply
+a bug was detected.
+.Pp
+The event information structures are designed to be trivially to filled in
+during an emergency with the information that is readily available.
+If the process has potentially been compromised, the calling function should not
+do any formatting of debug information or perform memory allocations, but just
+use existing values or constants as the event information and call
+.Fn scram
+to terminate the process immediately.
+The kernel will use the provided event information to write a formatted error
+message to the kernel log.
+.Pp
+.Fa event
+specifies which kind of event occurred and can be one of:
+.Pp
+.Bl -tag -width "SCRAM_UNDEFINED_BEHAVIOR" -compact -offset indent
+.It SCRAM_ASSERT
+Assertion failure.
+.It SCRAM_STACK_SMASH
+Stack smash.
+.It SCRAM_UNDEFINED_BEHAVIOR
+Undefined behavior.
+.El
+.Pp
+.Fa info
+points to the appropriate structure containing further information on the event
+or
+.Dv NULL
+if there is no information available:
+.Bd -literal
+struct scram_assert { /* SCRAM_ASSERT */
+    const char *filename; /* file the assertion failed in */
+    unsigned long line; /* line the assertion failed on */
+    const char *function; /* function containing the assertion */
+    const char *expression; /* assertion expression */
+};
+
+/* SCRAM_STACK_SMASH has no information structure */
+
+struct scram_undefined_behavior { /* SCRAM_UNDEFINED_BEHAVIOR */
+    const char *filename; /* file with undefined behavior */
+    unsigned long line; /* line with undefined behavior */
+    unsigned long column; /* column on the line with undefined behavior */
+    const char *violation; /* description of the undefined behavior */
+};
+.Ed
+.Sh RETURN VALUES
+The
+.Fn scram
+function never returns as the process is unconditionally terminated.
+.Sh ERRORS
+.Fn scram
+never fails as the process is always terminated, even on invalid parameters.
+The kernel may fail to allocate copies of strings, in which case "<unknown>" is
+used as a replacement in the error message.
+.Sh NOTES
+.Fn scram
+is generally not meant to be used directly by application developers, but is for
+internal use by the standard library in the implementation of
+.Xr assert 3 ,
+the stack protector
+.Xr ( gcc 1
+.Fl fstack-protector ) ,
+and the undefined behavior sanitizer
+.Xr ( gcc 1
+.Fl fsanitize=undefined ) .
+The design of
+.Fn scram
+is motivated by gcc's upstream libssp and libubsan libraries, which attempt to
+print debug information prior to terminating the process abnormally.
+Doing so is a risk, as the process may have been compromised and basic things
+like stdio cannot be trusted as crucial pointers and state may have been
+overwritten, and memory allocations are dangerous because the heap might be
+damaged.
+Attempting to format debug information may ironically give the attacker another
+chance to subvert control flow.
+The gcc upstream libubsan library is designed for debugging and should not go
+anywhere near production.
+.Pp
+The
+.Fn scram
+function avoids all these issues by design by having the kernel print the debug
+information.
+Sortix uses neither gcc library and the standard library has its own secure
+implementations using
+.Fn scram .
+It is always safe and desirable to use these features in production on Sortix.
+.Sh SEE ALSO
+.Xr gcc 1 ,
+.Xr _exit 2 ,
+.Xr exit_thread 2 ,
+.Xr assert 3 ,
+.Xr exit 3
+.Sh HISTORY
+The
+.Fn scram
+system call originally appeared in Sortix 1.0.

@@ -751,6 +751,9 @@ crtn.o \
 MISCOBJ=\
 $(CRTOBJ) \
 
+MANPAGES2=\
+scram/scram.2
+
 HEADERS:=$(shell find include -type f)
 
 LIBK_OBJS:=$(FREEOBJS:.o=.libk.o)
@@ -774,7 +777,7 @@ libs: $(BINS)
 libs-kernel: $(BINSKERNEL)
 
 .PHONY: all libs headers clean install install-include-dirs install-headers \
-        install-lib-dirs install-libs libs-kernel
+        install-lib-dirs install-libs install-man libs-kernel
 
 FORCE:
 
@@ -834,7 +837,7 @@ clean:
 	rm -f *.o */*.o */*/*.o *.a
 
 # Installation into sysroot
-install: install-headers install-libs install-libs-kernel
+install: install-headers install-libs install-libs-kernel install-man
 
 $(DESTDIR)$(LIBDIR):
 	mkdir -p $@
@@ -857,3 +860,7 @@ install-lib-dirs: $(DESTDIR)$(LIBDIR)
 install-libs: $(INSTALLLIBS)
 
 install-libs-kernel: $(INSTALLLIBSKERNEL)
+
+install-man:
+	mkdir -p $(DESTDIR)$(MANDIR)/man2
+	cp $(MANPAGES2) $(DESTDIR)$(MANDIR)/man2
