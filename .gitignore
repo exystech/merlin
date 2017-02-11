@@ -8,6 +8,7 @@ builds
 sysroot
 sysroot.destdir
 sysroot-overlay
+sysroot-overlay-*
 release
 ports
 repository
