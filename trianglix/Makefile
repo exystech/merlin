@@ -7,7 +7,7 @@ include ../build-aux/dirs.mak
 OPTLEVEL?=-g -O2
 CXXFLAGS?=$(OPTLEVEL)
 
-CXXFLAGS:=$(CXXFLAGS) -std=gnu++0x -Wall -Wextra -fno-exceptions -fno-rtti -msse -msse2
+CXXFLAGS:=$(CXXFLAGS) -std=gnu++11 -Wall -Wextra -fno-exceptions -fno-rtti -msse -msse2
 
 BINARY:=trianglix
 
