@@ -536,8 +536,8 @@ int sys_pipe2(int* pipefd, int flags)
 	Ref<Vnode> send_vnode(new Vnode(send_inode, Ref<Vnode>(NULL), 0, 0));
 	if ( !recv_vnode || !send_vnode ) return -1;
 
-	Ref<Descriptor> recv_desc(new Descriptor(recv_vnode, O_READ));
-	Ref<Descriptor> send_desc(new Descriptor(send_vnode, O_WRITE));
+	Ref<Descriptor> recv_desc(new Descriptor(recv_vnode, O_READ | flags));
+	Ref<Descriptor> send_desc(new Descriptor(send_vnode, O_WRITE | flags));
 	if ( !recv_desc || !send_desc ) return -1;
 
 	Ref<DescriptorTable> dtable = process->GetDTable();
