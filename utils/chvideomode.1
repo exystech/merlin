@@ -1,0 +1,162 @@
+.Dd February 6, 2017
+.Dt CHVIDEOMODE 1
+.Os
+.Sh NAME
+.Nm chvideomode
+.Nd interactively change the screen resolution
+.Sh SYNOPSIS
+.Nm
+.Op Fl \-show-all Ns "=" Ns Ar bool
+.Op Fl \-show-supported Ns "=" Ns Ar bool
+.Op Fl \-show-unsupported Ns "=" Ns Ar bool
+.Op Fl \-show-text Ns "=" Ns Ar bool
+.Op Fl \-show-graphics Ns "=" Ns Ar bool
+.Op Fl \-bpp Ns "=" Ns Ar bpp
+.Op Fl \-min-bpp Ns "=" Ns Ar min-bpp
+.Op Fl \-max-bpp Ns "=" Ns Ar max-bpp
+.Op Fl \-width Ns "=" Ns Ar width
+.Op Fl \-min-width Ns "=" Ns Ar min-width
+.Op Fl \-max-width Ns "=" Ns Ar max-width
+.Op Fl \-height Ns "=" Ns Ar height
+.Op Fl \-min-height Ns "=" Ns Ar min-height
+.Op Fl \-max-height Ns "=" Ns Ar max-height
+.Op Ar command ...
+.Sh DESCRIPTION
+.Nm
+changes the video mode by displaying an interactive menu containing a list of
+available modes, with an additional entry for entering a custom mode (if
+supported by the driver).
+If the mode change succeeds and
+.Ar command
+is specified,
+.Ar command
+is executed.
+If the mode change fails, the menu is redisplayed until cancellation or a
+successful mode change.
+.Pp
+By default,
+.Nm
+only displays supported text and graphical modes, but modes can also be
+explicitly filtered via options.
+Multiple filters can be specified, and only modes matching all filters will be
+displayed.
+If a filter has min and max options, setting it is equivalent to setting
+min and max to the same value; for example,
+.Fl \-bpp Ns "=" Ns Sy 32
+is equivalent to
+.Fl \-min-bpp Ns "=" Ns Sy 32 ,
+.Fl \-max-bpp Ns "=" Ns Sy 32 .
+Filters taking
+.Ar bool
+as an argument have possible values of
+.Sy true
+or
+.Sy false .
+If the same filter is specified multiple times, only the last specified value
+is used.
+.Pp
+The interactive key commands are as follows:
+.Bl -tag -width "1234567890"
+.It Up Arrow
+Move the selection up 1 item.
+.It Down Arrow
+Move the selection down 1 item.
+.It Escape
+Quit without changing video mode.
+.It Enter
+Change the video mode to the current selection.
+.El
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl \-show-all Ns "=" Ns Ar bool
+Override all other filter options, displaying every mode if
+.Ar bool
+is
+.Sy true .
+(defaults to
+.Sy false)
+.It Fl \-show-supported Ns "=" Ns Ar bool
+Show supported video modes if
+.Ar bool
+is
+.Sy true .
+(defaults to
+.Sy true )
+.It Fl \-show-unsupported Ns "=" Ns Ar bool
+Show unsupported video modes if
+.Ar bool
+is
+.Sy true .
+(defaults to
+.Sy false )
+.It Fl \-show-text Ns "=" Ns Ar bool
+Show video modes available in text mode if
+.Ar bool
+is
+.Sy true .
+(defaults to
+.Sy true )
+.It Fl \-show-graphics Ns "=" Ns Ar bool
+Show video modes available in graphics mode if
+.Ar bool
+is
+.Sy true .
+(defaults to
+.Sy true )
+.It Fl \-bpp Ns "=" Ns Ar bpp
+Show video modes with bits-per-pixel equal to
+.Ar bpp .
+.It Fl \-min-bpp Ns "=" Ns Ar min-bpp
+Show video modes with bits-per-pixel greater than
+.Ar min-bpp ,
+inclusive.
+.It Fl \-max-bpp Ns "=" Ns Ar max-bpp
+Show video modes with bits-per-pixel less than
+.Ar max-bpp ,
+inclusive.
+.It Fl \-width Ns "=" Ns Ar width
+Show video modes with width equal to
+.Ar width .
+.It Fl \-min-width Ns "=" Ns Ar min-width
+Show video modes with width greater than
+.Ar min-width ,
+inclusive.
+.It Fl \-max-width Ns "=" Ns Ar max-width
+Show video modes with width less than
+.Ar max-width ,
+inclusive.
+.It Fl \-height Ns "=" Ns Ar height
+Show video modes with height equal to
+.Ar height .
+.It Fl \-min-height Ns "=" Ns Ar min-height
+Show video modes with height greater than
+.Ar min-height ,
+inclusive.
+.It Fl \-max-height Ns "=" Ns Ar max-height
+Show video modes with height less than
+.Ar max-height ,
+inclusive.
+.El
+.Sh EXIT STATUS
+.Nm
+exits with an exit status of 10 if the menu is quit, 11 if no modes are
+available, 12 if no modes are available after filtering, 13 if the terminal has
+no associated video devices, 127 if
+.Ar command
+failed to run, or 1 on any other error.
+If
+.Nm
+changes the video mode successfully,
+.Nm
+exits with the exit status of
+.Ar command
+if specified,
+or 0 otherwise.
+.Sh SEE ALSO
+.Xr chkblayout 1 ,
+.Xr dispmsg_issue 2 ,
+.Xr videomode 5
+.Sh BUGS
+.Nm
+only supports a single monitor.

@@ -174,30 +174,6 @@ static void compact_arguments(int* argc, char*** argv)
 	}
 }
 
-static void help(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "Usage: %s [OPTION ...] [-- PROGRAM-TO-RUN [ARG ...]]\n", argv0);
-	fprintf(fp, "Changes the video mode and optionally runs a program\n");
-	fprintf(fp, "\n");
-	fprintf(fp, "Options supported by %s:\n", argv0);
-	fprintf(fp, "  --help             Display this help and exit\n");
-	fprintf(fp, "  --version          Output version information and exit\n");
-	fprintf(fp, "\n");
-	fprintf(fp, "Options for filtering modes:\n");
-	fprintf(fp, "  --show-all=BOOL\n");
-	fprintf(fp, "  --show-supported=BOOL, --show-unsupported=BOOL\n");
-	fprintf(fp, "  --show-text=BOOL\n");
-	fprintf(fp, "  --show-graphics=BOOL\n");
-	fprintf(fp, "  --bpp BPP, --min-bpp=BPP, --max-bpp=BPP\n");
-	fprintf(fp, "  --width=NUM, --min-width=NUM, --max-width=NUM\n");
-	fprintf(fp, "  --height=NUM, --min-heigh= NUM, --max-height=NUM\n");
-}
-
-static void version(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
-}
-
 bool string_parameter(const char* option,
                       const char* arg,
                       int argc,
@@ -303,14 +279,9 @@ int main(int argc, char* argv[])
 			{
 			default:
 				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				help(stderr, argv0);
 				exit(1);
 			}
 		}
-		else if ( !strcmp(arg, "--help") )
-			help(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--version") )
-			version(stdout, argv0), exit(0);
 		else if ( BOOL_PARAMETER("show-all", &filter.include_all) ) { }
 		else if ( BOOL_PARAMETER("show-supported", &filter.include_supported) ) { }
 		else if ( BOOL_PARAMETER("show-unsupported", &filter.include_unsupported) ) { }
@@ -322,7 +293,6 @@ int main(int argc, char* argv[])
 		else
 		{
 			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			help(stderr, argv0);
 			exit(1);
 		}
 	}

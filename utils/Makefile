@@ -75,6 +75,7 @@ xinstall
 
 MANPAGES1=\
 chkblayout.1 \
+chvideomode.1 \
 kernelinfo.1 \
 logname.1 \
 memstat.1 \
