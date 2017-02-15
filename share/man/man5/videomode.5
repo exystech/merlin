@@ -11,16 +11,17 @@ The
 .Nm videomode
 file is read on boot by
 .Xr init 8
-and is used as the initial graphics resolution on the primary monitor.  The
-resolution provided by the bootloader remains in effect if the file is missing.
+and is used as the initial graphics resolution on the primary monitor.
+The resolution provided by the bootloader remains in effect if the file is
+missing.
 The resolution is usable only if the graphics card has a driver and the
 resolution is supported.
 .Sh FORMAT
 .Ar width Ns x Ns Ar height Ns x Ns Ar bits-per-pixel
 .Pp
 The file specifies a graphics resolution as a single line with three numeric
-fields separated by x characters and no whitespace whatsoever.  The first field
-is used as the
+fields separated by x characters and no whitespace whatsoever.
+The first field is used as the
 .Ar width
 in pixels, the second field is used as the
 .Ar height

@@ -9,7 +9,8 @@
 .Sh DESCRIPTION
 .Nm login
 interactively authenticates users by asking them to enter their username and
-password.  The passwords are checked against the password hashes in
+password.
+The passwords are checked against the password hashes in
 .Pa /etc/passwd
 as described in
 .Xr passwd 5 .
@@ -18,10 +19,12 @@ creates a session as the requested user upon successful authentication.
 .Pp
 .Nm login
 has a graphical interface if the display is graphical and uses a textual
-interface otherwise.  The textual interface is forced if
+interface otherwise.
+The textual interface is forced if
 .Pa /etc/login.conf.textual
-exists. The process remains running in the background and takes
-over again when the user session exits.
+exists.
+The process remains running in the background and takes over again when the user
+session exits.
 .Pp
 Type a special username to perform special options:
 .Pp
@@ -35,8 +38,9 @@ exit asking for rebooting the computer
 .El
 .Sh SECURITY
 There is currently no method to confirm the login screen is in fact real other
-than witnessing a pristine boot.  Local users can log in and show a counterfeit
-login screen that look and behave like the real
+than witnessing a pristine boot.
+Local users can log in and show a counterfeit login screen that look and behave
+like the real
 .Nm login
 program and trick the next user into revealing their password.
 .Sh ENVIRONMENT
@@ -72,4 +76,5 @@ reboot, or exits 2 on fatal failure and the boot should halt.
 .Xr login 8
 .Sh BUGS
 .Nm login
-only supports a single monitor.  The mouse code is less than perfect.
+only supports a single monitor.
+The mouse code is less than perfect.

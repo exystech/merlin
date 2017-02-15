@@ -35,16 +35,15 @@ if the
 option is given.
 The default type is an array of
 .Sy unsigned char .
-The array contents are indented with tabs
-and the lines don't exceed 80 columns (tabs have the width of 8 spaces).
+The array contents are indented with tabs and the lines don't exceed 80 columns
+(tabs have the width of 8 spaces).
 .Pp
-The default array name is the output path if set, or the path of the first
-input file (if any), or otherwise
+The default array name is the output path if set, or the path of the first input
+file (if any), or otherwise
 .Sy carray .
-The default array name has all file extensions removed (but a leading period
-in the file name is kept).  The default array name is converted to the
-characters
-a-z, A-Z,
+The default array name has all file extensions removed (but a leading period in
+the file name is kept).
+The default array name is converted to the characters a-z, A-Z,
 .Sq _ ,
 and 0-9.  0-9 cannot be the first character of an identifier.
 .Sq +
@@ -59,15 +58,16 @@ A guard macro is optionally used by the
 .Fl g
 and
 .Fl G
-options.  The default guard macro is the output path if set, or the path of the
-first input file (if any) followed by
+options.
+The default guard macro is the output path if set, or the path of the first
+input file (if any) followed by
 .Sy _H ,
 or otherwise
 .Sy CARRAY_H .
 The default guard macro is converted to the characters A-Z,
 .Sq _ ,
-and 0-9.  0-9 cannot be the first character of an identifier.  The lower-case
-a-z is converted to the upper-case A-Z.
+and 0-9.  0-9 cannot be the first character of an identifier.
+The lower-case a-z is converted to the upper-case A-Z.
 .Sq +
 is replaced by
 .Sq X .
@@ -91,7 +91,8 @@ keyword.
 .It Fl e , Fl \-extern
 Declare the array with the
 .Sy extern
-keyword.  This option is mutually incompatible with the
+keyword.
+This option is mutually incompatible with the
 .Fl s
 option.
 .It Fl E , Fl \-extern-c
@@ -99,25 +100,27 @@ Wrap the array in
 .Sy extern """C""" { }
 subject to a preprocessor check for C++.
 .It Fl f , Fl \-forward
-Forward declare the array only, do not initialize it with contents.  The input
-files are not opened and the standard input is unused.  This option is mutually
-incompatible with the
+Forward declare the array only, do not initialize it with contents.
+The input files are not opened and the standard input is unused.
+This option is mutually incompatible with the
 .Fl r
 option.
 .It Fl g , Fl \-use-guard
 Wrap the output in a preprocessor conditional checking the guard macro is not
-set, and declare the macro if it is not set.  This conditional is a classic C
-include guard that ensures only the first inclusion of a header has any effect.
+set, and declare the macro if it is not set.
+This conditional is a classic C include guard that ensures only the first
+inclusion of a header has any effect.
 .It Fl G , Fl \-guard Ar guard
 Sets the guard macro to
 .Ar guard
 and enables the guard macro check as if the
 .Fl g
-option was set as well.  The guard macro is unrestricted and untransformed and
-will be be output verbatim.
+option was set as well.
+The guard macro is unrestricted and untransformed and will be output verbatim.
 .It Fl H , Fl \-headers
-Output inclusions of all the prerequisite headers.  By default, there are no
-prerequisite headers, unless the array type is one of the
+Output inclusions of all the prerequisite headers.
+By default, there are no prerequisite headers, unless the array type is one of
+the
 .In stdint.h
 types, in which case
 .In stdint.h
@@ -129,15 +132,16 @@ is the only prerequisite header.
 .\" (End)
 Sets the name of the array to
 .Ar identifier .
-The identifier is unrestricted and will be be output verbatim.
+The identifier is unrestricted and will be output verbatim.
 .It Fl \-includes Ar include-statements
 Sets the C preprocessor statements
 .Ar include-statements
 as how to include all the prerequisite headers and enables inclusion of the
 prerequisite headers as if the
 .Fl H
-option was set.  The preprocessor statements are unrestricted and untransformed
-and will be be output verbatim.
+option was set.
+The preprocessor statements are unrestricted and untransformed and will be
+output verbatim.
 .It Fl o , Fl output Ar output
 Write the output to the
 .Ar output
@@ -146,7 +150,8 @@ path rather than the standard output.
 Output only the hexadecimally encoded array contents, and the guard macro check
 if set by the
 .Fl g
-option.  This option is mutually incompatible with the
+option.
+This option is mutually incompatible with the
 .Fl f
 option.
 .It Fl s , Fl \-static
@@ -156,7 +161,7 @@ keyword.
 .It Fl t , Fl \-type Ar type
 Declare the array as an array of the specified
 .Ar type .
-The type is unrestricted and will be be output verbatim.
+The type is unrestricted and will be output verbatim.
 .It Fl v , Fl \-volatile
 Declare the array with the
 .Sy volatile

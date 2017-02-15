@@ -16,8 +16,9 @@
 upgrades the current operating system by copying the system files from the
 specified
 .Ar source
-directory (usually a sysroot) onto the current root filesystem.  This is meant
-to be used when building the operating system from source as described in
+directory (usually a sysroot) onto the current root filesystem.
+This is meant to be used when building the operating system from source as
+described in
 .Xr development 7 .
 .Pp
 .Nm
@@ -25,7 +26,8 @@ installs the
 .Sy system
 manifest from the tix repository in the
 .Ar source
-directory, as well as all the ports found.  The
+directory, as well as all the ports found.
+The
 .Xr initrd 7
 is regenerated using
 .Xr update-initrd 8 .
@@ -34,8 +36,10 @@ If grub is enabled in
 then the bootloader is reinstalled and reconfigured as needed.
 .Pp
 .Nm
-is an automatic and non-interactive upgrade.  It is meant to be used as part of
-the development process to upgrade to locally built versions.  The
+is an automatic and non-interactive upgrade.
+It is meant to be used as part of the development process to upgrade to locally
+built versions.
+The
 .Xr sysupgrade 8
 program is by contrast an interactive program, meant to help upgrading across
 much larger development distances.
@@ -43,33 +47,35 @@ much larger development distances.
 The options are as follows:
 .Bl -tag -width "12345678"
 .It Fl \-booting
-It's boot time, complete the system upgrade that was delayed.  This is meant to
-be used by
+It's boot time, complete the system upgrade that was delayed.
+This is meant to be used by
 .Xr init 8
 through the
 .Sy merge
-boot target.  This installs the
+boot target.
+This installs the
 .Pa /sysmerge
 directory onto the root filesystem and removes the
 .Pa /sysmerge
 directory.
 .It Fl c , Fl \-cancel
-Cancel a pending upgrade that would trigger on the next boot.  Remove the
+Cancel a pending upgrade that would trigger on the next boot.
+Remove the
 .Pa /sysmerge
 directory and restore the old
 .Xr kernel 7
 and
 .Xr initrd 7 .
 .It Fl \-hook-finalize
-Run the pre-installation compatibility hooks.  This is meant to be used by the
-old
+Run the pre-installation compatibility hooks.
+This is meant to be used by the old
 .Nm
 when it invokes the new
 .Nm
 during a non-waiting upgrade.
 .It Fl \-hook-prepare
-Run the post-prepare compatibility hooks.  This is meant to be used by the
-old
+Run the post-prepare compatibility hooks.
+This is meant to be used by the old
 .Nm
 when it invokes the new
 .Nm
@@ -88,7 +94,8 @@ with an initrd that runs
 on boot through the
 .Sy chain-merge
 .Xr init 8
-boot target.  Backups are made of the
+boot target.
+Backups are made of the
 .Xr kernel 7
 and
 .Xr initrd 7

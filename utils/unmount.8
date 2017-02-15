@@ -10,8 +10,8 @@
 .Ar directory ...
 .Sh DESCRIPTION
 .Nm
-unmounts the specified paths.  The mountpoint is removed so that it cannot be
-opened further, and
+unmounts the specified paths.
+The mountpoint is removed so that it cannot be opened further, and
 .Nm
 waits until no files on the filesystem are open, after which the filesystem is
 shut off cleanly.
@@ -20,12 +20,13 @@ The options are as follows:
 .Bl -tag -width "12345678"
 .It Fl f, Fl \-force
 Shut off the filesystem immediately, further operations to any open files will
-fail.  The filesystem will be consistent, but processes may be stopped in the
-middle of file operations.
+fail.
+The filesystem will be consistent, but processes may be stopped in the middle of
+file operations.
 .It Fl l, Fl \-lazy
-Do not wait for the filesystem to be unused, and shut off the filesystem in
-the background.  It is not safe to shut down the computer directly after using
-this option.
+Do not wait for the filesystem to be unused, and shut off the filesystem in the
+background.
+It is not safe to shut down the computer directly after using this option.
 .El
 .Sh EXIT STATUS
 .Nm

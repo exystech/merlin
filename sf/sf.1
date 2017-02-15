@@ -10,8 +10,8 @@
 .Op Ar device
 .Sh DESCRIPTION
 .Nm
-provides a simple scheme for framing a message over a byte stream.  This is
-useful in cases such as sockets, pipe, and serial devices where a real
+provides a simple scheme for framing a message over a byte stream.
+This is useful in cases such as sockets, pipe, and serial devices where a real
 end of file condition would require terminating the link, but it is important
 to transmit multiple messages and keeping the link open for an arbitrary amount
 of time.
@@ -23,8 +23,8 @@ most bytes represent themselves, an escape byte sequence
 .Li ( 0xF7 0xFD ) ,
 and an end of messsage byte sequence
 .Li ( 0xF7 0xFE ) .
-UTF-8 encoded text will never need to be escaped.  Data can be recursively
-framed.
+UTF-8 encoded text will never need to be escaped.
+Data can be recursively framed.
 .Pp
 Exactly one of the
 .Fl i
@@ -34,15 +34,18 @@ options must be set to control whether the program is in input or output mode.
 .Pp
 Input mode works by reading one byte at a time from stdin (or the
 .Ar device
-if given).  It discards all read bytes until it finds a valid start of message
-byte sequence.  It then decodes the body and writes the decoded bytes to stdout.
+if given).
+It discards all read bytes until it finds a valid start of message byte
+sequence.
+It then decodes the body and writes the decoded bytes to stdout.
 Finally it finds an end of message byte sequence and exits.
 .Pp
 Output mode works by reading bytes from stdin until an end of file condition.
 It emits a start of message byte sequence to stdout (or to the
 .Ar device
-if given).  It emits an encoded body with the contents of stdin.  Finally it
-emits an end of message byte sequence.
+if given).
+It emits an encoded body with the contents of stdin.
+Finally it emits an end of message byte sequence.
 .Pp
 The
 .Ar device

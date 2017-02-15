@@ -10,9 +10,9 @@
 .Ar file ...
 .Sh DESCRIPTION
 .Nm
-displays the input one page at a time.  The input is the concatenation of the
-input files, or the standard input if no files were specified and the
-standard input is not a terminal.
+displays the input one page at a time.
+The input is the concatenation of the input files, or the standard input if no
+files were specified and the standard input is not a terminal.
 .Pp
 The options are as follows:
 .Bl -tag -width "12345678"
@@ -20,11 +20,12 @@ The options are as follows:
 Output only escape sequences that change font properties such as color and
 boldness.
 .It Fl r
-Causes raw control characters to be dumped directly onto the terminal.  Usage
-of this option may cause output to be misleading for suspicious files, as the
-escape codes in the file are rendered and can be used to hide parts of the
-input.  Avoid the -r option if you want to see the actual bytes in the file,
-or use -R to show only selected escape codes.
+Causes raw control characters to be dumped directly onto the terminal.
+Usage of this option may cause output to be misleading for suspicious files, as
+the escape codes in the file are rendered and can be used to hide parts of the
+input.
+Avoid the -r option if you want to see the actual bytes in the file, or use -R
+to show only selected escape codes.
 .El
 .Sh COMMANDS
 .Nm

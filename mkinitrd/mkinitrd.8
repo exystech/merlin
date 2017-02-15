@@ -26,14 +26,16 @@ format of files and directories.
 Every specified
 .Ar directory
 is used as a root directory and is recursively searched for files and
-directories matching the filter.  If multiple directories are specified, the
-directories are merged together.  In case two files with the same path conflict,
-precedence is given to the file in the root directory specified first.
+directories matching the filter.
+If multiple directories are specified, the directories are merged together.
+In case two files with the same path conflict, precedence is given to the file
+in the root directory specified first.
 .Pp
 Hardlinks are detected and preserved to avoid data duplication.
-Inode times are truncated to second precision due to format limitations.  Inodes
-are stored with uid 0 and gid 0 of the root user.  The format is not compressed
-but can be compressed externally if it is decompressed during bootloading.
+Inode times are truncated to second precision due to format limitations.
+Inodes are stored with uid 0 and gid 0 of the root user.
+The format is not compressed but can be compressed externally if it is
+decompressed during bootloading.
 .Pp
 .Xr initrdfs 8
 can be used to view the files produced by
@@ -48,8 +50,8 @@ rules in the
 in the format specified under
 .Sx FILTER RULES .
 .It Fl \-format Ns "=" Ns Ar format
-Produce the archive in the specified format.  This is for forward compatibility
-and only
+Produce the archive in the specified format.
+This is for forward compatibility and only
 .Sy sortix-initrd-2
 is supported.
 .Sy default
@@ -70,12 +72,13 @@ at the specified
 .Ar destination .
 .El
 .Sh FILTER RULES
-The rule format is line based and leading whitespace is skipped.  Lines starting
-with a
+The rule format is line based and leading whitespace is skipped.
+Lines starting with a
 .Li #
-character are ignored as comments.  The first word on a line must be one of
-the following commands and the rest of the line is its parameter.  Trailing
-whitespace is not ignored.
+character are ignored as comments.
+The first word on a line must be one of the following commands and the rest of
+the line is its parameter.
+Trailing whitespace is not ignored.
 .Bl -tag -width "12345678"
 .It Sy default Ar boolean
 The
@@ -85,8 +88,9 @@ parameter is either
 or
 .Sy false
 and determines whether a file or directory is included if no other rules match
-it.  This defaults to
-.Sy true.
+it.
+This defaults to
+.Sy true .
 .It Sy include Ar path
 Include the file or directory if it matches
 .Ar path .
@@ -96,9 +100,10 @@ Exclude the file or directory if it matches
 .El
 .Pp
 The rules are checked on the paths relative to the root directories during the
-recursive descent.  The last rule to match a path decides whether it is
-included or not.  Directory are not descended into if they are excluded.  The
-pattern patch is simple and matches paths exactly.
+recursive descent.
+The last rule to match a path decides whether it is included or not.
+Directory are not descended into if they are excluded.
+The pattern patch is simple and matches paths exactly.
 .Sh EXIT STATUS
 .Nm
 will exit 0 on success and non-zero otherwise.

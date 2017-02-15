@@ -18,10 +18,11 @@ You will be presented a with standard Unix command line environment upon login o
 booting the live environment.
 .Ss Shutdown
 .Xr init 8
-spawns a session after boot.  This is
+spawns a session after boot.
+This is
 .Xr login 8
-if the system is booted in multi-user mode.  This is a root shell if booted in
-single-user mode.
+if the system is booted in multi-user mode.
+This is a root shell if booted in single-user mode.
 .Pp
 To power off from the login screen, login as user
 .Sy poweroff .
@@ -30,7 +31,8 @@ To reboot, login as user
 .Pp
 To power off from a single-user boot root shell, run
 .Sy exit 0
-in the shell. To reboot, run
+in the shell.
+To reboot, run
 .Sy exit 1
 in the shell.
 .Ss Keyboard Layout
@@ -64,9 +66,11 @@ to change the video mode after boot.
 .Ss Manual
 The system manual can be viewed with the
 .Xr man 1
-program.  Sortix is currently in the process of being documented and many manual
-pages are missing.  The current priority is to document areas specific to Sortix
-and assume standard knowledge from other operating system.
+program.
+Sortix is currently in the process of being documented and many manual pages are
+missing.
+The current priority is to document areas specific to Sortix and assume standard
+knowledge from other operating systems.
 .Ss Editor
 .Xr editor 1
 is the standard text file editor.
@@ -82,7 +86,8 @@ The
 .Xr memstat 1
 command shows the current memory usage.
 .Ss Third Party Software
-Releases come with useful third party software installed. The
+Releases come with useful third party software installed.
+The
 .Pa /tix/installed.list
 file lists all currently installed ports.
 .Ss Source Code
@@ -90,8 +95,8 @@ Releases come full with the system source code in
 .Pa /src
 as a
 .Xr git 1
-repository along with the tools to build it and develop it.  The build
-process is covered in
+repository along with the tools to build it and develop it.
+The build process is covered in
 .Xr development 7 .
 .Ss Mounting
 You can mount ext2 partitions using
@@ -111,13 +116,14 @@ driver only supports the
 .Sy large_file
 and
 .Sy filetype
-ext2 extensions.  You can make a compatible filesystem with:
+ext2 extensions.
+You can make a compatible filesystem with:
 .Pp
 .Dl $ mkfs.ext2 -O none,large_file,filetype
 .Ss Networking
-Sortix does not have networking at this time.  Unix sockets have a basic
-implementation incapable of advanced features.  The standard library and
-kernel provides stubs for many network interfaces.
+Sortix does not have networking at this time.
+Unix sockets have a basic implementation incapable of advanced features.
+The standard library and kernel provides stubs for many network interfaces.
 .Ss Serial Transfer
 It is possible to transfer files over serial devices as described in
 .Xr serial-transfer 7 .
