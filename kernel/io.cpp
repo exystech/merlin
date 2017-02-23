@@ -928,20 +928,22 @@ ssize_t sys_tcsetblob(int fd, const char* name, const void* buffer, size_t count
 	return result;
 }
 
-int sys_getpeername(int fd, struct sockaddr* addr, socklen_t* addrsize)
+int sys_getpeername(int fd, void* addr, size_t* addrsize)
 {
-	(void) fd;
-	(void) addr;
-	(void) addrsize;
-	return errno = ENOSYS, -1;
+	Ref<Descriptor> desc = CurrentProcess()->GetDescriptor(fd);
+	if ( !desc )
+		return -1;
+	ioctx_t ctx; SetupUserIOCtx(&ctx);
+	return desc->getpeername(&ctx, (uint8_t*) addr, addrsize);
 }
 
-int sys_getsockname(int fd, struct sockaddr* addr, socklen_t* addrsize)
+int sys_getsockname(int fd, void* addr, size_t* addrsize)
 {
-	(void) fd;
-	(void) addr;
-	(void) addrsize;
-	return errno = ENOSYS, -1;
+	Ref<Descriptor> desc = CurrentProcess()->GetDescriptor(fd);
+	if ( !desc )
+		return -1;
+	ioctx_t ctx; SetupUserIOCtx(&ctx);
+	return desc->getsockname(&ctx, (uint8_t*) addr, addrsize);
 }
 
 int sys_shutdown(int fd, int how)

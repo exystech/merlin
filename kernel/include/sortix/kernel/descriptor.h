@@ -121,6 +121,8 @@ public:
 	int tcsendbreak(ioctx_t* ctx, int duration);
 	int tcsetattr(ioctx_t* ctx, int actions, const struct termios* tio);
 	int shutdown(ioctx_t* ctx, int how);
+	int getpeername(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
+	int getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
 
 private:
 	Ref<Descriptor> open_elem(ioctx_t* ctx, const char* filename, int flags,

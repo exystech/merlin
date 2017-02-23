@@ -626,4 +626,16 @@ int AbstractInode::shutdown(ioctx_t* /*ctx*/, int /*how*/)
 	return errno = ENOTSOCK, -1;
 }
 
+int AbstractInode::getpeername(ioctx_t* /*ctx*/, uint8_t* /*addr*/,
+                               size_t* /*addrsize*/)
+{
+	return errno = ENOTSOCK, -1;
+}
+
+int AbstractInode::getsockname(ioctx_t* /*ctx*/, uint8_t* /*addr*/,
+                               size_t* /*addrsize*/)
+{
+	return errno = ENOTSOCK, -1;
+}
+
 } // namespace Sortix

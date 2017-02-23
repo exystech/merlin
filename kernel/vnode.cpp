@@ -498,4 +498,14 @@ int Vnode::shutdown(ioctx_t* ctx, int how)
 	return inode->shutdown(ctx, how);
 }
 
+int Vnode::getpeername(ioctx_t* ctx, uint8_t* addr, size_t* addrsize)
+{
+	return inode->getpeername(ctx, addr, addrsize);
+}
+
+int Vnode::getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize)
+{
+	return inode->getsockname(ctx, addr, addrsize);
+}
+
 } // namespace Sortix

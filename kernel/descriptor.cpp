@@ -1057,4 +1057,14 @@ int Descriptor::shutdown(ioctx_t* ctx, int how)
 	return vnode->shutdown(ctx, how);
 }
 
+int Descriptor::getpeername(ioctx_t* ctx, uint8_t* addr, size_t* addrsize)
+{
+	return vnode->getpeername(ctx, addr, addrsize);
+}
+
+int Descriptor::getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize)
+{
+	return vnode->getsockname(ctx, addr, addrsize);
+}
+
 } // namespace Sortix

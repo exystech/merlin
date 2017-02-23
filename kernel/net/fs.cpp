@@ -103,6 +103,8 @@ public:
 	virtual int setsockopt(ioctx_t* ctx, int level, int option_name,
 	                       const void* option_value, size_t option_size);
 	virtual int shutdown(ioctx_t* ctx, int how);
+	virtual int getpeername(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
+	virtual int getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
 
 private:
 	int do_bind(ioctx_t* ctx, const uint8_t* addr, size_t addrsize);
@@ -118,6 +120,7 @@ public: /* For use by Manager. */
 	StreamSocket* last_pending;
 	struct sockaddr_un* bound_address;
 	size_t bound_address_size;
+	int shutdown_flags;
 	bool is_listening;
 	bool is_connected;
 	bool is_refused;
@@ -170,6 +173,7 @@ StreamSocket::StreamSocket(uid_t owner, gid_t group, mode_t mode,
 	this->last_pending = NULL;
 	this->bound_address = NULL;
 	this->bound_address_size = 0;
+	this->shutdown_flags = 0;
 	this->is_listening = false;
 	this->is_connected = false;
 	this->is_refused = false;
@@ -386,6 +390,41 @@ int StreamSocket::shutdown(ioctx_t* /*ctx*/, int how)
 		incoming.Disconnect();
 	if ( how & SHUT_WR )
 		outgoing.Disconnect();
+	shutdown_flags |= how;
+	return 0;
+}
+
+int StreamSocket::getpeername(ioctx_t* ctx, uint8_t* addr, size_t* addrsize)
+{
+	ScopedLock lock(&socket_lock);
+	if ( !is_connected )
+		return errno = ENOTCONN, -1;
+	if ( shutdown_flags & SHUT_WR )
+		return errno = EINVAL, -1;
+	size_t used_addrsize;
+	if ( !ctx->copy_from_src(&used_addrsize, addrsize, sizeof(used_addrsize)) )
+		return -1;
+	if ( bound_address_size < used_addrsize )
+		used_addrsize = bound_address_size;
+	if ( !ctx->copy_to_dest(addr, bound_address, bound_address_size) )
+		return -1;
+	if ( !ctx->copy_to_dest(addrsize, &used_addrsize, sizeof(used_addrsize)) )
+		return -1;
+	return 0;
+}
+
+int StreamSocket::getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize)
+{
+	ScopedLock lock(&socket_lock);
+	size_t used_addrsize;
+	if ( !ctx->copy_from_src(&used_addrsize, addrsize, sizeof(used_addrsize)) )
+		return -1;
+	if ( bound_address_size < used_addrsize )
+		used_addrsize = bound_address_size;
+	if ( !ctx->copy_to_dest(addr, bound_address, bound_address_size) )
+		return -1;
+	if ( !ctx->copy_to_dest(addrsize, &used_addrsize, sizeof(used_addrsize)) )
+		return -1;
 	return 0;
 }
 
@@ -495,6 +534,13 @@ Ref<StreamSocket> Manager::Accept(StreamSocket* socket, ioctx_t* ctx,
 	Ref<StreamSocket> server(new StreamSocket(0, 0, 0666, Ref<Manager>(this)));
 	if ( !server )
 		return Ref<StreamSocket>(NULL);
+
+	server->bound_address = (struct sockaddr_un*) malloc(bound_address_size);
+	if ( !server->bound_address )
+		return Ref<StreamSocket>(NULL);
+
+	server->bound_address_size = bound_address_size;
+	memcpy(server->bound_address, bound_address, bound_address_size);
 
 	StreamSocket* client = socket->first_pending;
 	QueuePop(&socket->first_pending, &socket->last_pending);
