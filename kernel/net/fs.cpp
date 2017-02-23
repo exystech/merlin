@@ -386,6 +386,7 @@ int StreamSocket::setsockopt(ioctx_t* ctx, int level, int option_name,
 
 int StreamSocket::shutdown(ioctx_t* /*ctx*/, int how)
 {
+	ScopedLock lock(&socket_lock);
 	if ( how & SHUT_RD )
 		incoming.Disconnect();
 	if ( how & SHUT_WR )
