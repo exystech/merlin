@@ -391,12 +391,14 @@ int Vnode::poll(ioctx_t* ctx, PollNode* node)
 	return inode->poll(ctx, node);
 }
 
-Ref<Vnode> Vnode::accept(ioctx_t* ctx, uint8_t* addr, size_t* addrlen, int flags)
+Ref<Vnode> Vnode::accept4(ioctx_t* ctx, uint8_t* addr, size_t* addrlen,
+                          int flags)
 {
-	Ref<Inode> retinode = inode->accept(ctx, addr, addrlen, flags);
+	Ref<Inode> retinode = inode->accept4(ctx, addr, addrlen, flags);
 	if ( !retinode )
 		return Ref<Vnode>();
-	return Ref<Vnode>(new Vnode(retinode, Ref<Vnode>(), retinode->ino, retinode->dev));
+	return Ref<Vnode>(new Vnode(retinode, Ref<Vnode>(), retinode->ino,
+	                            retinode->dev));
 }
 
 int Vnode::bind(ioctx_t* ctx, const uint8_t* addr, size_t addrlen)

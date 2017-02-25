@@ -160,7 +160,7 @@ public:
 	void Disconnect();
 	void Unmount();
 	Channel* Connect(ioctx_t* ctx);
-	Channel* Accept();
+	Channel* Accept(ioctx_t* ctx);
 	Ref<Inode> BootstrapNode(ino_t ino, mode_t type);
 	Ref<Inode> OpenNode(ino_t ino, mode_t type);
 
@@ -181,8 +181,8 @@ class ServerNode : public AbstractInode
 public:
 	ServerNode(Ref<Server> server);
 	virtual ~ServerNode();
-	virtual Ref<Inode> accept(ioctx_t* ctx, uint8_t* addr, size_t* addrlen,
-	                          int flags);
+	virtual Ref<Inode> accept4(ioctx_t* ctx, uint8_t* addr, size_t* addrlen,
+	                           int flags);
 
 private:
 	Ref<Server> server;
@@ -242,8 +242,8 @@ public:
 	virtual int poll(ioctx_t* ctx, PollNode* node);
 	virtual int rename_here(ioctx_t* ctx, Ref<Inode> from, const char* oldname,
 	                        const char* newname);
-	virtual Ref<Inode> accept(ioctx_t* ctx, uint8_t* addr, size_t* addrlen,
-	                          int flags);
+	virtual Ref<Inode> accept4(ioctx_t* ctx, uint8_t* addr, size_t* addrlen,
+	                           int flags);
 	virtual int bind(ioctx_t* ctx, const uint8_t* addr, size_t addrlen);
 	virtual int connect(ioctx_t* ctx, const uint8_t* addr, size_t addrlen);
 	virtual int listen(ioctx_t* ctx, int backlog);
@@ -594,13 +594,17 @@ Channel* Server::Connect(ioctx_t* ctx)
 	return channel;
 }
 
-Channel* Server::Accept()
+Channel* Server::Accept(ioctx_t* ctx)
 {
 	ScopedLock lock(&connect_lock);
 	listener_system_tid = CurrentThread()->system_tid;
 	while ( !connecting && !unmounted )
+	{
+		if ( ctx->dflags & O_NONBLOCK )
+			return errno = EWOULDBLOCK, (Channel*) NULL;
 		if ( !kthread_cond_wait_signal(&connecting_cond, &connect_lock) )
 			return errno = EINTR, (Channel*) NULL;
+	}
 	if ( unmounted )
 		return errno = ECONNRESET, (Channel*) NULL;
 	Channel* result = connecting;
@@ -638,18 +642,19 @@ ServerNode::~ServerNode()
 	server->Disconnect();
 }
 
-Ref<Inode> ServerNode::accept(ioctx_t* ctx, uint8_t* addr, size_t* addrlen,
-                              int flags)
+Ref<Inode> ServerNode::accept4(ioctx_t* ctx, uint8_t* addr, size_t* addrlen,
+                               int flags)
 {
 	(void) addr;
-	(void) flags;
+	if ( flags & ~(0) )
+		return errno = EINVAL, Ref<Inode>(NULL);
 	size_t out_addrlen = 0;
 	if ( addrlen && !ctx->copy_to_dest(addrlen, &out_addrlen, sizeof(out_addrlen)) )
 		return Ref<Inode>(NULL);
 	Ref<ChannelNode> node(new ChannelNode);
 	if ( !node )
 		return Ref<Inode>(NULL);
-	Channel* channel = server->Accept();
+	Channel* channel = server->Accept(ctx);
 	if ( !channel )
 		return Ref<Inode>(NULL);
 	node->Construct(channel);
@@ -1462,8 +1467,8 @@ int Unode::rename_here(ioctx_t* ctx, Ref<Inode> from, const char* oldname,
 	return ret;
 }
 
-Ref<Inode> Unode::accept(ioctx_t* /*ctx*/, uint8_t* /*addr*/,
-                         size_t* /*addrlen*/, int /*flags*/)
+Ref<Inode> Unode::accept4(ioctx_t* /*ctx*/, uint8_t* /*addr*/,
+                          size_t* /*addrlen*/, int /*flags*/)
 {
 	return errno = ENOTSOCK, Ref<Inode>();
 }

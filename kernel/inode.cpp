@@ -512,8 +512,8 @@ int AbstractInode::rename_here(ioctx_t* /*ctx*/, Ref<Inode> /*from*/,
 	return errno = ENOTDIR, -1;
 }
 
-Ref<Inode> AbstractInode::accept(ioctx_t* /*ctx*/, uint8_t* /*addr*/,
-                                 size_t* /*addrlen*/, int /*flags*/)
+Ref<Inode> AbstractInode::accept4(ioctx_t* /*ctx*/, uint8_t* /*addr*/,
+                                  size_t* /*addrlen*/, int /*flags*/)
 {
 	return errno = ENOTSOCK, Ref<Inode>();
 }

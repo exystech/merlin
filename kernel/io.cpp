@@ -731,13 +731,15 @@ int sys_accept4(int fd, void* addr, size_t* addrlen, int flags)
 	int fdflags = 0;
 	if ( flags & SOCK_CLOEXEC ) fdflags |= FD_CLOEXEC;
 	if ( flags & SOCK_CLOFORK ) fdflags |= FD_CLOFORK;
-	flags &= ~(SOCK_CLOEXEC | SOCK_CLOFORK);
+	int descflags = 0;
+	if ( flags & SOCK_NONBLOCK ) descflags |= O_NONBLOCK;
+	flags &= ~(SOCK_CLOEXEC | SOCK_CLOFORK | SOCK_NONBLOCK);
 	ioctx_t ctx; SetupUserIOCtx(&ctx);
-	Ref<Descriptor> conn = desc->accept(&ctx, (uint8_t*) addr, addrlen, flags);
+	Ref<Descriptor> conn = desc->accept4(&ctx, (uint8_t*) addr, addrlen, flags);
 	if ( !conn )
 		return -1;
-	if ( flags & SOCK_NONBLOCK )
-		conn->SetFlags(conn->GetFlags() | O_NONBLOCK);
+	if ( descflags )
+		conn->SetFlags(conn->GetFlags() | descflags);
 	return CurrentProcess()->GetDTable()->Allocate(conn, fdflags);
 }
 

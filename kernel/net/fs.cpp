@@ -24,6 +24,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <sortix/fcntl.h>
@@ -82,8 +83,8 @@ class StreamSocket : public AbstractInode
 public:
 	StreamSocket(uid_t owner, gid_t group, mode_t mode, Ref<Manager> manager);
 	virtual ~StreamSocket();
-	virtual Ref<Inode> accept(ioctx_t* ctx, uint8_t* addr, size_t* addrsize,
-	                          int flags);
+	virtual Ref<Inode> accept4(ioctx_t* ctx, uint8_t* addr, size_t* addrsize,
+	                           int flags);
 	virtual int bind(ioctx_t* ctx, const uint8_t* addr, size_t addrsize);
 	virtual int connect(ioctx_t* ctx, const uint8_t* addr, size_t addrsize);
 	virtual int listen(ioctx_t* ctx, int backlog);
@@ -116,6 +117,7 @@ public: /* For use by Manager. */
 	StreamSocket* first_pending;
 	StreamSocket* last_pending;
 	struct sockaddr_un* bound_address;
+	size_t bound_address_size;
 	bool is_listening;
 	bool is_connected;
 	bool is_refused;
@@ -167,6 +169,7 @@ StreamSocket::StreamSocket(uid_t owner, gid_t group, mode_t mode,
 	this->first_pending = NULL;
 	this->last_pending = NULL;
 	this->bound_address = NULL;
+	this->bound_address_size = 0;
 	this->is_listening = false;
 	this->is_connected = false;
 	this->is_refused = false;
@@ -181,11 +184,11 @@ StreamSocket::~StreamSocket()
 {
 	if ( is_listening )
 		manager->Unlisten(this);
-	delete[] bound_address;
+	free(bound_address);
 }
 
-Ref<Inode> StreamSocket::accept(ioctx_t* ctx, uint8_t* addr, size_t* addrsize,
-                                int flags)
+Ref<Inode> StreamSocket::accept4(ioctx_t* ctx, uint8_t* addr, size_t* addrsize,
+                                 int flags)
 {
 	ScopedLock lock(&socket_lock);
 	if ( !is_listening )
@@ -198,33 +201,25 @@ int StreamSocket::do_bind(ioctx_t* ctx, const uint8_t* addr, size_t addrsize)
 	if ( is_connected || is_listening || bound_address )
 		return errno = EINVAL, -1;
 	size_t path_offset = offsetof(struct sockaddr_un, sun_path);
-	size_t path_len = (path_offset - addrsize) / sizeof(char);
 	if ( addrsize < path_offset )
 		return errno = EINVAL, -1;
-	uint8_t* buffer = new uint8_t[addrsize];
-	if ( !buffer )
+	size_t path_len = path_offset - addrsize;
+	struct sockaddr_un* address = (struct sockaddr_un*) malloc(addrsize);
+	if ( !address )
 		return -1;
-	if ( ctx->copy_from_src(buffer, addr, addrsize) )
-	{
-		struct sockaddr_un* address = (struct sockaddr_un*) buffer;
-		if ( address->sun_family == AF_UNIX )
-		{
-			bool found_nul = false;
-			for ( size_t i = 0; !found_nul && i < path_len; i++ )
-				if ( address->sun_path[i] == '\0' )
-					found_nul = true;
-			if ( found_nul )
-			{
-				bound_address = address;
-				return 0;
-			}
-			errno = EINVAL;
-		}
-		else
-			errno = EAFNOSUPPORT;
-	}
-	delete[] buffer;
-	return -1;
+	if ( !ctx->copy_from_src(address, addr, addrsize) )
+		return free(address), -1;
+	if ( address->sun_family != AF_UNIX )
+		return free(address), errno = EAFNOSUPPORT, -1;
+	bool found_nul = false;
+	for ( size_t i = 0; !found_nul && i < path_len; i++ )
+		if ( address->sun_path[i] == '\0' )
+			found_nul = true;
+	if ( !found_nul )
+		return free(address), errno = EINVAL, -1;
+	bound_address = address;
+	bound_address_size = addrsize;
+	return 0;
 }
 
 int StreamSocket::bind(ioctx_t* ctx, const uint8_t* addr, size_t addrsize)
@@ -465,40 +460,43 @@ int Manager::AcceptPoll(StreamSocket* socket, ioctx_t* /*ctx*/, PollNode* node)
 }
 
 Ref<StreamSocket> Manager::Accept(StreamSocket* socket, ioctx_t* ctx,
-	                              uint8_t* addr, size_t* addrsize, int /*flags*/)
+	                              uint8_t* addr, size_t* addrsize, int flags)
 {
+	if ( flags & ~(0) )
+		return errno = EINVAL, Ref<StreamSocket>(NULL);
+
 	ScopedLock lock(&manager_lock);
 
-	// TODO: Support non-blocking accept!
 	while ( !socket->first_pending )
+	{
+		if ( (ctx->dflags & O_NONBLOCK) || (flags & SOCK_NONBLOCK) )
+			return errno = EWOULDBLOCK, Ref<StreamSocket>(NULL);
 		if ( !kthread_cond_wait_signal(&socket->pending_cond, &manager_lock) )
 			return errno = EINTR, Ref<StreamSocket>(NULL);
-
-	StreamSocket* client = socket->first_pending;
-
-	struct sockaddr_un* client_addr = client->bound_address;
-	size_t client_addr_size = offsetof(struct sockaddr_un, sun_path) +
-	                          (strlen(client_addr->sun_path)+1) * sizeof(char);
-
-	if ( addr )
-	{
-		size_t caller_addrsize;
-		if ( !ctx->copy_from_src(&caller_addrsize, addrsize, sizeof(caller_addrsize)) )
-			return Ref<StreamSocket>(NULL);
-		if ( caller_addrsize < client_addr_size )
-			return errno = ERANGE, Ref<StreamSocket>(NULL);
-		if ( !ctx->copy_from_src(addrsize, &client_addr_size, sizeof(client_addr_size)) )
-			return Ref<StreamSocket>(NULL);
-		if ( !ctx->copy_to_dest(addr, client_addr, client_addr_size) )
-			return Ref<StreamSocket>(NULL);
 	}
 
-	// TODO: Give the caller the address of the remote!
+	struct sockaddr_un* bound_address = socket->bound_address;
+	size_t bound_address_size = socket->bound_address_size;
+	if ( addr )
+	{
+		size_t used_addrsize;
+		if ( !ctx->copy_from_src(&used_addrsize, addrsize,
+		                         sizeof(used_addrsize)) )
+			return Ref<StreamSocket>(NULL);
+		if ( bound_address_size < used_addrsize )
+			used_addrsize = bound_address_size;
+		if ( !ctx->copy_to_dest(addr, bound_address, bound_address_size) )
+			return Ref<StreamSocket>(NULL);
+		if ( !ctx->copy_to_dest(addrsize, &used_addrsize,
+		                        sizeof(used_addrsize)) )
+			return Ref<StreamSocket>(NULL);
+	}
 
 	Ref<StreamSocket> server(new StreamSocket(0, 0, 0666, Ref<Manager>(this)));
 	if ( !server )
 		return Ref<StreamSocket>(NULL);
 
+	StreamSocket* client = socket->first_pending;
 	QueuePop(&socket->first_pending, &socket->last_pending);
 
 	if ( !client->outgoing.Connect(&server->incoming) )
@@ -512,10 +510,6 @@ Ref<StreamSocket> Manager::Accept(StreamSocket* socket, ioctx_t* ctx,
 
 	client->is_connected = true;
 	server->is_connected = true;
-
-	// TODO: Should the server socket inherit the address of the listening
-	//       socket or perhaps the one of the client's source/destination, or
-	//       nothing at all?
 
 	kthread_cond_signal(&client->accepted_cond);
 

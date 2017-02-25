@@ -850,11 +850,15 @@ int Descriptor::poll(ioctx_t* ctx, PollNode* node)
 	return vnode->poll(ctx, node);
 }
 
-Ref<Descriptor> Descriptor::accept(ioctx_t* ctx, uint8_t* addr, size_t* addrlen, int flags)
+Ref<Descriptor> Descriptor::accept4(ioctx_t* ctx, uint8_t* addr,
+                                    size_t* addrlen, int flags)
 {
-	Ref<Vnode> retvnode = vnode->accept(ctx, addr, addrlen, flags);
+	int old_ctx_dflags = ctx->dflags;
+	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
+	Ref<Vnode> retvnode = vnode->accept4(ctx, addr, addrlen, flags);
 	if ( !retvnode )
 		return Ref<Descriptor>();
+	ctx->dflags = old_ctx_dflags;
 	return Ref<Descriptor>(new Descriptor(retvnode, O_READ | O_WRITE));
 }
 
