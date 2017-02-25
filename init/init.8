@@ -7,6 +7,8 @@
 .Sh SYNOPSIS
 .Nm init
 .Op Fl \-target Ns "=" Ns Ar init-target
+.Op Fl \-
+.Op Ar chain-init ...
 .Sh DESCRIPTION
 .Nm
 is the first program run after system startup and is responsible for
@@ -93,7 +95,8 @@ The
 target mounts the root filesystem as in
 .Pa /etc/fstab
 (see
-.Xr fstab 5) and runs the next
+.Xr fstab 5 )
+and runs the next
 .Nm
 program.
 This is used by
@@ -113,7 +116,9 @@ filesystem directory is bound at
 .Pp
 Finally the
 .Pa /sbin/init
-program of the target root filesystem is run inside a chroot.
+program (or
+.Ar chain-init
+if specified) of the target root filesystem is run inside a chroot.
 .Ss Configuration
 Once the
 .Nm

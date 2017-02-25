@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -108,8 +108,9 @@ static void BootThread(void* user);
 static void InitThread(void* user);
 static void SystemIdleThread(void* user);
 
+static int argc;
+static char** argv;
 static multiboot_info_t* bootinfo;
-static char* init_cmdline;
 
 static char* cmdline_tokenize(char** saved)
 {
@@ -154,6 +155,19 @@ static char* cmdline_tokenize(char** saved)
 		*saved = NULL;
 	data[output] = '\0';
 	return data;
+}
+
+static void compact_arguments(int* argc, char*** argv)
+{
+	for ( int i = 0; i < *argc; i++ )
+	{
+		while ( i < *argc && !(*argv)[i] )
+		{
+			for ( int n = i; n < *argc; n++ )
+				(*argv)[n] = (*argv)[n+1];
+			(*argc)--;
+		}
+	}
 }
 
 extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
@@ -235,59 +249,65 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 		FreeKernelAddress(&alloc);
 	}
 
-	bool no_random_seed = false;
+	int argmax = 1;
+	argv = new char*[argmax + 1];
+	if ( !argv )
+		Panic("Failed to allocate kernel command line");
+
 	char* arg_saved = cmdline;
 	char* arg;
-	struct kernel_option
-	{
-		const char* name;
-		bool has_parameter;
-	} options[] =
-	{
-		{ "--init", true },
-		{ "--no-random-seed", false },
-	};
-	size_t options_count = sizeof(options) / sizeof(options[0]);
 	while ( (arg = cmdline_tokenize(&arg_saved)) )
 	{
-		struct kernel_option* option = NULL;
-		char* parameter = NULL;
-		for ( size_t i = 0; i < options_count; i++ )
+		if ( argc == argmax )
 		{
-			struct kernel_option* candidate = &options[i];
-			if ( candidate->has_parameter )
-			{
-				size_t name_length = strlen(candidate->name);
-				if ( strncmp(arg, candidate->name, name_length) != 0 )
-					continue;
-				if ( arg[name_length] == '=' )
-					parameter = arg + name_length + 1;
-				else if ( !arg[name_length] )
-				{
-					if ( !(parameter = cmdline_tokenize(&arg_saved)) )
-					{
-						Log::PrintF("\r\e[J");
-						Log::PrintF("kernel: fatal: option '%s' requires an argument\n", arg);
-						HaltKernel();
-					}
-				}
-				else
-					continue;
-			}
-			else if ( strcmp(arg, candidate->name) != 0 )
-				continue;
-			option = candidate;
+			argmax = argmax ? 2 * argmax : 8;
+			char** new_argv = new char*[argmax + 1];
+			if ( !new_argv )
+				Panic("Failed to allocate kernel command line");
+			for ( int i = 0; i < argc; i++ )
+				new_argv[i] = argv[i];
+			argv = new_argv;
 		}
-		if ( !option )
+		argv[argc++] = arg;
+	}
+	argv[argc] = NULL;
+
+	bool no_random_seed = false;
+	for ( int i = 0; i < argc; i++ )
+	{
+		const char* arg = argv[i];
+		if ( arg[0] != '-' || !arg[1] )
+			continue;
+		argv[i] = NULL;
+		if ( !strcmp(arg, "--") )
+			break;
+		if ( arg[1] != '-' )
+		{
+			char c;
+			while ( (c = *++arg) ) switch ( c )
+			{
+			default:
+				Log::PrintF("\r\e[J");
+				Log::PrintF("kernel: fatal: unknown option -- '%c'\n", c);
+				HaltKernel();
+			}
+		}
+		else if ( !strcmp(arg, "--no-random-seed") )
+			no_random_seed = true;
+		else
 		{
 			Log::PrintF("\r\e[J");
 			Log::PrintF("kernel: fatal: unrecognized option '%s'\n", arg);
 			HaltKernel();
 		}
-		if ( !strcmp(option->name, "--init") )
-			init_cmdline = parameter;
-		else if ( !strcmp(option->name, "--no-random-seed") )
-			no_random_seed = true;
+	}
+
+	compact_arguments(&argc, &argv);
+
+	if ( argc == 0 )
+	{
+		argv[argc++] = (char*) "/sbin/init";
+		argv[argc] = NULL;
 	}
 
 	// Initialize the interrupt handler table and enable interrupts.
@@ -684,33 +704,6 @@ static void InitThread(void* /*user*/)
 
 	dtable.Reset();
 
-	static char default_init_cmdline[] = "/sbin/init";
-	if ( !init_cmdline )
-		init_cmdline = default_init_cmdline;
-
-	char* init_cmdline_dup = strdup(init_cmdline);
-	if ( !init_cmdline_dup )
-		PanicF("strdup: %m");
-	size_t init_cmdline_tokens = 0;
-	char* saved = init_cmdline_dup;
-	char* arg;
-	while ( (arg = cmdline_tokenize(&saved)) )
-		init_cmdline_tokens++;
-	free(init_cmdline_dup);
-
-	if ( INT_MAX - 1 < init_cmdline_tokens )
-		Panic("Too many tokens in init command line");
-
-	int argc = init_cmdline_tokens;
-	char** argv = new char*[argc + 1];
-	if ( !argv )
-		PanicF("operator new: %m");
-	saved = init_cmdline;
-	for ( int i = 0; i <= argc; i++ )
-		argv[i] = cmdline_tokenize(&saved);
-
-	if ( argc == 0 )
-		Panic("No init specified");
 	const char* initpath = argv[0];
 	Ref<Descriptor> init = root->open(&ctx, initpath, O_EXEC | O_READ);
 	if ( !init )

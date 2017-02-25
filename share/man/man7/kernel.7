@@ -6,7 +6,9 @@
 .Nd operating system kernel
 .Sh SYNOPSIS
 .Pa /boot/sortix.bin
-.Op Fl \-init Ns "=" Ns Ar init-command-line
+.Op Fl \-no-random-seed
+.Op Fl \-
+.Op Ar init ...
 .Sh DESCRIPTION
 .Pa /boot/sortix.bin
 is the operating system
@@ -19,22 +21,28 @@ compatible executable loaded by the bootloader along with a companion
 .Xr initrd 7
 that contains a userland.
 .Pp
-The kernel extracts the initrd into the initial kernel memory root filesystem
-and executes
+The kernel extracts the initrd into the initial kernel memory root filesystem.
+The specified
+.Ar init
+program is invoked with the given arguments, defaulting to the
 .Xr init 8
-as
-.Pa /sbin/init .
-The computer is powered off if this process exits 0, rebooted if it exits 1,
+at
+.Pa /sbin/init
+if
+.Ar init
+is not specified.
+If the
+.Nm init
+is to receive any argument starting with a dash, first pass the
+.Fl \-
+delimiter to stop kernel option parsing.
+The computer is powered off if the
+.Nm init
+process exits 0, rebooted if it exits 1,
 halted if it exits 2, and paniced otherwise.
 .Pp
 The options are as follows:
 .Bl -tag -width "12345678"
-.It Fl \-init Ns "=" Ns Ar init-command-line
-The
-.Ar init-command-line
-argument is split into tokens and used as the command line to invoke the
-specified
-.Xr init 8 .
 .It Fl \-no-random-seed
 Don't warn if no random seed file was loaded by the bootloader (usually from
 .Pa /boot/random.seed ) .

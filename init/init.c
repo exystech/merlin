@@ -813,8 +813,10 @@ static void niht(void)
 	}
 }
 
-static int init(const char* target)
+static int init(int argc, char** argv, const char* target)
 {
+	if ( 1 < argc )
+		fatal("unexpected extra operand: %s", argv[1]);
 	init_early();
 	set_hostname();
 	set_kblayout();
@@ -938,8 +940,10 @@ static int init(const char* target)
 	return result;
 }
 
-static int init_chain(const char* target)
+static int init_chain(int argc, char** argv, const char* target)
 {
+	int next_argc = argc - 1;
+	char** next_argv = argv + 1;
 	init_early();
 	prepare_block_devices();
 	load_fstab();
@@ -986,17 +990,27 @@ static int init_chain(const char* target)
 			if ( chdir("/") < 0 )
 				fatal("chdir: %s: %m", chain_location);
 			unsetenv("INIT_PID");
+			const char* program = next_argv[0];
 			if ( !strcmp(target, "chain-merge") )
 			{
-				const char* argv[] = { "init", "--target=merge", NULL };
-				execv("/sysmerge/sbin/init", (char* const*) argv);
-				fatal("Failed to load automatic update chain init: %s: %m", argv[0]);
+				if ( next_argc < 1 )
+				{
+					program = "/sysmerge/sbin/init";
+					next_argv = (char*[]) { "init", "--target=merge", NULL };
+				}
+				execvp(program, (char* const*) next_argv);
+				fatal("Failed to load automatic update chain init: %s: %m",
+				      next_argv[0]);
 			}
 			else
 			{
-				const char* argv[] = { "init", NULL };
-				execv("/sbin/init", (char* const*) argv);
-				fatal("Failed to load chain init: %s: %m", argv[0]);
+				if ( next_argc < 1 )
+				{
+					program = "/sbin/init";
+					next_argv = (char*[]) { "init", NULL };
+				}
+				execvp(program, (char* const*) next_argv);
+				fatal("Failed to load chain init: %s: %m", next_argv[0]);
 			}
 		}
 		int status;
@@ -1102,11 +1116,11 @@ int main(int argc, char* argv[])
 	     !strcmp(target, "sysinstall") ||
 	     !strcmp(target, "sysupgrade") ||
 	     !strcmp(target, "merge") )
-		return init(target);
+		return init(argc, argv, target);
 
 	if ( !strcmp(target, "chain") ||
 	     !strcmp(target, "chain-merge") )
-		return init_chain(target);
+		return init_chain(argc, argv, target);
 
 	fatal("Unknown initialization target `%s'", target);
 }

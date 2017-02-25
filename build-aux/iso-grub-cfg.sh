@@ -218,9 +218,9 @@ menuentry() {
   printf "}\n"
 }
 
-menuentry "live environment" ''
-menuentry "new installation" '--init="/sbin/init --target=sysinstall"'
-menuentry "upgrade existing installation" '--init="/sbin/init --target=sysupgrade"'
+menuentry "live environment" '-- /sbin/init'
+menuentry "new installation" '-- /sbin/init --target=sysinstall'
+menuentry "upgrade existing installation" '-- /sbin/init --target=sysupgrade'
 
 echo
 cat << EOF
