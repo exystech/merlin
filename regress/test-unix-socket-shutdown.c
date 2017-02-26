@@ -50,10 +50,9 @@ static void test(bool test_read,
 		char c;
 		if ( test_read )
 		{
-			ssize_t amount = read(fds[0], &c, 1);
-			if ( amount < 0 )
-				test_error(errno, "read");
-			test_assert(amount == 0);
+			ssize_t amount;
+			test_assert(0 <= (amount = read(fds[0], &c, 1)));
+			test_assertx(amount == 0);
 			_exit(0);
 		}
 		else
@@ -64,8 +63,8 @@ static void test(bool test_read,
 				ssize_t amount = write(fds[0], &c, 1);
 				if ( !sigpipe && amount == -1 && errno == EPIPE )
 					_exit(0);
-				if ( amount != 1 )
-					test_error(errno, "write");
+				test_assert(0 <= amount);
+				test_assertx(amount == 1);
 			}
 		}
 	}
@@ -82,9 +81,9 @@ static void test(bool test_read,
 	int status;
 	test_assert(waitpid(child_pid, &status, 0) == child_pid);
 	if ( test_read || !sigpipe )
-		test_assert(WIFEXITED(status) && WEXITSTATUS(status) == 0);
+		test_assertx(WIFEXITED(status) && WEXITSTATUS(status) == 0);
 	else
-		test_assert(WIFSIGNALED(status) && WTERMSIG(status) == SIGPIPE);
+		test_assertx(WIFSIGNALED(status) && WTERMSIG(status) == SIGPIPE);
 	if ( parent_shutdown || child_shutdown )
 		close(fds[1]);
 }

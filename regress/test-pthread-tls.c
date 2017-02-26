@@ -27,7 +27,7 @@ void* thread_routine(void* ctx)
 {
 	(void) ctx;
 
-	test_assert(tls_variable == 42);
+	test_assertx(tls_variable == 42);
 
 	tls_variable = 9001;
 
@@ -36,20 +36,16 @@ void* thread_routine(void* ctx)
 
 int main(void)
 {
-	int errnum;
-
-	test_assert(tls_variable == 42);
+	test_assertx(tls_variable == 42);
 
 	tls_variable = 1337;
 
 	pthread_t thread;
-	if ( (errnum = pthread_create(&thread, NULL, &thread_routine, NULL)) )
-		test_error(errnum, "pthread_create");
+	test_assertp(pthread_create(&thread, NULL, &thread_routine, NULL));
 
-	if ( (errnum = pthread_join(thread, NULL)) )
-		test_error(errnum, "pthread_join");
+	test_assertp(pthread_join(thread, NULL));
 
-	test_assert(tls_variable == 1337);
+	test_assertx(tls_variable == 1337);
 
 	return 0;
 }

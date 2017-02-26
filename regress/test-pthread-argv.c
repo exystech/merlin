@@ -32,10 +32,7 @@ void* thread_routine(void* ctx)
 {
 	(void) ctx;
 
-	int errnum;
-
-	if ( (errnum = pthread_join(main_thread, NULL)) )
-		test_error(errnum, "pthread_join");
+	test_assertp(pthread_join(main_thread, NULL));
 
 	size_t recount = 0;
 	for ( int i = 0; global_argv[i]; i++ )
@@ -43,7 +40,7 @@ void* thread_routine(void* ctx)
 	for ( int i = 0; global_envp[i]; i++ )
 		recount += strlen(global_envp[i]);
 
-	test_assert(answer == recount);
+	test_assertx(answer == recount);
 
 	exit(0);
 }
@@ -51,8 +48,6 @@ void* thread_routine(void* ctx)
 int main(int argc, char* argv[], char* envp[])
 {
 	(void) argc;
-
-	int errnum;
 
 	for ( int i = 0; argv[i]; i++ )
 		answer += strlen(argv[i]);
@@ -65,8 +60,7 @@ int main(int argc, char* argv[], char* envp[])
 	main_thread = pthread_self();
 
 	pthread_t thread;
-	if ( (errnum = pthread_create(&thread, NULL, &thread_routine, NULL)) )
-		test_error(errnum, "pthread_create");
+	test_assertp(pthread_create(&thread, NULL, &thread_routine, NULL));
 
 	pthread_exit(NULL);
 }

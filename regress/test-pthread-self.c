@@ -27,7 +27,7 @@ void* thread_routine(void* main_thread_ptr)
 {
 	pthread_t main_thread = *(pthread_t*) main_thread_ptr;
 
-	test_assert(!pthread_equal(main_thread, pthread_self()));
+	test_assertx(!pthread_equal(main_thread, pthread_self()));
 
 	child_thread_self = pthread_self();
 
@@ -36,20 +36,16 @@ void* thread_routine(void* main_thread_ptr)
 
 int main(void)
 {
-	int errnum;
-
 	pthread_t main_thread = pthread_self();
 
 	pthread_t thread;
-	if ( (errnum = pthread_create(&thread, NULL, &thread_routine, &main_thread)) )
-		test_error(errnum, "pthread_create");
+	test_assertp(pthread_create(&thread, NULL, &thread_routine, &main_thread));
 
-	if ( (errnum = pthread_join(thread, NULL)) )
-		test_error(errnum, "pthread_join");
+	test_assertp(pthread_join(thread, NULL));
 
-	test_assert(!pthread_equal(thread, pthread_self()));
-	test_assert(pthread_equal(thread, child_thread_self));
-	test_assert(!pthread_equal(pthread_self(), child_thread_self));
+	test_assertx(!pthread_equal(thread, pthread_self()));
+	test_assertx(pthread_equal(thread, child_thread_self));
+	test_assertx(!pthread_equal(pthread_self(), child_thread_self));
 
 	return 0;
 }

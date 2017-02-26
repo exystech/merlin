@@ -32,10 +32,8 @@ void* thread_routine(void* ctx)
 
 int main(void)
 {
-	int errnum;
 	pthread_t thread;
-	if ( (errnum = pthread_create(&thread, NULL, &thread_routine, NULL)) )
-		test_error(errnum, "pthread_create");
+	test_assertp(pthread_create(&thread, NULL, &thread_routine, NULL));
 	sched_yield();
 	exit(0);
 }

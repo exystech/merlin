@@ -33,24 +33,23 @@ int main(void)
 	unsigned char* buffer = (unsigned char*) string;
 	size_t buffer_size = string_length;
 
-	if ( !(fp = fmemopen(buffer, buffer_size, "r")) )
-		test_error(errno, "fmemopen");
+	test_assert((fp = fmemopen(buffer, buffer_size, "r")));
 
 	for ( size_t i = 0; i < buffer_size; i++ )
 	{
 		c = fgetc(fp);
-		test_assert(!(c == EOF && feof(fp)));
+		test_assertx(!(c == EOF && feof(fp)));
 		test_assert(!(c == EOF && ferror(fp)));
-		test_assert(c != EOF);
-		test_assert((unsigned char) c == buffer[i]);
-		test_assert(!feof(fp));
+		test_assertx(c != EOF);
+		test_assertx((unsigned char) c == buffer[i]);
+		test_assertx(!feof(fp));
 		test_assert(!ferror(fp));
 	}
 
 	c = fgetc(fp);
-	test_assert(c == EOF);
+	test_assertx(c == EOF);
 	test_assert(!ferror(fp));
-	test_assert(feof(fp));
+	test_assertx(feof(fp));
 
 	fclose(fp);
 

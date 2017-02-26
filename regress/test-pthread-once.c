@@ -40,18 +40,14 @@ void* thread_routine(void* ctx)
 
 int main(void)
 {
-	int errnum;
-
 	pthread_once(&init_counter_once, init_counter_increase);
 
 	pthread_t thread;
-	if ( (errnum = pthread_create(&thread, NULL, &thread_routine, NULL)) )
-		test_error(errnum, "pthread_create");
+	test_assertp(pthread_create(&thread, NULL, &thread_routine, NULL));
 
-	if ( (errnum = pthread_join(thread, NULL)) )
-		test_error(errnum, "pthread_join");
+	test_assertp(pthread_join(thread, NULL));
 
-	test_assert(init_counter == 1);
+	test_assertx(init_counter == 1);
 
 	return 0;
 }

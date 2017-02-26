@@ -25,28 +25,23 @@ pthread_t main_thread;
 
 void* thread_routine(void* expected_result)
 {
-	int errnum;
-
 	void* main_thread_result;
-	if ( (errnum = pthread_join(main_thread, &main_thread_result)) )
-		test_error(errnum, "pthread_join");
+	test_assertp(pthread_join(main_thread, &main_thread_result));
 
-	test_assert(expected_result == &main_thread);
+	test_assertx(expected_result == &main_thread);
 
 	exit(0);
 }
 
 int main(void)
 {
-	int errnum;
-
 	main_thread = pthread_self();
 
 	void* expected_result = &main_thread;
 
 	pthread_t thread;
-	if ( (errnum = pthread_create(&thread, NULL, &thread_routine, expected_result)) )
-		test_error(errnum, "pthread_create");
+	test_assertp(pthread_create(&thread, NULL, &thread_routine,
+	                            expected_result));
 
 	pthread_exit(expected_result);
 }

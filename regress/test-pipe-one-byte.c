@@ -30,8 +30,8 @@ int main(void)
 {
 	int fds[2];
 	pipe(fds);
-	pid_t pid = fork();
-	test_assert(0 <= pid);
+	pid_t pid;
+	test_assert(0 <= (pid = fork()));
 	if ( pid == 0 )
 	{
 		close(fds[0]);
@@ -43,7 +43,7 @@ int main(void)
 	close(fds[1]);
 	char c;
 	test_assert(read(fds[0], &c, 1) == 1);
-	test_assert(c == 'X');
+	test_assertx(c == 'X');
 	kill(pid, SIGKILL);
 	int status;
 	waitpid(pid, &status, 0);

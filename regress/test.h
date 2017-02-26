@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,17 +20,14 @@
 #ifndef TEST_H
 #define TEST_H
 
-#undef NDEBUG
-#include <assert.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define test_assert(x) assert(x)
-
-__attribute__((noreturn))
+__attribute((noreturn, unused)) static inline
 void test_error(int errnum, const char* format, ...)
 {
 	fprintf(stderr, "%s: ", program_invocation_name);
@@ -46,5 +43,32 @@ void test_error(int errnum, const char* format, ...)
 
 	exit(1);
 }
+
+__attribute((unused))
+static inline void test_assertion(bool assertion,
+                                  const char* file,
+                                  unsigned int line,
+                                  const char* assertion_string,
+                                  int errnum)
+{
+	if ( !assertion )
+		test_error(errnum, "assertion failure: %s:%u: %s", file, line,
+		           assertion_string);
+}
+
+__attribute((unused))
+static inline void test_assertionp(int errnum,
+                                   const char* file,
+                                   unsigned int line,
+                                   const char* assertion_string)
+{
+	test_assertion(errnum == 0, file, line, assertion_string, errnum);
+}
+
+#define test_assert(x) test_assertion((x), __FILE__, __LINE__, #x, errno)
+#define test_assertc(x, errnum) \
+        test_assertion((x), __FILE__, __LINE__, #x, errnum)
+#define test_assertp(x) test_assertionp((x), __FILE__, __LINE__, #x)
+#define test_assertx(x) test_assertion((x), __FILE__, __LINE__, #x, 0)
 
 #endif

@@ -29,7 +29,7 @@ void signal_handler(int signum, siginfo_t* siginfo, void* ucontext_ptr)
 	(void) siginfo;
 	(void) ucontext_ptr;
 
-	test_assert(signum == SIGUSR1);
+	test_assertx(signum == SIGUSR1);
 
 	signal_counter++;
 }
@@ -41,12 +41,11 @@ int main(void)
 	sa.sa_sigaction = signal_handler;
 	sa.sa_flags = SA_SIGINFO;
 
-	if ( sigaction(SIGUSR1, &sa, NULL) )
-		test_error(errno, "sigaction(USR1)");
+	test_assert(sigaction(SIGUSR1, &sa, NULL) == 0);
 
 	raise(SIGUSR1);
 
-	test_assert(signal_counter == 1);
+	test_assertx(signal_counter == 1);
 
 	return 0;
 }
