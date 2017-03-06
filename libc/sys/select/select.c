@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,9 +21,10 @@
 
 #include <errno.h>
 #include <poll.h>
+#include <string.h>
 
-static const int READ_EVENTS = POLLIN | POLLRDNORM;
-static const int WRITE_EVENTS = POLLOUT | POLLWRNORM;
+static const int READ_EVENTS = POLLIN | POLLRDNORM | POLLERR | POLLHUP;
+static const int WRITE_EVENTS = POLLOUT | POLLWRNORM | POLLERR;
 static const int EXCEPT_EVENTS = POLLERR | POLLHUP;
 
 int select(int nfds, fd_set* restrict readfds, fd_set* restrict writefds,
@@ -45,20 +46,11 @@ int select(int nfds, fd_set* restrict readfds, fd_set* restrict writefds,
 		fds[fds_count].fd = i;
 		fds[fds_count].events = fds[fds_count].revents = 0;
 		if ( readfds && FD_ISSET(i, readfds) )
-		{
-			FD_CLR(i, readfds);
 			fds[fds_count].events |= READ_EVENTS;
-		}
 		if ( writefds && FD_ISSET(i, writefds) )
-		{
-			FD_CLR(i, writefds);
 			fds[fds_count].events |= WRITE_EVENTS;
-		}
 		if ( exceptfds && FD_ISSET(i, exceptfds) )
-		{
-			FD_CLR(i, exceptfds);
 			fds[fds_count].events |= EXCEPT_EVENTS;
-		}
 		if ( fds[fds_count].events )
 			fds_count++;
 	}
@@ -73,6 +65,12 @@ int select(int nfds, fd_set* restrict readfds, fd_set* restrict writefds,
 	int num_occur = ppoll(fds, fds_count, timeout_tsp, NULL);
 	if ( num_occur < 0 )
 		return -1;
+	if ( readfds )
+		memset(readfds, 0, sizeof(*readfds));
+	if ( writefds )
+		memset(writefds, 0, sizeof(*writefds));
+	if ( exceptfds )
+		memset(exceptfds, 0, sizeof(*exceptfds));
 	int ret = 0;
 	for ( nfds_t i = 0; i < fds_count; i++ )
 	{
