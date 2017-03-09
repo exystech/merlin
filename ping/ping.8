@@ -1,0 +1,40 @@
+.Dd February 23, 2023
+.Dt PING 8
+.Os
+.Sh NAME
+.Nm ping
+.Nd internet control message protocol echo
+.Sh SYNOPSIS
+.Nm
+.Op Fl 46
+.Ar host
+.Sh DESCRIPTION
+.Nm
+tests connectivity to the remote
+.Ar host
+by sending an Internet Control Message Protocol
+.Xr ( icmp 4 )
+ECHO
+message and measures how quickly it responds to the ping and how many packets
+are lost.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl 4
+Ping using the Internet Prototocol version 4
+.Xr ( ip 4 ) .
+.It Fl 6
+Ping using the Internet Prototocol version 6
+.Xr ( ip6 4 ) .
+.El
+.Sh EXIT STATUS
+.Nm
+runs until terminated or it exits non-zero upon a fatal error.
+.Sh SEE ALSO
+.Xr icmp 4 ,
+.Xr ip 4 ,
+.Xr ip6 4 ,
+.Xr ping 4 ,
+.Xr ifconfig 8
+.Sh BUGS
+IPv6 is not yet implemented in the kernel.
