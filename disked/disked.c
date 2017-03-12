@@ -594,17 +594,59 @@ bool rewrite_finish(struct rewrite* rewr)
 	return true;
 }
 
-// TODO: Finish this, add decimal support and protect against overflow.
+static bool interactive;
+static bool quitting;
+static struct harddisk** hds;
+static size_t hds_count;
+static struct harddisk* current_hd;
+static enum partition_table_type current_pt_type;
+static struct partition_table* current_pt;
+static size_t current_areas_count;
+static struct device_area* current_areas;
+static const char* fstab_path = "/etc/fstab";
+
+__attribute__((format(printf, 1, 2)))
+static void command_error(const char* format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+	if ( !interactive )
+		verr(1, format, ap);
+	vfprintf(stderr, format, ap);
+	fprintf(stderr, ": %s\n", strerror(errno));
+	va_end(ap);
+}
+
+__attribute__((format(printf, 1, 2)))
+static void command_errorx(const char* format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+	if ( !interactive )
+		verrx(1, format, ap);
+	vfprintf(stderr, format, ap);
+	fprintf(stderr, "\n");
+	va_end(ap);
+}
+
+// TODO: Finish this and add decimal support.
 static bool parse_disk_quantity(off_t* out, const char* string, off_t max)
 {
 	if ( *string && isspace((unsigned char) *string) )
 		string++;
 	const char* end;
 	bool from_end = false;
+	errno = 0;
 	intmax_t value = strtoimax(string, (char**) &end, 10);
+	if ( value == INTMAX_MIN || errno )
+	{
+		if ( !errno )
+			errno = ERANGE;
+		command_error("Parsing `%s'", string);
+		return false;
+	}
 	if ( value < 0 )
 	{
-		// TODO: If the least possible value, overflow.
 		value = -value;
 		from_end = true;
 	}
@@ -693,17 +735,6 @@ static bool parse_disk_quantity(off_t* out, const char* string, off_t max)
 	value = (off_t) uvalue;
 	return *out = value, true;
 }
-
-static bool interactive;
-static bool quitting;
-static struct harddisk** hds;
-static size_t hds_count;
-static struct harddisk* current_hd;
-static enum partition_table_type current_pt_type;
-static struct partition_table* current_pt;
-static size_t current_areas_count;
-static struct device_area* current_areas;
-static const char* fstab_path = "/etc/fstab";
 
 static bool lookup_fstab_by_blockdevice(struct fstab* out_fsent,
                                         char** out_storage,
@@ -850,30 +881,6 @@ static bool add_blockdevice_to_fstab(struct blockdevice* bdev,
 	return rewrite_finish(&rewr);
 }
 
-__attribute__((format(printf, 1, 2)))
-static void command_error(const char* format, ...)
-{
-	va_list ap;
-	va_start(ap, format);
-	if ( !interactive )
-		verr(1, format, ap);
-	vfprintf(stderr, format, ap);
-	fprintf(stderr, ": %s\n", strerror(errno));
-	va_end(ap);
-}
-
-__attribute__((format(printf, 1, 2)))
-static void command_errorx(const char* format, ...)
-{
-	va_list ap;
-	va_start(ap, format);
-	if ( !interactive )
-		verrx(1, format, ap);
-	vfprintf(stderr, format, ap);
-	fprintf(stderr, "\n");
-	va_end(ap);
-}
-
 static void unscan_partition(struct partition* p)
 {
 	struct blockdevice* bdev = &p->bdev;
@@ -951,8 +958,15 @@ static void scan_device(void)
 	//       the partition table.
 	for ( size_t i = 0; i < current_pt->partitions_count; i++ )
 		scan_partition(current_pt->partitions[i]);
-	// TODO: Check for overflow here.
-	size_t areas_length = 2 * current_pt->partitions_count + 1;
+	size_t areas_length;
+	size_t partitions_count = current_pt->partitions_count;
+	if ( __builtin_mul_overflow(2, partitions_count, &areas_length) ||
+	     __builtin_add_overflow(1, areas_length, &areas_length ) )
+	{
+		errno = EOVERFLOW;
+		command_error("Scanning `%s'", device_name(current_hd->path));
+		return;
+	}
 	if ( current_pt_type == PARTITION_TABLE_TYPE_MBR )
 	{
 		struct mbr_partition_table* mbrpt =
@@ -2595,8 +2609,13 @@ static void on_rmtable(size_t argc, char** argv)
 	}
 	off_t sector_0 = 0; // MBR & GPT
 	off_t sector_1 = block_size; // GPT
-	// TODO: Overflow: Ensure underflow is not possible.
-	off_t sector_m1 = current_hd->st.st_size - block_size; // GPT
+	off_t sector_m1;
+	if ( __builtin_sub_overflow(current_hd->st.st_size, block_size, &sector_m1) )
+	{
+		errno = EOVERFLOW;
+		command_error("Removing partition table");
+		return;
+	}
 	if ( pwriteall(current_hd->fd, zeroes, block_size, sector_0) < block_size ||
 	     pwriteall(current_hd->fd, zeroes, block_size, sector_1) < block_size ||
 	     pwriteall(current_hd->fd, zeroes, block_size, sector_m1) < block_size )
