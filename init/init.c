@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -173,8 +173,15 @@ static void write_random_seed(void)
 		close(fd);
 		return;
 	}
+	// Write out randomness, but mix in some fresh kernel randomness in case the
+	// randomness used to seed arc4random didn't have enough entropy, there may
+	// be more now.
 	unsigned char buf[256];
 	arc4random_buf(buf, sizeof(buf));
+	unsigned char newbuf[256];
+	getentropy(newbuf, sizeof(newbuf));
+	for ( size_t i = 0; i < 256; i++ )
+		buf[i] ^= newbuf[i];
 	size_t done = writeall(fd, buf, sizeof(buf));
 	explicit_bzero(buf, sizeof(buf));
 	if ( done < sizeof(buf) )

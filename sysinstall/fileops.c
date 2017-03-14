@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -114,10 +114,17 @@ void write_random_seed(const char* path)
 		warn("chmod: %s", path);
 		_exit(2);
 	}
+	// Write out randomness, but mix in some fresh kernel randomness in case the
+	// randomness used to seed arc4random didn't have enough entropy, there may
+	// be more now.
 	unsigned char buf[256];
 	arc4random_buf(buf, sizeof(buf));
+	unsigned char newbuf[256];
+	getentropy(newbuf, sizeof(newbuf));
 	size_t done = writeall(fd, buf, sizeof(buf));
 	explicit_bzero(buf, sizeof(buf));
+	for ( size_t i = 0; i < 256; i++ )
+		buf[i] ^= newbuf[i];
 	if ( done < sizeof(buf) )
 	{
 		warn("write: %s", path);
