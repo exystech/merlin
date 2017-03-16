@@ -45,7 +45,7 @@ if test -z "$platform"; then
 fi
 
 if test -z "$version"; then
-  echo "$0: platform wasn't set with --version" >&2
+  echo "$0: version wasn't set with --version" >&2
   exit 1
 fi
 
