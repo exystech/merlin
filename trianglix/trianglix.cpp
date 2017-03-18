@@ -742,7 +742,7 @@ class object* create_user::command_line(const char* command)
 	user.pw_passwd = strdup(answers[1]);
 	user.pw_shell = strdup("sh");
 
-	mkdir(user.pw_dir, 777);
+	mkdir(user.pw_dir, 0777);
 
 	fp = fopen("/etc/passwd", "a");
 	fprintf(fp, "%s:%s:%ju:%ju:%s:%s:%s\n",

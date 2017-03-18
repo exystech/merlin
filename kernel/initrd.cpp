@@ -699,7 +699,7 @@ static void ExtractTo(Ref<Descriptor> desc,
 		char* prev = strdup(path);
 		if ( !prev )
 			PanicF("%s: strdup: %m", path);
-		if ( ExtractTo_mkdir(desc, &ctx->ioctx, dirname(prev), 755) < 0 )
+		if ( ExtractTo_mkdir(desc, &ctx->ioctx, dirname(prev), 0755) < 0 )
 			PanicF("%s: mkdir -p: %s: %m", path, prev);
 		free(prev);
 		file = desc->open(&ctx->ioctx, path, oflags, 0644);
