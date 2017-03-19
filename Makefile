@@ -15,6 +15,7 @@ disked \
 editor \
 ext \
 games \
+hostname \
 init \
 kblayout \
 kblayout-compiler \

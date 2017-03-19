@@ -1,0 +1,28 @@
+.Dd March 19, 2017
+.Dt HOSTNAME 1
+.Os
+.Sh NAME
+.Nm hostname
+.Nd write or set system hostname
+.Sh SYNOPSIS
+.Nm hostname
+.Op Fl s
+.Op Ar hostname
+.Sh DESCRIPTION
+.Nm
+writes the system hostname, or sets the system hostname to
+.Ar hostname
+if specified.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl s , Fl \-short
+Write the hostname up to but not including the first period.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr gethostname 2 ,
+.Xr sethostname 2 ,
+.Xr hostname 5
