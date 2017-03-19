@@ -6,7 +6,6 @@ include ../build-aux/dirs.mak
 OPTLEVEL?=$(DEFAULT_OPTLEVEL)
 CFLAGS?=$(OPTLEVEL)
 
-CPPFLAGS:=$(CPPFLAGS) -DVERSIONSTR=\"$(VERSION)\"
 CFLAGS:=$(CXXFLAGS) -Wall -Wextra
 
 BINARY=login

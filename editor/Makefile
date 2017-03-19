@@ -6,7 +6,6 @@ include ../build-aux/dirs.mak
 OPTLEVEL?=$(DEFAULT_OPTLEVEL)
 CFLAGS?=$(OPTLEVEL)
 
-CPPFLAGS:=$(CPPFLAGS) -DVERSIONSTR=\"$(VERSION)\"
 CFLAGS:=$(CFLAGS) -Wall -Wextra
 
 ifeq ($(HOST_IS_SORTIX),0)
