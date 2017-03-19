@@ -18,12 +18,12 @@ shut off cleanly.
 .Pp
 The options are as follows:
 .Bl -tag -width "12345678"
-.It Fl f, Fl \-force
+.It Fl f , Fl \-force
 Shut off the filesystem immediately, further operations to any open files will
 fail.
 The filesystem will be consistent, but processes may be stopped in the middle of
 file operations.
-.It Fl l, Fl \-lazy
+.It Fl l , Fl \-lazy
 Do not wait for the filesystem to be unused, and shut off the filesystem in the
 background.
 It is not safe to shut down the computer directly after using this option.

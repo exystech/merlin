@@ -90,12 +90,12 @@ The important targets are:
 Make all build tools.
 .It Sy clean
 Clean the component directories and the port source code.
-.Sy ( clean-core, clean-ports )
+.Sy ( clean-core , clean-ports )
 .It Sy clean-build-tools
 Clean the directories of all build tools.
 .It Sy distclean
 Run every clean target such that the source code is ready for distribution.
-.Sy ( clean-builds, clean-core, clean-ports, clean-release, clean-repository, clean-sysroot )
+.Sy ( clean-builds , clean-core , clean-ports , clean-release , clean-repository , clean-sysroot )
 .It Sy install-build-tools
 Install all build tools after making them.
 .It Sy iso
@@ -105,7 +105,7 @@ directory after making
 .Sy all .
 .It Sy mostlyclean
 Clean everything except binary packages.
-.Sy ( clean-builds, clean-core, clean-ports, clean-release, clean-sysroot )
+.Sy ( clean-builds , clean-core , clean-ports , clean-release , clean-sysroot )
 .It Sy release
 Make
 .Sy iso
@@ -157,7 +157,7 @@ and
 .It Ev SORTIX_INCLUDE_SOURCE
 Specifies whether the source code is included in the sysroot.
 This must be one of
-.Sy no, yes
+.Sy no , yes
 or
 .Sy git
 and defaults to
