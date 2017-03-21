@@ -113,7 +113,7 @@ void PanicInit()
 		Log::Center(BRAND_LOGO_PANIC);
 		Log::Center("KERNEL PANIC");
 		Log::Print("\n\nThe operating system encountered an unrecoverable "
-		           "error.\n\nTechincal information:\n");
+		           "error.\n\nTechnical information:\n");
 	}
 	else
 	{
