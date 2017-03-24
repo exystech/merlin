@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -177,39 +177,87 @@ static bool IsMouseResponse(uint8_t* response, size_t size)
 	return false;
 }
 
+static void IRQ1Work(void* /*context*/);
+static void IRQ12Work(void* /*context*/);
+
 static struct interrupt_handler irq1_registration;
 static struct interrupt_handler irq12_registration;
+static struct interrupt_work irq1_work = { NULL, IRQ1Work, NULL };
+static struct interrupt_work irq12_work = { NULL, IRQ12Work, NULL };
 static PS2Device* irq1_device;
 static PS2Device* irq12_device;
+static unsigned char irq1_buffer[128];
+static unsigned char irq12_buffer[128];
+static size_t irq1_offset;
+static size_t irq12_offset;
+static size_t irq1_used;
+static size_t irq12_used;
+static bool irq1_working;
+static bool irq12_working;
 
-static void IRQ1Work(void* ctx, void* payload, size_t size)
+static void IRQ1Work(void* /*context*/)
 {
-	(void) ctx;
-	assert(size == sizeof(unsigned char));
-	unsigned char* byteptr = (unsigned char*) payload;
-	unsigned char byte = *byteptr;
-	if ( irq1_device )
-		irq1_device->PS2DeviceOnByte(byte);
+	Interrupt::Disable();
+	size_t todo = irq1_used;
+	for ( size_t i = 0; i < todo; i++ )
+	{
+		unsigned char byte = irq1_buffer[irq1_offset++];
+		if ( sizeof(irq1_buffer) <= irq1_offset )
+			irq1_offset = 0;
+		irq1_used--;
+		Interrupt::Enable();
+		if ( irq1_device )
+			irq1_device->PS2DeviceOnByte(byte);
+		Interrupt::Disable();
+	}
+	if ( irq1_used )
+		Interrupt::ScheduleWork(&irq1_work);
+	else
+		irq1_working = false;
+	Interrupt::Enable();
 }
 
-static void IRQ12Work(void* ctx, void* payload, size_t size)
+static void IRQ12Work(void* /*context*/)
 {
-	(void) ctx;
-	assert(size == sizeof(unsigned char));
-	unsigned char* byteptr = (unsigned char*) payload;
-	unsigned char byte = *byteptr;
-	if ( irq12_device )
-		irq12_device->PS2DeviceOnByte(byte);
+	Interrupt::Disable();
+	size_t todo = irq12_used;
+	for ( size_t i = 0; i < todo; i++ )
+	{
+		unsigned char byte = irq12_buffer[irq12_offset++];
+		if ( sizeof(irq12_buffer) <= irq12_offset )
+			irq12_offset = 0;
+		irq12_used--;
+		Interrupt::Enable();
+		if ( irq12_device )
+			irq12_device->PS2DeviceOnByte(byte);
+		Interrupt::Disable();
+	}
+	if ( irq12_used )
+		Interrupt::ScheduleWork(&irq12_work);
+	else
+		irq12_working = false;
+	Interrupt::Enable();
 }
 
-static void OnIRQ1(struct interrupt_context* intctx, void* user)
+static void OnIRQ1(struct interrupt_context* /*intctx*/, void* /*user*/)
 {
-	(void) intctx;
-	(void) user;
 	if ( inport8(REG_STATUS) & REG_STATUS_OUTPUT )
 	{
 		uint8_t byte = inport8(REG_DATA);
-		Interrupt::ScheduleWork(IRQ1Work, NULL, &byte, sizeof(byte));
+		// TODO: This drops incoming bytes if the buffer is full. Instead make
+		// the device not send further interrupts until we have available bytes.
+		if ( irq1_used < sizeof(irq1_buffer) )
+		{
+			size_t index = irq1_offset + irq1_used++;
+			if ( sizeof(irq1_buffer) <= index )
+				index -= sizeof(irq1_buffer);
+			irq1_buffer[index] = byte;
+			if ( !irq1_working )
+			{
+				Interrupt::ScheduleWork(&irq1_work);
+				irq1_working = true;
+			}
+		}
 	}
 }
 
@@ -220,7 +268,20 @@ static void OnIRQ12(struct interrupt_context* intctx, void* user)
 	if ( inport8(REG_STATUS) & REG_STATUS_OUTPUT )
 	{
 		uint8_t byte = inport8(REG_DATA);
-		Interrupt::ScheduleWork(IRQ12Work, NULL, &byte, sizeof(byte));
+		// TODO: This drops incoming bytes if the buffer is full. Instead make
+		// the device not send further interrupts until we have available bytes.
+		if ( irq12_used < sizeof(irq12_buffer) )
+		{
+			size_t index = irq12_offset + irq12_used++;
+			if ( sizeof(irq12_buffer) <= index )
+				index -= sizeof(irq12_buffer);
+			irq12_buffer[index] = byte;
+			if ( !irq12_working )
+			{
+				Interrupt::ScheduleWork(&irq12_work);
+				irq12_working = true;
+			}
+		}
 	}
 }
 

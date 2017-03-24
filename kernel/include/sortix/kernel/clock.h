@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +25,7 @@
 #include <sortix/timespec.h>
 
 #include <sortix/kernel/kthread.h>
+#include <sortix/kernel/interrupt.h>
 
 namespace Sortix {
 
@@ -40,12 +41,16 @@ public:
 public:
 	Timer* delay_timer;
 	Timer* absolute_timer;
+	Timer* first_interrupt_timer;
+	Timer* last_interrupt_timer;
+	struct interrupt_work interrupt_work;
 	struct timespec current_time;
 	struct timespec current_advancement;
 	struct timespec resolution;
 	kthread_mutex_t clock_mutex;
 	bool clock_callable_from_interrupt;
 	bool we_disabled_interrupts;
+	bool interrupt_work_scheduled;
 
 public:
 	void SetCallableFromInterrupts(bool callable_from_interrupts);
@@ -71,6 +76,9 @@ private: // These should only be called if the clock is locked.
 	void FireTimer(Timer* timer);
 	void TriggerDelay(struct timespec unaccounted);
 	void TriggerAbsolute();
+
+public: // Only for use by Clock__InterruptWork.
+	void InterruptWork();
 
 };
 

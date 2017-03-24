@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,16 +30,26 @@
 
 namespace Sortix {
 
+static void Clock__InterruptWork(void* context)
+{
+	((Clock*) context)->InterruptWork();
+}
+
 Clock::Clock()
 {
 	delay_timer = NULL;
 	absolute_timer = NULL;
+	first_interrupt_timer = NULL;
+	last_interrupt_timer = NULL;
+	interrupt_work.handler = Clock__InterruptWork;
+	interrupt_work.context = this;
 	current_time = timespec_nul();
 	current_advancement = timespec_nul();
 	resolution = timespec_nul();
 	clock_mutex = KTHREAD_MUTEX_INITIALIZER;
 	clock_callable_from_interrupt = false;
 	we_disabled_interrupts = false;
+	interrupt_work_scheduled = false;
 }
 
 Clock::~Clock()
@@ -385,9 +395,25 @@ static void Clock__FireTimer(void* timer_ptr)
 	timer->clock->UnlockClock();
 }
 
-static void Clock__FireTimer_InterruptWorker(void* timer_ptr, void*, size_t)
+void Clock::InterruptWork()
 {
-	Clock__FireTimer(timer_ptr);
+	Interrupt::Disable();
+	Timer* work = first_interrupt_timer;
+	first_interrupt_timer = NULL;
+	last_interrupt_timer = NULL;
+	Interrupt::Enable();
+	while ( work )
+	{
+		Timer* next_work = work->next_interrupt_timer;
+		Clock__FireTimer(work);
+		work = next_work;
+	}
+	Interrupt::Disable();
+	if ( first_interrupt_timer )
+		Interrupt::ScheduleWork(&interrupt_work);
+	else
+		interrupt_work_scheduled = false;
+	Interrupt::Enable();
 }
 
 void Clock::FireTimer(Timer* timer)
@@ -409,7 +435,16 @@ void Clock::FireTimer(Timer* timer)
 		{
 			if ( !may_deallocate )
 				timer->flags |= TIMER_FIRING;
-			Interrupt::ScheduleWork(Clock__FireTimer_InterruptWorker, timer, NULL, 0);
+			(last_interrupt_timer ?
+			 last_interrupt_timer->next_interrupt_timer :
+			 first_interrupt_timer) = timer;
+			timer->next_interrupt_timer = NULL;
+			last_interrupt_timer = timer;
+			if ( !interrupt_work_scheduled )
+			{
+				Interrupt::ScheduleWork(&interrupt_work);
+				interrupt_work_scheduled = true;
+			}
 		}
 	}
 

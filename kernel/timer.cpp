@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -37,6 +37,7 @@ Timer::Timer()
 	clock = NULL;
 	prev_timer = NULL;
 	next_timer = NULL;
+	next_interrupt_timer = NULL;
 	callback = NULL;
 	user = NULL;
 	num_firings_scheduled = 0;

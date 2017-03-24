@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -37,10 +37,16 @@ struct interrupt_handler
 	struct interrupt_handler* prev;
 };
 
+struct interrupt_work
+{
+	struct interrupt_work* next;
+	void (*handler)(void*);
+	void* context;
+};
+
 } // namespace Sortix
 
 namespace Sortix {
-
 namespace Interrupt {
 
 #if defined(__i386__) || defined(__x86_64__)
@@ -112,15 +118,9 @@ inline bool SetEnabled(bool is_enabled)
 
 void RegisterHandler(unsigned int index, struct interrupt_handler* handler);
 void UnregisterHandler(unsigned int index, struct interrupt_handler* handler);
-
 void Init();
-void InitWorker();
 void WorkerThread(void* user);
-
-bool ScheduleWork(void (*handler)(void*, void*, size_t),
-                  void* handler_context,
-                  void* payload,
-                  size_t payload_size);
+void ScheduleWork(struct interrupt_work* work);
 
 } // namespace Interrupt
 } // namespace Sortix

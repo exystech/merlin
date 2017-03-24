@@ -159,7 +159,7 @@ public:
 public:
 	bool Initialize();
 	void OnInterrupt();
-	void InterruptWork(void* payload, size_t size);
+	void InterruptWork();
 
 private:
 	void Request(void* bufptr, size_t size);
@@ -171,6 +171,7 @@ private:
 private:
 	struct vbox_host_version vbox_version;
 	struct interrupt_handler interrupt_registration;
+	struct interrupt_work interrupt_work;
 	kthread_mutex_t buffer_lock;
 	uint64_t video_device;
 	volatile struct registers* regs;
@@ -181,6 +182,7 @@ private:
 	uint32_t devaddr;
 	uint32_t capabilities;
 	uint32_t listening_events;
+	uint32_t interrupt_work_events;
 	addralloc_t mmio_alloc;
 	addralloc_t buffer1_alloc;
 	addralloc_t buffer2_alloc;
@@ -196,6 +198,11 @@ private:
 
 };
 
+void VBoxDevice__InterruptWork(void* context)
+{
+	((VBoxDevice*) context)->InterruptWork();
+}
+
 VBoxDevice::VBoxDevice(uint32_t devaddr)
 {
 	this->buffer_lock = KTHREAD_MUTEX_INITIALIZER;
@@ -209,6 +216,9 @@ VBoxDevice::VBoxDevice(uint32_t devaddr)
 	this->has_buffer2_mapped = false;
 	this->has_interrupt_registered = false;
 	this->has_video_device = false;
+	this->interrupt_work.handler = VBoxDevice__InterruptWork;
+	this->interrupt_work.context = this;
+	this->interrupt_work_events = 0;
 }
 
 VBoxDevice::~VBoxDevice()
@@ -234,11 +244,6 @@ VBoxDevice::~VBoxDevice()
 void VBoxDevice__OnInterrupt(struct interrupt_context*, void* context)
 {
 	((VBoxDevice*) context)->OnInterrupt();
-}
-
-void VBoxDevice__InterruptWork(void* context, void* payload, size_t size)
-{
-	((VBoxDevice*) context)->InterruptWork(payload, size);
 }
 
 bool VBoxDevice::Initialize()
@@ -367,6 +372,9 @@ void VBoxDevice::OnInterrupt()
 
 	regs->guest_event_mask = 0;
 
+	assert(interrupt_work_events == 0);
+	interrupt_work_events = host_events;
+
 	// TODO: There's no protection that this interrupt handler isn't clobbering
 	//       the buffer because we don't have the lock.
 
@@ -378,15 +386,13 @@ void VBoxDevice::OnInterrupt()
 	ack_events.events = host_events; // TODO: Or?
 	RequestIRQ(&ack_events, sizeof(ack_events));
 
-	Interrupt::ScheduleWork(VBoxDevice__InterruptWork, this,
-	                        &host_events, sizeof(host_events));
+	Interrupt::ScheduleWork(&interrupt_work);
 }
 
-void VBoxDevice::InterruptWork(void* payload, size_t /*size*/)
+void VBoxDevice::InterruptWork()
 {
 	ScopedLock lock(&buffer_lock);
-	uint32_t host_events;
-	memcpy(&host_events, payload, sizeof(host_events));
+	uint32_t host_events = interrupt_work_events;
 
 	if ( host_events & VBOX_EVENT_DISPLAY_CHANGE_REQUEST )
 	{
@@ -405,6 +411,7 @@ void VBoxDevice::InterruptWork(void* payload, size_t /*size*/)
 			Video::ResizeDisplay(video_device, display, xres, yres, bpp);
 	}
 
+	interrupt_work_events = 0;
 	regs->guest_event_mask = listening_events;
 }
 

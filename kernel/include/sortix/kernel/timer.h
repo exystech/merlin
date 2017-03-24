@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -69,6 +69,7 @@ public:
 	Clock* clock;
 	Timer* prev_timer;
 	Timer* next_timer;
+	Timer* next_interrupt_timer;
 	void (*callback)(Clock* clock, Timer* timer, void* user);
 	void* user;
 	size_t num_firings_scheduled;

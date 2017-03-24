@@ -313,9 +313,6 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 	// Initialize the interrupt handler table and enable interrupts.
 	Interrupt::Init();
 
-	// Initialize the interrupt worker (before scheduling is enabled).
-	Interrupt::InitWorker();
-
 	// Initialize the clocks.
 	Time::Init();
 
