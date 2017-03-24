@@ -248,8 +248,9 @@ static void FakeInterruptedContext(struct interrupt_context* intctx, int int_no)
 #endif
 }
 
-static
-void SwitchThread(struct interrupt_context* intctx, Thread* prev, Thread* next)
+static void SwitchRegisters(struct interrupt_context* intctx,
+                            Thread* prev,
+                            Thread* next)
 {
 	if ( prev == next )
 		return;
@@ -262,6 +263,31 @@ void SwitchThread(struct interrupt_context* intctx, Thread* prev, Thread* next)
 	LoadInterruptedContext(intctx, &next->registers);
 
 	current_thread = next;
+}
+
+static void SwitchThread(struct interrupt_context* intctx,
+                         Thread* old_thread,
+                         Thread* new_thread)
+{
+	SwitchRegisters(intctx, old_thread, new_thread);
+	if ( intctx->signal_pending && InUserspace(intctx) )
+	{
+		// Become the thread for real and run the signal handler.
+		if ( old_thread == new_thread )
+		{
+			// We're already this thread, so run the signal handler.
+			Interrupt::Enable();
+			assert(Interrupt::IsEnabled());
+			Signal::DispatchHandler(intctx, NULL);
+		}
+		else
+		{
+			// We need to transfer execution to the correct stack. We know the
+			// the thread is in user-space and isn't using its kernel stack, and
+			// we know we're not using the stack right now.
+			FakeInterruptedContext(intctx, 130);
+		}
+	}
 }
 
 static Thread* idle_thread;
@@ -308,29 +334,21 @@ static Thread* PopNextThread(bool yielded)
 	return result;
 }
 
+void SwitchTo(struct interrupt_context* intctx, Thread* new_thread)
+{
+	Thread* old_thread = CurrentThread();
+	if ( new_thread == old_thread )
+		return;
+	first_runnable_thread = old_thread;
+	true_current_thread = new_thread;
+	SwitchThread(intctx, old_thread, new_thread);
+}
+
 static void RealSwitch(struct interrupt_context* intctx, bool yielded)
 {
 	Thread* old_thread = CurrentThread();
 	Thread* new_thread = PopNextThread(yielded);
 	SwitchThread(intctx, old_thread, new_thread);
-	if ( intctx->signal_pending && InUserspace(intctx) )
-	{
-		// Become the thread for real and run the signal handler.
-		if ( old_thread == new_thread )
-		{
-			// We're already this thread, so run the signal handler.
-			Interrupt::Enable();
-			assert(Interrupt::IsEnabled());
-			Signal::DispatchHandler(intctx, NULL);
-		}
-		else
-		{
-			// We need to transfer execution to the correct stack. We know the
-			// the thread is in user-space and isn't using its kernel stack, and
-			// we know we're not using the stack right now.
-			FakeInterruptedContext(intctx, 130);
-		}
-	}
 }
 
 void Switch(struct interrupt_context* intctx)

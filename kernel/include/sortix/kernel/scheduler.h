@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -49,6 +49,7 @@ static inline void ExitThread()
 #endif
 
 void Switch(struct interrupt_context* intctx);
+void SwitchTo(struct interrupt_context* intctx, Thread* new_thread);
 void SetThreadState(Thread* thread, ThreadState state);
 ThreadState GetThreadState(Thread* thread);
 void SetIdleThread(Thread* thread);

@@ -28,6 +28,9 @@
 namespace Sortix {
 namespace Interrupt {
 
+Thread* interrupt_worker_thread = NULL;
+bool interrupt_worker_thread_boost = false;
+
 static struct interrupt_work* first;
 static struct interrupt_work* last;
 
@@ -63,6 +66,7 @@ void ScheduleWork(struct interrupt_work* work)
 	(last ? last->next : first) = work;
 	work->next = NULL;
 	last = work;
+	interrupt_worker_thread_boost = true;
 }
 
 } // namespace Interrupt

@@ -29,6 +29,8 @@ namespace Sortix {
 
 struct interrupt_context;
 
+class Thread;
+
 struct interrupt_handler
 {
 	void (*handler)(struct interrupt_context*, void*);
@@ -121,6 +123,9 @@ void UnregisterHandler(unsigned int index, struct interrupt_handler* handler);
 void Init();
 void WorkerThread(void* user);
 void ScheduleWork(struct interrupt_work* work);
+
+extern Thread* interrupt_worker_thread;
+extern bool interrupt_worker_thread_boost;
 
 } // namespace Interrupt
 } // namespace Sortix

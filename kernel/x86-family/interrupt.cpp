@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -357,6 +357,12 @@ extern "C" void interrupt_handler(struct interrupt_context* intctx)
 	// Send an end of interrupt signal to the PICs if we got an IRQ.
 	if ( IRQ0 <= int_no && int_no <= IRQ15 )
 		PIC::SendEOI(int_no - IRQ0);
+
+	if ( interrupt_worker_thread_boost )
+	{
+		interrupt_worker_thread_boost = false;
+		Scheduler::SwitchTo(intctx, interrupt_worker_thread);
+	}
 }
 
 } // namespace Interrupt

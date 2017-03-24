@@ -423,16 +423,17 @@ static void BootThread(void* /*user*/)
 
 	// Let's create the interrupt worker thread that executes additional work
 	// requested by interrupt handlers, where such work isn't safe.
-	Thread* interruptworker = RunKernelThread(Interrupt::WorkerThread, NULL);
-	if ( !interruptworker )
+	Interrupt::interrupt_worker_thread =
+		RunKernelThread(Interrupt::WorkerThread, NULL);
+	if ( !Interrupt::interrupt_worker_thread )
 		Panic("Could not create interrupt worker");
 
 	// Initialize the worker thread data structures.
 	Worker::Init();
 
 	// Create a general purpose worker thread.
-	Thread* workerthread = RunKernelThread(Worker::Thread, NULL);
-	if ( !workerthread )
+	Thread* worker_thread = RunKernelThread(Worker::Thread, NULL);
+	if ( !worker_thread )
 		Panic("Unable to create general purpose worker thread");
 
 	//
