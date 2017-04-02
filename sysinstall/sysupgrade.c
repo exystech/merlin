@@ -925,6 +925,7 @@ int main(void)
 		}
 		if ( conf.system )
 			upgrade_finalize(target_release, &new_release, "", ".");
+		// TODO: Update /etc/upgrade.conf with new release values.
 		if ( conf.system )
 		{
 			printf(" - Creating initrd...\n");
