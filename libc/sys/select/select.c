@@ -65,12 +65,13 @@ int select(int nfds, fd_set* restrict readfds, fd_set* restrict writefds,
 	int num_occur = ppoll(fds, fds_count, timeout_tsp, NULL);
 	if ( num_occur < 0 )
 		return -1;
+	size_t fd_bytes = ((size_t) nfds + 7) / 8;
 	if ( readfds )
-		memset(readfds, 0, sizeof(*readfds));
+		memset(readfds, 0, fd_bytes);
 	if ( writefds )
-		memset(writefds, 0, sizeof(*writefds));
+		memset(writefds, 0, fd_bytes);
 	if ( exceptfds )
-		memset(exceptfds, 0, sizeof(*exceptfds));
+		memset(exceptfds, 0, fd_bytes);
 	int ret = 0;
 	for ( nfds_t i = 0; i < fds_count; i++ )
 	{
