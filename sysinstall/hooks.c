@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -51,12 +51,8 @@ void upgrade_finalize(const struct release* old_release,
 	(void) target_prefix;
 
 	// TODO: After releasing Sortix 1.1, remove this compatibility.
-	if ( old_release->version_major < 1 ||
-	     (old_release->version_major == 1 &&
-	      old_release->version_minor < 1) ||
-	     (old_release->version_major == 1 &&
-	      old_release->version_minor == 1 &&
-	      old_release->version_dev) )
+	if ( version_compare(old_release->version_major, old_release->version_minor,
+	                     old_release->version_dev, 1, 1, false) < 0 ) // < 1.1
 	{
 		char* random_seed_path;
 		if ( asprintf(&random_seed_path, "%sboot/random.seed", target_prefix) < 0 )

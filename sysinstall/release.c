@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,6 +26,44 @@
 #include <string.h>
 
 #include "release.h"
+
+int abi_compare(unsigned long a_major, unsigned long a_minor,
+                unsigned long b_major, unsigned long b_minor)
+{
+	if ( a_major < b_major )
+		return -1;
+	if ( a_major > b_major )
+		return 1;
+	if ( a_minor < b_minor )
+		return -1;
+	if ( a_minor > b_minor )
+		return 1;
+	return 0;
+}
+
+bool abi_compatible(unsigned long a_major, unsigned long a_minor,
+                    unsigned long b_major, unsigned long b_minor)
+{
+	return a_major == b_major && a_minor <= b_minor;
+}
+
+int version_compare(unsigned long a_major, unsigned long a_minor, bool a_dev,
+                    unsigned long b_major, unsigned long b_minor, bool b_dev)
+{
+	if ( a_major < b_major )
+		return -1;
+	if ( a_major > b_minor )
+		return 1;
+	if ( a_minor < b_minor )
+		return -1;
+	if ( a_minor > b_minor )
+		return 1;
+	if ( a_dev && !b_dev )
+		return -1;
+	if ( !a_dev && b_dev )
+		return 1;
+	return 0;
+}
 
 void release_free(struct release* release)
 {

@@ -213,8 +213,9 @@ int main(int argc, char* argv[])
 	struct conf conf;
 	load_upgrade_conf(&conf, "/etc/upgrade.conf");
 
-	bool can_run_new_abi = new_release.abi_major == old_release.abi_major &&
-	                       new_release.abi_minor <= old_release.abi_minor;
+	bool can_run_new_abi =
+		abi_compatible(new_release.abi_major, new_release.abi_minor,
+		               old_release.abi_major, old_release.abi_minor);
 
 	bool header;
 	bool copy_files;

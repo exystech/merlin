@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,7 +30,15 @@ struct release
 	unsigned long abi_minor;
 };
 
+int abi_compare(unsigned long a_major, unsigned long a_minor,
+                unsigned long b_major, unsigned long b_minor);
+bool abi_compatible(unsigned long a_major, unsigned long a_minor,
+                    unsigned long b_major, unsigned long b_minor);
+int version_compare(unsigned long a_major, unsigned long a_minor, bool a_dev,
+                    unsigned long b_major, unsigned long b_minor, bool b_dev);
 void release_free(struct release* release);
+int release_compare_abi(const struct release* a, const struct release* b);
+int release_compare_version(const struct release* a, const struct release* b);
 bool os_release_load(struct release* release,
                      const char* path,
                      const char* errpath);

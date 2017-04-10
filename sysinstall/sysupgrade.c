@@ -626,9 +626,8 @@ int main(void)
 		text("\n");
 	}
 
-	if ( new_release.abi_major < target_release->abi_major ||
-	     (target_release->abi_major == new_release.abi_major &&
-	      new_release.abi_minor < target_release->abi_minor) )
+	if ( abi_compare(new_release.abi_major, new_release.abi_minor,
+	                 target_release->abi_major, target_release->abi_minor) < 0 )
 	{
 		text("Warning: You are downgrading an existing installation to an "
 		     "release with an earlier ABI. This is not supported and there is "
@@ -646,8 +645,9 @@ int main(void)
 		text("\n");
 	}
 
-	bool can_run_old_abi = target_release->abi_major == new_release.abi_major &&
-	                       target_release->abi_minor <= new_release.abi_minor;
+	bool can_run_old_abi =
+		abi_compatible(target_release->abi_major, target_release->abi_minor,
+		               new_release.abi_major, new_release.abi_minor);
 
 	mountpoints = target->mountpoints;
 	mountpoints_used = target->mountpoints_used;
