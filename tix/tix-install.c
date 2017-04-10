@@ -150,6 +150,7 @@ static void version(FILE* fp, const char* argv0)
 
 static char* collection = NULL;
 static bool reinstall = false;
+static bool quiet = false;
 static char* tix_directory_path = NULL;
 static int generation;
 static const char* coll_prefix;
@@ -175,6 +176,7 @@ int main(int argc, char* argv[])
 			char c;
 			while ( (c = *++arg) ) switch ( c )
 			{
+			case 'q': quiet = true; break;
 			default:
 				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
 				help(stderr, argv0);
@@ -188,6 +190,8 @@ int main(int argc, char* argv[])
 		else if ( GET_OPTION_VARIABLE("--collection", &collection) ) { }
 		else if ( !strcmp(arg, "--reinstall") )
 			reinstall = true;
+		else if ( !strcmp(arg, "--quiet") )
+			quiet = true;
 		else
 		{
 			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
@@ -300,7 +304,9 @@ void InstallPackage(const char* tix_path)
 		       "--host=%s\".", coll_platform);
 	}
 
-	printf("Installing `%s' into `%s'...\n", package_name, collection);
+	if ( !quiet )
+		printf("Installing `%s' into `%s'...\n", package_name, collection);
+
 	char* data_and_prefix = package_prefix && package_prefix[0] ?
 	                        print_string("data%s", package_prefix) :
 	                        strdup("data");
