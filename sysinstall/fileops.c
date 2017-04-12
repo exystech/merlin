@@ -17,6 +17,7 @@
  * File operation utility functions.
  */
 
+#include <sys/stat.h>
 #include <sys/types.h>
 
 #include <err.h>
@@ -128,4 +129,43 @@ void write_random_seed(const char* path)
 		_exit(2);
 	}
 	close(fd);
+}
+
+char* read_string_file(const char* path)
+{
+	FILE* fp = fopen(path, "r");
+	if ( !fp )
+		return NULL;
+	struct stat st;
+	if ( fstat(fileno(fp), &st) < 0 )
+	{
+		fclose(fp);
+		return NULL;
+	}
+	size_t content_length;
+	if ( __builtin_add_overflow(1, st.st_size, &content_length) )
+	{
+		fclose(fp);
+		errno = EOVERFLOW;
+		return NULL;
+	}
+	char* content = malloc(content_length);
+	if ( !content )
+	{
+		fclose(fp);
+		return NULL;
+	}
+	size_t amount = fread(content, 1, content_length - 1, fp);
+	if ( ferror(fp) )
+	{
+		fclose(fp);
+		free(content);
+		return NULL;
+	}
+	fclose(fp);
+	if ( 0 < amount && content[amount - 1] == '\n' )
+		content[amount - 1] = '\0';
+	else
+		content[amount] = '\0';
+	return content;
 }

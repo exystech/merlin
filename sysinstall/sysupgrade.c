@@ -60,6 +60,7 @@ struct installation
 	struct release release;
 	struct mountpoint* mountpoints;
 	size_t mountpoints_used;
+	char* machine;
 };
 
 static struct installation* installations;
@@ -74,7 +75,8 @@ static char fs[] = "/tmp/fs.XXXXXX";
 static bool add_installation(struct blockdevice* bdev,
                              struct release* release,
                              struct mountpoint* mountpoints,
-                             size_t mountpoints_used)
+                             size_t mountpoints_used,
+                             char* machine)
 {
 	if ( installations_count == installations_length )
 	{
@@ -93,6 +95,7 @@ static bool add_installation(struct blockdevice* bdev,
 	installation->release = *release;
 	installation->mountpoints = mountpoints;
 	installation->mountpoints_used = mountpoints_used;
+	installation->machine = machine;
 	return true;
 }
 
@@ -135,7 +138,23 @@ static void search_installation_path(const char* mnt, struct blockdevice* bdev)
 		release_free(&release);
 		return;
 	}
-	if ( !add_installation(bdev, &release, mountpoints, mountpoints_used) )
+	char* machine_path;
+	if ( asprintf(&machine_path, "%s/etc/machine", mnt) < 0 )
+	{
+		warn("%s: malloc", path_of_blockdevice(bdev));
+		release_free(&release);
+		return;
+	}
+	char* machine = read_string_file(machine_path);
+	free(machine_path);
+	if ( !machine )
+	{
+		warn("%s/etc/machine", path_of_blockdevice(bdev));
+		release_free(&release);
+		return;
+	}
+	if ( !add_installation(bdev, &release, mountpoints, mountpoints_used,
+	                       machine) )
 	{
 		free_mountpoints(mountpoints, mountpoints_used);
 		release_free(&release);
@@ -494,7 +513,7 @@ int main(void)
 
 		if ( installations_count == 0 )
 		{
-			while ( true)
+			while ( true )
 			{
 				prompt(input, sizeof(input), "No existing installations found, "
 					   "run installer instead? (yes/no)", "yes");
@@ -516,9 +535,10 @@ int main(void)
 			for ( size_t i = 0; i < installations_count; i++ )
 			{
 				struct installation* installation = &installations[i];
-				printf("  %-16s  %s\n",
-					   path_of_blockdevice(installation->bdev),
-					   installation->release.pretty_name);
+				printf("  %-16s  %s (%s)\n",
+				       path_of_blockdevice(installation->bdev),
+				       installation->release.pretty_name,
+				       installation->machine);
 			}
 			text("\n");
 
@@ -549,7 +569,27 @@ int main(void)
 
 	struct release* target_release = &target->release;
 
-	// TODO: Check if /etc/machine matches the current architecture.
+	char* source_machine = read_string_file("/etc/machine");
+	if ( !source_machine )
+		err(2, "/etc/machine");
+	if ( strcmp(target->machine, source_machine) != 0 )
+	{
+		textf("Warning: You are changing an existing installation to another "
+		      "architecture! (%s -> %s) This is not supported and there is no "
+		      "promise this will work!\n", target->machine, source_machine);
+		while ( true )
+		{
+			prompt(input, sizeof(input),
+			       "Change the existing installation to another architecture?",
+			       "no");
+			if ( !strcasecmp(input, "no") || !strcasecmp(input, "yes") )
+				break;
+		}
+		if ( !strcasecmp(input, "no") )
+			errx(2, "upgrade aborted because of architecture mismatch");
+		text("\n");
+	}
+	free(source_machine);
 
 	if ( downgrading_version(target_release, &new_release) )
 	{
@@ -557,7 +597,7 @@ int main(void)
 		     "earlier release. This is not supported and there is no promise "
 		     "this will work!\n\n");
 
-		while ( true)
+		while ( true )
 		{
 			prompt(input, sizeof(input),
 			       "Downgrade to an earlier release?", "no");
@@ -594,7 +634,7 @@ int main(void)
 		     "release with an earlier ABI. This is not supported and there is "
 		     "no promise this will work!\n\n");
 
-		while ( true)
+		while ( true )
 		{
 			prompt(input, sizeof(input),
 			       "Downgrade to an earlier ABI?", "no");

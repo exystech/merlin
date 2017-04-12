@@ -191,7 +191,23 @@ int main(int argc, char* argv[])
 	}
 	free(new_release_path);
 
-	// TODO: Check if /etc/machine matches the current architecture.
+	const char* old_machine_path = "/etc/machine";
+	char* old_machine = read_string_file(old_machine_path);
+	if ( !old_machine )
+		err(2, "%s", old_machine_path);
+	char* new_machine_path;
+	if ( asprintf(&new_machine_path, "%s/etc/machine", source) < 0 )
+		err(2, "asprintf");
+	char* new_machine = read_string_file(new_machine_path);
+	if ( !new_machine )
+		err(2, "%s", new_machine_path);
+	if ( strcmp(old_machine, new_machine) != 0 )
+		errx(2, "%s (%s) does not match %s (%s)", new_machine_path,
+		     new_machine, old_machine_path, old_machine);
+	free(old_machine);
+	free(new_machine_path);
+	free(new_machine);
+
 	// TODO: Check for version (skipping, downgrading).
 
 	struct conf conf;
