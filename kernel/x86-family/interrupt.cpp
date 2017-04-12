@@ -240,7 +240,7 @@ void Init()
 	RegisterRawHandler(47, irq15, false, false);
 	RegisterRawHandler(128, syscall_handler, true, true);
 	RegisterRawHandler(129, yield_cpu_handler, true, false);
-	RegisterRawHandler(130, isr130, true, true);
+	RegisterRawHandler(130, isr130, false, true);
 	RegisterRawHandler(131, isr131, true, true);
 	RegisterRawHandler(132, thread_exit_handler, true, false);
 
