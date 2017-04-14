@@ -98,7 +98,7 @@ static void pstree(pid_t pid, const char* prefix, bool continuation)
 					err(1, "malloc");
 				memcpy(new_prefix, prefix, prefix_length);
 				memcpy(new_prefix + prefix_length,
-					   psst.ppid_next != -1 ? " | " : "   ", 3);
+					   psst.ppid_next != -1 ? " │ " : "   ", 3);
 				for ( size_t i = 0; i < path_length; i++ )
 					new_prefix[prefix_length + 3 + i] = ' ';
 				new_prefix[prefix_length + 3 + path_length] = '\0';
