@@ -538,6 +538,131 @@ static void set_videomode(void)
 		        xres, yres, bpp);
 }
 
+static int no_dot_nor_dot_dot(const struct dirent* entry, void* ctx)
+{
+	(void) ctx;
+	return !strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..") ? 0 : 1;
+}
+
+struct clean_tmp
+{
+	struct clean_tmp* parent;
+	DIR* dir;
+	char* path;
+	struct dirent** entries;
+	int num_entries;
+	int current_entry;
+};
+
+static void clean_tmp(void)
+{
+	const char* tmp_path = "/tmp";
+	struct clean_tmp* state = calloc(1, sizeof(struct clean_tmp));
+	if ( !state )
+	{
+		warning("malloc: %m");
+		return;
+	}
+	state->path = strdup(tmp_path);
+	if ( !state->path )
+	{
+		warning("malloc: %m");
+		free(state);
+		return;
+	}
+	state->dir = opendir(state->path);
+	if ( !state->dir )
+	{
+		warning("%s: %m", state->path);
+		free(state->path);
+		free(state);
+		return;
+	}
+	while ( state )
+	{
+		if ( !state->entries )
+		{
+			state->num_entries = dscandir_r(state->dir, &state->entries,
+			                                no_dot_nor_dot_dot, NULL,
+			                                alphasort_r, NULL);
+			if ( state->num_entries < 0 )
+				warning("%s: %m", state->path);
+		}
+		if ( state->num_entries <= state->current_entry )
+		{
+			closedir(state->dir);
+			for ( int i = 0; i < state->num_entries; i++ )
+				free(state->entries[i]);
+			free(state->entries);
+			free(state->path);
+			struct clean_tmp* new_state = state->parent;
+			free(state);
+			state = new_state;
+			if ( state )
+			{
+				struct dirent* entry = state->entries[state->current_entry];
+				const char* name = entry->d_name;
+				int fd = dirfd(state->dir);
+				if ( unlinkat(fd, name, AT_REMOVEDIR) < 0 )
+					warning("%s/%s: %m", state->path, name);
+				state->current_entry++;
+			}
+			continue;
+		}
+		struct dirent* entry = state->entries[state->current_entry];
+		const char* name = entry->d_name;
+		int fd = dirfd(state->dir);
+		if ( unlinkat(fd, name, AT_REMOVEFILE | AT_REMOVEDIR) < 0 )
+		{
+			if ( errno == ENOTEMPTY )
+			{
+				struct clean_tmp* new_state =
+					calloc(1, sizeof(struct clean_tmp));
+				if ( !new_state )
+				{
+					warning("%s/%s: malloc: %m", state->path, name);
+					state->current_entry++;
+					continue;
+				}
+				new_state->path = join_paths(state->path, name);
+				if ( !new_state->path )
+				{
+					warning("%s/%s: malloc: %m", state->path, name);
+					free(new_state);
+					state->current_entry++;
+					continue;
+				}
+				int flags = O_DIRECTORY | O_RDONLY | O_NOFOLLOW;
+				int newfd = openat(fd, new_state->path, flags);
+				if ( newfd < 0 )
+				{
+					warning("%s: %m", new_state->path);
+					free(new_state->path);
+					free(new_state);
+					state->current_entry++;
+					continue;
+				}
+				new_state->dir = fdopendir(newfd);
+				if ( !new_state->dir )
+				{
+					warning("%s: %m", new_state->path);
+					close(newfd);
+					free(new_state->path);
+					free(new_state);
+					state->current_entry++;
+					continue;
+				}
+				new_state->parent = state;
+				state = new_state;
+				continue;
+			}
+			else
+				warning("%s/%s: %m", state->path, name);
+		}
+		state->current_entry++;
+	}
+}
+
 static void init_early(void)
 {
 	static bool done = false;
@@ -548,6 +673,7 @@ static void init_early(void)
 	// Make sure that we have a /tmp directory.
 	umask(0000);
 	mkdir("/tmp", 01777);
+	clean_tmp();
 
 	// Set the default file creation mask.
 	umask(0022);

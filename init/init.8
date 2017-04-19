@@ -84,6 +84,11 @@ command line if it hasn't been password protected.
 Likewise unprivileged users can use their own replacement bootloader by booting
 a portable device under their control if the firmware configuration has not been
 password protected.
+.Ss Cleanup of /tmp
+.Nm
+deletes everything inside of
+.Pa /tmp
+if it exists, otherwise it is created with mode 1777.
 .Ss Partition Creation
 .Nm
 will scan every block device for valid partition tables and create the
