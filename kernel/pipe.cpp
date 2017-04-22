@@ -183,7 +183,7 @@ ssize_t PipeChannel::recvmsg(ioctx_t* ctx, struct msghdr* msg_ptr, int flags)
 	struct iovec* iov = new struct iovec[msg.msg_iovlen];
 	if ( !iov )
 		return -1;
-	if ( !ctx->copy_from_src(&iov, msg.msg_iov, iov_size) )
+	if ( !ctx->copy_from_src(iov, msg.msg_iov, iov_size) )
 		return delete[] iov, -1;
 	msg.msg_iov = iov;
 	size_t result = recvmsg_internal(ctx, &msg, flags);
@@ -317,7 +317,7 @@ ssize_t PipeChannel::sendmsg(ioctx_t* ctx, const struct msghdr* msg_ptr,
 	struct iovec* iov = new struct iovec[msg.msg_iovlen];
 	if ( !iov )
 		return -1;
-	if ( !ctx->copy_from_src(&iov, msg.msg_iov, iov_size) )
+	if ( !ctx->copy_from_src(iov, msg.msg_iov, iov_size) )
 		return delete[] iov, -1;
 	msg.msg_iov = iov;
 	size_t result = sendmsg_internal(ctx, &msg, flags);
