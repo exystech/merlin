@@ -84,7 +84,7 @@ int heap_get_paranoia(void);
 #endif
 #endif
 
-#if defined(HEAP_GUARD_DEBUG) && !defined(__is_sortix_libk)
+#if defined(HEAP_GUARD_DEBUG)
 struct heap_alloc
 {
 	uintptr_t from;
