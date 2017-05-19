@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,6 +17,7 @@
  * Provides access to filesystems in the Sortix kernel initrd format.
  */
 
+#include <sys/stat.h>
 #include <sys/types.h>
 
 #include <err.h>
@@ -86,19 +87,30 @@ initrd_inode_t* CloneInode(const initrd_inode_t* src)
 }
 
 bool ReadInodeData(int fd, initrd_superblock_t* sb, initrd_inode_t* inode,
-                   uint8_t* dest, size_t size)
+                   uint8_t* dest, size_t size, off_t offset)
 {
 	(void) sb;
-	if ( inode->size < size ) { errno = EINVAL; return false; }
-	return preadall(fd, dest, size, inode->dataoffset) == size;
+	if ( offset < 0 )
+		return errno = EINVAL, false;
+	if ( inode->size < (uintmax_t) offset )
+		return errno = EINVAL, false;
+	size_t available = inode->size - offset;
+	if ( inode->size < available )
+		return errno = EINVAL, false;
+	return preadall(fd, dest, size, inode->dataoffset + offset) == size;
 }
 
 uint8_t* GetInodeDataSize(int fd, initrd_superblock_t* sb,
                           initrd_inode_t* inode, size_t size)
 {
 	uint8_t* buf = (uint8_t*) malloc(size);
-	if ( !buf ) { return NULL; }
-	if ( !ReadInodeData(fd, sb, inode, buf, size) ) { free(buf); return NULL; }
+	if ( !buf )
+		return NULL;
+	if ( !ReadInodeData(fd, sb, inode, buf, size, 0) )
+	{
+		free(buf);
+		return NULL;
+	}
 	return buf;
 }
 
@@ -185,11 +197,94 @@ bool PrintFile(int fd, initrd_superblock_t* sb, initrd_inode_t* inode)
 		uint8_t buffer[BUFFER_SIZE];
 		uint32_t available = inode->size - sofar;
 		uint32_t count = available < BUFFER_SIZE ? available : BUFFER_SIZE;
-		if ( !ReadInodeData(fd, sb, inode, buffer, count) ) { return false; }
+		if ( !ReadInodeData(fd, sb, inode, buffer, count, 0) ) { return false; }
 		if ( writeall(1, buffer, count) != count ) { return false; }
 		sofar += count;
 	}
 	return true;
+}
+
+void Extract(int fd,
+             const char* fd_path,
+             initrd_superblock_t* sb,
+             initrd_inode_t* inode,
+             const char* out_path,
+             bool verbose)
+{
+	if ( verbose )
+		printf("%s\n", out_path);
+	if ( INITRD_S_ISLNK(inode->mode) )
+	{
+		char* buffer = (char*) malloc(inode->size + 1);
+		if ( !buffer )
+			err(1, "malloc");
+		if ( !ReadInodeData(fd, sb, inode, (uint8_t*) buffer, inode->size, 0) )
+			err(1, "%s", fd_path);
+		buffer[inode->size] = '\0';
+		// TODO: What if it already exists.
+		if ( symlink(buffer, out_path) < 0 )
+			err(1, "%s", out_path);
+		return;
+	}
+	else if ( INITRD_S_ISREG(inode->mode) )
+	{
+		int out_fd = open(out_path, O_WRONLY | O_CREAT | O_TRUNC, 0200);
+		if ( out_fd < 0 )
+			err(1, "%s", out_path);
+		uint32_t sofar = 0;
+		while ( sofar < inode->size )
+		{
+			const size_t BUFFER_SIZE = 16UL * 1024UL;
+			uint8_t buffer[BUFFER_SIZE];
+			uint32_t available = inode->size - sofar;
+			uint32_t count = available < BUFFER_SIZE ? available : BUFFER_SIZE;
+			if ( !ReadInodeData(fd, sb, inode, buffer, count, sofar) )
+				err(1, "%s", fd_path);
+			if ( writeall(out_fd, buffer, count) != count )
+				err(1, "%s", out_path);
+			sofar += count;
+		}
+		if ( fchmod(out_fd, inode->mode & 07777) < 0 )
+			err(1, "%s", out_path);
+		close(out_fd);
+		return;
+	}
+	else if ( !INITRD_S_ISDIR(inode->mode) )
+		errx(1, "%s: Unsupported kind of file", out_path);
+	bool made = true;
+	if ( mkdir(out_path, 0700) < 0 )
+	{
+		if ( errno != EEXIST )
+			err(1, "%s", out_path);
+		made = false;
+	}
+	uint8_t* direntries = GetInodeData(fd, sb, inode);
+	if ( !direntries )
+		err(1, "%s", out_path);
+	uint32_t offset = 0;
+	while ( offset < inode->size )
+	{
+		initrd_dirent_t* dirent = (initrd_dirent_t*) (direntries + offset);
+		offset += dirent->reclen;
+		if ( !dirent->namelen ) // TODO: Possible?
+			continue;
+		if ( !strcmp(dirent->name, ".") || !strcmp(dirent->name, "..") )
+			continue;
+		char* child_path;
+		if ( asprintf(&child_path, "%s/%s", out_path, dirent->name) < 0 )
+			err(1, "asprintf");
+		initrd_inode_t* child_inode = ResolvePath(fd, sb, inode, dirent->name);
+		if ( !child_inode )
+			err(1, "%s: %s", fd_path, out_path);
+		Extract(fd, fd_path, sb, child_inode, child_path, verbose);
+		free(child_path);
+	}
+	free(direntries);
+	// TODO: Time of check to time of use race condition, a concurrent rename
+	//       and we may assign the permissions to the wrong file, potentially
+	//       exploitable.
+	if ( made && chmod(out_path, inode->mode & 07777) < 0 )
+		err(1, " %s", out_path);
 }
 
 static void compact_arguments(int* argc, char*** argv)
@@ -205,21 +300,12 @@ static void compact_arguments(int* argc, char*** argv)
 	}
 }
 
-static void help(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "Usage: %s [OPTION]... INITRD (ls | cat) PATH\n", argv0);
-	fprintf(fp, "Accesses data in a Sortix kernel init ramdisk.\n");
-}
-
-static void version(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
-}
-
 int main(int argc, char* argv[])
 {
 	bool all = false;
-	const char* argv0 = argv[0];
+	const char* destination = ".";
+	bool verbose = false;
+
 	for ( int i = 1; i < argc; i++ )
 	{
 		const char* arg = argv[i];
@@ -233,24 +319,24 @@ int main(int argc, char* argv[])
 			char c;
 			while ( (c = *++arg) ) switch ( c )
 			{
+			case 'a': all = true; break;
+			case 'C':
+				if ( !*(destination = arg + 1) )
+				{
+					if ( i + 1 == argc )
+						errx(1, "option requires an argument -- 'C'");
+					destination = argv[i+1];
+					argv[++i] = NULL;
+				}
+				arg = "C";
+				break;
+			case 'v': verbose = true; break;
 			default:
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				help(stderr, argv0);
-				exit(1);
+				errx(1, "unknown option -- '%c'", c);
 			}
 		}
-		else if ( !strcmp(arg, "--help") )
-			help(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--version") )
-			version(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "-a") )
-			all = true;
 		else
-		{
-			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			help(stderr, argv0);
-			exit(1);
-		}
+			errx(1, "unknown option: %s", arg);
 	}
 
 	compact_arguments(&argc, &argv);
@@ -261,44 +347,49 @@ int main(int argc, char* argv[])
 	if ( argc == 2 )
 		errx(1, "No command specified");
 	const char* cmd = argv[2];
-	if ( argc == 3 )
-		errx(1, "No path specified");
-	const char* path = argv[3];
 
 	int fd = open(initrd, O_RDONLY);
-	if ( fd < 0 ) { err(1, "open: %s", initrd); }
+	if ( fd < 0 )
+		err(1, "open: %s", initrd);
 
 	initrd_superblock_t* sb = GetSuperBlock(fd);
-	if ( !sb ) { err(1, "read: %s", initrd); }
-
-	if ( path[0] != '/' ) { errno = ENOENT; err(1, "%s", path); }
+	if ( !sb )
+		err(1, "read: %s", initrd);
 
 	initrd_inode_t* root = GetInode(fd, sb, sb->root);
-	if ( !root ) { err(1, "read: %s", initrd); }
+	if ( !root )
+		err(1, "read: %s", initrd);
 
-	initrd_inode_t* inode = ResolvePath(fd, sb, root, path+1);
-	if ( !inode ) { err(1, "%s", path); }
-
-	free(root);
-
-	if ( !strcmp(cmd, "cat") )
+	for ( int i = 3; i < argc; i++ )
 	{
-		if ( !PrintFile(fd, sb, inode) ) { err(1, "%s", path); }
-	}
-	else if ( !strcmp(cmd, "ls") )
-	{
-		initrd_inode_t* dir = inode;
-		if ( !ListDirectory(fd, sb, dir, all) ) { err(1, "%s", path); }
-	}
-	else
-	{
-		fprintf(stderr, "%s: unrecognized command: %s", argv0, cmd);
-		exit(1);
-	}
+		const char* path = argv[i];
+		if ( path[0] != '/' )
+		{
+			errno = ENOENT;
+			errx(1, "%s", path);
+		}
 
-	free(inode);
-	free(sb);
-	close(fd);
+		initrd_inode_t* inode = ResolvePath(fd, sb, root, path+1);
+		if ( !inode )
+			err(1, "%s", path);
+
+		if ( !strcmp(cmd, "cat") )
+		{
+			if ( !PrintFile(fd, sb, inode) )
+				err(1, "%s", path);
+		}
+		else if ( !strcmp(cmd, "ls") )
+		{
+			if ( !ListDirectory(fd, sb, inode, all) )
+				err(1, "%s", path);
+		}
+		else if ( !strcmp(cmd, "extract") )
+			Extract(fd, initrd, sb, inode, destination, verbose);
+		else
+			errx(1, "unrecognized command: %s", cmd);
+
+		free(inode);
+	}
 
 	return 0;
 }
