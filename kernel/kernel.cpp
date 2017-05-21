@@ -666,7 +666,10 @@ static void BootThread(void* /*user*/)
 		Log::Sync();
 		HaltKernel();
 	default:
-		PanicF("Init returned with unexpected return code %i", status);
+		Log::PrintF("kernel: fatal: init exited with unexpected exit code %i\n",
+		            status);
+		Log::Sync();
+		HaltKernel();
 	}
 }
 

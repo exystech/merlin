@@ -218,10 +218,12 @@ graphics resolution (see
 .Sh EXIT STATUS
 .Nm
 exits 0 if the kernel should power off, exits 1 if the kernel should reboot, or
-exits 2 if the boot failed and the kernel should halt.
+exits 2 if the boot failed and the kernel should halt with a complaint about an
+.Nm
+fatality.
 Any other exit by the initial
 .Nm
-will trigger a kernel panic.
+will cause the kernel to halt with a complaint about an unexpected exit code.
 .Nm
 exits with the same exit status as its target session if it terminates normally.
 .Sh SEE ALSO

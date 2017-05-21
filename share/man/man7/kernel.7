@@ -39,7 +39,10 @@ delimiter to stop kernel option parsing.
 The computer is powered off if the
 .Nm init
 process exits 0, rebooted if it exits 1,
-halted if it exits 2, and paniced otherwise.
+halted with an complaint about an
+.Nm init
+fatality if it exits 2, and halted with a complaint about an unexpected exit code
+otherwise.
 .Pp
 The options are as follows:
 .Bl -tag -width "12345678"
