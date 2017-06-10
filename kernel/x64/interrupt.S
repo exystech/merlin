@@ -339,6 +339,7 @@ thread_exit_handler:
 	jmp interrupt_handler_prepare
 
 interrupt_handler_prepare:
+	cld
 	movq $1, asm_is_cpu_interrupted
 
 	pushq %r15

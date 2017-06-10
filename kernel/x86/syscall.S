@@ -25,6 +25,8 @@
 .type syscall_handler, @function
 syscall_handler:
 	/* -- stack is 12 bytes from being 16-byte aligned -- */
+	cld
+
 	movl $0, errno
 
 	pushl %ebp

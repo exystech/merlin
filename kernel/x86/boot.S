@@ -54,6 +54,9 @@ nullpage: .global nullpage
 .type __start, @function
 _start:
 __start:
+	# Clear the direction flag.
+	cld
+
 	# Initialize the stack pointer. The magic value is from kernel.cpp.
 	movl $(stack + 65536), %esp # 64 KiB, see kernel.cpp
 

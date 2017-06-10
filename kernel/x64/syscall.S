@@ -24,6 +24,7 @@
 .section .text
 .type syscall_handler, @function
 syscall_handler:
+	cld
 	movl $0, errno
 
 	pushq %rbp
