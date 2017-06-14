@@ -206,9 +206,7 @@ void* syscall_list[SYSCALL_MAX_NUM + 1] =
 
 int sys_bad_syscall(void)
 {
-	// TODO: Send signal, set errno, or crash/abort process?
-	Log::PrintF("I am the bad system call!\n");
-	return errno = EINVAL, -1;
+	return errno = ENOSYS, -1;
 }
 
 } // namespace Sortix
