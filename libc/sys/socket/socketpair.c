@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -131,7 +131,7 @@ static int socketpair_unix_stream(int flags, int fds[2])
 
 int socketpair(int family, int type, int protocol, int fds[2])
 {
-	if ( family == AF_UNIX )
+	if ( family == AF_UNSPEC || family == AF_UNIX )
 	{
 		if ( protocol != 0 )
 			return errno = EPROTONOSUPPORT, -1;
