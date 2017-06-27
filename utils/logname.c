@@ -65,6 +65,7 @@ int main(int argc, char* argv[])
 	if ( 1 < argc )
 		errx(1, "unexpected extra operand");
 
+	errno = 0;
 	char* login_name = getlogin();
 	if ( !login_name )
 	{
