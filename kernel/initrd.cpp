@@ -209,6 +209,8 @@ static void ExtractDir(struct initrd_context* ctx,
 			PanicF("initrd_directory_open: %s: %m", name);
 		struct initrd_inode* child =
 			(struct initrd_inode*) initrd_get_inode(ctx, childino);
+		if ( !child )
+			PanicF("initrd_get_inode(%u): %s: %m", childino, name);
 		mode_t mode = initrd_mode_to_host_mode(child->mode);
 		if ( INITRD_S_ISDIR(child->mode) )
 		{
@@ -310,7 +312,10 @@ static void ExtractInitrd(Ref<Descriptor> desc, struct initrd_context* ctx)
 	                               O_READ | O_DIRECTORY, 0)) )
 		PanicF("initrd: .initrd-links: %m");
 
-	ExtractNode(ctx, initrd_get_inode(ctx, ctx->sb->root), desc);
+	struct initrd_inode* root = initrd_get_inode(ctx, ctx->sb->root);
+	if ( !root )
+		PanicF("initrd: initrd_get_inode(%u): %m", ctx->sb->root);
+	ExtractNode(ctx, root, desc);
 
 	union
 	{
