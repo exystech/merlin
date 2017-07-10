@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,17 +22,15 @@
 
 #include <sys/cdefs.h>
 
+#if __USE_SORTIX || __USE_POSIX
 #include <sys/__/types.h>
+#endif
 
 #if __USE_SORTIX
 #include <stdint.h>
 #endif
 
 #include <sortix/wait.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #define EXIT_SUCCESS (0)
 #define EXIT_FAILURE (1)
@@ -54,11 +52,13 @@ typedef struct
 	long rem;
 } ldiv_t;
 
+#if 1999 <= __USE_C || defined(__cplusplus)
 typedef struct
 {
 	long long quot;
 	long long rem;
 } lldiv_t;
+#endif
 
 #ifndef NULL
 #define __need_NULL
@@ -77,13 +77,16 @@ typedef struct
 #include <stddef.h>
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void abort(void) __attribute__ ((__noreturn__));
 int abs(int value);
 int atexit(void (*function)(void));
 double atof(const char* value);
 int atoi(const char*);
 long atol(const char*);
-long long atoll(const char*);
 void* bsearch(const void*, const void*, size_t, size_t, int (*)(const void*, const void*));
 void* calloc(size_t, size_t);
 char* canonicalize_file_name(const char* path);
@@ -96,8 +99,6 @@ void free(void*);
 char* getenv(const char*);
 long labs(long);
 ldiv_t ldiv(long, long);
-long long llabs(long long);
-lldiv_t lldiv(long long, long long);
 void* malloc(size_t);
 int mblen(const char*, size_t);
 size_t mbstowcs(wchar_t* __restrict, const char* __restrict, size_t);
@@ -127,12 +128,18 @@ float strtof(const char* __restrict, char** __restrict);
 long strtol(const char* __restrict, char** __restrict, int);
 long double strtold(const char* __restrict, char** __restrict);
 unsigned long strtoul(const char* __restrict, char** __restrict, int);
-unsigned long long strtoull(const char* __restrict, char** __restrict, int);
-long long strtoll(const char* __restrict, char** __restrict, int);
 int system(const char*);
 int unsetenv(const char*);
 size_t wcstombs(char* __restrict, const wchar_t *__restrict, size_t);
 int wctomb(char*, wchar_t);
+
+#if 1999 <= __USE_C || defined(__cplusplus)
+long long atoll(const char*);
+long long llabs(long long);
+lldiv_t lldiv(long long, long long);
+unsigned long long strtoull(const char* __restrict, char** __restrict, int);
+long long strtoll(const char* __restrict, char** __restrict, int);
+#endif
 
 #if defined(__is_sortix_libc)
 struct exit_handler
