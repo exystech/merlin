@@ -39,7 +39,7 @@ static const uint32_t DISPMSG_CONTROL_VM_AUTO_SCALE = 1 << 6;
 
 struct dispmsg_string
 {
-	size_t byte_size; // Including the terminating NUL-byte.
+	size_t byte_size; /* Including the terminating NUL-byte. */
 	char* str;
 };
 
@@ -64,104 +64,104 @@ struct dispmsg_crtc_mode
 
 struct dispmsg_header
 {
-	uint64_t msgid; // in
+	uint64_t msgid; /* in */
 };
 
 #define DISPMSG_ENUMERATE_DEVICES 0x00
 struct dispmsg_enumerate_devices
 {
-	uint64_t msgid; // in
-	size_t devices_length; // in, out
-	uint64_t* devices; // in, *out
+	uint64_t msgid; /* in */
+	size_t devices_length; /* in, out */
+	uint64_t* devices; /* in, *out */
 };
 
 #define DISPMSG_GET_DRIVER_COUNT 0x01
 struct dispmsg_get_driver_count
 {
-	uint64_t msgid; // in
-	uint64_t device; // in
-	uint64_t driver_count; // out
+	uint64_t msgid; /* in */
+	uint64_t device; /* in */
+	uint64_t driver_count; /* out */
 };
 
 #define DISPMSG_GET_DRIVER_NAME 0x02
 struct dispmsg_get_driver_name
 {
-	uint64_t msgid; // in
-	uint64_t device; // in
-	uint64_t driver_index; // in
-	struct dispmsg_string name; // out
+	uint64_t msgid; /* in */
+	uint64_t device; /* in */
+	uint64_t driver_index; /* in */
+	struct dispmsg_string name; /* out */
 };
 
 #define DISPMSG_GET_DRIVER 0x03
 struct dispmsg_get_driver
 {
-	uint64_t msgid; // in
-	uint64_t device; // in
-	uint64_t driver_index; // out
+	uint64_t msgid; /* in */
+	uint64_t device; /* in */
+	uint64_t driver_index; /* out */
 };
 
 #define DISPMSG_SET_DRIVER 0x04
 struct dispmsg_set_driver
 {
-	uint64_t msgid; // in
-	uint64_t device; // in
-	uint64_t driver_index; // in
+	uint64_t msgid; /* in */
+	uint64_t device; /* in */
+	uint64_t driver_index; /* in */
 };
 
 #define DISPMSG_SET_CRTC_MODE 0x05
 struct dispmsg_set_crtc_mode
 {
-	uint64_t msgid; // in
-	uint64_t device; // in
-	uint64_t connector; // in
-	struct dispmsg_crtc_mode mode; // in
+	uint64_t msgid; /* in */
+	uint64_t device; /* in */
+	uint64_t connector; /* in */
+	struct dispmsg_crtc_mode mode; /* in */
 };
 
 #define DISPMSG_GET_CRTC_MODE 0x06
 struct dispmsg_get_crtc_mode
 {
-	uint64_t msgid; // in
-	uint64_t device; // in
-	uint64_t connector; // in
-	struct dispmsg_crtc_mode mode; // out
+	uint64_t msgid; /* in */
+	uint64_t device; /* in */
+	uint64_t connector; /* in */
+	struct dispmsg_crtc_mode mode; /* out */
 };
 
 #define DISPMSG_GET_CRTC_MODES 0x07
 struct dispmsg_get_crtc_modes
 {
-	uint64_t msgid; // in
-	uint64_t device; // in
-	uint64_t connector; // in
-	size_t modes_length; // in, out
-	struct dispmsg_crtc_mode* modes; // in, *out
+	uint64_t msgid; /* in */
+	uint64_t device; /* in */
+	uint64_t connector; /* in */
+	size_t modes_length; /* in, out */
+	struct dispmsg_crtc_mode* modes; /* in, *out */
 };
 
 #define DISPMSG_GET_MEMORY_SIZE 0x08
 struct dispmsg_get_memory_size
 {
-	uint64_t msgid; // in
-	uint64_t device; // in
-	uint64_t memory_size; // out
+	uint64_t msgid; /* in */
+	uint64_t device; /* in */
+	uint64_t memory_size; /* out */
 };
 
 #define DISPMSG_WRITE_MEMORY 0x09
 struct dispmsg_write_memory
 {
-	uint64_t msgid; // in
-	uint64_t device; // in
-	uint64_t offset; // in
-	size_t size; // in
-	uint8_t* src; // in, *in
+	uint64_t msgid; /* in */
+	uint64_t device; /* in */
+	uint64_t offset; /* in */
+	size_t size; /* in */
+	uint8_t* src; /* in, *in */
 };
 
 #define DISPMSG_READ_MEMORY 0x0A
 struct dispmsg_read_memory
 {
-	uint64_t msgid; // in
-	uint64_t device; // in
-	uint64_t offset; // in
-	size_t size; // in
-	uint8_t* dst; // in, *out
+	uint64_t msgid; /* in */
+	uint64_t device; /* in */
+	uint64_t offset; /* in */
+	size_t size; /* in */
+	uint8_t* dst; /* in, *out */
 };
 
 struct tiocgdisplay
@@ -172,8 +172,8 @@ struct tiocgdisplay
 
 struct tiocgdisplays
 {
-	size_t count; // in, out
-	struct tiocgdisplay* displays; // in, *out
+	size_t count; /* in, out */
+	struct tiocgdisplay* displays; /* in, *out */
 };
 
 #ifdef __cplusplus

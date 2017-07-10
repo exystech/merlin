@@ -58,7 +58,7 @@
 
 typedef struct initrd_superblock
 {
-	char magic[16]; // "sortix-initrd-2"
+	char magic[16]; /* "sortix-initrd-2" */
 	uint32_t fssize;
 	uint32_t revision;
 	uint32_t inodesize;

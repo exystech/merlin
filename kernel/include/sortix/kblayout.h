@@ -33,7 +33,7 @@ extern "C" {
 
 struct kblayout
 {
-	char magic[32]; // "sortix-kblayout-1"
+	char magic[32]; /* "sortix-kblayout-1" */
 	char name[32];
 	uint32_t num_modifiers;
 	uint32_t num_scancodes;
