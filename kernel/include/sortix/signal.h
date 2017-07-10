@@ -22,10 +22,6 @@
 
 #include <sys/cdefs.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define SIGHUP      1 /* Hangup */
 #define SIGINT      2 /* Interrupt */
 #define SIGQUIT     3 /* Quit */
@@ -68,9 +64,5 @@ extern "C" {
 #define SIG_ERR ((void (*)(int)) -1)
 #define SIG_DFL ((void (*)(int)) 0)
 #define SIG_IGN ((void (*)(int)) 1)
-
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
 
 #endif

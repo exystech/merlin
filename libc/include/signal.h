@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,27 +22,31 @@
 
 #include <sys/cdefs.h>
 
+#if __USE_SORTIX || __USE_POSIX
 #include <sys/__/types.h>
+#endif
 
+#if __USE_SORTIX || __USE_POSIX
 #if !defined(__is_sortix_libk) && !defined(__is_sortix_kernel)
 #include <__/pthread.h>
 #endif
+#endif
 
+#include <sortix/signal.h>
+
+#if __USE_SORTIX || __USE_POSIX
 #include <sortix/sigaction.h>
 #include <sortix/sigevent.h>
 #include <sortix/siginfo.h>
-#include <sortix/signal.h>
-#include <sortix/signal.h>
 #include <sortix/sigprocmask.h>
 #include <sortix/sigset.h>
 #include <sortix/sigval.h>
 #include <sortix/stack.h>
 #include <sortix/timespec.h>
 #include <sortix/ucontext.h>
-
-#ifdef __cplusplus
-extern "C" {
 #endif
+
+#if __USE_SORTIX || __USE_POSIX
 
 #ifndef __uid_t_defined
 #define __uid_t_defined
@@ -72,22 +76,31 @@ typedef __pthread_attr_t pthread_attr_t;
 typedef __pthread_t pthread_t;
 #endif
 
-#endif
+#endif /* !defined(__is_sortix_libk) && !defined(__is_sortix_kernel) */
 
 #define NSIG __SIG_MAX_NUM
+
+#endif /* __USE_SORTIX || __USE_POSIX */
 
 typedef int sig_atomic_t;
 
 #define MINSIGSTKSZ 2048
 #define SIGSTKSZ 8192
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+int raise(int sig);
+void (*signal(int, void (*)(int)))(int);
+
+#if __USE_SORTIX || __USE_POSIX
 int kill(pid_t, int);
 int killpg(pid_t, int);
 void psiginfo(const siginfo_t*, const char*);
 void psignal(int, const char*);
 /* TODO: int pthread_kill(pthread_t, int); */
 int pthread_sigmask(int, const sigset_t* __restrict, sigset_t* __restrict);
-int raise(int sig);
 int sigaction(int, const struct sigaction* __restrict, struct sigaction* __restrict);
 int sigaddset(sigset_t*, int);
 int sigaltstack(const stack_t* __restrict, stack_t* __restrict);
@@ -97,7 +110,6 @@ int sigemptyset(sigset_t*);
 int sigfillset(sigset_t*);
 int sigisemptyset(const sigset_t*);
 int sigismember(const sigset_t*, int);
-void (*signal(int, void (*)(int)))(int);
 int signotset(sigset_t*, const sigset_t*);
 int sigorset(sigset_t*, const sigset_t*, const sigset_t*);
 int sigpending(sigset_t*);
@@ -108,6 +120,7 @@ int sigsuspend(const sigset_t*);
                           const struct timespec* __restrict); */
 /* TODO: int sigwait(const sigset_t* __restrict, int* __restrict); */
 /* TODO: int sigwaitinfo(const sigset_t* __restrict, siginfo_t* __restrict); */
+#endif
 
 #ifdef __cplusplus
 } /* extern "C" */
