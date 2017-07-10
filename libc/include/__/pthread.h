@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -147,10 +147,12 @@ typedef struct
 #if defined(__is_sortix_libc)
 typedef struct
 {
+	char __structure_is_non_empty;
 } __pthread_rwlockattr_t;
 #else
 typedef struct
 {
+	char __structure_is_non_empty;
 } __pthread_rwlockattr_t;
 #endif
 
