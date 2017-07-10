@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,10 +22,8 @@
 
 #include <sys/cdefs.h>
 
+#if __USE_SORTIX || __USE_POSIX
 #include <sys/__/types.h>
-
-#ifdef __cplusplus
-extern "C" {
 #endif
 
 #ifndef NULL
@@ -47,6 +45,10 @@ extern "C" {
 typedef int __locale_t;
 typedef __locale_t locale_t;
 #endif
+#endif
+
+#ifdef __cplusplus
+extern "C" {
 #endif
 
 void* memchr(const void*, int, size_t);
