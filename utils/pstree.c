@@ -92,16 +92,18 @@ static void pstree(pid_t pid, const char* prefix, bool continuation)
 			char* new_prefix;
 			if ( prefix[0] )
 			{
+				const char* drawing = psst.ppid_next != -1 ? " │ " : "   ";
+				size_t drawing_length = strlen(drawing);
 				size_t prefix_length = strlen(prefix);
-				size_t new_prefix_length = prefix_length + 3 + path_length;
+				size_t new_prefix_length =
+					prefix_length + drawing_length + path_length;
 				if ( !(new_prefix = (char*) malloc(new_prefix_length + 1)) )
 					err(1, "malloc");
 				memcpy(new_prefix, prefix, prefix_length);
-				memcpy(new_prefix + prefix_length,
-					   psst.ppid_next != -1 ? " │ " : "   ", 3);
+				memcpy(new_prefix + prefix_length, drawing, drawing_length);
 				for ( size_t i = 0; i < path_length; i++ )
-					new_prefix[prefix_length + 3 + i] = ' ';
-				new_prefix[prefix_length + 3 + path_length] = '\0';
+					new_prefix[prefix_length + drawing_length + i] = ' ';
+				new_prefix[prefix_length + drawing_length + path_length] = '\0';
 			}
 			else
 			{
