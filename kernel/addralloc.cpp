@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  * addralloc.cpp
- * Class to keep track of mount points.
+ * Kernel virtual address space allocation.
  */
 
 #include <assert.h>
