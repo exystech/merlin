@@ -370,7 +370,8 @@ int main(void)
 		     "software installed to properly upgrade installations.\n");
 		while ( true )
 		{
-			prompt(input, sizeof(input), "Sure you want to proceed?", "no");
+			prompt(input, sizeof(input), "ignore_missing_programs",
+			       "Sure you want to proceed?", "no");
 			if ( strcasecmp(input, "no") == 0 )
 				return 0;
 			if ( strcasecmp(input, "yes") == 0 )
@@ -400,14 +401,14 @@ int main(void)
 	};
 	size_t num_readies = sizeof(readies) / sizeof(readies[0]);
 	const char* ready = readies[arc4random_uniform(num_readies)];
-	prompt(input, sizeof(input), "Ready?", ready);
+	prompt(input, sizeof(input), "ready", "Ready?", ready);
 	text("\n");
 
 	bool kblayout_setable = 0 <= tcgetblob(0, "kblayout", NULL, 0);
 	while ( kblayout_setable )
 	{
 		// TODO: Detect the name of the current keyboard layout.
-		prompt(input, sizeof(input),
+		prompt(input, sizeof(input), "kblayout",
 		       "Choose your keyboard layout ('?' or 'L' for list)", "default");
 		if ( !strcmp(input, "?") ||
 		     !strcmp(input, "l") ||
@@ -481,7 +482,7 @@ int main(void)
 		const char* def = good ? "no" : "yes";
 		while ( true )
 		{
-			prompt(input, sizeof(input),
+			prompt(input, sizeof(input), "videomode",
 			       "Select display resolution? (yes/no)", def);
 			if ( strcasecmp(input, "no") && strcasecmp(input, "yes") )
 				continue;
@@ -521,7 +522,8 @@ int main(void)
 		{
 			while ( true )
 			{
-				prompt(input, sizeof(input), "No existing installations found, "
+				prompt(input, sizeof(input), "run_installer_instead",
+					   "No existing installations found, "
 					   "run installer instead? (yes/no)", "yes");
 				if ( !strcasecmp(input, "no") || !strcasecmp(input, "yes") )
 					break;
@@ -551,7 +553,8 @@ int main(void)
 			const char* def = NULL;
 			if ( installations_count == 1 )
 				def = path_of_blockdevice(installations[0].bdev);
-			prompt(input, sizeof(input), "Which installation to upgrade?", def);
+			prompt(input, sizeof(input), "which_installaton",
+			       "Which installation to upgrade?", def);
 			target = NULL;
 			for ( size_t i = 0; i < installations_count; i++ )
 			{
@@ -585,7 +588,7 @@ int main(void)
 		      "promise this will work!\n", target->machine, source_machine);
 		while ( true )
 		{
-			prompt(input, sizeof(input),
+			prompt(input, sizeof(input), "switch_architecture",
 			       "Change the existing installation to another architecture?",
 			       "no");
 			if ( !strcasecmp(input, "no") || !strcasecmp(input, "yes") )
@@ -605,7 +608,7 @@ int main(void)
 
 		while ( true )
 		{
-			prompt(input, sizeof(input),
+			prompt(input, sizeof(input), "downgrade_release",
 			       "Downgrade to an earlier release?", "no");
 			if ( !strcasecmp(input, "no") || !strcasecmp(input, "yes") )
 				break;
@@ -622,7 +625,7 @@ int main(void)
 
 		while ( true )
 		{
-			prompt(input, sizeof(input),
+			prompt(input, sizeof(input), "skip_release",
 			       "Skip across releases?", "no");
 			if ( !strcasecmp(input, "no") || !strcasecmp(input, "yes") )
 				break;
@@ -641,7 +644,7 @@ int main(void)
 
 		while ( true )
 		{
-			prompt(input, sizeof(input),
+			prompt(input, sizeof(input), "downgrade_abi",
 			       "Downgrade to an earlier ABI?", "no");
 			if ( !strcasecmp(input, "no") || !strcasecmp(input, "yes") )
 				break;
@@ -707,7 +710,7 @@ int main(void)
 
 		while ( true )
 		{
-			prompt(input, sizeof(input),
+			prompt(input, sizeof(input), "cancel_pending_sysmerge",
 			       "Cancel pending sysmerge upgrade?", "yes");
 			if ( !strcasecmp(input, "no") || !strcasecmp(input, "yes") )
 				break;
@@ -774,7 +777,7 @@ int main(void)
 
 		while ( true )
 		{
-			promptx(input, sizeof(input),
+			promptx(input, sizeof(input), "confirm_upgrade",
 				   "Upgrade? (yes/no/poweroff/reboot/halt)", "yes", true);
 			if ( !strcasecmp(input, "yes") )
 				break;
@@ -930,7 +933,7 @@ int main(void)
 
 	while ( true )
 	{
-		prompt(input, sizeof(input),
+		prompt(input, sizeof(input), "finally",
 		       "What now? (poweroff/reboot/halt)", "reboot");
 		if ( !strcasecmp(input, "poweroff") )
 			return 0;

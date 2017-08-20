@@ -424,7 +424,8 @@ int main(void)
 		     "software installed to properly install this operating system.\n");
 		while ( true )
 		{
-			prompt(input, sizeof(input), "Sure you want to proceed?", "no");
+			prompt(input, sizeof(input), "ignore_missing_programs",
+			       "Sure you want to proceed?", "no");
 			if ( strcasecmp(input, "no") == 0 )
 				return 0;
 			if ( strcasecmp(input, "yes") == 0 )
@@ -453,7 +454,7 @@ int main(void)
 	};
 	size_t num_readies = sizeof(readies) / sizeof(readies[0]);
 	const char* ready = readies[arc4random_uniform(num_readies)];
-	prompt(input, sizeof(input), "Ready?", ready);
+	prompt(input, sizeof(input), "ready", "Ready?", ready);
 	text("\n");
 
 	text("This is not yet a fully fledged operating system. You should adjust "
@@ -475,7 +476,7 @@ int main(void)
 	while ( kblayout_setable )
 	{
 		// TODO: Detect the name of the current keyboard layout.
-		prompt(input, sizeof(input),
+		prompt(input, sizeof(input), "kblayout",
 		       "Choose your keyboard layout ('?' or 'L' for list)", "default");
 		if ( !strcmp(input, "?") ||
 		     !strcmp(input, "l") ||
@@ -561,7 +562,7 @@ int main(void)
 		const char* def = good ? "no" : "yes";
 		while ( true )
 		{
-			prompt(input, sizeof(input),
+			prompt(input, sizeof(input), "videomode",
 			       "Select a default display resolution? (yes/no)", def);
 			if ( strcasecmp(input, "no") && strcasecmp(input, "yes") )
 				continue;
@@ -617,7 +618,7 @@ int main(void)
 	while ( true )
 	{
 		const char* def = bootloader_default ? "yes" : "no";
-		prompt(accept_grub, sizeof(accept_grub),
+		prompt(accept_grub, sizeof(accept_grub), "grub",
 		       "Install a new GRUB bootloader?", def);
 		if ( strcasecmp(accept_grub, "no") == 0 ||
 		     strcasecmp(accept_grub, "yes") == 0 )
@@ -639,6 +640,7 @@ int main(void)
 		while ( true )
 		{
 			prompt(accept_grub_password, sizeof(accept_grub_password),
+			       "grub_password",
 			       "Password protect interactive bootloader? (yes/no)", "yes");
 			if ( strcasecmp(accept_grub_password, "no") == 0 ||
 			     strcasecmp(accept_grub_password, "yes") == 0 )
@@ -661,8 +663,8 @@ int main(void)
 			if ( !strcmp(first, "") )
 			{
 				char answer[32];
-				prompt(answer, sizeof(answer),
-					   "Empty password is stupid, are you sure? (yes/no)", "no");
+				prompt(answer, sizeof(answer), "grub_password_empty",
+				       "Empty password is stupid, are you sure? (yes/no)", "no");
 				if ( strcasecmp(answer, "yes") != 0 )
 					continue;
 			}
@@ -790,6 +792,7 @@ int main(void)
 			while ( true )
 			{
 				prompt(return_to_disked, sizeof(return_to_disked),
+				       "missing_bios_boot_partition",
 				       "Return to disked to make a BIOS boot partition?", "yes");
 				if ( strcasecmp(accept_grub, "no") == 0 ||
 					 strcasecmp(accept_grub, "yes") == 0 )
@@ -827,7 +830,7 @@ int main(void)
 
 	while ( true )
 	{
-		prompt(input, sizeof(input),
+		prompt(input, sizeof(input), "confirm_install",
 		       "Install " BRAND_DISTRIBUTION_NAME "? "
 		       "(yes/no/poweroff/reboot/halt)", "yes");
 		if ( !strcasecmp(input, "yes") )
@@ -961,7 +964,7 @@ int main(void)
 			fclose(defhost_fp);
 		}
 		char hostname[HOST_NAME_MAX + 1] = "";
-		prompt(hostname, sizeof(hostname), "System hostname?",
+		prompt(hostname, sizeof(hostname), "hostname", "System hostname?",
 		       defhost[0] ? defhost : NULL);
 		if ( !install_configurationf("etc/hostname", "w", "%s\n", hostname) )
 			continue;
@@ -1000,7 +1003,7 @@ int main(void)
 		if ( !strcmp(first, "") )
 		{
 			char answer[32];
-			prompt(answer, sizeof(answer),
+			prompt(answer, sizeof(answer), "empty_password",
 			       "Empty password is stupid, are you sure? (yes/no)", "no");
 			if ( strcasecmp(answer, "yes") != 0 )
 				continue;
@@ -1051,7 +1054,7 @@ int main(void)
 		const char* question = "Setup a user? (enter username or 'no')";
 		if ( made_user )
 			question = "Setup another user? (enter username or 'no')";
-		prompt(userstr, sizeof(userstr), question, "no");
+		prompt(userstr, sizeof(userstr), NULL, question, "no");
 		if ( !strcmp(userstr, "no") )
 			break;
 		if ( !strcmp(userstr, "yes") )
@@ -1065,7 +1068,7 @@ int main(void)
 			continue;
 		}
 		static char name[256];
-		prompt(name, sizeof(name), "Full name of user?", user);
+		prompt(name, sizeof(name), NULL, "Full name of user?", user);
 		char first[128];
 		char second[128];
 		while ( true )
@@ -1081,7 +1084,7 @@ int main(void)
 			if ( !strcmp(first, "") )
 			{
 				char answer[32];
-				prompt(answer, sizeof(answer),
+				prompt(answer, sizeof(answer), "empty_password",
 				       "Empty password is stupid, are you sure? (yes/no)", "no");
 				if ( strcasecmp(answer, "yes") != 0 )
 					continue;
@@ -1144,7 +1147,7 @@ int main(void)
 
 	while ( true )
 	{
-		prompt(input, sizeof(input),
+		prompt(input, sizeof(input), "finally",
 		       "What now? (poweroff/reboot/halt/boot)", "boot");
 		if ( !strcasecmp(input, "poweroff") )
 			exit(0);

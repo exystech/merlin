@@ -144,18 +144,21 @@ void textf(const char* format, ...)
 
 void prompt(char* buffer,
             size_t buffer_size,
+            const char* autoconf_name,
             const char* question,
             const char* answer)
 {
-	promptx(buffer, buffer_size, question, answer, false);
+	promptx(buffer, buffer_size, autoconf_name, question, answer, false);
 }
 
 void promptx(char* buffer,
              size_t buffer_size,
+             const char* autoconf_name,
              const char* question,
              const char* answer,
              bool catch_if_shell)
 {
+	(void) autoconf_name;
 	while ( true )
 	{
 		printf("\e[1m");
