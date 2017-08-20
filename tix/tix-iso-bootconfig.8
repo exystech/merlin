@@ -216,6 +216,13 @@ GRUB module is loaded and an
 hook is emitted that loads
 .Pa output-directory/boot/liveconfig.tar.xz
 as a multiboot module.
+.Pp
+If the liveconfig contains
+.Xr autoinstall.conf 5
+or
+.Xr autoupgrade.conf 5 ,
+the menu titles are modified to loudly warn they will automatically
+install/upgrade the operating system.
 .It Fl \-random-seed
 Copy 256 bytes of randomness from
 .Pa /dev/urandom

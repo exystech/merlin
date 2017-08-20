@@ -1,0 +1,443 @@
+.Dd April 23, 2023
+.Dt AUTOINSTALL.CONF 5
+.Os
+.Sh NAME
+.Nm autoinstall.conf
+.Nd automatic installation configuration
+.Sh SYNOPSIS
+.Nm /etc/autoinstall.conf
+.Sh DESCRIPTION
+.Nm
+configures
+.Xr sysinstall 8
+to do an automatic operating system
+.Xr installation 7 .
+.Pp
+The system administrator can automate operating system installations by
+following
+.Xr release-iso-modification 7
+to embed the
+.Pa /etc/autoinstall.conf
+file into the release cdrom filesystem.
+Existing installations can similarly be automatically upgraded using
+.Xr autoupgrade.conf 5 .
+.Pp
+Each line is formatted as
+.Ar question Ns = Ns Ar answer
+which provides an
+.Ar answer
+to a
+.Ar question
+asked during installation.
+Alternatively
+.Ar question Ns += Ns Ar answer
+appends to an existing answer (if any) separated by a space, and
+.Ar question Ns ++= Ns Ar answer
+appends another line to an existing answer (if any).
+Empty lines and lines starting with
+.Sq #
+are comments and are ignored.
+Otherwise whitespace is significant.
+The empty answer accepts the default answer (if any) and is different from no
+answer, which makes
+.Xr sysinstall 8
+ask the question normally.
+Installations can be made fully non-interactive using
+.Sy accept_defaults .
+.Pp
+Each question has a counterpart question suffixed with
+.Sq "!"
+which contains a
+.Xr sh 1
+script that is executed before the question is asked.
+If the original question isn't answered, then the script's standard output
+is used as the answer to the original question.
+The installation aborts if the script exits unsuccessfully.
+These scripts are useful to customize the installation with arbitrary code.
+.Pp
+The questions in chronological order are as follows:
+.Bl -tag -width "12345678"
+.It Sy accept_defaults Ns "=" Ns Oo Sy no "|" yes Oc ( default Sy no )
+Accept the default answer (if any) to questions that were not
+configured in
+.Nm ?
+This feature makes installations entirely automated even if unexpected questions
+are asked, although the essential questions must be answered.
+.It Sy countdown Ns "=" Ns Ar seconds No ( default Li 10 )
+Count down for this many
+.Ar seconds
+with a warning that an automated installation is about to happen?
+The countdown happens if
+.Sy accept_defaults=yes
+or if the
+.Sy ready
+question is answered and either the
+.Sy disked
+or
+.Sy confirm_install
+questions are answered.
+.It Sy ignore_missing_programs Ns "=" Ns Oo Sy no "|" yes Oc ( default Sy no )
+Ignore if the installer environment does not have the needed ports installed?
+This situation ordinarily does not happen.
+.It Sy ready Ns "=" Ns Ar affirmation
+Are you ready to begin the installation process?
+This is a human readable positive affirmation of your choice that you're ready
+to install, useful for fully automated installations.
+Not answering this question is useful for semi-automated installations where one
+would acknowledge the installation before it's begun.
+It also provides the opportunity to escape to a shell before installing.
+.Pp
+The
+.Sy "ready!"
+question is convenient for running shell commands before the installation
+begins.
+.It Sy kblayout Ns "=" Ns Oo Sy default "|" Ar layout Oc ( default Sy default )
+Switch to this keyboard
+.Ar layout
+using
+.Xr chkblayout 1 ?
+The choice is remembered as the
+.Xr kblayout 5
+system default.
+.It Sy videomode Ns "=" Ns Oo Sy no "|" Sy yes "|" Ar WIDTH Ns x Ns Ar HEIGHT Ns x Ns Ar BPP Oc ( default Sy yes )
+Interactively select a graphics resolution using
+.Xr chvideomode 1
+or non-interactively set it to the specified resolution?
+The choice is remembered as the
+.Xr videomode 5
+system default.
+.Pp
+If the installation is non-interactive with
+.Sy accept_defaults=true ,
+then the default is instead
+.Sy no .
+.It Sy grub Ns "=" Ns Oo Sy no "|" Sy yes Oc
+Install the GRUB bootloader onto the device containing the
+.Pa /boot
+filesystem (if it exists, otherwise the root filesystem)?
+The default is
+.Sy yes
+if any existing installations are found with GRUB enabled or if no filesystems
+were found, otherwise the default is
+.Sy no .
+.Pp
+This is an essential question that must be answered for automatic installations.
+.It Sy grub_password Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy yes )
+Protect the bootloader with a password to avoid unauthorized root access via the
+advanced bootloader features?
+The standard bootloader menu options don't require a password.
+The password is set in the
+.Sy grub_password_hash
+question.
+.Pp
+If the installation is non-interactive with
+.Sy accept_defaults=true ,
+then the default is instead
+.Sy no
+if the
+.Sy grub_password_hash
+question is not answered.
+.It Sy grub_password_hash Ns "=" Ns Ar hash
+The bootloader password as hashed by the
+.Xr grub-mkpasswd-pbkdf2 1
+program?
+The password is asked interactively if this question is not answered.
+The choice is remembered in
+.Xr grubpw 5 .
+.Pp
+Although it's discouraged to place unhashed passwords in
+.Nm ,
+the
+.Sy "grub_password!"
+question could be answered with
+.Li "grub-mkpasswd-pbkdf2 -p password"
+to dynamically hash the bootloader password.
+.It Sy grub_password_empty Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy no )
+Allow an insecure empty bootloader password typed interactively?
+.It Sy disked Ns "=" Ns Ar commands
+Commands to create partitions and filesystems with
+.Xr disked 8 ?
+The
+.Li ++=
+syntax is useful to append multiple lines to the
+.Sy disked
+answer.
+A root filesystem must be mounted in order to install the operating system.
+The mountpoints are remembered in
+.Xr fstab 5 .
+.Pp
+This is an essential question that must be answered for automatic installations.
+.Pp
+The
+.Sy "disked!"
+question is convenient for running shell commands before the partitioning step,
+or to generate dynamic partitioning commands on the standard output if the
+original
+.Sy disked
+question is unanswered.
+.It Sy missing_bios_boot_partition Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy yes )
+Attempt
+.Xr disked 8
+again if the GRUB bootloader is installed but the
+.Pa /boot
+directory's filesystem is inside a GPT partition table that doesn't have a
+biosboot partition?
+.It Sy confirm_install Ns "=" Ns Oo Sy no "|" Sy yes "|" Sy exit "|" Sy poweroff "|" Sy reboot "|" Sy halt Oc ( default Sy yes )
+Install the operating system or abort the installation?
+This is the final confirmation before the operating system is installed, after
+the partitioning has taken place.
+.Pp
+The
+.Sy "confirm_install!"
+question is convenient for running shell commands before the installation step,
+after partitioning has happened, but before the filesystems are mounted.
+.It Sy hostname Ns "=" Ns Ar hostname
+Hostname for the installation?
+The choice is remembered in
+.Xr hostname 5 .
+.Pp
+This is an essential question that must be answered for automatic installations.
+If it isn't answered and
+.Sy accept_defaults=yes ,
+then the current (and likely default) hostname is used.
+.It Sy password_hash_root Ns "=" Ns Ar hash
+Password for the root user as hashed with
+.Xr crypt_newhash 2 ?
+The empty string sets the password to the empty string (insecure) and a literal
+.Sy x
+disables password login for root.
+The choice is remembered in
+.Xr passwd 5 .
+.Pp
+This is an essential question that must be answered for automatic installations.
+If it isn't answered and
+.Sy accept_defaults=yes ,
+then password login is disabled for root.
+.Pp
+Although it's discouraged to place unhashed passwords in
+.Nm ,
+the
+.Sy "password_hash_root!"
+question could be answered with
+.Li "echo password | passwd -H"
+to dynamically hash the root password.
+.It Sy password_hash_root Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy no )
+Allow an insecure empty root password typed interactively?
+.It Sy copy_ssh_authorized_keys_root Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy yes )
+Copy the
+.Pa /root/.ssh/authorized_keys
+file (if it exists) into the installation?
+.It Sy copy_ssh_config_root Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy yes )
+Copy the
+.Pa /root/.ssh/config
+file (if it exists) into the installation?
+.It Sy copy_ssh_id_rsa_root Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy yes )
+Copy the
+.Pa /root/.ssh/id_rsa
+file (if it exists) into the installation?
+.It Sy copy_ssh_known_hosts_root Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy yes )
+Copy the
+.Pa /root/.ssh/known_hosts
+file (if it exists) into the installation?
+.It Sy empty_password Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy no )
+Allow insecure empty passwords for regular users?
+.It Sy enable_ntpd Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy no )
+Automatically get time from the network using
+.Xr ntpd 8 ?
+Note this choice has privacy implications as the servers in
+.Xr ntpd.conf 5
+file will be contacted in the background.
+The choice is remembered in
+.Pa /etc/init/local
+per
+.Xr init 5 .
+.It Sy enable_sshd Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy no )
+Enable the
+.Xr sshd 8
+secure shell server?
+The choice is remembered in
+.Pa /etc/init/local
+per
+.Xr init 5 .
+.It Sy copy_sshd_config Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy no )
+Copy the
+.Pa /etc/sshd_config
+file (if it exists) into the installation?
+.It Sy enable_sshd_password Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy no )
+Enable password authentication in the local
+.Xr sshd 8 ?
+The choice is remembered in
+.Xr sshd_config 5 .
+.Pp
+It's strongly encouraged to answer
+.Sy no
+and instead use public key authentication.
+The installation environment can be seeded with the ssh keys using the
+.Xr release-iso-modification 7
+procedure and the default answers will copy the keys into the installation.
+.It Sy enable_sshd_root_password Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy no )
+Enable ssh to the root user with password authentication?
+.It Sy copy_sshd_private_keys Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy yes )
+Copy the sshd private keys (if they exist) into the installation?
+These are
+.Pa /etc/ssh_host_ecdsa_key ,
+.Pa /etc/ssh_host_ed25519_key ,
+.Pa /etc/ssh_host_rsa_key .
+.It Sy finally Ns "=" Ns Oo Sy exit "|" Sy poweroff "|" Sy reboot "|" Sy halt "|" Sy boot Oc ( default Sy boot )
+What action should be taken when the installation is finished?
+.Pp
+The
+.Sy "finally!"
+question is convenient for running shell commands once the installation is
+complete to customize the installation.
+The working directory is the root filesystem of the installation with all
+filesystems mounted.
+The
+.Li "chroot -d ."
+command is useful to
+.Xr chroot 8
+into the new root filesystem to run commands with the
+.Pa /dev
+filesystem mounted.
+.El
+.Sh FILES
+.Bl -tag -width "/etc/autoinstall.conf" -compact
+.It Pa /etc/autoinstall.conf
+Automatic installation configuration.
+.El
+.Sh EXAMPLES
+.Ss Fully automated installation
+To perform a fully automated installation with root login disabled, create
+.Pa autoinstall.conf :
+.Bd -literal -offset indentq
+accept_defaults=yes
+grub=yes
+disked++=mktable mbr
+disked++=mkpart 1 0% 100% ext2 /
+hostname=dragon
+password_hash_root=x
+.Ed
+.Pp
+Then follow
+.Xr release-iso-modification 7
+to configure the installation medium:
+.Bd -literal -offset indent
+tix-iso-liveconfig --autoinstall=autoinstall.conf liveconfig
+tix-iso-bootconfig \\
+  --liveconfig=liveconfig --default=1 --random-seed \\
+  bootconfig
+tix-iso-add sortix.iso bootconfig -o autosortix.iso
+.Ed
+.Pp
+The resulting
+.Pa autosortix.iso
+image will then automatically format the harddisk and install the operating
+system on whatever machine it is booted on.
+Take care.
+.Ss Setting passwords
+The
+.Xr grub-mkpasswd-pbkdf2 1
+command can be used to hash a GRUB password and
+.Xr passwd 1
+can be used to hash a user password:
+.Bd -literal -offset indent
+grub-mkpasswd-pbkdf2 -p bootloader-password
+echo root-password | passwd -H
+.Ed
+.Pp
+The hashes can then be inserted in
+.Nm :
+.Bd -literal -offset indent
+grub_password_hash=grub.pbkdf2.sha512.10000.68DA[...]
+password_hash_root=$2b$10$d/9pP1[...]
+.Ed
+.Pp
+Alternatively the passwords could be embedded in
+.Nm ,
+however beware that your
+.Nm
+file and the installation medium could leak:
+.Bd -literal -offset indent
+grub_password_hash!=grub-mkpasswd-pbkdf2 -p bootloader-password
+password_hash_root!=echo root-password | passwd -H
+.Ed
+.Ss Automatically install with sshd
+To automatically install the operating system with sshd enabled with keys and
+authorizations set up ahead of time, first create
+.Pa autoinstall.conf :
+.Bd -literal -offset indent
+accept_defaults=yes
+grub=yes
+disked++=mktable mbr
+disked++=mkpart 1 0% 100% ext2 /
+hostname=example.com
+password_hash_root=x
+enable_sshd=yes
+.Ed
+.Pp
+Then follow
+.Xr release-iso-modification 7
+to configure the installation medium with automated installation and sshd:
+.Bd -literal -offset indent
+tix-iso-liveconfig \\
+  --autoinstall=autoinstall.conf \\
+  --root-ssh-authorized-keys="$HOME/.ssh/id_rsa.pub" \\
+  --sshd-keygen \\
+  --sshd-key-known-hosts-file="$HOME/.ssh/known_hosts" \\
+  --sshd-key-known-hosts-hosts="example.com example.com,192.0.2.1 192.0.2.1" \\
+  liveconfig
+tix-iso-bootconfig \\
+  --liveconfig=liveconfig --default=1 --random-seed \\
+  bootconfig
+tix-iso-add sortix.iso bootconfig -o autosortix.iso
+.Ed
+.Pp
+To ssh into the installation after it has finished:
+.Bd -literal -offset indent
+ssh root@example.com
+.Ed
+.Pp
+The connection will be immediately trusted because the just-generated server
+keys were associated with the hostname in the
+.Pa $HOME/.ssh/known_hosts
+file.
+This step assumes the hostname (example.com in this example) resolves to the
+installation's IP address, otherwise the IP address can be used directly.
+If the IP address is known ahead of time, it should be inserted into the
+space delimited
+.Fl \-sshd-key-known-hosts-hosts
+list of host aliases.
+.Ss Automatically install into a virtual machine with sshd
+To automatically install into a qemu virtual machine, follow the above example
+but instead associate the server keys with your localhost and optionally use a
+.Pa known_hosts
+file per virtual machine.
+.Bd -literal -offset indent
+  ...
+  --sshd-key-known-hosts-file="sortix.hdd.known_hosts" \\
+  --sshd-key-known-hosts-hosts=127.0.0.1 \\
+  ...
+.Ed
+.Pp
+Create the harddisk and spawn the virtual machine and forward the local port
+2222 to the virtual machine's port 22.
+.Bd -literal -offset indent
+qemu-img create -f qcow2 sortix.hdd 1G
+qemu-system-x86_64 \\
+  -vga std -m 1024 \\
+  -hda sortix.hdd -cdrom autosortix.iso \\
+  -device e1000,netdev=net0 \\
+  -netdev user,id=net0,hostfwd=tcp:127.0.0.1:2222-:22
+.Ed
+.Pp
+To ssh into the installation after it has finished:
+.Bd -literal -offset indent
+ssh -oUserKnownHostsFile=sortix.hdd.known_hosts -p 2222 root@127.0.0.1
+.Ed
+.Sh SEE ALSO
+.Xr autoupgrade.conf 5 ,
+.Xr upgrade.conf 5 ,
+.Xr release-iso-modification 7 ,
+.Xr upgrade 7 ,
+.Xr sysupgrade 8 ,
+.Xr tix 8

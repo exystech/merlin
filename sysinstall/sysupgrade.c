@@ -28,6 +28,7 @@
 #include <err.h>
 #include <errno.h>
 #include <fstab.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -42,6 +43,7 @@
 #include <mount/harddisk.h>
 #include <mount/partition.h>
 
+#include "autoconf.h"
 #include "conf.h"
 #include "devices.h"
 #include "execute.h"
@@ -329,6 +331,12 @@ void exit_handler(void)
 		rmdir(fs);
 }
 
+static void cancel_on_sigint(int signum)
+{
+	(void) signum;
+	errx(2, "fatal: Upgrade canceled");
+}
+
 int main(void)
 {
 	shlvl();
@@ -349,6 +357,13 @@ int main(void)
 	if ( atexit(exit_handler) != 0 )
 		err(2, "atexit");
 
+	autoconf_load("/etc/autoupgrade.conf");
+
+	char* accepts_defaults = autoconf_eval("accept_defaults");
+	bool non_interactive = accepts_defaults &&
+	                       !strcasecmp(accepts_defaults, "yes");
+	free(accepts_defaults);
+
 	struct utsname uts;
 	uname(&uts);
 
@@ -356,6 +371,41 @@ int main(void)
 
 	textf("Hello and welcome to the " BRAND_DISTRIBUTION_NAME " " VERSIONSTR ""
 	      " upgrader for %s.\n\n", uts.machine);
+
+	if ( autoconf_has("ready") ||
+	     autoconf_has("confirm_upgrade") )
+	{
+		int countdown = 10;
+		if ( autoconf_has("countdown") )
+		{
+			char* string = autoconf_eval("countdown");
+			countdown = atoi(string);
+			free(string);
+		}
+		sigset_t old_set;
+		sigset_t new_set;
+		sigemptyset(&new_set);
+		sigaddset(&new_set, SIGINT);
+		sigprocmask(SIG_BLOCK, &new_set, &old_set);
+		struct sigaction old_sa;
+		struct sigaction new_sa = { 0 };
+		new_sa.sa_handler = cancel_on_sigint;
+		sigaction(SIGINT, &new_sa, &old_sa);
+		for ( ; 0 < countdown; countdown-- )
+		{
+			textf("Automatically upgrading to " BRAND_DISTRIBUTION_NAME " "
+			      VERSIONSTR " in %i %s... (Control-C to cancel)\n", countdown,
+			      countdown != 1 ? "seconds" : "second");
+			sigprocmask(SIG_SETMASK, &old_set, NULL);
+			sleep(1);
+			sigprocmask(SIG_BLOCK, &new_set, &old_set);
+		}
+		textf("Automatically upgrading " BRAND_DISTRIBUTION_NAME " "
+			      VERSIONSTR "...\n");
+		text("\n");
+		sigaction(SIGINT, &old_sa, NULL);
+		sigprocmask(SIG_SETMASK, &old_set, NULL);
+	}
 
 	// '|' rather than '||' is to ensure side effects.
 	if ( missing_program("cut") |
@@ -401,6 +451,9 @@ int main(void)
 	};
 	size_t num_readies = sizeof(readies) / sizeof(readies[0]);
 	const char* ready = readies[arc4random_uniform(num_readies)];
+	if ( autoconf_has("confirm_upgrade") )
+		text("Warning: This upgrader will automatically upgrade an operating "
+		     "system!\n");
 	prompt(input, sizeof(input), "ready", "Ready?", ready);
 	text("\n");
 
@@ -479,16 +532,20 @@ int main(void)
 				good = true;
 			}
 		}
-		const char* def = good ? "no" : "yes";
+		const char* def = non_interactive || good ? "no" : "yes";
 		while ( true )
 		{
 			prompt(input, sizeof(input), "videomode",
-			       "Select display resolution? (yes/no)", def);
-			if ( strcasecmp(input, "no") && strcasecmp(input, "yes") )
+			       "Select display resolution? "
+			       "(yes/no/WIDTHxHEIGHTxBPP)", def);
+			unsigned int xres, yres, bpp;
+			bool set = sscanf(input, "%ux%ux%u", &xres, &yres, &bpp) == 3;
+			if ( !set && strcasecmp(input, "no") && strcasecmp(input, "yes") )
 				continue;
 			if ( strcasecmp(input, "no") == 0 )
 				break;
-			if ( execute((const char*[]) { "chvideomode", NULL }, "f") != 0 )
+			const char* r = set ? input : NULL;
+			if ( execute((const char*[]) { "chvideomode", r, NULL }, "f") != 0 )
 				continue;
 			break;
 		}
@@ -535,7 +592,7 @@ int main(void)
 				execlp("sysinstall", "sysinstall", (const char*) NULL);
 				err(2, "sysinstall");
 			}
-			continue;
+			errx(2, "Upgrade aborted since no installations were found");
 		}
 
 		while ( true )
