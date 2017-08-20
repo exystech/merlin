@@ -17,7 +17,7 @@ for argument do
   fi
 
   case $argument in
-  *=?*) parameter=$(expr "X$argument" : '[^=]*=\(.*\)') ;;
+  *=?*) parameter=$(expr "X$argument" : '[^=]*=\(.*\)' || true) ;;
   *=)   parameter= ;;
   *)    parameter=yes ;;
   esac

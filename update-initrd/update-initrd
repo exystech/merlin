@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+# Copyright (c) 2015, 2016, 2017 Jonas 'Sortie' Termansen.
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -29,7 +29,7 @@ for argument do
     continue
   fi
   case $argument in
-  *=?*) parameter=$(expr "X$argument" : '[^=]*=\(.*\)') ;;
+  *=?*) parameter=$(expr "X$argument" : '[^=]*=\(.*\)' || true) ;;
   *=)   parameter= ;;
   *)    parameter=yes ;;
   esac
