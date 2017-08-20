@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -158,6 +158,8 @@ void promptx(char* buffer,
 {
 	while ( true )
 	{
+		printf("\e[1m");
+		fflush(stdout);
 		text(question);
 		if ( answer )
 			printf(" [%s] ", answer);
@@ -165,6 +167,8 @@ void promptx(char* buffer,
 			printf(" ");
 		fflush(stdout);
 		fgets(buffer, buffer_size, stdin);
+		printf("\e[22m");
+		fflush(stdout);
 		size_t buffer_length = strlen(buffer);
 		if ( buffer_length && buffer[buffer_length-1] == '\n' )
 			buffer[--buffer_length] = '\0';
@@ -202,6 +206,8 @@ void password(char* buffer,
 	unsigned int termmode;
 	gettermmode(0, &termmode);
 	settermmode(0, termmode & ~TERMMODE_ECHO);
+	printf("\e[1m");
+	fflush(stdout);
 	text(question);
 	printf(" ");
 	fflush(stdout);
@@ -209,7 +215,7 @@ void password(char* buffer,
 	// TODO: This may leave a copy of the password in the stdio buffer.
 	fgets(buffer, buffer_size, stdin);
 	fflush(stdin);
-	printf("\n");
+	printf("\e[22m\n");
 	size_t buffer_length = strlen(buffer);
 	if ( buffer_length && buffer[buffer_length-1] == '\n' )
 		buffer[--buffer_length] = '\0';

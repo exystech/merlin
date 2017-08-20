@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -396,6 +396,8 @@ static void prompt(char* buffer,
 {
 	while ( true )
 	{
+		printf("\e[1m");
+		fflush(stdout);
 		text(question);
 		if ( answer )
 			printf(" [%s] ", answer);
@@ -403,6 +405,8 @@ static void prompt(char* buffer,
 			printf(" ");
 		fflush(stdout);
 		fgets(buffer, buffer_size, stdin);
+		printf("\e[22m");
+		fflush(stdout);
 		size_t buffer_length = strlen(buffer);
 		if ( buffer_length && buffer[buffer_length-1] == '\n' )
 			buffer[--buffer_length] = '\0';
