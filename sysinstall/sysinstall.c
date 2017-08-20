@@ -34,6 +34,7 @@
 #include <fstab.h>
 #include <limits.h>
 #include <pwd.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,6 +54,7 @@
 #include <mount/partition.h>
 #include <mount/uuid.h>
 
+#include "autoconf.h"
 #include "conf.h"
 #include "devices.h"
 #include "execute.h"
@@ -385,6 +387,12 @@ void exit_gui(int code)
 	exit(code);
 }
 
+static void cancel_on_sigint(int signum)
+{
+	(void) signum;
+	errx(2, "fatal: Installation canceled");
+}
+
 int main(void)
 {
 	shlvl();
@@ -422,10 +430,45 @@ int main(void)
 	if ( !conf_load(&conf, "/etc/upgrade.conf") && errno != ENOENT )
 		warn("/etc/upgrade.conf");
 
+	autoconf_load("/etc/autoinstall.conf");
+
 	static char input[256];
 
 	textf("Hello and welcome to the " BRAND_DISTRIBUTION_NAME " " VERSIONSTR ""
 	      " installer for %s.\n\n", uts.machine);
+
+	if ( autoconf_get("ready") &&
+	     autoconf_get("confirm_install") )
+	{
+		int countdown = 10;
+		// TODO: Is atoi defined on all inputs? Use a larger integer type!
+		//       Check for bad input!
+		if ( autoconf_get("countdown") )
+			countdown = atoi(autoconf_get("countdown"));
+		sigset_t old_set;
+		sigset_t new_set;
+		sigemptyset(&new_set);
+		sigaddset(&new_set, SIGINT);
+		sigprocmask(SIG_BLOCK, &new_set, &old_set);
+		struct sigaction old_sa;
+		struct sigaction new_sa = { 0 };
+		new_sa.sa_handler = cancel_on_sigint;
+		sigaction(SIGINT, &new_sa, &old_sa);
+		for ( ; 0 < countdown; countdown-- )
+		{
+			textf("Automatically installing " BRAND_DISTRIBUTION_NAME " "
+			      VERSIONSTR " in %i %s... (Control-C to cancel)\n", countdown,
+			      countdown != 1 ? "seconds" : "second");
+			sigprocmask(SIG_SETMASK, &old_set, NULL);
+			sleep(1);
+			sigprocmask(SIG_BLOCK, &new_set, &old_set);
+		}
+		textf("Automatically installing " BRAND_DISTRIBUTION_NAME " "
+		      VERSIONSTR "...\n");
+		text("\n");
+		sigaction(SIGINT, &old_sa, NULL);
+		sigprocmask(SIG_SETMASK, &old_set, NULL);
+	}
 
 	// '|' rather than '||' is to ensure side effects.
 	if ( missing_program("cut") |
@@ -478,6 +521,13 @@ int main(void)
 	};
 	size_t num_readies = sizeof(readies) / sizeof(readies[0]);
 	const char* ready = readies[arc4random_uniform(num_readies)];
+	if ( autoconf_get("disked") )
+		text("Warning: This installer will perform automatic harddisk "
+		     "partitioning!\n");
+	if ( autoconf_get("confirm_install") &&
+	     !strcasecmp(autoconf_get("confirm_install"), "yes") )
+		text("Warning: This installer will automatically install an operating "
+		     "system!\n");
 	prompt(input, sizeof(input), "ready", "Ready?", ready);
 	text("\n");
 
@@ -686,7 +736,12 @@ int main(void)
 			     strcasecmp(accept_grub_password, "yes") == 0 )
 				break;
 		}
-		while ( !strcasecmp(accept_grub_password, "yes") )
+		if ( autoconf_get("grub_password_hash") )
+		{
+			const char* hash = autoconf_get("grub_password_hash");
+			install_configurationf("grubpw", "w", "%s\n", hash);
+		}
+		else while ( !strcasecmp(accept_grub_password, "yes") )
 		{
 			char first[128];
 			char second[128];
@@ -755,7 +810,8 @@ int main(void)
 			text("Type man to display the disked(8) man page.\n");
 		not_first = true;
 		const char* argv[] = { "disked", "--fstab=fstab", NULL };
-		if ( execute(argv, "f") != 0 )
+		const char* disked_input = autoconf_get("disked");
+		if ( execute(argv, "fi", disked_input) != 0 )
 		{
 			// TODO: We also end up here on SIGINT.
 			// TODO: Offer a shell here instead of failing?
@@ -1030,6 +1086,21 @@ int main(void)
 	{
 		textf("Root account already exists, skipping creating it.\n");
 	}
+	else if ( autoconf_get("password_hash_root") )
+	{
+		const char* hash = autoconf_get("password_hash_root");
+		if ( !install_configurationf("etc/passwd", "a",
+			"root:%s:0:0:root:/root:sh\n"
+			"include /etc/default/passwd.d/*\n", hash) )
+			err(2, "etc/passwd");
+		textf("User '%s' added to /etc/passwd\n", "root");
+		if ( !install_configurationf("etc/group", "a",
+			"root::0:root\n"
+			"include /etc/default/group.d/*\n") )
+			err(2, "etc/passwd");
+		install_skel("/root", 0, 0);
+		textf("Group '%s' added to /etc/group.\n", "root");
+	}
 	else while ( true )
 	{
 		char first[128];
@@ -1139,8 +1210,9 @@ int main(void)
 	text("Congratulations, the system is now functional! This is a good time "
 	     "to do further customization of the system.\n\n");
 
+	// TODO: autoconf users support.
 	bool made_user = false;
-	for ( uid_t uid = 1000; true; )
+	for ( uid_t uid = 1000; !has_autoconf; )
 	{
 		while ( passwd_has_uid("etc/passwd", uid) )
 			uid++;
@@ -1222,7 +1294,9 @@ int main(void)
 		uid++;
 		made_user = true;
 	}
-	text("\n");
+	// TODO: autoconf support.
+	if ( !has_autoconf )
+		text("\n");
 
 	// TODO: Ask if networking should be disabled / enabled.
 

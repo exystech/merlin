@@ -28,6 +28,7 @@
 #include <err.h>
 #include <errno.h>
 #include <fstab.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -42,6 +43,7 @@
 #include <mount/harddisk.h>
 #include <mount/partition.h>
 
+#include "autoconf.h"
 #include "conf.h"
 #include "devices.h"
 #include "execute.h"
@@ -338,6 +340,12 @@ void exit_gui(int code)
 	exit(code);
 }
 
+static void cancel_on_sigint(int signum)
+{
+	(void) signum;
+	errx(2, "fatal: Upgrade canceled");
+}
+
 int main(void)
 {
 	shlvl();
@@ -358,6 +366,8 @@ int main(void)
 	if ( atexit(exit_handler) != 0 )
 		err(2, "atexit");
 
+	autoconf_load("/etc/autoupgrade.conf");
+
 	struct utsname uts;
 	uname(&uts);
 
@@ -365,6 +375,39 @@ int main(void)
 
 	textf("Hello and welcome to the " BRAND_DISTRIBUTION_NAME " " VERSIONSTR ""
 	      " upgrader for %s.\n\n", uts.machine);
+
+	if ( autoconf_get("ready") &&
+	     autoconf_get("confirm_install") )
+	{
+		int countdown = 10;
+		// TODO: Is atoi defined on all inputs? Use a larger integer type!
+		//       Check for bad input!
+		if ( autoconf_get("countdown") )
+			countdown = atoi(autoconf_get("countdown"));
+		sigset_t old_set;
+		sigset_t new_set;
+		sigemptyset(&new_set);
+		sigaddset(&new_set, SIGINT);
+		sigprocmask(SIG_BLOCK, &new_set, &old_set);
+		struct sigaction old_sa;
+		struct sigaction new_sa = { 0 };
+		new_sa.sa_handler = cancel_on_sigint;
+		sigaction(SIGINT, &new_sa, &old_sa);
+		for ( ; 0 < countdown; countdown-- )
+		{
+			textf("Automatically upgrading to " BRAND_DISTRIBUTION_NAME " "
+			      VERSIONSTR " in %i %s... (Control-C to cancel)\n", countdown,
+			      countdown != 1 ? "seconds" : "second");
+			sigprocmask(SIG_SETMASK, &old_set, NULL);
+			sleep(1);
+			sigprocmask(SIG_BLOCK, &new_set, &old_set);
+		}
+		textf("Automatically upgrading " BRAND_DISTRIBUTION_NAME " "
+			      VERSIONSTR "...\n");
+		text("\n");
+		sigaction(SIGINT, &old_sa, NULL);
+		sigprocmask(SIG_SETMASK, &old_set, NULL);
+	}
 
 	// '|' rather than '||' is to ensure side effects.
 	if ( missing_program("cut") |
@@ -410,6 +453,10 @@ int main(void)
 	};
 	size_t num_readies = sizeof(readies) / sizeof(readies[0]);
 	const char* ready = readies[arc4random_uniform(num_readies)];
+	if ( autoconf_get("confirm_upgrade") &&
+	     !strcasecmp(autoconf_get("confirm_upgrade"), "yes") )
+		text("Warning: This upgrader will automatically upgrade an operating "
+		     "system!\n");
 	prompt(input, sizeof(input), "ready", "Ready?", ready);
 	text("\n");
 

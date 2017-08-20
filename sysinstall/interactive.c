@@ -33,6 +33,7 @@
 
 #include <display.h>
 
+#include "autoconf.h"
 #include "execute.h"
 #include "interactive.h"
 
@@ -160,7 +161,6 @@ void promptx(char* buffer,
              const char* answer,
              bool catch_if_shell)
 {
-	(void) autoconf_name;
 	while ( true )
 	{
 		printf("\e[1m");
@@ -171,6 +171,21 @@ void promptx(char* buffer,
 		else
 			printf(" ");
 		fflush(stdout);
+		const char* autoconf_value = autoconf_get(autoconf_name);
+		const char* accept_defaults = autoconf_get("accept_defaults");
+		const char* automatic_answer = NULL;
+		if ( autoconf_value )
+			automatic_answer = autoconf_value;
+		else if ( accept_defaults && !strcasecmp(accept_defaults, "yes") )
+			automatic_answer = answer;
+		if ( automatic_answer )
+		{
+			printf("%s\n", automatic_answer);
+			printf("\e[22m");
+			fflush(stdout);
+			strlcpy(buffer, automatic_answer, buffer_size);
+			return;
+		}
 		fgets(buffer, buffer_size, stdin);
 		printf("\e[22m");
 		fflush(stdout);
