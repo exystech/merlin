@@ -305,7 +305,12 @@ void InstallPackage(const char* tix_path)
 	}
 
 	if ( !quiet )
-		printf("Installing `%s' into `%s'...\n", package_name, collection);
+	{
+		printf("Installing %s", package_name);
+		if ( strcmp(collection, "/") != 0 )
+			printf(" into `%s'\n", collection);
+		printf("...\n");
+	}
 
 	char* data_and_prefix = package_prefix && package_prefix[0] ?
 	                        print_string("data%s", package_prefix) :
