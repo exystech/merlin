@@ -611,8 +611,12 @@ void edit_line(struct edit_line* edit_state)
 					edit_line_show(edit_state);
 				} break;
 				case '~':
+					if ( params[0] == 1 )
+						edit_line_type_home(edit_state);
 					if ( params[0] == 3 )
 						edit_line_type_delete(edit_state);
+					if ( params[0] == 4 )
+						edit_line_type_end(edit_state);
 					break;
 				}
 				escape = 0;
