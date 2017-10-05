@@ -37,14 +37,17 @@ for argument do
   --) dashdash=yes ;;
   --sysroot=*) sysroot=$parameter ;;
   --sysroot) previous_option=sysroot ;;
-  --help) show_help ;;
-  --version) show_version ;;
   -*) echo "$0: unrecognized option $argument" >&2
       $option_checking && exit 1 ;;
   *) echo "$0: unexpected operand $argument" >&2
      exit 1 ;;
   esac
 done
+
+if test -n "$previous_option"; then
+  echo "$0: option '$argument' requires an argument" >&2
+  exit 1
+fi
 
 sysmerge=false
 exec_prefix="$sysroot"
