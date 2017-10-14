@@ -626,8 +626,14 @@ static void ExtractTix(Ref<Descriptor> desc, struct initrd_context* ctx)
 	{
 		if ( strncmp(TAR.name, "data", 4) != 0 || TAR.name[4] != '/' )
 			continue;
-		if ( !(manifest_list[manifest_list_count++] = strdup(TAR.name + 4)) )
+		char* path = strdup(TAR.name + 4);
+		if ( !path )
 			Panic("initrd tar malloc failure");
+		size_t length = strlen(path);
+		// Trim the trailing slash from directories.
+		if ( 2 <= length && path[length-1] == '/' )
+			path[length-1] = '\0';
+		manifest_list[manifest_list_count++] = path;
 	}
 	CloseTar(&TAR);
 	qsort(manifest_list, manifest_list_count, sizeof(char*), manifest_sort);
