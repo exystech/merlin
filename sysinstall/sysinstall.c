@@ -440,7 +440,7 @@ int main(void)
 	     "This is not something you should do on a whim or when you are "
 	     "impatient. Take the time to read the documentation and be patient "
 	     "while you learn the new system. This is a very good time to start an "
-		 "external music player that plays soothing classical music on loop.\n\n");
+	     "external music player that plays soothing classical music on loop.\n\n");
 	const char* readies[] =
 	{
 		"Ready",
