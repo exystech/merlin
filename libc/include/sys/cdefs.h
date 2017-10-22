@@ -55,4 +55,44 @@
 
 #define __pure2 __attribute__((__const__))
 
+/*
+ * Compatibility macros to advertise to ports when features become available.
+ * These macros are only for things that are not trivial to detect from a C
+ * source file (such as by a standard macro).
+ *
+ * The feature foo should initially have an undef preprocessor statement of the
+ * macro __SORTIX_HAS_FOO__ (or something like that). It should carry a TODO
+ * comment stating:
+ *
+ * - What the feature is and when the macro should become defined.
+ * - Which ports (if any) rely on this macro and will use the feature whenever
+ *   the macro is defined.
+ * - That the macro should be removed when the specific ports have been updated
+ *   to no longer rely on the macro. If no ports used the feature in the first
+ *   place, it should say to remove the macro when the feature is implemented.
+ *
+ * The undef statement should become a define statement when the feature is
+ * implemented. As the each port is updated after that, the feature should
+ * become unconditionally used in the port, and the port is removed from the
+ * list here. Finally, when the list is empty, the macro is removed entirely.
+ *
+ * For instance, the TODO statement for the feature foo with the undef'd macro
+ * __SORTIX_HAS_FOO__ might say:
+ *
+ *   "Define when foo is implemented. Remove when libbar, libqux, and libbaz are
+ *    updated to not rely on this macro."
+ *
+ * Should a port become broken if a macro is defined here, the port should be
+ * fixed (by either fixing it or disabling the feature in the port regardless
+ * of the macro) before the macro is officially enabled here.
+ */
+
+/* TODO: Define when floating point formating is implemented. Remove when gawk
+         is updated to not rely on this macro. */
+#undef __SORTIX_HAS_FORMAT_FLOAT__
+
+/* TODO: Define when floating point parsing is implemented. No ports are using
+         this macro at this time. Remove when the feature is implemented. */
+#undef __SORTIX_HAS_FLOAT_PARSE__
+
 #endif
