@@ -24,6 +24,9 @@
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#ifdef CP_PRETEND_TO_BE_INSTALL
+#include <libgen.h>
+#endif
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -46,6 +49,34 @@ static const int FLAG_TARGET_DIR = 1 << 2;
 static const int FLAG_NO_TARGET_DIR = 1 << 3;
 static const int FLAG_UPDATE = 1 << 4;
 static const int FLAG_FORCE = 1 << 5;
+#ifdef CP_PRETEND_TO_BE_INSTALL
+static const int FLAG_MKDIR = 1 << 31;
+#endif
+
+#ifdef CP_PRETEND_TO_BE_INSTALL
+int mkdir_p(const char* path, mode_t mode)
+{
+	int saved_errno = errno;
+	if ( !mkdir(path, mode) )
+		return 0;
+	if ( errno == ENOENT )
+	{
+		char* prev = strdup(path);
+		if ( !prev )
+			return -1;
+		int status =  mkdir_p(dirname(prev), mode | 0500);
+		free(prev);
+		if ( status < 0 )
+			return -1;
+		errno = saved_errno;
+		if ( !mkdir(path, mode) )
+			return 0;
+	}
+	if ( errno == EEXIST )
+		return errno = saved_errno, 0;
+	return -1;
+}
+#endif
 
 static char* join_paths(const char* a, const char* b)
 {
@@ -422,7 +453,7 @@ int main(int argc, char* argv[])
 			case 'b': /* ignored */ break;
 			case 'c': /* ignored */ break;
 			case 'C': /* ignored */ break;
-			case 'd': /* ignored */ break;
+			case 'd': flags |= FLAG_MKDIR; break;
 			case 'g': if ( *(arg + 1) ) arg = "g"; else if ( i + 1 != argc ) argv[++i] = NULL; break;
 			case 'm': if ( *(arg + 1) ) arg = "m"; else if ( i + 1 != argc ) argv[++i] = NULL; break;
 			case 'o': if ( *(arg + 1) ) arg = "o"; else if ( i + 1 != argc ) argv[++i] = NULL; break;
@@ -517,6 +548,22 @@ int main(int argc, char* argv[])
 
 	if ( argc < 2 )
 		errx(1, "missing file operand");
+
+#ifdef CP_PRETEND_TO_BE_INSTALL
+	if ( flags & FLAG_MKDIR )
+	{
+		bool success = true;
+		for ( int i = 1; i < argc; i++ )
+		{
+			if ( mkdir_p(argv[i], 0777) < 0 )
+			{
+				warn("%s", argv[i]);
+				success = false;
+			}
+		}
+		return success ? 0 : 1;
+	}
+#endif
 
 	if ( flags & FLAG_NO_TARGET_DIR )
 	{
