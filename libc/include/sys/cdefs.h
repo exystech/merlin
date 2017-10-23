@@ -95,4 +95,8 @@
          this macro at this time. Remove when the feature is implemented. */
 #undef __SORTIX_HAS_FLOAT_PARSE__
 
+/* TODO: Define when restartable system calls are implemented. Remove when git
+         is updated to not rely on this macro. */
+#undef __SORTIX_HAS_RESTARTABLE_SYSCALLS__
+
 #endif
