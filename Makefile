@@ -434,4 +434,4 @@ run-virtualbox-debug: sortix.iso
 # Statistics
 .PHONY: linecount
 linecount:
-	wc -l `git ls-files | grep -Ev '^libm/man/.*$$'` | sort -h
+	wc -l `git ls-files | grep -Ev '^libm/man/.*$$'` | LC_ALL=C sort
