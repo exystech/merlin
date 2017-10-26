@@ -53,16 +53,6 @@ Full::~Full()
 {
 }
 
-int Full::truncate(ioctx_t* /*ctx*/, off_t /*length*/)
-{
-	return 0;
-}
-
-off_t Full::lseek(ioctx_t* /*ctx*/, off_t offset, int /*whence*/)
-{
-	return offset;
-}
-
 ssize_t Full::read(ioctx_t* ctx, uint8_t* buf, size_t count)
 {
 	ctx->zero_dest(buf, count);

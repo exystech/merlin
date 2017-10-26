@@ -20,7 +20,6 @@
 #include <sys/types.h>
 
 #include <stdint.h>
-#include <string.h>
 #include <stdlib.h>
 
 #include <sortix/stat.h>
@@ -32,7 +31,8 @@
 
 namespace Sortix {
 
-DevRandom::DevRandom(dev_t dev, ino_t ino, uid_t owner, gid_t group, mode_t mode)
+DevRandom::DevRandom(dev_t dev, ino_t ino, uid_t owner, gid_t group,
+                     mode_t mode)
 {
 	inode_type = INODE_TYPE_STREAM;
 	if ( !dev )
@@ -51,16 +51,6 @@ DevRandom::DevRandom(dev_t dev, ino_t ino, uid_t owner, gid_t group, mode_t mode
 
 DevRandom::~DevRandom()
 {
-}
-
-int DevRandom::truncate(ioctx_t* /*ctx*/, off_t /*length*/)
-{
-	return 0;
-}
-
-off_t DevRandom::lseek(ioctx_t* /*ctx*/, off_t offset, int /*whence*/)
-{
-	return offset;
 }
 
 ssize_t DevRandom::read(ioctx_t* ctx, uint8_t* buf, size_t count)
@@ -82,7 +72,8 @@ ssize_t DevRandom::read(ioctx_t* ctx, uint8_t* buf, size_t count)
 	return (ssize_t) sofar;
 }
 
-ssize_t DevRandom::pread(ioctx_t* ctx, uint8_t* buf, size_t count, off_t /*off*/)
+ssize_t DevRandom::pread(ioctx_t* ctx, uint8_t* buf, size_t count,
+                         off_t /*off*/)
 {
 	return read(ctx, buf, count);
 }
@@ -92,8 +83,8 @@ ssize_t DevRandom::write(ioctx_t* /*ctx*/, const uint8_t* /*buf*/, size_t count)
 	return count;
 }
 
-ssize_t DevRandom::pwrite(ioctx_t* /*ctx*/, const uint8_t* /*buf*/, size_t count,
-                    off_t /*off*/)
+ssize_t DevRandom::pwrite(ioctx_t* /*ctx*/, const uint8_t* /*buf*/,
+                          size_t count, off_t /*off*/)
 {
 	return count;
 }

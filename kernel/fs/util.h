@@ -28,7 +28,7 @@ class UtilMemoryBuffer : public AbstractInode
 {
 public:
 	UtilMemoryBuffer(dev_t dev, ino_t ino, uid_t owner, gid_t group,
-	                 mode_t mode, uint8_t* buf, size_t bufsize,
+	                 mode_t mode, uint8_t* buf, off_t bufsize,
 	                 bool write = true, bool deletebuf = true);
 	virtual ~UtilMemoryBuffer();
 	virtual int truncate(ioctx_t* ctx, off_t length);
@@ -41,7 +41,7 @@ public:
 private:
 	kthread_mutex_t filelock;
 	uint8_t* buf;
-	size_t bufsize;
+	off_t bufsize;
 	bool write;
 	bool deletebuf;
 

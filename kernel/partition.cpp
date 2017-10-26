@@ -19,6 +19,7 @@
 
 #include <sys/types.h>
 
+#include <assert.h>
 #include <errno.h>
 
 #include <sortix/seek.h>
@@ -35,6 +36,10 @@ namespace Sortix {
 
 Partition::Partition(Ref<Inode> inner_inode, off_t start, off_t length)
 {
+	assert(0 <= start);
+	assert(0 <= length);
+	assert(length <= OFF_MAX - start);
+	assert(S_ISBLK(inner_inode->type) || S_ISREG(inner_inode->type));
 	this->dev = (dev_t) this;
 	this->ino = (ino_t) this;
 	this->type = inner_inode->type;
@@ -62,33 +67,48 @@ int Partition::truncate(ioctx_t* /*ctx*/, off_t new_length)
 
 off_t Partition::lseek(ioctx_t* /*ctx*/, off_t offset, int whence)
 {
-	if ( whence == SEEK_SET )
-		return offset;
-	if ( whence == SEEK_END )
-		// TODO: Avoid underflow and overflow!
-		return length + offset;
+	if ( whence == SEEK_END && offset == 0 )
+		return length;
 	return errno = EINVAL, -1;
 }
 
 ssize_t Partition::pread(ioctx_t* ctx, uint8_t* buf, size_t count, off_t off)
 {
+	if ( off < 0 )
+		return errno = EINVAL, -1;
 	if ( length <= off )
 		return 0;
 	off_t available = length - off;
 	if ( (uintmax_t) available < (uintmax_t) count )
 		count = available;
-	return inner_inode->pread(ctx, buf, count, start + off);
+	if ( count == 0 )
+		return 0;
+	off_t final_offset;
+	if ( __builtin_add_overflow(start, off, &final_offset) )
+		return errno = EOVERFLOW, -1;
+	assert(start <= final_offset);
+	assert(final_offset < start + length);
+	return inner_inode->pread(ctx, buf, count, final_offset);
 }
 
 ssize_t Partition::pwrite(ioctx_t* ctx, const uint8_t* buf, size_t count,
                           off_t off)
 {
+	if ( off < 0 )
+		return errno = EINVAL, -1;
 	if ( length <= off )
-		return 0;
+		return count ? (errno = EFBIG, -1) : 0;
 	off_t available = length - off;
 	if ( (uintmax_t) available < (uintmax_t) count )
 		count = available;
-	return inner_inode->pwrite(ctx, buf, count, start + off);
+	if ( count == 0 )
+		return 0;
+	off_t final_offset;
+	if ( __builtin_add_overflow(start, off, &final_offset) )
+		return errno = EOVERFLOW, -1;
+	assert(start <= final_offset);
+	assert(final_offset < start + length);
+	return inner_inode->pwrite(ctx, buf, count, final_offset);
 }
 
 int Partition::stat(ioctx_t* ctx, struct stat* st)

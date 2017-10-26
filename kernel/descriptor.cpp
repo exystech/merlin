@@ -119,6 +119,32 @@ Ref<Descriptor> OpenDirContainingPath(ioctx_t* ctx,
 	return ret;
 }
 
+size_t TruncateIOVec(struct iovec* iov, int iovcnt, off_t limit)
+{
+	assert(0 <= iovcnt);
+	assert(0 <= limit);
+	off_t left = limit;
+	if ( (uintmax_t) SSIZE_MAX <= (uintmax_t) left )
+		left = SSIZE_MAX;
+	size_t requested = 0;
+	for ( int i = 0; i < iovcnt; i++ )
+	{
+		size_t request = iov[i].iov_len;
+		if ( __builtin_add_overflow(requested, request, &requested) )
+			requested = SIZE_MAX;
+		if ( left == 0 )
+			iov[i].iov_len = 0;
+		else if ( (uintmax_t) left < (uintmax_t) request )
+		{
+			iov[i].iov_len = left;
+			left = 0;
+		}
+		else
+			left -= request;
+	}
+	return requested;
+}
+
 // TODO: Add security checks.
 
 Descriptor::Descriptor()
@@ -192,13 +218,14 @@ Ref<Descriptor> Descriptor::Fork()
 
 bool Descriptor::IsSeekable()
 {
+	if ( S_ISCHR(type) )
+		return false;
 	ScopedLock lock(&current_offset_lock);
 	if ( !checked_seekable )
 	{
-		// TODO: Is this enough? Check that errno happens to be ESPIPE?
 		int saved_errno = errno;
 		ioctx_t ctx; SetupKernelIOCtx(&ctx);
-		seekable = S_ISDIR(vnode->type) || 0 <= vnode->lseek(&ctx, SEEK_SET, 0);
+		seekable = S_ISDIR(vnode->type) || 0 <= vnode->lseek(&ctx, 0, SEEK_END);
 		checked_seekable = true;
 		errno = saved_errno;
 	}
@@ -242,18 +269,26 @@ int Descriptor::truncate(ioctx_t* ctx, off_t length)
 	if ( length < 0 )
 		return errno = EINVAL, -1;
 	if ( !(dflags & O_WRITE) )
-		return errno = EPERM, -1;
+		return errno = EBADF, -1;
 	return vnode->truncate(ctx, length);
 }
 
 off_t Descriptor::lseek(ioctx_t* ctx, off_t offset, int whence)
 {
-	// TODO: Possible information leak to let someone without O_READ | O_WRITE
-	//       seek the file and get information about data holes.
+	if ( S_ISCHR(type) )
+	{
+		if ( whence != SEEK_SET && whence != SEEK_CUR && whence != SEEK_END )
+			return errno = EINVAL, -1;
+		return 0;
+	}
+
 	if ( !IsSeekable() )
-		return vnode->lseek(ctx, offset, whence);
+		return errno = ESPIPE, -1;
 
 	ScopedLock lock(&current_offset_lock);
+
+	// TODO: Possible information leak to let someone without O_READ | O_WRITE
+	//       seek the file and get information about data holes.
 	off_t reloff;
 	if ( whence == SEEK_SET )
 		reloff = 0;
@@ -261,48 +296,51 @@ off_t Descriptor::lseek(ioctx_t* ctx, off_t offset, int whence)
 		reloff = current_offset;
 	else if ( whence == SEEK_END )
 	{
-		if ( (reloff = vnode->lseek(ctx, offset, SEEK_END)) < 0 )
+		if ( (reloff = vnode->lseek(ctx, 0, SEEK_END)) < 0 )
 			return -1;
 	}
 	else
 		return errno = EINVAL, -1;
 
-	if ( offset < 0 && reloff + offset < 0 )
+	off_t new_offset;
+	if ( __builtin_add_overflow(reloff, offset, &new_offset) )
 		return errno = EOVERFLOW, -1;
-	if ( OFF_MAX - current_offset < offset )
-		return errno = EOVERFLOW, -1;
+	if ( new_offset < 0 )
+		return errno = EINVAL, -1;
 
-	return current_offset = reloff + offset;
+	return current_offset = new_offset;
 }
 
 ssize_t Descriptor::read(ioctx_t* ctx, uint8_t* buf, size_t count)
 {
 	if ( !(dflags & O_READ) )
-		return errno = EPERM, -1;
-	if ( !count )
-		return 0;
+		return errno = EBADF, -1;
 	if ( SIZE_MAX < count )
 		count = SSIZE_MAX;
 	int old_ctx_dflags = ctx->dflags;
 	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
+	ssize_t result;
 	if ( !IsSeekable() )
+		result = vnode->read(ctx, buf, count);
+	else
 	{
-		ssize_t result = vnode->read(ctx, buf, count);
-		ctx->dflags = old_ctx_dflags;
-		return result;
+		ScopedLock lock(&current_offset_lock);
+		off_t available = OFF_MAX - current_offset;
+		if ( (uintmax_t) available < (uintmax_t) count )
+			count = available;
+		result = vnode->pread(ctx, buf, count, current_offset);
+		if ( 0 < result &&
+		     __builtin_add_overflow(current_offset, result, &current_offset) )
+			current_offset = OFF_MAX;
 	}
-	ScopedLock lock(&current_offset_lock);
-	ssize_t ret = vnode->pread(ctx, buf, count, current_offset);
-	if ( 0 <= ret )
-		current_offset += ret;
 	ctx->dflags = old_ctx_dflags;
-	return ret;
+	return result;
 }
 
 ssize_t Descriptor::readv(ioctx_t* ctx, const struct iovec* iov_ptr, int iovcnt)
 {
 	if ( !(dflags & O_READ) )
-		return errno = EPERM, -1;
+		return errno = EBADF, -1;
 	if ( iovcnt < 0 || IOV_MAX < iovcnt )
 		return errno = EINVAL, -1;
 	struct iovec* iov = new struct iovec[iovcnt];
@@ -313,32 +351,46 @@ ssize_t Descriptor::readv(ioctx_t* ctx, const struct iovec* iov_ptr, int iovcnt)
 		return delete[] iov, -1;
 	int old_ctx_dflags = ctx->dflags;
 	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
+	ssize_t result = -1;
 	if ( !IsSeekable() )
 	{
-		ssize_t result = vnode->readv(ctx, iov, iovcnt);
-		ctx->dflags = old_ctx_dflags;
-		delete[] iov;
-		return result;
+		if ( SSIZE_MAX < TruncateIOVec(iov, iovcnt, SSIZE_MAX) )
+			errno = EINVAL;
+		else
+			result = vnode->readv(ctx, iov, iovcnt);
 	}
-	ScopedLock lock(&current_offset_lock);
-	ssize_t ret = vnode->preadv(ctx, iov, iovcnt, current_offset);
-	if ( 0 <= ret )
-		current_offset += ret;
+	else
+	{
+		ScopedLock lock(&current_offset_lock);
+		off_t available = OFF_MAX - current_offset;
+		if ( SSIZE_MAX < TruncateIOVec(iov, iovcnt, available) )
+			errno = EINVAL;
+		else
+			result = vnode->preadv(ctx, iov, iovcnt, current_offset);
+		if ( 0 < result &&
+		     __builtin_add_overflow(current_offset, result, &current_offset) )
+			current_offset = OFF_MAX;
+	}
 	ctx->dflags = old_ctx_dflags;
 	delete[] iov;
-	return ret;
+	return result;
 }
 
 ssize_t Descriptor::pread(ioctx_t* ctx, uint8_t* buf, size_t count, off_t off)
 {
+	if ( S_ISCHR(type) )
+		return read(ctx, buf, count);
 	if ( !(dflags & O_READ) )
-		return errno = EPERM, -1;
+		return errno = EBADF, -1;
+	if ( !IsSeekable() )
+		return errno = ESPIPE, -1;
 	if ( off < 0 )
 		return errno = EINVAL, -1;
-	if ( !count )
-		return 0;
 	if ( SSIZE_MAX < count )
 		count = SSIZE_MAX;
+	off_t available = OFF_MAX - off;
+	if ( (uintmax_t) available < (uintmax_t) count )
+		count = available;
 	int old_ctx_dflags = ctx->dflags;
 	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
 	ssize_t result = vnode->pread(ctx, buf, count, off);
@@ -349,8 +401,12 @@ ssize_t Descriptor::pread(ioctx_t* ctx, uint8_t* buf, size_t count, off_t off)
 ssize_t Descriptor::preadv(ioctx_t* ctx, const struct iovec* iov_ptr,
                            int iovcnt, off_t off)
 {
+	if ( S_ISCHR(type) )
+		return readv(ctx, iov_ptr, iovcnt);
 	if ( !(dflags & O_READ) )
-		return errno = EPERM, -1;
+		return errno = EBADF, -1;
+	if ( !IsSeekable() )
+		return errno = ESPIPE, -1;
 	if ( off < 0 || iovcnt < 0 || IOV_MAX < iovcnt )
 		return errno = EINVAL, -1;
 	struct iovec* iov = new struct iovec[iovcnt];
@@ -359,6 +415,9 @@ ssize_t Descriptor::preadv(ioctx_t* ctx, const struct iovec* iov_ptr,
 	size_t iov_size = sizeof(struct iovec) * iovcnt;
 	if ( !ctx->copy_from_src(iov, iov_ptr, iov_size) )
 		return delete[] iov, -1;
+	off_t available = OFF_MAX - off;
+	if ( SSIZE_MAX < TruncateIOVec(iov, iovcnt, available) )
+		return delete[] iov, errno = EINVAL, -1;
 	int old_ctx_dflags = ctx->dflags;
 	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
 	ssize_t result = vnode->preadv(ctx, iov, iovcnt, off);
@@ -370,42 +429,49 @@ ssize_t Descriptor::preadv(ioctx_t* ctx, const struct iovec* iov_ptr,
 ssize_t Descriptor::write(ioctx_t* ctx, const uint8_t* buf, size_t count)
 {
 	if ( !(dflags & O_WRITE) )
-		return errno = EPERM, -1;
-	if ( !count )
-		return 0;
+		return errno = EBADF, -1;
 	if ( SSIZE_MAX < count )
 		count = SSIZE_MAX;
 	int old_ctx_dflags = ctx->dflags;
 	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
+	ssize_t result;
 	if ( !IsSeekable() )
+		result = vnode->write(ctx, buf, count);
+	else
 	{
-		ssize_t result = vnode->write(ctx, buf, count);
-		ctx->dflags = old_ctx_dflags;
-		return result;
-	}
-	ScopedLock lock(&current_offset_lock);
-	if ( ctx->dflags & O_APPEND )
-	{
-		off_t end = vnode->lseek(ctx, 0, SEEK_END);
-		if ( end < 0 )
+		ScopedLock lock(&current_offset_lock);
+		if ( ctx->dflags & O_APPEND )
 		{
-			ctx->dflags = old_ctx_dflags;
-			return -1;
+			off_t end = vnode->lseek(ctx, 0, SEEK_END);
+			if ( 0 <= end )
+				current_offset = end;
 		}
-		current_offset = end;
+		if ( current_offset == OFF_MAX && count )
+		{
+			errno = EFBIG;
+			result = -1;
+		}
+		else
+		{
+			off_t available = OFF_MAX - current_offset;
+			if ( (uintmax_t) available < (uintmax_t) count )
+				count = available;
+			result = vnode->pwrite(ctx, buf, count, current_offset);
+			if ( 0 < result &&
+			     __builtin_add_overflow(current_offset, result,
+			                            &current_offset) )
+				current_offset = OFF_MAX;
+		}
 	}
-	ssize_t ret = vnode->pwrite(ctx, buf, count, current_offset);
-	if ( 0 <= ret )
-		current_offset += ret;
 	ctx->dflags = old_ctx_dflags;
-	return ret;
+	return result;
 }
 
 ssize_t Descriptor::writev(ioctx_t* ctx, const struct iovec* iov_ptr,
                            int iovcnt)
 {
 	if ( !(dflags & O_WRITE) )
-		return errno = EPERM, -1;
+		return errno = EBADF, -1;
 	if ( iovcnt < 0 || IOV_MAX < iovcnt )
 		return errno = EINVAL, -1;
 	struct iovec* iov = new struct iovec[iovcnt];
@@ -416,43 +482,61 @@ ssize_t Descriptor::writev(ioctx_t* ctx, const struct iovec* iov_ptr,
 		return delete[] iov, -1;
 	int old_ctx_dflags = ctx->dflags;
 	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
+	ssize_t result = -1;
 	if ( !IsSeekable() )
 	{
-		ssize_t result = vnode->writev(ctx, iov, iovcnt);
-		ctx->dflags = old_ctx_dflags;
-		delete[] iov;
-		return result;
+		if ( SSIZE_MAX < TruncateIOVec(iov, iovcnt, SSIZE_MAX) )
+			errno = EINVAL;
+		else
+			result = vnode->writev(ctx, iov, iovcnt);
 	}
-	ScopedLock lock(&current_offset_lock);
-	if ( ctx->dflags & O_APPEND )
+	else
 	{
-		off_t end = vnode->lseek(ctx, 0, SEEK_END);
-		if ( end < 0 )
+		ScopedLock lock(&current_offset_lock);
+		if ( ctx->dflags & O_APPEND )
 		{
-			ctx->dflags = old_ctx_dflags;
-			return -1;
+			off_t end = vnode->lseek(ctx, 0, SEEK_END);
+			if ( 0 <= end )
+				current_offset = end;
 		}
-		current_offset = end;
+		off_t available = OFF_MAX - current_offset;
+		size_t count = TruncateIOVec(iov, iovcnt, available);
+		if ( SSIZE_MAX < count )
+			errno = EINVAL;
+		else if ( current_offset == OFF_MAX && count )
+			errno = EFBIG;
+		else
+		{
+			result = vnode->pwritev(ctx, iov, iovcnt, current_offset);
+			if ( 0 < result &&
+			     __builtin_add_overflow(current_offset, result,
+			                            &current_offset) )
+				current_offset = OFF_MAX;
+		}
 	}
-	ssize_t ret = vnode->pwritev(ctx, iov, iovcnt, current_offset);
-	if ( 0 <= ret )
-		current_offset += ret;
 	ctx->dflags = old_ctx_dflags;
 	delete[] iov;
-	return ret;
+	return result;
 }
 
 ssize_t Descriptor::pwrite(ioctx_t* ctx, const uint8_t* buf, size_t count,
                            off_t off)
 {
+	if ( S_ISCHR(type) )
+		return write(ctx, buf, count);
 	if ( !(dflags & O_WRITE) )
-		return errno = EPERM, -1;
+		return errno = EBADF, -1;
+	if ( !IsSeekable() )
+		return errno = ESPIPE, -1;
 	if ( off < 0 )
 		return errno = EINVAL, -1;
-	if ( !count )
-		return 0;
+	if ( off == OFF_MAX && count )
+		return errno = EFBIG, -1;
 	if ( SSIZE_MAX < count )
 		count = SSIZE_MAX;
+	off_t available = OFF_MAX - off;
+	if ( (uintmax_t) available < (uintmax_t) count )
+		count = available;
 	int old_ctx_dflags = ctx->dflags;
 	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
 	ssize_t result = vnode->pwrite(ctx, buf, count, off);
@@ -463,8 +547,12 @@ ssize_t Descriptor::pwrite(ioctx_t* ctx, const uint8_t* buf, size_t count,
 ssize_t Descriptor::pwritev(ioctx_t* ctx, const struct iovec* iov_ptr,
                             int iovcnt, off_t off)
 {
+	if ( S_ISCHR(type) )
+		return writev(ctx, iov_ptr, iovcnt);
 	if ( !(dflags & O_WRITE) )
-		return errno = EPERM, -1;
+		return errno = EBADF, -1;
+	if ( !IsSeekable() )
+		return errno = ESPIPE, -1;
 	if ( off < 0 || iovcnt < 0 || IOV_MAX < iovcnt )
 		return errno = EINVAL, -1;
 	struct iovec* iov = new struct iovec[iovcnt];
@@ -473,6 +561,12 @@ ssize_t Descriptor::pwritev(ioctx_t* ctx, const struct iovec* iov_ptr,
 	size_t iov_size = sizeof(struct iovec) * iovcnt;
 	if ( !ctx->copy_from_src(iov, iov_ptr, iov_size) )
 		return delete[] iov, -1;
+	off_t available = OFF_MAX - off;
+	size_t count = TruncateIOVec(iov, iovcnt, available);
+	if ( SSIZE_MAX < count )
+		return delete[] iov, errno = EINVAL, -1;
+	if ( off == OFF_MAX && count != 0 )
+		return delete[] iov, errno = EFBIG, -1;
 	int old_ctx_dflags = ctx->dflags;
 	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
 	ssize_t result = vnode->pwritev(ctx, iov, iovcnt, off);
@@ -529,15 +623,18 @@ ssize_t Descriptor::readdirents(ioctx_t* ctx,
 	//       it with the O_EXEC flag - POSIX allows that and it makes sense
 	//       because the execute bit on directories control search permission.
 	if ( !(dflags & (O_SEARCH | O_READ | O_WRITE)) )
-		return errno = EPERM, -1;
+		return errno = EBADF, -1;
 	if ( SSIZE_MAX < size )
 		size = SSIZE_MAX;
 	if ( size < sizeof(*dirent) )
 		return errno = EINVAL, -1;
 	ScopedLock lock(&current_offset_lock);
+	if ( current_offset == OFF_MAX && size )
+		return 0;
 	ssize_t ret = vnode->readdirents(ctx, dirent, size, current_offset);
-	if ( 0 < ret )
-		current_offset++;
+	if ( 0 < ret &&
+	     __builtin_add_overflow(current_offset, 1, &current_offset) )
+		current_offset = OFF_MAX;
 	return ret;
 }
 
@@ -803,7 +900,7 @@ int Descriptor::rename_here(ioctx_t* ctx, Ref<Descriptor> from,
 ssize_t Descriptor::readlink(ioctx_t* ctx, char* buf, size_t bufsize)
 {
 	if ( !(dflags & O_READ) )
-		return errno = EPERM, -1;
+		return errno = EBADF, -1;
 	if ( SSIZE_MAX < bufsize )
 		bufsize = SSIZE_MAX;
 	return vnode->readlink(ctx, buf, bufsize);

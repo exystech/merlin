@@ -205,6 +205,8 @@ ssize_t PipeChannel::recvmsg_internal(ioctx_t* ctx, struct msghdr* msg,
 		return errno = EINTR, -1;
 	ssize_t so_far = 0;
 	size_t peeked = 0;
+	if ( SSIZE_MAX < TruncateIOVec(msg->msg_iov, msg->msg_iovlen, SSIZE_MAX) )
+		return errno = EINVAL, -1;
 	int iov_i = 0;
 	size_t iov_offset = 0;
 	while ( iov_i < msg->msg_iovlen && so_far < SSIZE_MAX )
@@ -336,6 +338,8 @@ ssize_t PipeChannel::sendmsg_internal(ioctx_t* ctx, const struct msghdr* msg,
 	if ( !lock.IsAcquired() )
 		return errno = EINTR, -1;
 	sender_system_tid = this_thread->system_tid;
+	if ( SSIZE_MAX < TruncateIOVec(msg->msg_iov, msg->msg_iovlen, SSIZE_MAX) )
+		return errno = EINVAL, -1;
 	ssize_t so_far = 0;
 	int iov_i = 0;
 	size_t iov_offset = 0;

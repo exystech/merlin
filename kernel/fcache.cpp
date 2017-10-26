@@ -439,10 +439,8 @@ off_t FileCache::GetFileSize()
 off_t FileCache::lseek(ioctx_t* /*ctx*/, off_t offset, int whence)
 {
 	ScopedLock lock(&fcache_mutex);
-	if ( whence == SEEK_SET )
-		return offset;
-	if ( whence == SEEK_END )
-		return (off_t) file_size + offset;
+	if ( whence == SEEK_END && offset == 0 )
+		return (off_t) file_size;
 	return errno = EINVAL, -1;
 }
 

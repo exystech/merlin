@@ -838,6 +838,14 @@ int sys_mkpartition(int fd, off_t start, off_t length, int flags)
 	Ref<Inode> inner_inode = desc->vnode->inode;
 	desc.Reset();
 
+	if ( !S_ISBLK(inner_inode->type) && !S_ISREG(inner_inode->type) )
+		return errno = EPERM, -1;
+	if ( start < 0 || length < 0 )
+		return errno = EINVAL, -1;
+	off_t end;
+	if ( __builtin_add_overflow(start, length, &end) )
+		return errno = EOVERFLOW, -1;
+
 	Ref<Inode> partition(new Partition(inner_inode, start, length));
 	if ( !partition )
 		return -1;

@@ -150,6 +150,7 @@ int LinkInodeInDir(ioctx_t* ctx, Ref<Descriptor> dir, const char* name,
                    Ref<Inode> inode);
 Ref<Descriptor> OpenDirContainingPath(ioctx_t* ctx, Ref<Descriptor> from,
                                       const char* path, char** finalp);
+size_t TruncateIOVec(struct iovec* iov, int iovcnt, off_t limit);
 
 } // namespace Sortix
 

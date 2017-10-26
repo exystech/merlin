@@ -876,6 +876,8 @@ int Unode::truncate(ioctx_t* ctx, off_t length)
 
 off_t Unode::lseek(ioctx_t* ctx, off_t offset, int whence)
 {
+	if ( whence != SEEK_END && offset != 0 )
+		return errno = EINVAL, -1;
 	Channel* channel = server->Connect(ctx);
 	if ( !channel )
 		return -1;

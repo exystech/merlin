@@ -327,7 +327,7 @@ void* sys_mmap(void* addr_ptr, size_t size, int prot, int flags, int fd,
 		if ( !(desc = process->GetDescriptor(fd)) )
 			return MAP_FAILED;
 		// Verify that the file is seekable.
-		if ( desc->lseek(&ctx, 0, SEEK_CUR) < 0 )
+		if ( S_ISCHR(desc->type) || desc->lseek(&ctx, 0, SEEK_END) < 0 )
 			return errno = ENODEV, MAP_FAILED;
 		// Verify that we have read access to the file.
 		if ( desc->read(&ctx, NULL, 0) != 0 )

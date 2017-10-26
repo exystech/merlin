@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -52,19 +52,10 @@ Zero::~Zero()
 {
 }
 
-int Zero::truncate(ioctx_t* /*ctx*/, off_t /*length*/)
-{
-	return 0;
-}
-
-off_t Zero::lseek(ioctx_t* /*ctx*/, off_t offset, int /*whence*/)
-{
-	return offset;
-}
-
 ssize_t Zero::read(ioctx_t* ctx, uint8_t* buf, size_t count)
 {
-	ctx->zero_dest(buf, count);
+	if ( !ctx->zero_dest(buf, count) )
+		return -1;
 	return (ssize_t) count;
 }
 

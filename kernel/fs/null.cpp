@@ -50,16 +50,6 @@ Null::~Null()
 {
 }
 
-int Null::truncate(ioctx_t* /*ctx*/, off_t /*length*/)
-{
-	return 0;
-}
-
-off_t Null::lseek(ioctx_t* /*ctx*/, off_t offset, int /*whence*/)
-{
-	return offset;
-}
-
 ssize_t Null::read(ioctx_t* /*ctx*/, uint8_t* /*buf*/, size_t /*count*/)
 {
 	return 0;
@@ -77,7 +67,7 @@ ssize_t Null::write(ioctx_t* /*ctx*/, const uint8_t* /*buf*/, size_t count)
 }
 
 ssize_t Null::pwrite(ioctx_t* /*ctx*/, const uint8_t* /*buf*/, size_t count,
-                    off_t /*off*/)
+                     off_t /*off*/)
 {
 	return count;
 }

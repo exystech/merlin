@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -71,15 +71,8 @@ int PortNode::truncate(ioctx_t* /*ctx*/, off_t length)
 
 off_t PortNode::lseek(ioctx_t* /*ctx*/, off_t offset, int whence)
 {
-	if ( whence == SEEK_SET )
-		return offset;
-	if ( whence == SEEK_END )
-	{
-		off_t result;
-		if ( __builtin_add_overflow(harddisk->GetSize(), offset, &result) )
-			return errno = EOVERFLOW, -1;
-		return result;
-	}
+	if ( whence == SEEK_END && offset == 0 )
+		return (off_t) harddisk->GetSize();
 	return errno = EINVAL, -1;
 }
 

@@ -146,9 +146,7 @@ int AbstractInode::truncate(ioctx_t* /*ctx*/, off_t /*length*/)
 
 off_t AbstractInode::lseek(ioctx_t* /*ctx*/, off_t /*offset*/, int /*whence*/)
 {
-	if ( inode_type == INODE_TYPE_STREAM || inode_type == INODE_TYPE_TTY )
-		return errno = ESPIPE, -1;
-	return errno = EBADF, -1;
+	return errno = ESPIPE, -1;
 }
 
 ssize_t AbstractInode::read(ioctx_t* ctx, uint8_t* buf, size_t count)
