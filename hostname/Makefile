@@ -19,7 +19,7 @@ install: all
 	mkdir -p $(DESTDIR)$(BINDIR)
 	install $(BINARIES) $(DESTDIR)$(BINDIR)
 	mkdir -p $(DESTDIR)$(MANDIR)/man1
-	install $(MANPAGES1) $(DESTDIR)$(MANDIR)/man1
+	cp $(MANPAGES1) $(DESTDIR)$(MANDIR)/man1
 
 %: %.c
 	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< -o $@
