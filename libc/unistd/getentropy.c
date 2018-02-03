@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  * unistd/getentropy.c
- * Read entropy into an user buffer.
+ * Read entropy into a user buffer.
  */
 
 #include <sys/syscall.h>
