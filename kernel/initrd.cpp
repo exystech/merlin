@@ -378,7 +378,8 @@ static bool ReadTar(TAR* TAR)
 			return false;
 		TAR->offset = TAR->next_offset;
 		struct tar* tar = (struct tar*) (TAR->tar_file + TAR->offset);
-		if ( tar->size[sizeof(tar->size) - 1] != '\0' )
+		if ( tar->size[sizeof(tar->size) - 1] != '\0' &&
+		     tar->size[sizeof(tar->size) - 1] != ' ' )
 			return false;
 		size_t size = strtoul(tar->size, NULL, 8);
 		size_t dist = sizeof(struct tar) + -(-size & ~((size_t) 512 - 1));
@@ -388,7 +389,8 @@ static bool ReadTar(TAR* TAR)
 		TAR->data_offset = TAR->offset + 512;
 		TAR->data = TAR->tar_file + TAR->data_offset;
 		TAR->size = size;
-		if ( tar->mode[sizeof(tar->mode) - 1] != '\0' )
+		if ( tar->mode[sizeof(tar->mode) - 1] != '\0' &&
+		     tar->mode[sizeof(tar->mode) - 1] != ' ' )
 			return false;
 		TAR->mode = strtoul(tar->mode, NULL, 8) & 07777;
 		TAR->typeflag = tar->typeflag;
@@ -461,7 +463,7 @@ static void ExtractTarObject(Ref<Descriptor> desc,
                              struct initrd_context* ctx,
                              TAR* TAR)
 {
-	if ( TAR->typeflag == '0' )
+	if ( TAR->typeflag == '0' || TAR->typeflag == 0 )
 	{
 		int oflags = O_WRITE | O_CREATE | O_TRUNC;
 		Ref<Descriptor> file(desc->open(&ctx->ioctx, TAR->name, oflags, TAR->mode));
