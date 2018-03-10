@@ -686,7 +686,7 @@ int main(void)
 	// TODO: Perhaps let the user know the size of the system that will be
 	//       installed?
 
-	text("You need select a root filesystem and other mountpoints now. You "
+	text("You need to select a root filesystem and other mountpoints now. You "
 	     "will now be dumped into a partition editor. Create and format a "
 	     "root filesystem partition as needed.\n");
 	text("\n");
