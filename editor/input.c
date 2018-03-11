@@ -140,7 +140,7 @@ void editor_type_kbkey(struct editor* editor, int kbkey)
 		case KBKEY_LEFT: editor_type_control_left(editor); break;
 		case KBKEY_RIGHT: editor_type_control_right(editor); break;
 		case KBKEY_UP: editor_type_control_up(editor); break;
-		case KBKEY_DOWN: editor_type_control_select_down(editor); break;
+		case KBKEY_DOWN: editor_type_control_down(editor); break;
 		}
 	}
 	else if ( !editor->control && editor->shift )
