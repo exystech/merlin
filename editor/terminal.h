@@ -76,7 +76,7 @@ void row_column_smallest(size_t ra, size_t ca, size_t rb, size_t cb,
 __attribute__((unused))
 static inline
 void row_column_biggest(size_t ra, size_t ca, size_t rb, size_t cb,
-                         size_t* row, size_t* column)
+                        size_t* row, size_t* column)
 {
 	if ( is_row_column_lt(ra, ca, rb, cb) )
 		*row = rb, *column = cb;

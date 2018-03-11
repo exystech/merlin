@@ -33,15 +33,15 @@ enum language language_of_path(const char* path)
 	size_t path_length = strlen(path);
 	if ( 2 <= path_length &&
 	     (!strcmp(path+path_length-2, ".c") ||
-		  !strcmp(path+path_length-2, ".h")) )
+	      !strcmp(path+path_length-2, ".h")) )
 		return LANGUAGE_C_CXX;
 	if ( 4 <= path_length &&
 	     (!strcmp(path+path_length-4, ".c++") ||
-		  !strcmp(path+path_length-4, ".h++") ||
-		  !strcmp(path+path_length-4, ".cxx") ||
-		  !strcmp(path+path_length-4, ".hxx") ||
-		  !strcmp(path+path_length-4, ".cpp") ||
-		  !strcmp(path+path_length-4, ".hpp")) )
+	      !strcmp(path+path_length-4, ".h++") ||
+	      !strcmp(path+path_length-4, ".cxx") ||
+	      !strcmp(path+path_length-4, ".hxx") ||
+	      !strcmp(path+path_length-4, ".cpp") ||
+	      !strcmp(path+path_length-4, ".hpp")) )
 		return LANGUAGE_C_CXX;
 	if ( (5 <= path_length && !strcmp(path+path_length-5, ".diff")) ||
 	     (6 <= path_length && !strcmp(path+path_length-6, ".patch")) )
@@ -111,7 +111,7 @@ static size_t recognize_constant(const wchar_t* string, size_t string_length)
 		                                string[result] == L'L') )
 			result++;
 		else if ( result < string_length && (string[result] == L'f' ||
-			                                 string[result] == L'F') )
+		                                     string[result] == L'F') )
 			result++;
 	}
 	else
@@ -120,10 +120,10 @@ static size_t recognize_constant(const wchar_t* string, size_t string_length)
 		                                string[result] == L'U') )
 			result++;
 		if ( result < string_length && (string[result] == L'l' ||
-			                            string[result] == L'L') )
+		                                string[result] == L'L') )
 			result++;
 		if ( result < string_length && (string[result] == L'l' ||
-			                            string[result] == L'L') )
+		                                string[result] == L'L') )
 			result++;
 	}
 	return result;

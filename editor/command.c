@@ -235,8 +235,8 @@ void editor_type_exit_select_right(struct editor* editor)
 	{
 		size_t column, row;
 		row_column_biggest(editor->cursor_row, editor->cursor_column,
-		                  editor->select_row, editor->select_column,
-		                  &column, &row);
+		                   editor->select_row, editor->select_column,
+		                   &column, &row);
 		editor_cursor_set(editor, column, row);
 		return;
 	}
@@ -409,7 +409,7 @@ void editor_type_control_select_up(struct editor* editor)
 void editor_type_down(struct editor* editor)
 {
 	editor_type_exit_select_right(editor);
-	if ( editor->cursor_row+1 == editor->lines_used  )
+	if ( editor->cursor_row+1 == editor->lines_used )
 	{
 		editor_cursor_column_set(editor, editor->lines[editor->cursor_row].used);
 		return;
@@ -423,7 +423,7 @@ void editor_type_down(struct editor* editor)
 
 void editor_type_select_down(struct editor* editor)
 {
-	if ( editor->select_row+1 == editor->lines_used  )
+	if ( editor->select_row+1 == editor->lines_used )
 	{
 		editor_select_column_set(editor, editor->lines[editor->select_row].used);
 		return;

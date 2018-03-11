@@ -311,9 +311,9 @@ void editor_input_process(struct editor_input* editor_input,
 		if ( full_match )
 		{
 			editor_emulate_kbkey(editor,
-				terminal_sequences[match].kbkey,
-				terminal_sequences[match].control,
-				terminal_sequences[match].shift);
+			                     terminal_sequences[match].kbkey,
+			                     terminal_sequences[match].control,
+			                     terminal_sequences[match].shift);
 			memmove(editor_input->termseq,
 			        editor_input->termseq + match_size,
 			        editor_input->termseq_used - match_size);

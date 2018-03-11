@@ -34,7 +34,7 @@ size_t editor_select_column_set(struct editor* editor, size_t x)
 		if ( rx < editor->page_x_offset )
 			editor->page_x_offset = rx;
 		if ( editor->page_x_offset + editor->viewport_width <= rx )
-			editor->page_x_offset = rx + 1- editor->viewport_width;
+			editor->page_x_offset = rx + 1 - editor->viewport_width;
 	}
 	return editor->select_column = x;
 }
@@ -46,7 +46,7 @@ size_t editor_select_row_set(struct editor* editor, size_t y)
 		if ( y < editor->page_y_offset )
 			editor->page_y_offset = y;
 		if ( editor->page_y_offset + editor->viewport_height <= y )
-			editor->page_y_offset = y + 1- editor->viewport_height;
+			editor->page_y_offset = y + 1 - editor->viewport_height;
 	}
 	return editor->select_row = y;
 }
