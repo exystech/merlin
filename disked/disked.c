@@ -125,19 +125,20 @@ static char* format_bytes_amount(uintmax_t num_bytes)
 	uintmax_t value = num_bytes;
 	uintmax_t value_fraction = 0;
 	uintmax_t exponent = 1024;
-	char prefixes[] = { '\0', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y' };
-	size_t num_prefixes = sizeof(prefixes) / sizeof(prefixes[0]);
-	size_t prefix_index = 0;
-	while ( exponent <= value && prefix_index + 1 < num_prefixes)
+	char suffixes[] = { '\0', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y' };
+	size_t num_suffixes = sizeof(suffixes) / sizeof(suffixes[0]);
+	size_t suffix_index = 0;
+	while ( exponent <= value && suffix_index + 1 < num_suffixes)
 	{
 		value_fraction = value % exponent;
 		value /= exponent;
-		prefix_index++;
+		suffix_index++;
 	}
-	char prefix_str[] = { prefixes[prefix_index],  'i', 'B', '\0' };
+	char suffix_str[] = { suffixes[suffix_index],  'i', 'B', '\0' };
 	char value_fraction_char = '0' + (value_fraction / (1024 / 10 + 1)) % 10;
 	char* result;
-	if ( asprintf(&result, "%ju.%c %s", value, value_fraction_char, prefix_str) < 0 )
+	if ( asprintf(&result, "%ju.%c %s", value, value_fraction_char,
+	              suffix_str) < 0 )
 		return NULL;
 	return result;
 }
