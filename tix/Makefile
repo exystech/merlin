@@ -27,6 +27,14 @@ tix-rmpatch \
 PROGRAMS:=\
 $(BINARIES) \
 tix-eradicate-libtool-la \
+tix-iso-add \
+tix-iso-bootconfig \
+tix-iso-liveconfig \
+
+MANPAGES8=\
+tix-iso-add.8 \
+tix-iso-bootconfig.8 \
+tix-iso-liveconfig.8 \
 
 all: $(PROGRAMS)
 
@@ -40,6 +48,9 @@ $(DESTDIR)$(SBINDIR):
 
 install: all $(DESTDIR)$(SBINDIR)
 	install $(PROGRAMS) $(DESTDIR)$(SBINDIR)
+	mkdir -p $(DESTDIR)$(MANDIR)/man8
+	mkdir -p $(DESTDIR)$(MANDIR)/man8
+	cp $(MANPAGES8) $(DESTDIR)$(MANDIR)/man8
 
 clean:
 	rm -f $(BINARIES)

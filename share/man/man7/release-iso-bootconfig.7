@@ -1,0 +1,554 @@
+.Dd February 24, 2018
+.Dt RELEASE-ISO-BOOTCONFIG 7
+.Os
+.Sh NAME
+.Nm release-iso-bootconfig
+.Nd release .iso bootloader configuration
+.Sh DESCRIPTION
+You can customize the bootloader configuration of a release .iso by adding your
+own
+.Pa /boot/grub/hooks.cfg
+to the .iso filesystem as part of the
+.Xr release-iso-modification 7
+procedure.
+This manual page details the programming interface available when writing this
+file.
+.Pp
+Commonly a custom
+.Pa /boot/grub/hooks.cfg
+would take some actions when loaded (such as setting variables)
+and define hook functions as described in the
+.Sx Hooks
+subsection to inject behavior in certain locations, and otherwise make use of
+the facilities described in this manual page.
+.Ss Ports and Binary Packages
+The release .iso contains binary packages.
+The ports menu controls what binary packages are installed in the live
+environment.
+.Ss Port Sets
+The binary packages menu controls what binary packages have a copy stored in the
+.Pa /repository
+directory inside the live environment.
+.Pp
+Sets of ports and binary packages are defined by
+.Pa build-aux/ports.conf
+in the source code:
+.Bl -tag -width "12345678"
+.It Sy all
+All ports.
+.It Sy basic
+Common software and everything needed to develop the operating system
+.It Sy minimal
+Ports needed to successfully install and upgrade the operating system.
+.It Sy no
+No ports.
+.El
+.Ss Configuration Files
+The bootloader configuration consists of these GRUB configuration files that you
+can use or overwrite as desired:
+.Bl -tag -width "12345678"
+.It Pa /boot/grub/grub.cfg
+The GRUB bootloader will load its configuration by loading this file.
+.Pp
+First, this file loads the default bootloader configuration by taking the following
+actions:
+.Pp
+It defining no-operation versions of each of the hook functions defined below.
+.Pp
+It loads the appropriate GRUB modules.
+.Pp
+It initializes the global variable described below.
+.Pp
+It defines functions to select each set of ports and binary package, as
+described below loaded above.
+.Pp
+Secondly, it loads
+.Pa /boot/grub/hooks.cfg
+(if it exists)
+which can take any actions it wants and customize the default configuration.
+.Pp
+Finally, it loads
+.Pa /boot/grub/main.cfg
+to display the menu menu.
+.It Pa /boot/grub/hooks.cfg
+This file provides additional bootloader configuration if it exists.
+.Pp
+This file is loaded (if it exists) by
+.Pa /boot/grub/grub.cfg
+after the default bootloader configuration has been loaded.
+The bootloader configuration is designed to be customized by setting the
+variables defined below, defining any of the hook functions defined below, or
+any other desired actions.
+.It Pa /boot/grub/main.cfg
+This file displays the main bootloader menu by taking the following actions:
+.Pp
+The
+.Sy menu_title
+variable is set to the contents of the
+.Sy base_menu_title
+variable.
+.Pp
+The
+.Sy hook_menu_pre
+hook is run.
+.Pp
+Menu entries are emitted for the live environment, the installer, and the
+upgrader.
+.Pp
+The live environment menu entry runs:
+.Li load_sortix -- /sbin/init --target=single-user
+.Pp
+The installer menu entry runs:
+.Li load_sortix -- /sbin/init --target=sysinstall
+.Pp
+The upgrader menu entry runs:
+.Li load_sortix -- /sbin/init --target=sysupgrade
+.Pp
+Menu entries are emitted for the ports selection bootloader menu (which runs
+.Li configfile /boot/grub/ports.cfg )
+and the advanced bootloader menu (which runs
+.Li configfile /boot/grub/advanced.cfg )
+.Pp
+Finally the
+.Sy hook_menu_post
+hook is run.
+.It Pa /boot/grub/advanced.cfg
+This file displays the advanced bootloader menu by taking the following actions:
+.Pp
+A menu entry is emitted that goes back to the main menu (which runs
+.Li configfile /boot/grub/main.cfg )
+.Pp
+The
+.Sy menu_title
+variable is set to the contents of the
+.Sy base_menu_title
+variable appended with " - Advanced Options".
+.Pp
+The
+.Sy hook_advanced_menu_pre
+hook is run.
+.Pp
+A menu entry is emitted that goes to the binary packages menu (which runs
+.Li configfile /boot/grub/tix.cfg )
+.Pp
+Finally, the
+.Sy hook_advanced_menu_post
+hook is run.
+.It Pa /boot/grub/ports.cfg
+This file displays the port selection bootloader menu by taking the following
+actions:
+.Pp
+A menu entry is emitted that goes back to the main menu (which runs
+.Li configfile /boot/grub/main.cfg )
+.Pp
+The
+.Sy menu_title
+variable is set to the contents of the
+.Sy base_menu_title
+variable appended with " - Ports".
+.Pp
+The
+.Sy hook_ports_menu_pre
+hook is run.
+.Pp
+The following menu entries implicitly run
+.Li configfile /boot/grub/ports.cfg
+afterwards to return to this menu.
+.Pp
+A menu entry is emitted that loads all ports by running
+.Sy select_ports_set_all .
+.Pp
+The
+.Sy hook_ports_menu_pre
+hook is run.
+.Pp
+Menu entries are emitted for each of the port sets, each of which load only
+those ports set by running
+.Sy select_ports_set_ Ns Ar $set .
+.Pp
+A menu entry is emitted that loads no ports by running
+.Sy select_ports_set_no .
+.Pp
+The
+.Sy hook_ports_menu
+hook is run.
+.Pp
+Menu entries are emitted for each port, each stating whether that port will be
+loaded, and selecting such a menu entry will toggle whether the port is loaded
+by setting
+.Sy port_ Ns Ar $set
+variable to
+.Sy true
+or
+.Sy false .
+.Pp
+Finally, the
+.Sy hook_ports_menu_post
+hook is run.
+.It Pa /boot/grub/tix.cfg
+This file displays the binary packages selection bootloader menu by taking the
+following actions:
+.Pp
+A menu entry is emitted that goes back to the advanced menu (which runs
+.Li configfile /boot/grub/advanced.cfg )
+.Pp
+The
+.Sy menu_title
+variable is set to the contents of the
+.Sy base_menu_title
+variable appended with " - Binary Packages".
+.Pp
+The
+.Sy hook_tix_menu_pre
+hook is run.
+.Pp
+The following menu entries implicitly run
+.Li configfile /boot/grub/tix.cfg
+afterwards to return to this menu.
+.Pp
+A menu entry is emitted that loads all binary packages by running
+.Sy select_tix_set_all .
+.Pp
+The
+.Sy hook_tix_menu_pre
+hook is run.
+.Pp
+Menu entries are emitted for each of the binary package sets, each of which load
+only those binary packages set by running
+.Sy select_tix_set_ Ns Ar $set .
+.Pp
+A menu entry is emitted that loads no binary packages by running
+.Sy select_tix_set_no .
+.Pp
+The
+.Sy hook_tix_menu
+hook is run.
+.Pp
+Menu entries are emitted for each binary package, each stating whether that
+binary package will be loaded, and selecting such a menu entry will toggle
+whether the binary package is loaded
+by setting
+.Sy tix_ Ns Ar $set
+variable to
+.Sy true
+or
+.Sy false .
+.Pp
+Finally, the
+.Sy hook_tix_menu_post
+hook is run.
+.El
+.Ss Variables
+In addition to the standard GRUB variables, the following global variables are
+set in
+.Pa /boot/grub/grub.cfg :
+.Bl -tag -width "12345678"
+.It Sy base_menu_title
+The base menu title which is used to construct the menu titles for each of the
+menus by setting the
+.Sy menu_title
+variable.
+The main menu uses this title verbatim, while the other menus will append
+" -
+.Ar menu_name Ns
+" when constructing
+.Sy menu_title.
+(Default: "Sortix $version for $machine")
+.It Sy default
+Select this bootloader menu option number by default (counting from 0).
+If the selected menu option itself is a submenu, it can be appended with a
+.Sy '>'
+and another selection to pick a default menu option in that submenu, and so on.
+(Default: 0)
+.It Sy machine_type
+The machine type this release was built for.
+.It Sy menu_title
+The menu title to display above the bootloader menu.
+(Default: "$base_menu_title")
+.It Sy no_random_seed
+An additional command line parameter passed to the
+.Xr kernel 7
+if
+.Pa /boot/random.seed
+doesn't exist.
+This variable defaults to
+.Sy --no-random-seed
+if
+.Pa /boot/random.seed
+doesn't exist, otherwise it defaults to the empty string.
+.It Sy port_ Ns Ar $port
+The
+.Ar port
+is installed into live environment if this variable is set to
+.Sy true
+and not if set to
+.Sy false .
+(Default:
+.Sy true )
+.It Sy timeout
+The time in seconds before the default menu entry (according to the
+.Sy default
+variable) is automatically selected.
+If set to 0, the default menu entry is loaded instantaneously.
+The timeout is disabled if set to -1.
+(Default: 10)
+.It Sy tix_ Ns Ar $port
+A copy of the binary package is stored in
+.Pa /repository
+in the live environment if this variable is set to
+.Sy true
+and not if set to
+.Sy false .
+(Default:
+.Sy true )
+.It Sy version
+The version number of this release.
+.El
+.Ss Functions
+In addition to the standard GRUB functions, the following functions are set in
+.Pa /boot/grub/grub.cfg :
+.Bl -tag -width "12345678"
+.It Sy load_base
+This function loads the base system into the live environment by taking the
+following actions:
+.Pp
+If this is x86_64 system, check using
+.Li cpuid -l
+whether the processor supports 64-bit mode and error if not.
+.Pp
+Run the
+.Sy hook_kernel_pre
+hook.
+.Pp
+Load
+.Pa /boot/sortix.bin.xz
+as a multiboot kernel,
+with a
+.Xr kernel 7
+command line consisting of
+.Sy $no_random_seed
+followed by the arguments to this function (which should contain
+.Li "-- /sbin/init --target=desired-target" )
+followed by any additional options to
+.Xr init 8 .
+.Pp
+Run the
+.Sy hook_kernel_post
+hook.
+.Pp
+If
+.Sy no_random_seed
+is not set to
+.Sy --no-random-seed ,
+load
+.Pa /boot/random.seed
+as a multiboot module with the
+.Li --random-seed
+command line.
+.Pp
+Load
+.Pa /boot/system.initrd.xz ,
+.Pa /boot/src.initrd.xz ,
+.Pa /boot/live.initrd.xz ,
+and
+.Pa /boot/overlay.initrd.xz
+(only if a
+.Pa sysroot-overlay
+directory existed when making the release .iso)
+as multiboot modules without any command line.
+.Pp
+Run the
+.Sy hook_initrd_post
+hook.
+.It Sy load_ports
+Load the ports and binary packages into the live environment by taking the
+following actions:
+.Pp
+Run the
+.Sy hook_ports_pre
+hook.
+.Pp
+For each port, if
+.Sy tix_ Ns Ar $port
+is
+.Sy true ,
+then load the port as a binary package by running:
+.Bd -literal
+    module --nounzip /repository/$port.tix.tar.xz \\
+           --to /repository/$port.tix.tar.xz
+.Ed
+And if
+.Sy port_ Ns Ar $port
+is
+.Sy true ,
+then install the port into the live environment by running:
+.Bd -literal
+    module /repository/$port.tix.tar.xz --tix
+.Ed
+.Pp
+Run the
+.Sy hook_ports_post
+hook.
+.It Sy load_sortix
+Load the base system and ports into the live environment by running
+.Sy load_base
+with the given arguments and then run
+.Sy load_ports .
+.It Sy select_ports_set_ Ns Ar $set
+Install only the ports that belong to the ports set
+.Ar set .
+Run the
+.Sy hook_port_set Ns Ar $set
+hook afterwards.
+.It Sy select_tix_set_ Ns Ar $set
+Load only the binary packages that belong to the ports set
+.Ar set .
+Run the
+.Sy hook_tix_set Ns Ar $set
+hook afterwards.
+.El
+.Ss Hooks
+The following hooks are run by the GRUB bootloader configuration:
+.Bl -tag -width "12345678"
+.It Sy hook_advanced_menu_post
+After the advanced menu entries have been emitted.
+.It Sy hook_advanced_menu_pre
+Before the advanced menu entries are emitted.
+.It Sy hook_initrd_post
+After the initrd is loaded.
+.It Sy hook_kernel_post
+After the kernel has been loaded.
+.It Sy hook_kernel_pre
+Before the kernel is loaded and before the initrd is loaded.
+.It Sy hook_menu_post
+After the main menu entries have been emitted.
+.It Sy hook_menu_pre
+Before the main menu entries are emitted.
+.It Sy hook_ports_menu
+After the port sets menu entries have been emitted and before the individual
+port menu entires are emitted as a way to define additional ports to be loaded
+or not.
+.It Sy hook_ports_menu_post
+After the ports selection menu entries have been emitted.
+.It Sy hook_ports_menu_pre
+Before the ports selection menu entries are emitted.
+.It Sy hook_ports_menu_sets
+After the "Load all ports" menu entry has been emitted as a place to define
+additional sets to be loaded.
+.It Sy hook_ports_post
+After the ports and binary packages have been loaded.
+.It Sy hook_ports_pre
+Before the ports and binary packages are loaded.
+.It Sy hook_ports_set_ Ns Ar $set
+After the menu entry has been picked that chooses the given
+.Ar set
+of ports and the port variables have been updated.
+.It Sy hook_tix_menu
+After the binary packages sets menu entries have been emitted and before the
+individual binary packages menu entires are emitted as a way to define
+additional binary packages to be loaded or not.
+.It Sy hook_tix_menu_post
+After the binary packages selection menu entries have been emitted.
+.It Sy hook_tix_menu_pre
+Before the binary packages selection menu entries are emitted.
+.It Sy hook_tix_menu_sets
+After the "Load all binary packages" menu entry has been emitted as a place to
+define additional sets to be loaded.
+.It Sy hook_tix_set_ Ns Ar $set
+After the menu entry has been picked that chooses the given
+.Ar set
+of binary packages and the binary packages variables have been updated.
+.El
+.Pp
+For more information on the GRUB configuration file format and the available
+commands, see the GRUB manual.
+.Sh EXAMPLES
+Adding the port
+.Sy foo
+to the
+.Sy basic
+and
+.Sy all
+port sets can be done with this
+.Pa /boot/grub/hooks.cfg :
+.Bd -literal
+port_foo=true
+tix_foo=false
+export port_foo
+export tix_foo
+function hook_ports_menu {
+  if $port_foo; then
+    menuentry "foo = true" {
+      port_foo=false
+      configfile /boot/grub/ports.cfg
+    }
+  else
+    menuentry "foo = false" {
+      port_foo=true
+      configfile /boot/grub/ports.cfg
+    }
+  fi
+}
+function hook_tix_menu {
+  if $tix_foo; then
+    menuentry "foo = true" {
+      tix_foo=false
+      configfile /boot/grub/tix.cfg
+    }
+  else
+    menuentry "foo = false" {
+      tix_foo=true
+      configfile /boot/grub/tix.cfg
+    }
+  fi
+}
+function hook_ports_set_all {
+  port_foo=true
+}
+function hook_tix_set_all {
+  tix_foo=true
+}
+function hook_ports_set_basic {
+  port_foo=true
+}
+function hook_tix_set_basic {
+  tix_foo=true
+}
+function hook_ports_set_minimal {
+  port_foo=false
+}
+function hook_tix_set_minimal {
+  tix_foo=false
+}
+function hook_ports_set_no {
+  port_foo=false
+}
+function hook_tix_set_no {
+  tix_foo=false
+}
+function hook_ports_pre {
+  if $tix_foo; then
+    echo -n "Loading /repository/foo.tix.tar.xz (3.0M) ... "
+    module --nounzip /repository/foo.tix.tar.xz \\
+           --to /repository/foo.tix.tar.xz
+    echo done
+  fi
+  if $port_foo; then
+    echo -n "Loading /repository/foo.tix.tar.xz (3.0M) ... "
+    module /repository/foo.tix.tar.xz --tix
+    echo done
+  fi
+}
+.Ed
+.Pp
+The
+.Xr tix-iso-bootconfig 8
+convenience script makes it easy to generate bootloader configuration for
+common scenarios.
+.Pp
+See
+.Xr release-iso-modification 7
+for additional examples.
+.Sh SEE ALSO
+.Xr release-iso-bootconfig 7 ,
+.Xr tix-iso-bootconfig 8

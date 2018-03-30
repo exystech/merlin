@@ -408,6 +408,24 @@ release-iso: $(SORTIX_RELEASE_DIR)/$(VERSION)/builds/$(BUILD_NAME).iso
 .PHONY: release-builds
 release-builds: release-iso
 
+$(SORTIX_RELEASE_DIR)/$(VERSION)/scripts: $(SORTIX_RELEASE_DIR)/$(VERSION)
+	mkdir -p $@
+
+$(SORTIX_RELEASE_DIR)/$(VERSION)/scripts/tix-iso-add: tix/tix-iso-add $(SORTIX_RELEASE_DIR)/$(VERSION)/scripts
+	cp $< $@
+
+$(SORTIX_RELEASE_DIR)/$(VERSION)/scripts/tix-iso-bootconfig: tix/tix-iso-bootconfig $(SORTIX_RELEASE_DIR)/$(VERSION)/scripts
+	cp $< $@
+
+$(SORTIX_RELEASE_DIR)/$(VERSION)/scripts/tix-iso-liveconfig: tix/tix-iso-liveconfig $(SORTIX_RELEASE_DIR)/$(VERSION)/scripts
+	cp $< $@
+
+.PHONY: release-scripts
+release-scripts: \
+  $(SORTIX_RELEASE_DIR)/$(VERSION)/scripts/tix-iso-add \
+  $(SORTIX_RELEASE_DIR)/$(VERSION)/scripts/tix-iso-bootconfig \
+  $(SORTIX_RELEASE_DIR)/$(VERSION)/scripts/tix-iso-liveconfig \
+
 $(SORTIX_RELEASE_DIR)/$(VERSION)/README: README $(SORTIX_RELEASE_DIR)/$(VERSION)
 	cp $< $@
 
@@ -418,7 +436,7 @@ release-readme: $(SORTIX_RELEASE_DIR)/$(VERSION)/README
 release-arch: release-builds release-readme
 
 .PHONY: release-shared
-release-shared: release-readme
+release-shared: release-readme release-scripts
 
 .PHONY: release
 release: release-arch release-shared

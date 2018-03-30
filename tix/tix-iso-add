@@ -1,0 +1,115 @@
+#!/bin/sh
+# Copyright (c) 2017 Jonas 'Sortie' Termansen.
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# tix-iso-add
+# Add directory to iso filesystem.
+
+set -e
+
+directory=
+input=
+operand=1
+output=
+
+dashdash=
+previous_option=
+for argument do
+  if test -n "$previous_option"; then
+    eval $previous_option=\$argument
+    previous_option=
+    continue
+  fi
+
+  case $argument in
+  *=?*) parameter=$(expr "X$argument" : '[^=]*=\(.*\)' || true) ;;
+  *=)   parameter= ;;
+  *)    parameter=yes ;;
+  esac
+
+  case $dashdash$argument in
+  --) dashdash=yes ;;
+  -o) previous_option=output ;;
+  --output=*) output=$parameter ;;
+  --output) previous_option=output ;;
+  -*) echo "$0: unrecognized option $argument" >&2
+      exit 1 ;;
+  *)
+    if [ $operand = 1 ]; then
+      input="$argument"
+      operand=2
+    elif [ $operand = 2 ]; then
+      directory="$argument"
+      operand=3
+    else
+      echo "$0: unexpected extra operand $argument" >&2
+      exit 1
+    fi
+    ;;
+  esac
+done
+
+if test -n "$previous_option"; then
+  echo "$0: option '$argument' requires an argument" >&2
+  exit 1
+fi
+
+if test -z "$input"; then
+  echo "$0: No input file was specified" >&2
+  exit 1
+fi
+
+if test -z "$output"; then
+  output="$input"
+fi
+
+tmpdir=
+tmpdest=
+cleanup() {
+  if [ -n "$tmpdir" ]; then rm -rf "$tmpdir"; fi
+  if [ -n "$tmpdest" ]; then rm -rf "$tmpdest"; fi
+}
+trap cleanup EXIT HUP INT QUIT TERM
+
+if [ -z "$directory" ]; then
+  tmpdir=$(mktemp -d)
+  directory=$tmpdir
+fi
+
+# Use different -indev and -outdev as just xorriso -dev doesn't rewrite the .iso
+# in the same manner.
+if [ "$input" = "$output" ]; then
+  tmpdest=$(mktemp -d)
+  dest=$tmpdest/iso
+else
+  dest=$output
+  rm -f -- "$dest"
+fi
+
+xorriso \
+  -indev "$input" \
+  -outdev "$dest" \
+  -boot_image grub keep \
+  -pathspecs on \
+  -add \
+  ="$directory"
+
+# xorriso doesn't write out the destination file if the directory is empty.
+if [ ! -e "$dest" ]; then
+  cp -- "$input" "$dest"
+fi
+
+if [ "$dest" != "$output" ]; then
+  cp -- "$dest" "$output"
+fi

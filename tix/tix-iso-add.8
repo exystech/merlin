@@ -1,0 +1,79 @@
+.Dd February 4, 2018
+.Dt TIX-ISO-ADD 8
+.Os
+.Sh NAME
+.Nm tix-iso-add
+.Nd add directory to .iso filesystem
+.Sh SYNOPSIS
+.Nm
+.Op Fl o Ar output-file
+.Ar input-file
+.Ar input-directory
+.Sh DESCRIPTION
+.Nm
+adds the contents of the
+.Ar input-directory
+directory to the .iso filesystem at
+.Ar input-file ,
+while keeping the .iso bootable after the modification.
+.Pp
+.Xr xorriso 1
+must be installed in order to use this script.
+.Pp
+This script is designed to be convenient when modifying a Sortix release .iso as
+part of the
+.Xr release-iso-modification 7
+procedure.
+The user is free to take all its actions themselves if it doesn't meet their
+needs.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl o Ar output-file , Fl \-output Ar output-file
+Write the modified
+.Ar input-file
+to
+.Ar output-file
+instead of modifying
+.Ar input-file
+in place.
+This path must not be the same as the
+.Ar input-file .
+.El
+.Pp
+This script works by invoking the
+.Xr xorriso 1
+program and essentially boils down to:
+.Bd -literal
+xorriso \\
+  -indev "$input_file" \\
+  -outdev "$output_file" \\
+  -boot_image grub keep \\
+  -pathspecs on \\
+  -add \\
+  ="$input_directory"
+.Ed
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+On error, the input file is left alone.
+.Sh EXAMPLES
+To add some files and directories to an .iso filesystem, one can run:
+.Bd -literal
+mkdir directory
+mkdir directory/foo
+mkdir directory/foo/bar
+echo qux > directory/foo/bar/qux
+echo spam > directory/foo/bar/spam
+tix-iso-add sortix.iso directory
+.Ed
+.Pp
+To save the modified iso elsewhere, one can run:
+.Bd -literal
+tix-iso-add -o sortix-modified.iso sortix.iso directory
+.Ed
+.Sh SEE ALSO
+.Xr xorriso 1 ,
+.Xr release-iso-modification 7 ,
+.Xr tix-iso-bootconfig 8 ,
+.Xr tix-iso-liveconfig 8

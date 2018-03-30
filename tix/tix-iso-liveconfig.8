@@ -1,0 +1,92 @@
+.Dd February 4, 2018
+.Dt TIX-ISO-LIVECONFIG 8
+.Os
+.Sh NAME
+.Nm tix-iso-liveconfig
+.Nd generate additional live environment configuration for Sortix .iso releases
+.Sh SYNOPSIS
+.Nm
+.Op Fl \-hostname Ns = Ns Ar hostname
+.Op Fl \-kblayout Ns = Ns Ar kblayout
+.Op Fl \-videomode Ns = Ns Ar videomode
+.Ar output-directory
+.Sh DESCRIPTION
+.Nm
+generates additional live environment configuration for Sortix .iso releases
+that can be overlaid onto the live environment filesystem by making an archive
+of it and loading it as an initrd in the .iso bootloader configuration.
+An release .iso can be modified to contain this additional live environment
+configuration by using
+.Xr tix-iso-bootconfig 8
+to add an initrd of it in the additional bootloader configuration, and then
+using
+.Xr tix-iso-add 8
+to add the additional bootloader configuration to the release .iso.
+.Pp
+.Nm
+creates the
+.Ar output-directory
+directory if it doesn't already exist and populates it with the requested
+additional configuration for the live environment.
+By default, it doesn't make any directories or files inside the
+.Ar output-directory
+directory.
+.Pp
+This script is designed to be convenient when modifying a Sortix release .iso as
+part of the
+.Xr release-iso-modification 7
+procedure.
+The user is free to take all its actions themselves if it doesn't meet their
+needs, or to make changes to the output after running the script.
+These configuration changes apply only to the live environment, not to any
+installations made from inside it.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl \-hostname Ns = Ns Ar hostname
+Set the live environment's hostname by writing
+.Ar hostname
+to
+.Pa output-directory/etc/hostname .
+(See
+.Xr hostname 5 )
+.It Fl \-kblayout Ns = Ns Ar kblayout
+Set the live environment's keyboard layout by writing
+.Ar kblayout
+to
+.Pa output-directory/etc/kblayout .
+(See
+.Xr kblayout 5 )
+.It Fl \-videomode Ns = Ns Ar videomode
+Set the live environment's graphics resolution by writing
+.Ar videomode
+to
+.Pa output-directory/etc/videomode .
+(See
+.Xr videomode 5 )
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh EXAMPLES
+This section contains examples of how one can modify a release .iso.
+.Ss Hostname, Keyboard Layout, and Graphics Resolution
+To customize the live environment of a release with a custom hostname, custom
+keyboard layout, and custom graphics resolution:
+.Bd -literal
+tix-iso-liveconfig \\
+  --hostname=dragon \\
+  --kblayout=dk \\
+  --videomode=1920x1080x32 \\
+  liveconfig
+tix-iso-bootconfig --liveconfig=liveconfig bootconfig
+tix-iso-add sortix.iso bootconfig
+.Ed
+.Sh SEE ALSO
+.Xr xorriso 1 ,
+.Xr hostname 5 ,
+.Xr kblayout 5 ,
+.Xr videomode 5 ,
+.Xr release-iso-modification 7 ,
+.Xr tix-iso-add 8 ,
+.Xr tix-iso-bootconfig 8

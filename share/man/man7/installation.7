@@ -72,6 +72,23 @@ medium over any existing operating system installations.
 After the installation is complete, remove the installation medium and restore
 the firmware boot order to prioritize the local harddisk.
 Then power the computer on normally to run the new operating system.
+.Ss Release .iso Modification
+Optionally, you might want to modification a release .iso to meet your custom
+needs per the instructions in
+.Xr release-iso-modification 7 .
+.Pp
+The release modification procedure lets you customize aspects such as the
+default bootloader menu option and timeout, the default hostname, the default
+keyboard layout, the default graphics resolution, adding files of your choice to
+the live environment, and so on.
+.Pp
+Warning: The live environment does not come with any random entropy and entropy
+gathering is not yet implemented.
+To keep your system secure, it is recommended to use the release modification
+procedure to add a
+.Pa /boot/random.seed
+file to the release .iso in order to securely seed the cryptographically secure
+pseudorandom number generator.
 .Ss Qemu
 Virtual machines are a well-supported installation target.
 For instance, to prepare a 1 GiB harddisk and install the operating system onto
@@ -371,6 +388,7 @@ Congratulations on your new Sortix system.
 .Xr initrd 7 ,
 .Xr kernel 7 ,
 .Xr mbr 7 ,
+.Xr release-iso-modification 7 ,
 .Xr upgrade 7 ,
 .Xr user-guide 7 ,
 .Xr disked 8 ,

@@ -21,6 +21,23 @@ before that one.
 If the existing installation is a development snapshot, you must either upgrade
 to a newer development snapshot of that version, or a the final release of that
 version.
+.Ss Release .iso Modification
+Optionally, you might want to modification a release .iso to meet your custom
+needs per the instructions in
+.Xr release-iso-modification 7 .
+.Pp
+The release modification procedure lets you customize aspects such as the
+default bootloader menu option and timeout, the default hostname, the default
+keyboard layout, the default graphics resolution, adding files of your choice to
+the live environment, and so on.
+.Pp
+Warning: The live environment does not come with any random entropy and entropy
+gathering is not yet implemented.
+To keep your system secure, it is recommended to use the release modification
+procedure to add a
+.Pa /boot/random.seed
+file to the release .iso in order to securely seed the cryptographically secure
+pseudorandom number generator.
 .Ss Bootloader Menu
 Pick the
 .Li upgrade existing installation

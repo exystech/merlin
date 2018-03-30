@@ -1,0 +1,404 @@
+.Dd February 5, 2018
+.Dt RELEASE-ISO-MODIFICATION 7
+.Os
+.Sh NAME
+.Nm release-iso-modification
+.Nd instructions on how to modify release .iso filesystems
+.Sh DESCRIPTION
+This document describes how to modify Sortix .iso releases to meet your custom
+needs.
+The bootloader configuration in .iso releases is designed with an extensible
+hooks system that let's you override it with further configuration and to load
+additional files of your choice into the live environment.
+The live environment is configurable through the normal operating system
+configuration as described in section 5 of the manual.
+.Pp
+The release modification procedure lets you customize aspects such as the
+default bootloader menu option and timeout, the default hostname, the default
+keyboard layout, the default graphics resolution, adding files of your choice to
+the live environment, and so on.
+.Ss Prerequisites
+.Bl -bullet -compact
+.It
+A
+.Pa sortix-x.y-arch.iso
+release for your architecture.
+.It
+.Xr xorriso 1
+needs to be installed.
+.El
+.Ss Overview
+The release modification process has three stages:
+.Pp
+.Bl -bullet -compact
+.It
+Optionally, creating additional files that will be loaded onto the live
+environment (the liveconfig).
+.It
+Creating additional bootloader configuration (the bootconfig), which will
+contain an archived copy of the liveconfig (if any).
+.It
+Adding the bootconfig to the release .iso.
+.El
+.Pp
+The bootloader menu Install and Upgrade selections will start the live
+environment and run the
+.Xr sysinstall 8
+installer and
+.Xr sysupgrade 8
+upgrader respectively and they are thus also customizable by this procedure.
+.Ss Convenience Scripts
+The release modification can be done manually by hand, or you can use the
+following convenience scripts that make the release modification easy:
+.Pp
+.Bl -bullet -compact
+.It
+.Xr tix-iso-liveconfig 8
+that generates additional configuration files for the live environment.
+.It
+.Xr tix-iso-bootconfig 8
+that generates additional bootloader configuration and optionally configures the
+bootloader to load the liveconfig into the live environment.
+.It
+.Xr tix-iso-add 8
+that adds the bootconfig (and thus the liveconfig if any) to the release .iso.
+.El
+.Pp
+These convenience scripts come with the operating system and are installed in
+the
+.Pa /sbin
+directory.
+These scripts are entirely for convenience and you can perform their tasks
+yourself if they don't meet your needs.
+The scripts are readable shell scripts and you can learn how they work and
+extend them with your own features.
+.Pp
+If you are not on a Sortix system or on a different version of Sortix than the
+one you are customizing, you can download the shell scripts matching the latest
+stable release:
+.Pp
+.Bl -bullet -compact
+.It
+.Lk https://sortix.org/release/stable/scripts/tix-iso-liveconfig
+.It
+.Lk https://sortix.org/release/stable/scripts/tix-iso-bootconfig
+.It
+.Lk https://sortix.org/release/stable/scripts/tix-iso-add
+.El
+.Pp
+If you are not customizing the latest stable release, you can find the matching
+versions of the scripts in the
+.Pa scripts/
+subdirectory of the appropriate release directory, or you can check out the
+.Pa tix
+directory in the source code from
+.Lk https://sortix.org/source/
+matching the release you are currently customizing.
+.Ss Additional Live Configuration Configuration
+The live environment is a normal instance of the operating system and can be
+configured by adding additional files or overwriting existing files.
+Section 5 of the manual documents the system and software configuration files.
+Additional files can also be added for their own sake.
+.Pp
+To do so, create a directory that will contain this additional live environment
+configuration (liveconfig), whose contents will be extracted on top of the live
+environment's root filesystem.
+A compressed archive of this directory will be made in the next subsection and
+needs to be registered with the bootloader configuration.
+.Pp
+The
+.Xr tix-iso-liveconfig 8
+convenience script is useful as it offers a lot of commonly useful
+customizations to the live environment and can populate an initial liveconfig
+directory for you.
+.Ss Additional Bootloader Configuration
+The GRUB bootloader configuration of an release .iso is extensible and allows
+additional configuration to hook into it by writing a
+.Pa /boot/grub/hooks.cfg
+configuration file as described in
+.Xr release-iso-bootconfig 7 .
+.Pp
+To do so, create a directory that will contain this additional bootloader
+configuration (bootconfig), whose contents will be added onto the release .iso.
+The liveconfig (if any) is normally added to the bootconfig as a compressed
+archive and the additional bootloader configuration loads it as an initrd onto
+the live environment.
+The bootconfig will be overlaid to the release .iso in the next subsection.
+.Pp
+The
+.Xr tix-iso-bootconfig 8
+convenience script makes it easy to generate common additional bootloader
+configuration and its documentation has examples of what it can do.
+It is commonly used with the
+.Fl \-liveconfig
+option to generate the bootloader configuration that loads the additional files
+from the liveconfig into the live environment.
+.Ss Adding Files To The Release
+Releases are modified by adding the bootconfig (which contains a compressed copy
+of the liveconfig, if any) files to the release .iso.
+.Pp
+The
+.Xr tix-iso-add 8
+convenience script makes it easy to add files to a release .iso while taking
+care to keep the release .iso bootable after the modification.
+You need
+.Xr xorriso 1
+installed to use this script.
+Alternatively you can add the files to the release .iso by running
+.Xr xorriso 1
+yourself:
+.Bd -literal
+xorriso \\
+  -indev "$input_file" \\
+  -outdev "$output_file" \\
+  -boot_image grub keep \\
+  -pathspecs on \\
+  -add \\
+  ="$input_directory"
+.Ed
+.Pp
+Your modified release can then be used in place of the original release.
+See the
+.Sx EXAMPLES
+section below for inspiration on what customizations to make, as well as the
+manual pages for the
+.Xr tix-iso-liveconfig 8
+and
+.Xr tix-iso-bootconfig 8
+convenience scripts.
+.Sh EXAMPLES
+This section contains examples of how one can modify a release .iso.
+.Ss "No Change"
+To customize a release with no customizations except for the bootloader to say
+the release was modified by the current user on the current host:
+.Bd -literal
+tix-iso-bootconfig bootconfig
+tix-iso-add sortix.iso bootconfig
+.Ed
+.Ss Add Files to the Live Environment
+To customize a release with additional files and directories in the live
+environment:
+.Bd -literal
+mkdir -p liveconfig
+mkdir -p liveconfig/root
+echo foo > liveconfig/root/foofile
+echo bar > liveconfig/root/barfile
+tix-iso-bootconfig --liveconfig=liveconfig bootconfig
+tix-iso-add sortix.iso bootconfig
+.Ed
+.Ss Provide Random Seed
+To customize a release with a random seed
+.Pa ( /boot/random.seed )
+(which must be kept confidential and
+not reused, see the warnings in
+.Xr tix-iso-bootconfig 8 ) :
+.Bd -literal
+tix-iso-bootconfig --random-seed bootconfig
+tix-iso-add sortix.iso bootconfig
+rm bootconfig/boot/random.seed # When no longer useful.
+rm sortix.iso # When no longer useful.
+# And erase any media made from sortix.iso when no longer useful.
+.Ed
+.Ss Hostname, Keyboard Layout, and Graphics Resolution
+To customize the live environment of a release with a custom hostname, custom
+keyboard layout, and custom graphics resolution:
+.Bd -literal
+tix-iso-liveconfig \\
+  --hostname=dragon \\
+  --kblayout=dk \\
+  --videomode=1920x1080x32 \\
+  liveconfig
+tix-iso-bootconfig --liveconfig=liveconfig bootconfig
+tix-iso-add sortix.iso bootconfig
+.Ed
+.Ss Load Only Basic Ports by Default
+To customize a release to only loads basic ports by default:
+.Bd -literal
+mkdir -p bootconfig/grub
+cat > bootconfig/grub/hooks.cfg << EOF
+function hook_init {
+  select_ports_set_basic
+}
+EOF
+tix-iso-add sortix.iso bootconfig
+.Ed
+.Ss Default Bootloader Menu Option and Timeout
+To customize a release so the default bootloader menu option is to run the
+installer (bootloader menu option 1, counting from 0) and to change the
+bootloader menu timeout to 2 seconds:
+.Bd -literal
+tix-iso-bootconfig --default=1 --timeout=2 bootconfig
+tix-iso-add sortix.iso bootconfig
+.Ed
+.Ss Locked Down Multi-User Live Environment
+To customize a release so the live environment boots to the login screen by
+default with the provided database of users and groups
+.Xr ( passwd 5
+and
+.Xr group 5 ) ,
+password protect the
+bootloader so only the default live environment option can be chosen by
+unauthenticated users:
+.Bd -literal
+mkdir -p liveconfig/etc
+# Each user's username is their password hashed with crypt_newhash(3).
+(printf 'root:%s:0:0:root:/root:sh\\n' \\
+        '$2b$10$S/fJmYIJSkRdifk61xDYn.w62y.vNu35tZkznR6xa3Ntg0hsbI8tO' &&
+ printf 'alice:%s:1000:1000:alice:/home/alice:sh\\n' \\
+        '$2b$10$4xGAf5FyCYedWoNltWvbmOOreXcI5cH/f4Jz/pkWrWxwZ7TQ/WbRC' &&
+ printf 'bob:%s:1001:1001:bob:/home/bob:sh\\n' \\
+        '$2b$10$0.IukhbHNy63te6ozVJ7Pu/EvbCcr892981XbqRQ0w16UPhmDdUqa') |
+cat > liveconfig/etc/passwd
+cat > liveconfig/etc/group << EOF
+root::0:root
+alice::1000:alice
+bob::1001:bob
+EOF
+mkdir -p liveconfig/home
+mkdir -p -m 700 liveconfig/home/alice
+mkdir -p -m 700 liveconfig/home/bob
+grub-mkpasswd-pbkdf2 | # enter bootloader password
+tee /dev/tty |
+tail -1 |
+sed 's/PBKDF2 hash of your password is //' > liveconfig/etc/grubpw
+tix-iso-bootconfig --liveconfig=liveconfig bootconfig
+(echo 'insmod password_pbkdf2'
+ echo 'set superusers="root"'
+ echo "password_pbkdf2 root $(cat liveconfig/etc/grubpw)") |
+cat >> bootconfig/boot/grub/hooks.cfg
+cat > bootconfig/boot/grub/main.cfg << \EOF
+menu_title="$base_menu_title"
+hook_menu_pre
+menuentry "Sortix $version" --unrestricted {
+  load_sortix -- /sbin/init --target=multi-user
+}
+hook_menu_post
+EOF
+tix-iso-add sortix.iso bootconfig
+.Ed
+.Ss Add a new Port
+To customize a release with a new port
+.Sy foo
+in the
+.Sy basic
+and
+.Sy all
+port sets and fully integrate it with the bootloader menus:
+.Bd -literal
+mkdir -p bootconfig/boot/grub
+cat > bootconfig/boot/grub/hooks.cfg << \\EOF
+port_foo=true
+tix_foo=false
+export port_foo
+export tix_foo
+function hook_ports_menu {
+  if $port_foo; then
+    menuentry "foo = true" {
+      port_foo=false
+      configfile /boot/grub/ports.cfg
+    }
+  else
+    menuentry "foo = false" {
+      port_foo=true
+      configfile /boot/grub/ports.cfg
+    }
+  fi
+}
+function hook_tix_menu {
+  if $tix_foo; then
+    menuentry "foo = true" {
+      tix_foo=false
+      configfile /boot/grub/tix.cfg
+    }
+  else
+    menuentry "foo = false" {
+      tix_foo=true
+      configfile /boot/grub/tix.cfg
+    }
+  fi
+}
+function hook_ports_set_all {
+  port_foo=true
+}
+function hook_tix_set_all {
+  tix_foo=true
+}
+function hook_ports_set_basic {
+  port_foo=true
+}
+function hook_tix_set_basic {
+  tix_foo=true
+}
+function hook_ports_set_minimal {
+  port_foo=false
+}
+function hook_tix_set_minimal {
+  tix_foo=false
+}
+function hook_ports_set_no {
+  port_foo=false
+}
+function hook_tix_set_no {
+  tix_foo=false
+}
+function hook_ports_pre {
+  if $tix_foo; then
+    echo -n "Loading /repository/foo.tix.tar.xz (3.0M) ... "
+    module --nounzip /repository/foo.tix.tar.xz \\
+           --to /repository/foo.tix.tar.xz
+    echo done
+  fi
+  if $port_foo; then
+    echo -n "Loading /repository/foo.tix.tar.xz (3.0M) ... "
+    module /repository/foo.tix.tar.xz --tix
+    echo done
+  fi
+}
+EOF
+mkdir -p bootconfig/repository
+cp foo.tix.tar.xz bootconfig/repository/foo.tix.tar.xz
+tix-iso-add sortix.iso bootconfig
+.Ed
+.Ss Add a new Ports Set
+To customize a release with your own set of ports that are loaded by
+default and fully integrate it with the bootloader menus:
+.Bd -literal
+mkdir -p bootconfig/boot/grub
+cat > bootconfig/boot/grub/hooks.cfg << \\EOF
+function hook_ports_menu_sets {
+  menuentry "Load only recommended ports" {
+    select_ports_set_recommended
+    configfile /boot/grub/ports.cfg
+  }
+}
+function hook_tix_menu_sets {
+  menuentry "Load only basic binary packages" {
+    select_tix_set_recommended
+    configfile /boot/grub/tix.cfg
+  }
+}
+select_ports_set_recommended {
+  # The basic set can be extended by calling select_ports_set_basic here.
+  port_foo=false
+  port_bar=true
+}
+select_tix_set_recommended {
+  # The basic set can be extended by calling select_tix_set_basic here.
+  tix_foo=false
+  tix_bar=true
+}
+# Load the recommended set of ports by default.
+hook_ports_menu_sets
+EOF
+tix-iso-add sortix.iso bootconfig
+.Ed
+.Sh SEE ALSO
+.Xr xorriso 1 ,
+.Xr development 7 ,
+.Xr installation 7 ,
+.Xr release-iso-bootconfig 7 ,
+.Xr upgrade 7 ,
+.Xr user-guide 7 ,
+.Xr tix-iso-add 8 ,
+.Xr tix-iso-bootconfig 8 ,
+.Xr tix-iso-liveconfig 8
