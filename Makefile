@@ -22,6 +22,7 @@ kblayout-compiler \
 login \
 mkinitrd \
 regress \
+rw \
 sf \
 sh \
 sysinstall \

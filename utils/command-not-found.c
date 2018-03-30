@@ -109,6 +109,12 @@ void suggest_reboot(const char* filename)
 	}
 }
 
+void suggest_rw(const char* filename)
+{
+	fprintf(stderr, "No command '%s' found, did you mean:\n", filename);
+	fprintf(stderr, " Command 'rw' from package 'rw'\n");
+}
+
 int main(int argc, char* argv[])
 {
 	const char* filename = 2 <= argc ? argv[1] : argv[0];
@@ -134,6 +140,8 @@ int main(int argc, char* argv[])
 		suggest_poweroff(filename);
 	else if ( !strcmp(filename, "reboot") )
 		suggest_reboot(filename);
+	else if ( !strcmp(filename, "dd") )
+		suggest_rw(filename);
 	fprintf(stderr, "%s: command not found\n", filename);
 	return 127;
 }

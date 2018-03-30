@@ -1,0 +1,453 @@
+.Dd March 6, 2018
+.Dt RW 1
+.Os
+.Sh NAME
+.Nm rw
+.Nd blockwise input/output
+.Sh SYNOPSIS
+.Nm
+.Op Fl afhPstvx
+.Op Fl b Ar block-size
+.Op Fl c Ar count
+.Op Fl I Ar input-offset
+.Op Fl i Ar input-file
+.Op Fl O Ar output-offset
+.Op Fl o Ar output-file
+.Op Fl p Ar interval
+.Op Fl r Ar input-block-size
+.Op Fl w Ar output-block-size
+.Sh DESCRIPTION
+.Nm
+reads blocks from the standard input and copies them to the standard output
+until the end of the standard input.
+The input block size and output block sizes default to appropriate values for
+efficiently reading from the input and writing to the output.
+Input and output will be done as aligned as possible on the block size
+boundaries.
+The final input block can be partial.
+Output blocks are written whenever enough input blocks have been read, or
+partially written whenever the end of the input is reached.
+The output file is not truncated after the copy is done.
+.Pp
+Byte quantities can be specified as a non-negative count of bytes in decimal
+format, hexadecimal format (with leading
+.Sy 0x ) ,
+or octal format (with leading
+.Sy 0 ) ;
+optionally followed by any amount of whitespace, and then suffixed with any of
+the following case-insensitive suffixes that multiplies the specified quantity
+by that magnitude:
+.Pp
+.Bl -tag -width "12345678" -compact
+.It Sy B
+Magnitude of a byte (1 byte).
+.It Sy K , Sy KiB
+Magnitude of kibibytes (1,024 bytes).
+.It Sy M , Sy MiB
+Magnitude of mebibytes (1,048,576 bytes).
+.It Sy G , Sy GiB
+Magnitude of gibibytes (1,073,741,824 bytes).
+.It Sy T , Sy TiB
+Magnitude of tebibytes (1,099,511,627,776 bytes).
+.It Sy P , Sy PiB
+Magnitude of pebibytes (1,125,899,906,842,624 bytes).
+.It Sy E , Sy EiB
+Magnitude of exbibytes (1,152,921,504,606,846,976 bytes).
+.It Sy r
+Magnitude of input blocks (the default input block size when setting block
+sizes).
+.It Sy w
+Magnitude of output blocks (the default output block size when setting block
+sizes
+.It Sy x
+Magnitude of input and output blocks (if they have the same size) (the default
+block size when setting block sizes).
+.El
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl a
+In combination with
+.Fl o ,
+open the output file in append mode.
+This option must be used with
+.Fl o
+and is incompatible with
+.Fl t .
+The output offset is set to the size of the output file.
+.It Fl b Ar block-size
+Set both the input and output block sizes to
+.Ar block-size .
+.It Fl c Ar count
+Stop after copying the byte quantify specified by
+.Ar count ,
+in addition to stopping when the end of the input is reached.
+If the
+.Ar count
+starts with a leading
+.Sq - ,
+stop that many bytes before the end of the input (only works if the input size
+is known).
+.It Fl f
+Continue as much as possible in the event of I/O errors and exit unsuccessfully
+afterwards.
+For each input failure, skip forward to the next input block or the next
+native-size input block or the end of the file (whichever comes first), write an
+error to the standard error, and replace the failed input with NUL bytes when
+writing it to the output.
+For each output failure, skip forward to the next output block or the next
+native-size output block (whichever comes first) and write an error to the
+standard error.
+The native-size input and output blocks are those defined by the preferred
+input/output size for the input and output.
+This option only works for the input if it is seekable and the input size is
+known.
+This option only works for the output if it is seekable (and
+.Fl a
+is not set).
+Beware that the default preferred input/output sizes may be larger than the
+underlying storage sector sizes: If this option is used, the
+.Fl r
+and
+.Fl w
+options should be set to the appropriate input/output sector sizes, or more than
+just the bad sector may be skipped.
+.It Fl h
+Write statistics in the human readable format where byte amounts and time
+amounts are formatted according to their magnitude as described in the
+.Sx DIAGNOSTICS
+section.
+.It Fl I Ar offset
+Skip past the first
+.Ar offset
+bytes in the input before the copying begins.
+If the
+.Ar offset
+starts with a leading
+.Sq -
+it is interpreted as that many bytes before the end of the input (if the size is
+known), and if it starts with a leading
+.Sq +
+it is interpreted as that many bytes after the end of the input (if the size is
+known).
+If the input is not seekable, the first
+.Ar offset
+bytes are read and discarded before the copying begins.
+If the
+.Ar offset
+is not a multiple of the input block size, the first input block is reduced in
+size such that it ends at a input-block-size-aligned position in the input.
+.It Fl i Ar input-file
+Read the input from
+.Ar input-file
+instead of the standard input.
+.It Fl O Ar offset
+Seek past the first
+.Ar offset
+bytes in the output before the copying begins.
+If the
+.Ar offset
+starts with a leading
+.Sq -
+it is interpreted as that many bytes before the end of the output (if the size
+is known), and if it starts with a leading
+.Sq +
+it is interpreted as that many bytes after the end of the output (if the size
+is
+known).
+If the output is not seekable, the number of NUL bytes specified in
+.Ar offset
+are written to the output before the copying begins.
+This option cannot be set to a non-zero value if
+.Fl a
+is set.
+If the
+.Ar offset
+is not a multiple of the output block size, the first output block is reduced in
+size such that it ends at a output block size aligned position in the output.
+.It Fl o Ar output-file
+Write the output to
+.Ar output-file
+instead of the standard output, creating the file if it doesn't exist.
+If
+.Ar output-file
+already exists, the existing data is not discarded.
+Use
+.Fl t
+if you want to truncate the output afterwards.
+.It Fl P
+Pad the final output block with NUL bytes, such that the final output offset
+(counting the initial offset with
+.Fl O )
+is a multiple of the output block size.
+.It Fl p Ar interval
+Write occasional statistics to the standard error during the transfer and on
+completion, or when being terminated by
+.Dv SIGINT .
+.Ar interval
+is a non-negative integer of how long the interval is in whole seconds between
+statistics being written.
+Statistics are written for every read and write if the
+.Ar interval
+is zero.
+The format is described in the
+.Sx DIAGNOSTICS
+section.
+.It Fl r Ar input-block-size
+Set the input block size to
+.Ar input-block-size .
+.It Fl s
+Sync the output on successful completion.
+.It Fl t
+Truncate the output to the final output position after the copy has completed.
+This option requires the output to be truncatable.
+This option is incompatible with
+.Fl a .
+.It Fl v
+Write statistics to the standard error upon completion, or when being terminated
+by
+.Dv SIGINT .
+The format is described in the
+.Sx DIAGNOSTICS
+section.
+.It Fl w Ar output-block-size
+Set the output block size to
+.Ar output-block-size .
+.It Fl x
+In combination with
+.Fl o ,
+fail if the output file already exists.
+.El
+.Sh ASYNCHRONOUS EVENTS
+.Bl -tag -width "SIGUSR1"
+.It Dv SIGINT
+If
+.Fl v
+or
+.Fl p
+is set, abort the copy, write statistics to the standard error, and then exit as
+if killed by
+.Dv SIGINT .
+.It Dv SIGUSR1
+Write statistics to the standard error and continue the copy.
+If
+.Dv SIGUSR1
+is not ignored, this handler is installed and this signal is unblocked.
+To use this signal without a race condition before the signal handler is
+installed (as
+.Dv SIGUSR1
+is deadly by default), block the signal before loading this program.
+To disable the handling of this signal, ignore the signal before loading this
+program.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh EXAMPLES
+Copy from the standard input to the standard output:
+.Bd -literal
+rw
+.Ed
+.Pp
+Copy the first 256 bytes from the input to the output:
+.Bd -literal
+rw -c 256
+.Ed
+.Pp
+Copy from the input file
+.Pa foo
+to the beginning of the output file
+.Pa bar
+(preserving any data in the output file beyond the final output position after
+the copy is finished).
+.Bd -literal
+rw -i foo -o bar
+.Ed
+.Pp
+Copy from the input file to the beginning of the output file, truncating the
+output file to the final output position afterwards:
+.Bd -literal
+rw -i foo -o bar -t
+.Ed
+.Pp
+Copy from the input file
+.Pa foo
+to the beginning of the output block device
+.Pa /dev/bar
+(preserving any existing data on the output block device beyond the copied
+area), while writing progress statistics every 10 seconds in the human readable
+format, and sync the output block device afterwards:
+.Bd -literal
+rw -i foo -o /dev/bar -p 10 -h -s
+.Ed
+.Pp
+Skip the first 512 bytes of the input, and then append the next 1024 bytes to
+the output file
+.Pa bar :
+.Bd -literal
+rw -I 512 -c 1024 -o bar -a
+.Ed
+.Pp
+Copy 2 KiB from offset 768 in the input file
+.Pa foo
+to offset 256 MiB in the output file
+.Pa bar .
+.Bd -literal
+rw -c 2K -i foo -I 768 -o bar -O 256M
+.Ed
+.Pp
+Copy from sector 32 and 4 sectors onwards from a block device
+.Pa /dev/foo
+(with the sector size being 512 bytes)
+to the output file
+.Pa bar :
+.Bd -literal
+rw -r 512 -i /dev/foo -I 32r -c 4r -o bar
+.Ed
+.Pp
+With a block size of 4096 bytes, copy 64 blocks from the input from offset 32
+blocks in the input to offset 65536 blocks in the output:
+.Bd -literal
+rw -b 4096 -c 64x -I 32x -O 65536x
+.Ed
+.Pp
+Back up the
+.Pa /dev/foo
+block device (with the sector size being 512 bytes) to the
+.Pa bar
+output file, continuing despite I/O errors by writing error messages to the
+standard error and writing NUL bytes to the output instead, truncating the
+output file to the size of the input, writing progress statistics every 10
+seconds in the human readable format to the standard error:
+.Bd -literal
+rw -f -i /dev/foo -r 512 -o bar -t -p 10 -h
+.Ed
+.Pp
+With the input block size of 512 bytes and the output block size of 8192 bytes,
+copy 16384 input blocks from input block 65536 onwards to output block 1048576:
+.Bd -literal
+rw -r 512 -w 8192 -c 16384r -I 65536r -O 1048576w
+.Ed
+.Pp
+Copy 512 bytes from 1024 bytes before the end of the input to 2048 bytes after
+the current size of the output file:
+.Bd -literal
+rw -c 512 -I -1024 -o bar -O +2048
+.Ed
+.Pp
+Skip the first 100 bytes of the input and copy until 200 bytes are left in the
+input file:
+.Bd -literal
+rw -i foo -I 100 -c -200
+.Ed
+.Sh DIAGNOSTICS
+Statistics about the copy are written to the standard error upon completion
+if either
+.Fl v
+or
+.Fl p
+are set; occasionally if
+.Fl p
+is set; upon
+.Dv SIGINT
+(if not ignored when the program was loaded) if
+.Fl v
+is set; and upon
+.Dv SIGUSR1
+(if not ignored when the program was loaded).
+.Pp
+The statistics are in this format:
+.Bd -literal
+<time-elapsed> s <done> B / <total> B <percent>% <speed> B/s <time-left> s
+.Ed
+.Pp
+.Ar time-elapsed
+is the number of seconds since the copying began.
+.Ar done
+is the number of bytes copied so far.
+.Ar total
+is an estimate of how many bytes will be copied, or
+.Sq "?"
+if not known.
+.Ar percent
+is how many percent complete the copy is, or
+.Sq "?"
+if not known.
+.Ar speed
+the average speed of copying so far in bytes per second, or
+.Sq "?"
+if it is too early to tell.
+.Ar time-left
+is the number of seconds left, assuming the remaining data is copied at the
+current average speed, or
+.Sq "?"
+is not known.
+.Pp
+For instance, the statistics could look like this:
+.Bd -literal
+7 s 714682368 B / 1238364160 B 57% 102097481 B/s 5 s
+.Ed
+.Pp
+The statistics are printed with human readable byte units (B, KiB, MiB, GiB,
+TiB, PiB, EiB) and time units (s, m, h, d) if the
+.Fl h
+option is set:
+.Bd -literal
+7 s 714.4 MiB / 1.1 GiB 60% 102.0 MiB/s 4 s
+.Ed
+.Sh SEE ALSO
+.Xr cat 1 ,
+.Xr cp 1 ,
+.Xr dd 1
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 1.1.
+.Pp
+.Nm
+is similar to
+.Xr dd 1 ,
+but has a distinct design and improvements:
+.Bl -bullet
+.It
+The command line options use the conventional option format.
+.It
+The output file is not truncated by default.
+One has to use
+.Fl t .
+.It
+The input and output block sizes default to the preferred I/O block sizes
+instead of 512 bytes.
+.Pp
+The
+.Fl c , I ,
+and
+.Fl O
+options accept byte quantities by default instead of block counts, but can
+be specified in block counts by using the
+.Sq r , w ,
+and
+.Sq x
+suffixes.
+.It
+Statistics are not written by default.
+One has to use
+.Fl v
+or
+.Fl p .
+The statistics contain more useful information and is machine readable as it
+contains no localized information.
+A human readable statistics format is available using
+.Fl h .
+Statistics can occasionally be written out using
+.Fl p .
+.It
+There is no support for converting ASCII to EBCDIC, converting ASCII to a
+different EBCDIC, EBCDIC to ASCII, swapping pairs of bytes, converting the bytes
+to lower-case or upper-case, converting line-delimited data into fixed-size
+blocks, or converting fixed-sized blocks into line-delimited data.
+.It
+Offsets can be specified relative to the end of the input/output.
+.It
+Input errors stop the copying immediately rather than writing out a partial
+output block.
+.El
