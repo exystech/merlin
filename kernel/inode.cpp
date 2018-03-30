@@ -33,6 +33,7 @@
 #include <sortix/kernel/ioctx.h>
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/kthread.h>
+#include <sortix/kernel/memorymanagement.h>
 #include <sortix/kernel/refcount.h>
 #include <sortix/kernel/time.h>
 
@@ -50,7 +51,7 @@ AbstractInode::AbstractInode()
 	stat_atim = Time::Get(CLOCK_REALTIME);
 	stat_ctim = Time::Get(CLOCK_REALTIME);
 	stat_mtim = Time::Get(CLOCK_REALTIME);
-	stat_blksize = 0;
+	stat_blksize = Page::Size();
 	stat_blocks = 0;
 	supports_iovec = false;
 }

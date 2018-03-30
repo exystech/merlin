@@ -46,7 +46,6 @@ UtilMemoryBuffer::UtilMemoryBuffer(dev_t dev, ino_t ino, uid_t owner,
 	this->stat_gid = group;
 	this->type = S_IFREG;
 	this->stat_mode = (mode & S_SETABLE) | this->type;
-	this->stat_blksize = 1;
 	this->stat_size = bufsize;
 	this->dev = dev;
 	this->ino = ino ? ino : (ino_t) this;

@@ -44,7 +44,6 @@ DevRandom::DevRandom(dev_t dev, ino_t ino, uid_t owner, gid_t group,
 	this->stat_gid = group;
 	this->stat_mode = (mode & S_SETABLE) | this->type;
 	this->stat_size = 0;
-	this->stat_blksize = 1;
 	this->dev = dev;
 	this->ino = ino;
 }

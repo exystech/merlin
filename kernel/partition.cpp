@@ -119,7 +119,7 @@ int Partition::stat(ioctx_t* ctx, struct stat* st)
 	if ( !ctx->copy_from_src(&myst, st, sizeof(myst)) )
 		return -1;
 	myst.st_size = length;
-	myst.st_blocks = length / (myst.st_blksize ?  myst.st_blksize : 1);
+	myst.st_blocks = length / 512;
 	if ( !ctx->copy_to_dest(st, &myst, sizeof(myst)) )
 		return -1;
 	return 0;
