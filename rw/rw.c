@@ -324,7 +324,7 @@ static void progress(struct timespec start,
 int main(int argc, char *argv[])
 {
 	// SIGUSR1 is deadly by default until a handler is installed, let users
-	// avoid the race condition by letting them block if before loading this
+	// avoid the race condition by letting them block it before loading this
 	// program and then it's unblocked after a handler is installed. Allow
 	// disabling SIGUSR1 handling by setting the handler to ignore before
 	// loading this program.
@@ -501,8 +501,7 @@ int main(int argc, char *argv[])
 	//
 	// 1) If
 	//
-	//    * The input block size and output block sizes are a multiple of each
-	//      other, and
+	//    * The input and output block sizes are a multiple of each other, and
 	//    * the input offset and output offsets are equal modulo the block
 	//      sizes;
 	//
@@ -646,7 +645,7 @@ int main(int argc, char *argv[])
 	// The offset in the ring buffer where data begins.
 	size_t buffer_offset = 0;
 
-	// The amount of data bytes in the in the ring buffer.
+	// The amount of data bytes in the ring buffer.
 	size_t buffer_used = 0;
 
 	// IO vector for efficient IO in case the ring buffer data wraps.
@@ -756,7 +755,7 @@ int main(int argc, char *argv[])
 			}
 		}
 		// If requested, pad the final block with NUL bytes until the next
-		// output block size boundrary in the output.
+		// output-block-size boundrary in the output.
 		if ( pad && (input_eof && 0 < buffer_used) &&
 		     buffer_used < next_output_blksize )
 		{
@@ -776,7 +775,7 @@ int main(int argc, char *argv[])
 			estimated_total_out = total_out + buffer_used;
 			pad = false;
 		}
-		// If the end of the input has been reached or an fuæll output block can
+		// If the end of the input has been reached or a full output block can
 		// written out, write out an output block.
 		if ( (input_eof && 0 < buffer_used) ||
 		     next_output_blksize <= buffer_used )
