@@ -76,10 +76,10 @@ and is incompatible with
 .Fl t .
 The output offset is set to the size of the output file.
 .It Fl b Ar block-size
-Set both the input and output block sizes to
+Set both the input and output block sizes to the byte quantity specified by
 .Ar block-size .
 .It Fl c Ar count
-Stop after copying the byte quantify specified by
+Stop after copying the byte quantity specified by
 .Ar count ,
 in addition to stopping when the end of the input is reached.
 If the
@@ -194,7 +194,7 @@ The format is described in the
 .Sx DIAGNOSTICS
 section.
 .It Fl r Ar input-block-size
-Set the input block size to
+Set the input block size to the byte quantity specified by
 .Ar input-block-size .
 .It Fl s
 Sync the output on successful completion.
@@ -211,7 +211,7 @@ The format is described in the
 .Sx DIAGNOSTICS
 section.
 .It Fl w Ar output-block-size
-Set the output block size to
+Set the output block size to the byte quantity specified by
 .Ar output-block-size .
 .It Fl x
 In combination with
