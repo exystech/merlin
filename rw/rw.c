@@ -461,7 +461,7 @@ int main(int argc, char *argv[])
 		output_blksize = parse_size_t(output_blksize_str,
 		                              input_st.st_blksize,
 		                              output_st.st_blksize);
-	if ( input_blksize == 0 )
+	if ( output_blksize == 0 )
 		errx(1, "the output block size cannot be zero");
 
 	off_t input_offset = 0;
