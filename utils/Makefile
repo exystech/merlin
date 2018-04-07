@@ -82,6 +82,7 @@ memstat.1 \
 pager.1 \
 passwd.1 \
 readlink.1 \
+sort.1 \
 uname.1 \
 
 SBINS=\

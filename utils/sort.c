@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2018 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,8 +17,8 @@
  * Sort, merge, or sequence check text files.
  */
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <locale.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -29,55 +29,55 @@
 // TODO: Implement all the features mandated by POSIX.
 // TODO: Implement the useful GNU extensions.
 
-int flip_comparison(int rel)
+static int flip_comparison(int rel)
 {
 	return rel < 0 ? 1 : 0 < rel ? -1 : 0;
 }
 
-int indirect_compare(int (*compare)(const char*, const char*),
-                     const void* a_ptr, const void* b_ptr)
+static int indirect_compare(int (*compare)(const char*, const char*),
+                            const void* a_ptr, const void* b_ptr)
 {
 	const char* a = *(const char* const*) a_ptr;
 	const char* b = *(const char* const*) b_ptr;
 	return compare(a, b);
 }
 
-int compare_line(const char* a, const char* b)
+static int compare_line(const char* a, const char* b)
 {
 	return strcoll(a, b);
 }
 
-int indirect_compare_line(const void* a_ptr, const void* b_ptr)
+static int indirect_compare_line(const void* a_ptr, const void* b_ptr)
 {
 	return indirect_compare(compare_line, a_ptr, b_ptr);
 }
 
-int compare_line_reverse(const char* a, const char* b)
+static int compare_line_reverse(const char* a, const char* b)
 {
 	return flip_comparison(compare_line(a, b));
 }
 
-int indirect_compare_line_reverse(const void* a_ptr, const void* b_ptr)
+static int indirect_compare_line_reverse(const void* a_ptr, const void* b_ptr)
 {
 	return indirect_compare(compare_line_reverse, a_ptr, b_ptr);
 }
 
-int compare_version(const char* a, const char* b)
+static int compare_version(const char* a, const char* b)
 {
 	return strverscmp(a, b);
 }
 
-int indirect_compare_version(const void* a_ptr, const void* b_ptr)
+static int indirect_compare_version(const void* a_ptr, const void* b_ptr)
 {
 	return indirect_compare(compare_version, a_ptr, b_ptr);
 }
 
-int compare_version_reverse(const char* a, const char* b)
+static int compare_version_reverse(const char* a, const char* b)
 {
 	return flip_comparison(compare_version(a, b));
 }
 
-int indirect_compare_version_reverse(const void* a_ptr, const void* b_ptr)
+static int indirect_compare_version_reverse(const void* a_ptr, const void* b_ptr)
 {
 	return indirect_compare(compare_version_reverse, a_ptr, b_ptr);
 }
@@ -90,10 +90,9 @@ struct input_stream
 	FILE* current_file;
 	const char* last_file_path;
 	uintmax_t last_line_number;
-	bool result_status;
 };
 
-char* read_line(FILE* fp, const char* fpname, int delim)
+static char* read_line(FILE* fp, const char* fpname, int delim)
 {
 	char* line = NULL;
 	size_t line_size = 0;
@@ -102,7 +101,7 @@ char* read_line(FILE* fp, const char* fpname, int delim)
 	{
 		free(line);
 		if ( ferror(fp) )
-			error(0, errno, "read: `%s'", fpname);
+			err(2, "read: %s", fpname);
 		return NULL;
 	}
 	if ( (unsigned char) line[amount-1] == (unsigned char) delim )
@@ -110,15 +109,14 @@ char* read_line(FILE* fp, const char* fpname, int delim)
 	return line;
 }
 
-char* read_input_stream_line(struct input_stream* is, int delim)
+static char* read_input_stream_line(struct input_stream* is, int delim)
 {
 	if ( !is->files_length )
 	{
 		char* result = read_line(stdin, "<stdin>", delim);
-		if ( ferror(stdin) )
-			is->result_status = false;
 		is->last_file_path = "-";
-		is->last_line_number++;
+		if ( result )
+			is->last_line_number++;
 		return result;
 	}
 	while ( is->files_current < is->files_length )
@@ -130,21 +128,11 @@ char* read_input_stream_line(struct input_stream* is, int delim)
 			if ( !strcmp(path, "-") )
 				is->current_file = stdin;
 			else if ( !(is->current_file = fopen(path, "r")) )
-			{
-				error(0, errno, "`%s'", path);
-				is->result_status = false;
-				is->files_current++;
-				continue;
-			}
+				err(2, "%s", path);
 		}
 		char* result = read_line(is->current_file, path, delim);
 		if ( !result )
 		{
-			if ( ferror(is->current_file) )
-			{
-				error(0, errno, "reading: `%s'", path);
-				is->result_status = false;
-			}
 			if ( is->current_file != stdin )
 				fclose(is->current_file);
 			is->current_file = NULL;
@@ -158,9 +146,9 @@ char* read_input_stream_line(struct input_stream* is, int delim)
 	return NULL;
 }
 
-char** read_input_stream_lines(size_t* result_num_lines,
-                               struct input_stream* is,
-                               int delim)
+static char** read_input_stream_lines(size_t* result_num_lines,
+                                      struct input_stream* is,
+                                      int delim)
 {
 	char** lines = NULL;
 	size_t lines_used = 0;
@@ -171,18 +159,13 @@ char** read_input_stream_lines(size_t* result_num_lines,
 	{
 		if ( lines_used == lines_length )
 		{
-			size_t new_lines_length = lines_length ? 2 * lines_length : 64;
-			size_t new_lines_size = sizeof(char*) * new_lines_length;
-			char** new_lines = (char**) realloc(lines, new_lines_size);
+			size_t old_lines_length = lines_length ? lines_length : 64;
+			char** new_lines = (char**) reallocarray(lines, old_lines_length,
+			                                         2 * sizeof(char*));
 			if ( !new_lines )
-			{
-				error(0, errno, "realloc");
-				free(line);
-				is->result_status = false;
-				return *result_num_lines = lines_used, lines;
-			}
+				err(2, "malloc");
 			lines = new_lines;
-			lines_length = new_lines_length;
+			lines_length = 2 * old_lines_length;
 		}
 		lines[lines_used++] = line;
 	}
@@ -203,93 +186,6 @@ static void compact_arguments(int* argc, char*** argv)
 	}
 }
 
-static void help(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "Usage: %s [OPTION]... [FILE]...\n", argv0);
-	fprintf(fp, "Write sorted concatenation of all FILE(s) to standard output.\n");
-	fprintf(fp, "\n");
-	fprintf(fp, "Mandatory arguments to long options are mandatory for short options too.\n");
-	fprintf(fp, "Ordering options:\n");
-	fprintf(fp, "\n");
-#if 0
-	fprintf(fp, "  -b, --ignore-leading-blanks  ignore leading blanks\n");
-	fprintf(fp, "  -d, --dictionary-order      consider only blanks and alphanumeric characters\n");
-	fprintf(fp, "  -f, --ignore-case           fold lower case to upper case characters\n");
-	fprintf(fp, "  -g, --general-numeric-sort  compare according to general numerical value\n");
-	fprintf(fp, "  -i, --ignore-nonprinting    consider only printable characters\n");
-	fprintf(fp, "  -M, --month-sort            compare (unknown) < `JAN' < ... < `DEC'\n");
-	fprintf(fp, "  -h, --human-numeric-sort    compare human readable numbers (e.g., 2K 1G)\n");
-	fprintf(fp, "  -n, --numeric-sort          compare according to string numerical value\n");
-	fprintf(fp, "  -R, --random-sort           sort by random hash of keys\n");
-	fprintf(fp, "      --random-source=FILE    get random bytes from FILE\n");
-#endif
-	fprintf(fp, "  -r, --reverse               reverse the result of comparisons\n");
-#if 0
-	fprintf(fp, "      --sort=WORD             sort according to WORD:\n");
-	fprintf(fp, "                                general-numeric -g, human-numeric -h, month -M,\n");
-	fprintf(fp, "                                numeric -n, random -R, version -V\n");
-#endif
-	fprintf(fp, "  -V, --version-sort          natural sort of (version) numbers within text\n");
-	fprintf(fp, "\n");
-	fprintf(fp, "Other options:\n");
-	fprintf(fp, "\n");
-#if 0
-	fprintf(fp, "      --batch-size=NMERGE   merge at most NMERGE inputs at once;\n");
-	fprintf(fp, "                            for more use temp files\n");
-#endif
-	fprintf(fp, "  -c, --check, --check=diagnose-first  check for sorted input; do not sort\n");
-	fprintf(fp, "  -C, --check=quiet, --check=silent  like -c, but do not report first bad line\n");
-#if 0
-	fprintf(fp, "      --compress-program=PROG  compress temporaries with PROG;\n");
-	fprintf(fp, "                              decompress them with PROG -d\n");
-	fprintf(fp, "      --debug               annotate the part of the line used to sort,\n");
-	fprintf(fp, "                              and warn about questionable usage to stderr\n");
-	fprintf(fp, "      --files0-from=F       read input from the files specified by\n");
-	fprintf(fp, "                            NUL-terminated names in file F;\n");
-	fprintf(fp, "                            If F is - then read names from standard input\n");
-	fprintf(fp, "  -k, --key=POS1[,POS2]     start a key at POS1 (origin 1), end it at POS2\n");
-	fprintf(fp, "                            (default end of line).  See POS syntax below\n");
-#endif
-	fprintf(fp, "  -m, --merge               merge already sorted files; do not sort\n");
-	fprintf(fp, "  -o, --output=FILE         write result to FILE instead of standard output\n");
-#if 0
-	fprintf(fp, "  -s, --stable              stabilize sort by disabling last-resort comparison\n");
-	fprintf(fp, "  -S, --buffer-size=SIZE    use SIZE for main memory buffer\n");
-	fprintf(fp, "  -t, --field-separator=SEP  use SEP instead of non-blank to blank transition\n");
-	fprintf(fp, "  -T, --temporary-directory=DIR  use DIR for temporaries, not $TMPDIR or /tmp;\n");
-	fprintf(fp, "                              multiple options specify multiple directories\n");
-	fprintf(fp, "      --parallel=N          change the number of sorts run concurrently to N\n");
-#endif
-	fprintf(fp, "  -u, --unique              with -c, check for strict ordering;\n");
-	fprintf(fp, "                              without -c, output only the first of an equal run\n");
-	fprintf(fp, "  -z, --zero-terminated     end lines with 0 byte, not newline\n");
-	fprintf(fp, "      --help                display this help and exit\n");
-	fprintf(fp, "      --version             output version information and exit\n");
-	fprintf(fp, "\n");
-#if 0
-	fprintf(fp, "POS is F[.C][OPTS], where F is the field number and C the character position\n");
-	fprintf(fp, "in the field; both are origin 1.  If neither -t nor -b is in effect, characters\n");
-	fprintf(fp, "in a field are counted from the beginning of the preceding whitespace.  OPTS is\n");
-	fprintf(fp, "one or more single-letter ordering options, which override global ordering\n");
-	fprintf(fp, "options for that key.  If no key is given, use the entire line as the key.\n");
-	fprintf(fp, "\n");
-	fprintf(fp, "SIZE may be followed by the following multiplicative suffixes:\n");
-	fprintf(fp, "%% 1%% of memory, b 1, K 1024 (default), and so on for M, G, T, P, E, Z, Y.\n");
-	fprintf(fp, "\n");
-#endif
-	fprintf(fp, "With no FILE, or when FILE is -, read standard input.\n");
-	fprintf(fp, "\n");
-	fprintf(fp, "*** WARNING ***\n");
-	fprintf(fp, "The locale specified by the environment affects sort order.\n");
-	fprintf(fp, "Set LC_ALL=C to get the traditional sort order that uses\n");
-	fprintf(fp, "native byte values.\n");
-}
-
-static void version(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
-}
-
 int main(int argc, char* argv[])
 {
 	setlocale(LC_ALL, "");
@@ -303,7 +199,6 @@ int main(int argc, char* argv[])
 	bool version_sort = false;
 	bool zero_terminated = false;
 
-	const char* argv0 = argv[0];
 	for ( int i = 1; i < argc; i++ )
 	{
 		const char* arg = argv[i];
@@ -317,18 +212,14 @@ int main(int argc, char* argv[])
 			char c;
 			while ( (c = *++arg) ) switch ( c )
 			{
-			case 'c': check = true; break;
-			case 'C': check = check_quiet = false; break;
+			case 'C': check = true, check_quiet = true; break;
+			case 'c': check = true, check_quiet = false; break;
 			case 'm': merge = true; break;
 			case 'o':
 				if ( !*(output = arg + 1) )
 				{
 					if ( i + 1 == argc )
-					{
-						error(0, 0, "option requires an argument -- 'o'");
-						fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
-						exit(125);
-					}
+						errx(2, "option requires an argument -- 'o'");
 					output = argv[i+1];
 					argv[++i] = NULL;
 				}
@@ -339,15 +230,9 @@ int main(int argc, char* argv[])
 			case 'V': version_sort = true; break;
 			case 'z': zero_terminated = true; break;
 			default:
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				help(stderr, argv0);
-				exit(1);
+				errx(2, "unknown option -- '%c'", c);
 			}
 		}
-		else if ( !strcmp(arg, "--help") )
-			help(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--version") )
-			version(stdout, argv0), exit(0);
 		else if ( !strcmp(arg, "--check") ||
 		          !strcmp(arg, "--check=diagnose-first") )
 			check = true, check_quiet = false;
@@ -361,11 +246,7 @@ int main(int argc, char* argv[])
 		else if ( !strcmp(arg, "--output") )
 		{
 			if ( i + 1 == argc )
-			{
-				error(0, 0, "option '--output' requires an argument");
-				fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
-				exit(125);
-			}
+				errx(2, "option '--output' requires an argument");
 			output = argv[i+1];
 			argv[++i] = NULL;
 		}
@@ -378,17 +259,15 @@ int main(int argc, char* argv[])
 		else if ( !strcmp(arg, "--zero-terminated") )
 			zero_terminated = true;
 		else
-		{
-			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			help(stderr, argv0);
-			exit(1);
-		}
+			errx(2, "unknown option: %s", arg);
 	}
 
 	compact_arguments(&argc, &argv);
 
-	if ( output && !freopen(output, "w", stdout) )
-		error(2, errno, "`%s'", output);
+	if ( check_quiet && output )
+		errx(1, "the -C and -o options are incompatible");
+	if ( check && output )
+		errx(1, "the -c and -o options are incompatible");
 
 	int delim = zero_terminated ? '\0' : '\n';
 
@@ -413,7 +292,6 @@ int main(int argc, char* argv[])
 	is.files = (const char* const*) (argv + 1);
 	is.files_current = 0;
 	is.files_length = argc - 1;
-	is.result_status = true;
 
 	if ( check )
 	{
@@ -424,10 +302,10 @@ int main(int argc, char* argv[])
 		{
 			if ( prev_line && compare(line, prev_line) < needed_relation )
 			{
-				if ( !check_quiet )
-					error(0, errno, "%s:%ju: disorder: %s", is.last_file_path,
-					                is.last_line_number, line);
-				exit(1);
+				if ( check_quiet )
+					return 1;
+				errx(1, "%s:%ju: disorder: %s", is.last_file_path,
+				     is.last_line_number, line);
 			}
 			free(prev_line);
 			prev_line = line;
@@ -443,14 +321,19 @@ int main(int argc, char* argv[])
 
 		qsort(lines, lines_used, sizeof(*lines), qsort_compare);
 
+		if ( output && !freopen(output, "w", stdout) )
+			err(2, "%s", output);
+
 		for ( size_t i = 0; i < lines_used; i++ )
 		{
 			if ( unique && i && compare(lines[i-1], lines[i]) == 0 )
 				continue;
-			fputs(lines[i], stdout);
-			fputc(delim, stdout);
+			if ( fputs(lines[i], stdout) == EOF || fputc(delim, stdout) == EOF )
+				err(2, "%s", output ? output : "<stdout>");
 		}
+		if ( fflush(stdout) == EOF )
+			err(2, "%s", output ? output : "<stdout>");
 	}
 
-	return is.result_status ? 0 : 2;
+	return 0;
 }
