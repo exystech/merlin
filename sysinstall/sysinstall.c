@@ -1129,12 +1129,9 @@ int main(void)
 	text("It's time to boot into the newly installed system.\n\n");
 
 	if ( strcasecmp(accept_grub, "no") == 0 )
-	{
-		text("You did not accept a bootloader and need to arrange by "
-		     "bootloading by your own means. /etc/grub.d/10_sortix.cache is a "
-		     "GRUB configuration fragment that boots the newly installed "
-		     "system.\n\n");
-	}
+		text("You did not accept a bootloader and need to set up bootloading "
+		     "yourself. /etc/grub.d/10_sortix.cache is a GRUB configuration "
+		     "fragment that boots the newly installed system.\n\n");
 
 	text("Upon boot, you'll be greeted with a login screen. Enter your "
 	     "credentials to get a command line. Login as user 'poweroff' as "
