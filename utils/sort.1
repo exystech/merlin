@@ -6,7 +6,7 @@
 .Nd sort lines of text
 .Sh SYNOPSIS
 .Nm
-.Op Fl CcmruVz
+.Op Fl CcmRruVz
 .Op Fl o Ar path
 .Ar
 .Sh DESCRIPTION
@@ -46,6 +46,16 @@ This option is incompatible with
 .Fl C
 and
 .Fl c .
+.It Fl R , \-random-sort
+Sort the lines randomly with an uniform distribution, where all permutations are
+equally likely.
+This option is incompatible with
+.Fl C
+and
+.Fl c .
+If
+.Fl u ,
+don't write duplicate lines to the output.
 .It Fl r , \-reverse
 Compare the lines in reverse order.
 .It Fl u , \-unique
@@ -123,11 +133,17 @@ which is currently partially implemented in this implementation of
 .Nm .
 .Pp
 The
-.Fl V
+.Fl R , V ,
 and
 .Fl z
 options, as well as the long options, are extensions also found in GNU
 coreutils.
+.Pp
+Unlike GNU coreutils,
+.Fl R
+will not remove duplicates unless
+.Fl u
+is passed.
 .Pp
 As an extension, the
 .Fl C

@@ -29,6 +29,17 @@
 // TODO: Implement all the features mandated by POSIX.
 // TODO: Implement the useful GNU extensions.
 
+static size_t pick_uniform(size_t upper)
+{
+	if ( upper < 2 )
+		return 0;
+	size_t minimum = -upper % upper;
+	size_t selection;
+	do arc4random_buf(&selection, sizeof(selection));
+	while ( selection < minimum );
+	return selection % upper;
+}
+
 static int flip_comparison(int rel)
 {
 	return rel < 0 ? 1 : 0 < rel ? -1 : 0;
@@ -194,6 +205,7 @@ int main(int argc, char* argv[])
 	bool check_quiet = false;
 	bool merge = false;
 	const char* output = NULL;
+	bool random = false;
 	bool reverse = false;
 	bool unique = false;
 	bool version_sort = false;
@@ -225,6 +237,7 @@ int main(int argc, char* argv[])
 				}
 				arg = "o";
 				break;
+			case 'R': random = true; break;
 			case 'r': reverse = true; break;
 			case 'u': unique = true; break;
 			case 'V': version_sort = true; break;
@@ -250,6 +263,8 @@ int main(int argc, char* argv[])
 			output = argv[i+1];
 			argv[++i] = NULL;
 		}
+		else if ( !strcmp(arg, "--random-sort") )
+			random = true;
 		else if ( !strcmp(arg, "--reverse") )
 			reverse = true;
 		else if ( !strcmp(arg, "--unique") )
@@ -268,6 +283,10 @@ int main(int argc, char* argv[])
 		errx(1, "the -C and -o options are incompatible");
 	if ( check && output )
 		errx(1, "the -c and -o options are incompatible");
+	if ( check_quiet && random )
+		errx(1, "the -C and -R options are incompatible");
+	if ( check && random )
+		errx(1, "the -c and -R options are incompatible");
 
 	int delim = zero_terminated ? '\0' : '\n';
 
@@ -319,7 +338,34 @@ int main(int argc, char* argv[])
 		size_t lines_used = 0;
 		char** lines = read_input_stream_lines(&lines_used, &is, delim);
 
-		qsort(lines, lines_used, sizeof(*lines), qsort_compare);
+		if ( !random || unique )
+			qsort(lines, lines_used, sizeof(*lines), qsort_compare);
+
+		if ( random )
+		{
+			if ( unique )
+			{
+				size_t o = 0;
+				for ( size_t i = 0; i < lines_used; i++ )
+				{
+					if ( o && compare(lines[i], lines[o - 1]) == 0 )
+						continue;
+					lines[o++] = lines[i];
+				}
+				lines_used = o;
+			}
+			for ( size_t i = 0; i < lines_used; i++ )
+			{
+				size_t left = lines_used - i;
+				size_t choice = i + pick_uniform(left);
+				if ( choice != i )
+				{
+					char* tmp = lines[i];
+					lines[i] = lines[choice];
+					lines[choice] = tmp;
+				}
+			}
+		}
 
 		if ( output && !freopen(output, "w", stdout) )
 			err(2, "%s", output);
