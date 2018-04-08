@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2014, 2015, 2018 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -57,11 +57,12 @@ ssize_t getdelim(char** lineptr, size_t* n, int delim, FILE* fp)
 		}
 		if ( (c = getc_unlocked(fp)) == EOF )
 		{
-			if ( !written || feof_unlocked(fp) )
+			if ( !written || ferror_unlocked(fp) )
 			{
 				funlockfile(fp);
 				return -1;
 			}
+			break;
 		}
 		(*lineptr)[written++] = c;
 	} while ( c != delim );
