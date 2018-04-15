@@ -13,15 +13,15 @@
 .Op Fl i Ar input-file
 .Op Fl O Ar output-offset
 .Op Fl o Ar output-file
-.Op Fl p Ar interval
+.Op Fl p Ar period
 .Op Fl r Ar input-block-size
 .Op Fl w Ar output-block-size
 .Sh DESCRIPTION
 .Nm
 reads blocks from the standard input and copies them to the standard output
 until the end of the standard input.
-The input block size and output block sizes default to appropriate values for
-efficiently reading from the input and writing to the output.
+The input and output block sizes default to appropriate values for efficiently
+reading from the input and writing to the output.
 Input and output will be done as aligned as possible on the block size
 boundaries.
 The final input block can be partial.
@@ -136,7 +136,7 @@ bytes are read and discarded before the copying begins.
 If the
 .Ar offset
 is not a multiple of the input block size, the first input block is reduced in
-size such that it ends at a input-block-size-aligned position in the input.
+size such that it ends at an input-block-size-aligned position in the input.
 .It Fl i Ar input-file
 Read the input from
 .Ar input-file
@@ -180,15 +180,14 @@ Pad the final output block with NUL bytes, such that the final output offset
 (counting the initial offset with
 .Fl O )
 is a multiple of the output block size.
-.It Fl p Ar interval
+.It Fl p Ar period
 Write occasional statistics to the standard error during the transfer and on
 completion, or when being terminated by
 .Dv SIGINT .
-.Ar interval
-is a non-negative integer of how long the interval is in whole seconds between
-statistics being written.
+.Ar period
+specifies the period in whole seconds at which statistics are written out.
 Statistics are written for every read and write if the
-.Ar interval
+.Ar period
 is zero.
 The format is described in the
 .Sx DIAGNOSTICS
@@ -374,7 +373,7 @@ is how many percent complete the copy is, or
 .Sq "?"
 if not known.
 .Ar speed
-the average speed of copying so far in bytes per second, or
+is the average speed of copying so far in bytes per second, or
 .Sq "?"
 if it is too early to tell.
 .Ar time-left
