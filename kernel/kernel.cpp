@@ -520,7 +520,7 @@ static void BootThread(void* /*user*/)
 	if ( slashdev->mkdir(&ctx, "pts", 0755) < 0 )
 		Panic("Could not mkdir /dev/pts");
 	Ref<Descriptor> ptsdir =
-		slashdev->open(&ctx, "pts", O_DIRECTORY | O_READ | O_WRITE);
+		slashdev->open(&ctx, "pts", O_DIRECTORY | O_READ);
 	if ( !ptsdir )
 		Panic("Could not open /dev/pts");
 	if ( !mtable->AddMount(ptsdir->ino, ptsdir->dev, pts, true) )

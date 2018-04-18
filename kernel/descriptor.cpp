@@ -645,7 +645,11 @@ static bool IsSaneFlagModeCombination(int flags, mode_t /*mode*/)
 	// opening a directory, attempting to truncate it, and then aborting with an
 	// error because a directory was opened.
 	if ( (flags & (O_CREATE | O_TRUNC)) && (flags & (O_DIRECTORY)) )
-		return errno = EINVAL, false;
+		return false;
+	// POSIX: "The result of using O_TRUNC without either O_RDWR or
+	// O_WRONLY is undefined."
+	if ( (flags & O_TRUNC) && !(flags & O_WRITE) )
+		return false;
 	return true;
 }
 
@@ -770,6 +774,21 @@ Ref<Descriptor> Descriptor::open(ioctx_t* ctx, const char* filename, int flags,
 
 	delete[] filename_mine;
 
+	// Abort if the user tries to write to an existing directory.
+	if ( S_ISDIR(desc->type) )
+	{
+		if ( flags & (O_CREATE | O_TRUNC | O_WRITE) )
+			return errno = EISDIR, Ref<Descriptor>();
+	}
+
+	// Truncate the file if requested.
+	if ( (flags & O_TRUNC) && S_ISREG(desc->type) )
+	{
+		assert(flags & O_WRITE); // IsSaneFlagModeCombination
+		if ( desc->truncate(ctx, 0) < 0 )
+			return Ref<Descriptor>();
+	}
+
 	// Abort the open if the user wanted a directory but this wasn't.
 	if ( flags & O_DIRECTORY && !S_ISDIR(desc->type) )
 		return errno = ENOTDIR, Ref<Descriptor>();
@@ -801,13 +820,6 @@ Ref<Descriptor> Descriptor::open_elem(ioctx_t* ctx, const char* filename,
 	Ref<Descriptor> ret(new Descriptor(retvnode, ret_flags));
 	if ( !ret )
 		return Ref<Descriptor>();
-
-	// Truncate the file if requested.
-	// TODO: This is a bit dodgy, should this be moved to the inode open method
-	//       or something? And how should error handling be done here?
-	if ( (flags & O_TRUNC) && S_ISREG(ret->type) )
-		if ( flags & O_WRITE )
-			ret->truncate(ctx, 0);
 
 	return ret;
 }
