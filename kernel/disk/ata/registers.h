@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2018, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -33,6 +33,25 @@ struct prd
 	little_uint16_t flags;
 };
 
+struct atapi_packet
+{
+	uint8_t operation;
+	uint8_t reladdr_lun;
+	uint8_t lba[4];
+	uint8_t reserved0;
+	uint8_t reserved1;
+	uint8_t pmi;
+	uint8_t control;
+	uint8_t reserved2;
+	uint8_t reserved3;
+};
+
+struct atapi_capacity
+{
+	big_uint32_t last_lba;
+	big_uint32_t block_size;
+};
+
 static const uint16_t PRD_FLAG_EOT = 1 << 15;
 
 static const uint16_t REG_DATA = 0x0;
@@ -57,6 +76,12 @@ static const uint8_t CMD_WRITE_DMA_EXT = 0x35;
 static const uint8_t CMD_FLUSH_CACHE = 0xE7;
 static const uint8_t CMD_FLUSH_CACHE_EXT = 0xEA;
 static const uint8_t CMD_IDENTIFY = 0xEC;
+static const uint8_t CMD_PACKET = 0xA0;
+static const uint8_t CMD_IDENTIFY_PACKET = 0xA1;
+
+static const uint8_t ATAPI_CMD_READ_CAPACITY = 0x25;
+static const uint8_t ATAPI_CMD_WRITE_CAPACITY = 0x28;
+static const uint8_t ATAPI_CMD_READ = 0xA8;
 
 static const uint8_t STATUS_ERROR = 1 << 0;
 static const uint8_t STATUS_DATAREADY = 1 << 3;
