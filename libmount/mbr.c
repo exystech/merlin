@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2018 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -87,7 +87,7 @@ blockdevice_get_partition_table_mbr(struct partition_table** pt_ptr,
                                     struct blockdevice* bdev)
 {
 	*pt_ptr = NULL;
-	blksize_t logical_block_size = blockdevice_logical_block_size(bdev);
+	blksize_t logical_block_size = 512;
 	if ( !blockdevice_check_reasonable_block_size(logical_block_size) )
 		return errno = EINVAL, PARTITION_ERROR_ERRNO;
 	off_t device_size = blockdevice_size(bdev);
