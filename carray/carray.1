@@ -7,9 +7,9 @@
 .Sh SYNOPSIS
 .Nm carray
 .\" After releasing Sortix 1.1, make this change to match carray.c:
-.\".Op Fl ceEgHrsv
+.\".Op Fl ceEgHirsv
 .\" Compatibility:
-.Op Fl ceEgHirsv
+.Op Fl ceEgHrsv
 .\" (End)
 .Op Fl G Ar guard
 .\" After releasing Sortix 1.1, make this change to match carray.c:
@@ -45,7 +45,8 @@ The default array name has all file extensions removed (but a leading period in
 the file name is kept).
 The default array name is converted to the characters a-z, A-Z,
 .Sq _ ,
-and 0-9.  0-9 cannot be the first character of an identifier.
+and 0-9.
+0-9 cannot be the first character of an identifier.
 .Sq +
 will be replaced by
 .Sq x .
@@ -66,7 +67,8 @@ or otherwise
 .Sy CARRAY_H .
 The default guard macro is converted to the characters A-Z,
 .Sq _ ,
-and 0-9.  0-9 cannot be the first character of an identifier.
+and 0-9.
+0-9 cannot be the first character of an identifier.
 The lower-case a-z is converted to the upper-case A-Z.
 .Sq +
 is replaced by
