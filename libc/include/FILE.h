@@ -24,7 +24,7 @@
 
 #include <sys/__/types.h>
 
-#include <pthread.h>
+#include <__/pthread.h>
 
 #if !defined(BUFSIZ)
 #include <stdio.h>
@@ -48,6 +48,11 @@ typedef __off_t off_t;
 #ifndef __ssize_t_defined
 #define __ssize_t_defined
 typedef __ssize_t ssize_t;
+#endif
+
+#ifndef __pthread_mutex_t_defined
+#define __pthread_mutex_t_defined
+typedef __pthread_mutex_t pthread_mutex_t;
 #endif
 
 #ifndef __FILE_defined
@@ -94,7 +99,7 @@ struct __FILE
 /* Internally used by standard library. */
 #if defined(__is_sortix_libc)
 extern FILE* __first_file;
-extern __pthread_mutex_t __first_file_lock;
+extern pthread_mutex_t __first_file_lock;
 #endif
 
 #ifdef __cplusplus

@@ -40,6 +40,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <timespec.h>
 
 /* This implementation is adaptable to current computing power.

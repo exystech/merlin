@@ -17,6 +17,7 @@
  * After a FILE has been shut down, returns all fields to their default state.
  */
 
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
