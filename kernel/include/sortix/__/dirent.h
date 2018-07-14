@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2018 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,18 +22,20 @@
 
 #include <sys/cdefs.h>
 
-#include <sortix/__/dt.h>
-#include <sortix/__/stat.h>
+#define __DT_UNKNOWN 0x0
+#define __DT_FIFO 0x1
+#define __DT_CHR 0x2
+#define __DT_DIR 0x4
+#define __DT_BLK 0x6
+#define __DT_REG 0x8
+#define __DT_LNK 0xA
+#define __DT_SOCK 0xC
+#define __DT_BITS 0xF
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#define __S_IFMT_SHIFT 12
+#define __S_IFMT_MASK __DT_BITS
 
 #define __IFTODT(mode) (((mode) & __S_IFMT) >> __S_IFMT_SHIFT)
 #define __DTTOIF(dirtype) ((dirtype) << __S_IFMT_SHIFT)
-
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
 
 #endif

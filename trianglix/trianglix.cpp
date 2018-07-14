@@ -19,6 +19,7 @@
 
 #include <sys/display.h>
 #include <sys/keycodes.h>
+#include <sys/stat.h>
 #include <sys/termmode.h>
 #include <sys/wait.h>
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2015, 2018 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,14 +24,7 @@
 
 #include <sys/__/types.h>
 
-#include <stdint.h>
-
 #include <sortix/__/dirent.h>
-#include <sortix/__/dt.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #ifndef __dev_t_defined
 #define __dev_t_defined
@@ -74,9 +67,5 @@ struct dirent
 	unsigned char d_type;
 	__extension__ char d_name[];
 };
-
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
 
 #endif

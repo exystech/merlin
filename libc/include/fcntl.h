@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2018 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,14 +24,9 @@
 
 #include <sys/__/types.h>
 
-#include <sys/stat.h>
-
 #include <sortix/fcntl.h>
 #include <sortix/seek.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <sortix/mode.h>
 
 /* The kernel would like to simply deal with one bit for each base access mode,
    but using the traditional names O_RDONLY, O_WRONLY and O_RDWR for this would
@@ -49,6 +44,20 @@ extern "C" {
 #ifndef __pid_t_defined
 #define __pid_t_defined
 typedef __pid_t pid_t;
+#endif
+
+#ifndef __off_t_defined
+#define __off_t_defined
+typedef __off_t off_t;
+#endif
+
+#ifndef __mode_t_defined
+#define __mode_t_defined
+typedef __mode_t mode_t;
+#endif
+
+#ifdef __cplusplus
+extern "C" {
 #endif
 
 int creat(const char* path, mode_t mode);

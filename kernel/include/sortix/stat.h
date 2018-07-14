@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2018 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,16 +23,54 @@
 
 #include <sys/cdefs.h>
 
-#include <sys/types.h>
+#include <sys/__/types.h>
 
-#include <sortix/__/dirent.h>
-#include <sortix/__/dt.h>
-#include <sortix/__/stat.h>
-
+#include <sortix/mode.h>
 #include <sortix/timespec.h>
 
-#ifdef __cplusplus
-extern "C" {
+#ifndef __dev_t_defined
+#define __dev_t_defined
+typedef __dev_t dev_t;
+#endif
+
+#ifndef __ino_t_defined
+#define __ino_t_defined
+typedef __ino_t ino_t;
+#endif
+
+#ifndef __mode_t_defined
+#define __mode_t_defined
+typedef __mode_t mode_t;
+#endif
+
+#ifndef __nlink_t_defined
+#define __nlink_t_defined
+typedef __nlink_t nlink_t;
+#endif
+
+#ifndef __uid_t_defined
+#define __uid_t_defined
+typedef __uid_t uid_t;
+#endif
+
+#ifndef __gid_t_defined
+#define __gid_t_defined
+typedef __gid_t gid_t;
+#endif
+
+#ifndef __off_t_defined
+#define __off_t_defined
+typedef __off_t off_t;
+#endif
+
+#ifndef __blksize_t_defined
+#define __blksize_t_defined
+typedef __blksize_t blksize_t;
+#endif
+
+#ifndef __blkcnt_t_defined
+#define __blkcnt_t_defined
+typedef __blkcnt_t blkcnt_t;
 #endif
 
 struct stat
@@ -52,48 +90,7 @@ struct stat
 	blkcnt_t st_blocks;
 };
 
-#define S_IXOTH 01
-#define S_IWOTH 02
-#define S_IROTH 04
-#define S_IRWXO 07
-#define S_IXGRP 010
-#define S_IWGRP 020
-#define S_IRGRP 040
-#define S_IRWXG 070
-#define S_IXUSR 0100
-#define S_IWUSR 0200
-#define S_IRUSR 0400
-#define S_IRWXU 0700
-#define S_IFMT __DTTOIF(__DT_BITS)
-#define S_IFSOCK __DTTOIF(__DT_SOCK)
-#define S_IFLNK __DTTOIF(__DT_LNK)
-#define S_IFREG __DTTOIF(__DT_REG)
-#define S_IFBLK __DTTOIF(__DT_BLK)
-#define S_IFDIR __DTTOIF(__DT_DIR)
-#define S_IFCHR __DTTOIF(__DT_CHR)
-#define S_IFIFO __DTTOIF(__DT_FIFO)
-#define S_ISUID 0x0800
-#define S_ISGID 0x0400
-#define S_ISVTX 0x0200
-#define S_SETABLE (0777 | 0x0200 | 0x0400 | 0x0800)
-#define S_ISSOCK(mode) (((mode) & S_IFMT) == S_IFSOCK)
-#define S_ISLNK(mode) (((mode) & S_IFMT) == S_IFLNK)
-#define S_ISREG(mode) (((mode) & S_IFMT) == S_IFREG)
-#define S_ISBLK(mode) (((mode) & S_IFMT) == S_IFBLK)
-#define S_ISDIR(mode) (((mode) & S_IFMT) == S_IFDIR)
-#define S_ISCHR(mode) (((mode) & S_IFMT) == S_IFCHR)
-#define S_ISFIFO(mode) (((mode) & S_IFMT) == S_IFIFO)
-
-#ifdef __is_sortix_kernel
-#define S_IFFACTORY 0x10000
-#define S_IFFACTORY_NOSTAT 0x20000
-#endif
-
 #define UTIME_NOW  0x3FFFFFFF
 #define UTIME_OMIT 0x3FFFFFFE
-
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
 
 #endif

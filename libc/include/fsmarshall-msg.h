@@ -21,6 +21,7 @@
 #define INCLUDE_FSMARSHALL_MSG_H
 
 #include <sys/cdefs.h>
+#include <sys/types.h>
 
 #include <stddef.h>
 
