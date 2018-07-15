@@ -95,9 +95,9 @@ void update_env(void)
 	struct winsize ws;
 	if ( tcgetwinsize(0, &ws) == 0 )
 	{
-		snprintf(str, sizeof(str), "%zu", ws.ws_col);
+		snprintf(str, sizeof(str), "%zu", (size_t) ws.ws_col);
 		setenv("COLUMNS", str, 1);
-		snprintf(str, sizeof(str), "%zu", ws.ws_row);
+		snprintf(str, sizeof(str), "%zu", (size_t) ws.ws_row);
 		setenv("LINES", str, 1);
 	}
 }

@@ -55,7 +55,7 @@ void tenth_last_column(void)
 	tcgetwincurpos(1, &wcp);
 	if ( wcp.wcp_col - ws.ws_col < 10 )
 		printf("\n");
-	printf("\e[%zuG", ws.ws_col - 10);
+	printf("\e[%zuG", (size_t) (ws.ws_col - 10));
 	fflush(stdout);
 }
 
