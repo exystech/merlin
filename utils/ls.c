@@ -814,7 +814,7 @@ static int ls_directory(int parentfd, const char* relpath, const char* path)
 		memset(record, 0, sizeof(*record));
 		if ( !(record->dirent = dirent_dup(entry)) )
 			err(1, "malloc");
-		if ( stat_record(dir, path, record) < 0 )
+		if ( !stat_record(dir, path, record) )
 			ret = 1;
 		record->no_recurse = isdotdot;
 	}
