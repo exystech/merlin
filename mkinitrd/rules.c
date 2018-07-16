@@ -225,15 +225,16 @@ bool AddRulesFromFile(FILE* fp, const char* fpname)
 			goto error_out;
 		}
 	}
-	free(mem);
 	if ( ferror(fp) )
 	{
 	error_out_errno:
 		warn("%s", fpname);
 	error_out:
+		free(mem);
 		ChangeRulesAmount(rules_at_start);
 		return false;
 	}
+	free(mem);
 	return true;
 }
 
