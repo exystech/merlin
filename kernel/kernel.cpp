@@ -380,6 +380,7 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 	idlethread->kernelstacksize = STACK_SIZE;
 	idlethread->kernelstackmalloced = false;
 	system->firstthread = idlethread;
+	system->threads_not_exiting_count = 1;
 	Scheduler::SetIdleThread(idlethread);
 
 	// Let's create a regular kernel thread that can decide what happens next.

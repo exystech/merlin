@@ -135,6 +135,7 @@ public:
 public:
 	Thread* firstthread;
 	kthread_mutex_t threadlock;
+	size_t threads_not_exiting_count;
 	bool threads_exiting;
 
 public:
@@ -177,7 +178,6 @@ public:
 	Process* Fork();
 
 private:
-	void OnLastThreadExit();
 	void LastPrayer();
 	void WaitedFor();
 	void NotifyChildExit(Process* child, bool zombify);
@@ -185,6 +185,8 @@ private:
 	bool IsLimboDone();
 
 public:
+	void OnLastThreadExit();
+	void AfterLastThreadExit();
 	void ResetForExecute();
 
 };

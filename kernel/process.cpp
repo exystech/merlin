@@ -71,6 +71,10 @@ namespace Sortix {
 
 kthread_mutex_t process_family_lock = KTHREAD_MUTEX_INITIALIZER;
 
+// The system is shutting down and creation of additional processes and threads
+// should be prevented. Protected by process_family_lock.
+static bool is_init_exiting = false;
+
 Process::Process()
 {
 	program_image_path = NULL;
@@ -134,6 +138,7 @@ Process::Process()
 
 	firstthread = NULL;
 	threadlock = KTHREAD_MUTEX_INITIALIZER;
+	threads_not_exiting_count = 0;
 	threads_exiting = false;
 
 	segments = NULL;
@@ -171,6 +176,7 @@ Process::~Process() // process_family_lock taken
 	assert(!mtable);
 	assert(!cwd);
 	assert(!root);
+	assert(!threads_not_exiting_count);
 
 	assert(ptable);
 	ptable->Free(pid);
@@ -196,7 +202,35 @@ void Process::BootstrapDirectories(Ref<Descriptor> root)
 	this->cwd = root;
 }
 
-void Process__OnLastThreadExit(void* user);
+void Process::OnLastThreadExit()
+{
+	Process* init = Scheduler::GetInitProcess();
+	assert(init);
+
+	// Child processes can't be reparented away if we're init. The system is
+	// about to shut down, so broadcast SIGKILL every process and wait for every
+	// single process to exit. The operating system is finished when init has
+	// exited.
+	if ( init == this )
+	{
+		ScopedLock lock(&process_family_lock);
+		// Forbid any more processes and threads from being created, so this
+		// loop will always terminate.
+		is_init_exiting = true;
+		kthread_mutex_lock(&ptrlock);
+		for ( pid_t pid = ptable->Next(0); 0 < pid; pid = ptable->Next(pid) )
+		{
+			Process* process = ptable->Get(pid);
+			if ( process->pid != 0 && process != init )
+				process->DeliverSignal(SIGKILL);
+		}
+		kthread_mutex_unlock(&ptrlock);
+		// NotifyChildExit always signals zombiecond for init when
+		// is_init_exiting is true.
+		while ( firstchild )
+			kthread_cond_wait(&zombiecond, &process_family_lock);
+	}
+}
 
 void Process::OnThreadDestruction(Thread* thread)
 {
@@ -220,11 +254,16 @@ void Process::OnThreadDestruction(Thread* thread)
 		ScheduleDeath();
 }
 
+void Process__AfterLastThreadExit(void* user)
+{
+	return ((Process*) user)->AfterLastThreadExit();
+}
+
 void Process::ScheduleDeath()
 {
 	// All our threads must have exited at this point.
 	assert(!firstthread);
-	Worker::Schedule(Process__OnLastThreadExit, this);
+	Worker::Schedule(Process__AfterLastThreadExit, this);
 }
 
 // Useful for killing a partially constructed process without waiting for
@@ -236,12 +275,7 @@ void Process::AbortConstruction()
 	ScheduleDeath();
 }
 
-void Process__OnLastThreadExit(void* user)
-{
-	return ((Process*) user)->OnLastThreadExit();
-}
-
-void Process::OnLastThreadExit()
+void Process::AfterLastThreadExit()
 {
 	LastPrayer();
 }
@@ -258,6 +292,8 @@ void Process::DeleteTimers()
 	}
 }
 
+// This function runs in a worker thread and cannot block on another worker
+// thread, or it may deadlock.
 void Process::LastPrayer()
 {
 	assert(this);
@@ -304,6 +340,16 @@ void Process::LastPrayer()
 	// Init is nice and will gladly raise our orphaned children and zombies.
 	Process* init = Scheduler::GetInitProcess();
 	assert(init);
+
+	// Child processes can't be reparented away if we're init. OnLastThreadExit
+	// must have already killed all the child processes and prevented more from
+	// being created.
+	if ( init == this )
+	{
+		assert(is_init_exiting);
+		assert(!firstchild);
+	}
+
 	while ( firstchild )
 	{
 		Process* process = firstchild;
@@ -436,7 +482,11 @@ void Process::NotifyChildExit(Process* child, bool zombify)
 		zombiechild = child;
 	}
 
-	if ( zombify )
+	// Notify this parent process about the child exiting if it's meant to
+	// become a zombie process. Additionally, always notify init about children
+	// when init is exiting, because OnLastThreadExit needs to be able to catch
+	// every child exiting.
+	if ( zombify || (is_init_exiting && Scheduler::GetInitProcess() == this) )
 	{
 		DeliverSignal(SIGCHLD);
 		kthread_cond_broadcast(&zombiecond);
@@ -651,6 +701,15 @@ Process* Process::Fork()
 
 	kthread_mutex_lock(&process_family_lock);
 
+	// Forbid the creation of new processes if init has exited.
+	if ( is_init_exiting )
+	{
+		kthread_mutex_unlock(&process_family_lock);
+		clone->AbortConstruction();
+		return NULL;
+	}
+
+	// Register the new process by assigning a pid.
 	if ( (clone->pid = (clone->ptable = ptable)->Allocate(clone)) < 0 )
 	{
 		kthread_mutex_unlock(&process_family_lock);
@@ -1484,9 +1543,15 @@ pid_t sys_tfork(int flags, struct tfork* user_regs)
 #warning "You need to implement initializing the registers of the new thread"
 #endif
 
+	// Forbid the creation of new threads if init has exited.
+	ScopedLock process_family_lock_lock(&process_family_lock);
+	if ( is_init_exiting )
+		return errno = EPERM, -1;
+
 	// If the thread could not be created, make the process commit suicide
 	// in a manner such that we don't wait for its zombie.
 	Thread* thread = CreateKernelThread(child_process, &cpuregs);
+	process_family_lock_lock.Reset();
 	if ( !thread )
 	{
 		if ( making_process )

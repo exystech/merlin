@@ -125,13 +125,20 @@ Thread* CreateKernelThread(Process* process, struct thread_registers* regs)
 		return errno = EINVAL, (Thread*) NULL;
 #endif
 
+	kthread_mutex_lock(&process->threadlock);
+
+	// Note: Only allow the process itself to make threads, except the initial
+	// thread. This requirement is because kthread_exit() needs to know when
+	// it's the last thread in the process (using threads_not_exiting_count),
+	// and that no more threads will appear, so it can run some final process
+	// termination steps without any interference.
+	assert(!process->firstthread || process == CurrentProcess());
+
 	Thread* thread = AllocateThread();
 	if ( !thread )
 		return NULL;
 
 	memcpy(&thread->registers, regs, sizeof(struct thread_registers));
-
-	kthread_mutex_lock(&process->threadlock);
 
 	// Create the family tree.
 	thread->process = process;
@@ -140,6 +147,7 @@ Thread* CreateKernelThread(Process* process, struct thread_registers* regs)
 		firsty->prevsibling = thread;
 	thread->nextsibling = firsty;
 	process->firstthread = thread;
+	process->threads_not_exiting_count++;
 
 	kthread_mutex_unlock(&process->threadlock);
 

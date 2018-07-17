@@ -21,6 +21,7 @@
 
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/kthread.h>
+#include <sortix/kernel/process.h>
 #include <sortix/kernel/scheduler.h>
 #include <sortix/kernel/signal.h>
 #include <sortix/kernel/thread.h>
@@ -39,6 +40,20 @@ static void kthread_do_kill_thread(void* user)
 
 extern "C" void kthread_exit()
 {
+	Process* process = CurrentProcess();
+	// Note: This requires all threads in this process to have been made by
+	// only threads in this process, except the initial thread. Otherwise more
+	// threads may appear, and we can't conclude whether this is the last thread
+	// in the process to exit.
+	kthread_mutex_lock(&process->threadlock);
+	bool is_last_to_exit = --process->threads_not_exiting_count == 0;
+	kthread_mutex_unlock(&process->threadlock);
+	// All other threads in the process have committed to exiting, though they
+	// might not have exited yet. However, we know they are only running the
+	// below code that schedules thread termination. It's therefore safe to run
+	// a final process termination step without interference.
+	if ( is_last_to_exit )
+		process->OnLastThreadExit();
 	Worker::Schedule(kthread_do_kill_thread, CurrentThread());
 	Scheduler::ExitThread();
 	__builtin_unreachable();
