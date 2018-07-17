@@ -518,7 +518,9 @@ pid_t sys_waitpid(pid_t pid, int* user_status, int options)
 {
 	int status = 0;
 	pid_t ret = CurrentProcess()->Wait(pid, &status, options);
-	if ( 0 < ret && !CopyToUser(user_status, &status, sizeof(status)) )
+	if ( 0 < ret &&
+	     user_status &&
+	     !CopyToUser(user_status, &status, sizeof(status)) )
 		return -1;
 	return ret;
 }
