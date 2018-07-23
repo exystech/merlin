@@ -1093,7 +1093,7 @@ int main(void)
 		{
 			explicit_bzero(first, sizeof(first));
 			warn("crypt_newhash");
-			continue;unmount_all_but_root();
+			continue;
 		}
 		explicit_bzero(first, sizeof(first));
 		if ( !install_configurationf("etc/passwd", "a",
