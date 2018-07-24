@@ -98,7 +98,7 @@ private:
 	void DoScroll(ssize_t off, TextChar entry);
 	void DoMove(TextPos to, TextPos from, size_t numchars);
 	void DoFill(TextPos from, TextPos to, TextChar fillwith);
-	void IssueCommand(TextBufferCmd* cmd);
+	void IssueCommand(TextBufferCmd* cmd, bool already_locked = false);
 	bool StopRendering();
 	void ResumeRendering();
 	bool IsCommandIdempotent(const TextBufferCmd* cmd) const;

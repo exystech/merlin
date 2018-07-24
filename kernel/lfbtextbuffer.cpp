@@ -348,7 +348,7 @@ void LFBTextBuffer::RenderRange(TextPos from, TextPos to)
 	}
 }
 
-void LFBTextBuffer::IssueCommand(TextBufferCmd* cmd)
+void LFBTextBuffer::IssueCommand(TextBufferCmd* cmd, bool already_locked)
 {
 	if ( invalidated )
 	{
@@ -369,12 +369,15 @@ void LFBTextBuffer::IssueCommand(TextBufferCmd* cmd)
 			RenderRange(render_from, render_to);
 		return;
 	}
-	ScopedLock lock(&queue_lock);
+	if ( !already_locked )
+		kthread_mutex_lock(&queue_lock);
 	while ( queue_used == queue_length )
 		kthread_cond_wait(&queue_not_full, &queue_lock);
 	if ( !queue_used )
 		kthread_cond_signal(&queue_not_empty);
 	queue[(queue_offset + queue_used++) % queue_length] = *cmd;
+	if ( !already_locked )
+		kthread_mutex_unlock(&queue_lock);
 }
 
 bool LFBTextBuffer::StopRendering()
@@ -383,8 +386,10 @@ bool LFBTextBuffer::StopRendering()
 		return false;
 	TextBufferCmd cmd;
 	cmd.type = TEXTBUFCMD_PAUSE;
-	IssueCommand(&cmd);
 	ScopedLock lock(&queue_lock);
+	if ( queue_is_paused )
+		return false;
+	IssueCommand(&cmd, true);
 	while ( !queue_is_paused )
 		kthread_cond_wait(&queue_paused, &queue_lock);
 	return true;
