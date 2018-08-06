@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016, 2017, 2018 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -78,8 +78,13 @@ void Clock::LockClock()
 {
 	if ( clock_callable_from_interrupt )
 	{
-		if ( (we_disabled_interrupts = Interrupt::IsEnabled()) )
+		if ( Interrupt::IsEnabled() )
+		{
 			Interrupt::Disable();
+			we_disabled_interrupts = true;
+		}
+		else
+			we_disabled_interrupts = false;
 	}
 	else
 		kthread_mutex_lock(&clock_mutex);
