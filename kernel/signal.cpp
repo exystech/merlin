@@ -549,8 +549,6 @@ void Thread::HandleSignal(struct interrupt_context* intctx)
 
 	ScopedLock lock(&process->signal_lock);
 
-	assert(process->sigreturn);
-
 retry_another_signal:
 
 	// Determine which signals are not blocked.
@@ -613,8 +611,9 @@ retry_another_signal:
 	assert(action->sa_handler != SIG_DFL || !sigismember(&default_ignored_signals, signum));
 
 	// The default action must be to terminate the process. Signals that are
-	// ignored by default got discarded earlier.
-	if ( action->sa_handler == SIG_DFL )
+	// ignored by default got discarded earlier. If execve() failed, sigreturn
+	// may be NULL and the process isn't able to properly process signals.
+	if ( action->sa_handler == SIG_DFL || !process->sigreturn )
 	{
 		kthread_mutex_unlock(&process->signal_lock);
 		process->ExitThroughSignal(signum);
