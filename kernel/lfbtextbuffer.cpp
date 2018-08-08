@@ -355,7 +355,7 @@ void LFBTextBuffer::IssueCommand(TextBufferCmd* cmd, bool already_locked)
 		invalidated = false;
 		TextBufferCmd newcmd;
 		newcmd.type = TEXTBUFCMD_REDRAW;
-		IssueCommand(&newcmd);
+		IssueCommand(&newcmd, already_locked);
 	}
 	if ( !queue_thread || emergency_state )
 	{
