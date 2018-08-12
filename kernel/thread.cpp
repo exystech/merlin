@@ -131,8 +131,11 @@ Thread* CreateKernelThread(Process* process, struct thread_registers* regs)
 	// thread. This requirement is because kthread_exit() needs to know when
 	// it's the last thread in the process (using threads_not_exiting_count),
 	// and that no more threads will appear, so it can run some final process
-	// termination steps without any interference.
-	assert(!process->firstthread || process == CurrentProcess());
+	// termination steps without any interference. It's always allowed to create
+	// threads in the kernel process as it never exits.
+	assert(!process->firstthread ||
+	       process == CurrentProcess() ||
+	       process == Scheduler::GetKernelProcess());
 
 	Thread* thread = AllocateThread();
 	if ( !thread )
