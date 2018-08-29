@@ -62,8 +62,10 @@ partition editor of the existing operating system to shrink its installation.
 .Pp
 Determine how the target machine will boot the release.
 If the firmware supports usb-iso hybrid images, you can use
+.Xr rw 1
+or
 .Xr dd 1
-or such to copy the release physically onto a USB portable storage device.
+to copy the release physically onto a USB portable storage device.
 If the target machine has a cdrom drive, you can burn the release to a cdrom.
 Insert the installation medium in the computer and power it on.
 If needed, change the boot order in the firmware to prefer the installation
