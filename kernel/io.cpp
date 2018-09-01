@@ -464,7 +464,7 @@ int sys_fchownat(int dirfd, const char* path, uid_t owner, gid_t group, int flag
 	ioctx_t ctx; SetupUserIOCtx(&ctx);
 	Ref<Descriptor> from = PrepareLookup(pathcopy, dirfd);
 	if ( !from ) { delete[] pathcopy; return -1; }
-	int open_flags = O_WRITE | (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
+	int open_flags = O_READ | (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
 	Ref<Descriptor> desc = from->open(&ctx, pathcopy, open_flags);
 	from.Reset();
 	delete[] pathcopy;
@@ -512,7 +512,7 @@ int sys_fchmodat(int dirfd, const char* path, mode_t mode, int flags)
 	ioctx_t ctx; SetupUserIOCtx(&ctx);
 	Ref<Descriptor> from = PrepareLookup(pathcopy, dirfd);
 	if ( !from ) { delete[] pathcopy; return -1; }
-	int open_flags = O_WRITE | (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
+	int open_flags = O_READ | (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
 	Ref<Descriptor> desc = from->open(&ctx, pathcopy, open_flags);
 	from.Reset();
 	delete[] pathcopy;
@@ -541,7 +541,7 @@ int sys_utimensat(int dirfd, const char* path,
 	ioctx_t ctx; SetupUserIOCtx(&ctx);
 	Ref<Descriptor> from = PrepareLookup(pathcopy, dirfd);
 	if ( !from ) { delete[] pathcopy; return -1; }
-	int open_flags = O_WRITE | (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
+	int open_flags = O_READ | (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
 	Ref<Descriptor> desc = from->open(&ctx, pathcopy, open_flags);
 	from.Reset();
 	delete[] pathcopy;

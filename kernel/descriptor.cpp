@@ -256,11 +256,13 @@ int Descriptor::statvfs(ioctx_t* ctx, struct statvfs* stvfs)
 
 int Descriptor::chmod(ioctx_t* ctx, mode_t mode)
 {
+	// TODO: Regardless of dflags, check if the user/group can chmod.
 	return vnode->chmod(ctx, mode);
 }
 
 int Descriptor::chown(ioctx_t* ctx, uid_t owner, gid_t group)
 {
+	// TODO: Regardless of dflags, check if the user/group can chown.
 	return vnode->chown(ctx, owner, group);
 }
 
@@ -597,6 +599,7 @@ int Descriptor::utimens(ioctx_t* ctx, const struct timespec* user_times)
 	if ( !valid_utimens_timespec(times[0]) ||
 	     !valid_utimens_timespec(times[1]) )
 		return errno = EINVAL;
+	// TODO: Regardless of dflags, check if the user/group can utimens.
 	return vnode->utimens(ctx, times);
 }
 
