@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2018 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,7 +17,6 @@
  * Abnormal process termination.
  */
 
-#include <sys/stat.h>
 #include <sys/wait.h>
 
 #include <signal.h>
@@ -33,11 +32,6 @@ void abort(void)
 #ifdef __is_sortix_libk
 	libk_abort();
 #else
-	sigset_t set_of_sigabrt;
-	sigemptyset(&set_of_sigabrt);
-	sigaddset(&set_of_sigabrt, SIGABRT);
-	sigprocmask(SIG_UNBLOCK, &set_of_sigabrt, NULL);
-
 	raise(SIGABRT);
 
 	int exit_code = WCONSTRUCT(WNATURE_SIGNALED, 128 + SIGABRT, SIGABRT);
