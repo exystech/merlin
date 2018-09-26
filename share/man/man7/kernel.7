@@ -51,6 +51,56 @@ Don't warn if no random seed file was loaded by the bootloader (usually from
 .Pa /boot/random.seed ) .
 This option is useful for live environments where this situation is unavoidable.
 .El
+.Pp
+The kernel accepts multiboot modules from the bootloader, which are processed
+in order.
+The
+.Xr initrd 7
+must be passed through this mechanism.
+.Pp
+The format of each multiboot module is automatically detected by default:
+.Pp
+.Bl -bullet -compact
+.It
+Initialization ramdisks produced by
+.Xr mkinitrd 8
+are extracted in the root directory.
+.It
+.Xr tar 7
+archives in the ustar format are extracted into the root directory.
+The bootloader must already have decompressed the archive.
+If the archive contains the
+.Pa tix/tixinfo
+file, it is instead installed into the root directory as a
+.Xr tix 7
+binary package.
+.El
+.Pp
+Each multiboot module has its own command line where the options are as follows:
+.Bl -tag -width "12345678"
+.It Fl \-random-seed
+The module contains random data used to seed the kernel entropy gathering.
+This file is supposed to contain 256 bytes of secret randomness that hasn't been
+used before.
+Recycling the random seed is dangerous and insecure.
+Omitting the random seed will cause the kernel entropy to be insecurely seeded
+with the current time and other readily available information.
+The bootloader normally loads the random seed from
+.Pa /boot/random.seed .
+.It Fl \-tar
+The module is a
+.Xr tar 7
+archive that is extracted into the root directory.
+.It Fl \-tix
+The module is a
+.Xr tix 7
+binary package that is installed into the root directory.
+.It Fl \-to Ns "=" Ns Ar file
+Write the contents of the module to the specifed
+.Ar file ,
+creating it with mode 644 if it doesn't exist, and truncating it if it does exist.
+Non-existent parent directories are created with mode 755 as needed.
+.El
 .Sh SEE ALSO
 .Xr initrd 7 ,
 .Xr init 8

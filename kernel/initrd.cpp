@@ -769,7 +769,8 @@ static void ExtractModule(struct multiboot_mod_list* module,
 	const unsigned char bzip2_magic[] = { 'B', 'Z' };
 	const unsigned char gz_magic[] = { 0x1F, 0x8B };
 
-	if ( !strncmp(cmdline, "--to ", strlen("--to ")) )
+	if ( !strncmp(cmdline, "--to ", strlen("--to ")) ||
+	     !strncmp(cmdline, "--to=", strlen("--to=")) )
 		ExtractTo(desc, ctx, cmdline + strlen("--to "));
 	else if ( sizeof(struct initrd_superblock) <= ctx->initrd_size &&
 	          !memcmp(ctx->initrd, "sortix-initrd-2", strlen("sortix-initrd-2")) )
