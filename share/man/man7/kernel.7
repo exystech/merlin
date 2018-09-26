@@ -78,6 +78,17 @@ binary package.
 .Pp
 Each multiboot module has its own command line where the options are as follows:
 .Bl -tag -width "12345678"
+.It Fl \-append-to Ns "=" Ns Ar file
+Append the contents of the module to the specifed
+.Ar file ,
+creating it with mode 644 if it doesn't exist.
+Non-existent parent directories are created with mode 755 as needed.
+.It Fl \-create-to Ns "=" Ns Ar file
+Create the specified
+.Ar file
+with mode 644 with contents of the module, but only if it doesn't already exist.
+No action is taken if the file already existed.
+Non-existent parent directories are created with mode 755 as needed.
 .It Fl \-random-seed
 The module contains random data used to seed the kernel entropy gathering.
 This file is supposed to contain 256 bytes of secret randomness that hasn't been

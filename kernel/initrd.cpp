@@ -703,9 +703,10 @@ static int ExtractTo_mkdir(Ref<Descriptor> desc, ioctx_t* ctx,
 
 static void ExtractTo(Ref<Descriptor> desc,
                       struct initrd_context* ctx,
-                      const char* path)
+                      const char* path,
+                      int extra_oflags)
 {
-	int oflags = O_WRITE | O_CREATE | O_TRUNC;
+	int oflags = O_WRITE | O_CREATE | extra_oflags;
 	Ref<Descriptor> file(desc->open(&ctx->ioctx, path, oflags, 0644));
 	if ( !file && errno == ENOENT )
 	{
@@ -718,9 +719,16 @@ static void ExtractTo(Ref<Descriptor> desc,
 		file = desc->open(&ctx->ioctx, path, oflags, 0644);
 	}
 	if ( !file )
+	{
+		if ( errno == EEXIST && (oflags & O_EXCL) )
+			return;
 		PanicF("%s: %m", path);
-	if ( file->truncate(&ctx->ioctx, ctx->initrd_size) != 0 )
-		PanicF("truncate: %s: %m", path);
+	}
+	if ( !(oflags & O_APPEND) )
+	{
+		if ( file->truncate(&ctx->ioctx, ctx->initrd_size) != 0 )
+			PanicF("truncate: %s: %m", path);
+	}
 	size_t sofar = 0;
 	while ( sofar < ctx->initrd_size )
 	{
@@ -771,7 +779,13 @@ static void ExtractModule(struct multiboot_mod_list* module,
 
 	if ( !strncmp(cmdline, "--to ", strlen("--to ")) ||
 	     !strncmp(cmdline, "--to=", strlen("--to=")) )
-		ExtractTo(desc, ctx, cmdline + strlen("--to "));
+		ExtractTo(desc, ctx, cmdline + strlen("--to "), O_TRUNC);
+	else if ( !strncmp(cmdline, "--append-to ", strlen("--append-to ")) ||
+	          !strncmp(cmdline, "--append-to=", strlen("--append-to=")) )
+		ExtractTo(desc, ctx, cmdline + strlen("--append-to "), O_APPEND);
+	else if ( !strncmp(cmdline, "--create-to ", strlen("--create-to ")) ||
+	          !strncmp(cmdline, "--create-to=", strlen("--create-to=")) )
+		ExtractTo(desc, ctx, cmdline + strlen("--create-to "), O_EXCL);
 	else if ( sizeof(struct initrd_superblock) <= ctx->initrd_size &&
 	          !memcmp(ctx->initrd, "sortix-initrd-2", strlen("sortix-initrd-2")) )
 		ExtractInitrd(desc, ctx);
