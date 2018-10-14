@@ -53,14 +53,14 @@ The GRUB bootloader will load its configuration by loading this file.
 First, this file loads the default bootloader configuration by taking the following
 actions:
 .Pp
-It defining no-operation versions of each of the hook functions defined below.
+It defines no-operation versions of each of the hook functions defined below.
 .Pp
 It loads the appropriate GRUB modules.
 .Pp
 It initializes the global variable described below.
 .Pp
 It defines functions to select each set of ports and binary package, as
-described below loaded above.
+described below.
 .Pp
 Secondly, it loads
 .Pa /boot/grub/hooks.cfg
@@ -260,7 +260,7 @@ If the selected menu option itself is a submenu, it can be appended with a
 .Sy '>'
 and another selection to pick a default menu option in that submenu, and so on.
 (Default: 0)
-.It Sy machine_type
+.It Sy machine
 The machine type this release was built for.
 .It Sy menu_title
 The menu title to display above the bootloader menu.
@@ -268,9 +268,7 @@ The menu title to display above the bootloader menu.
 .It Sy no_random_seed
 An additional command line parameter passed to the
 .Xr kernel 7
-if
-.Pa /boot/random.seed
-doesn't exist.
+turning off the warning about lack of entropy if there is no random seed.
 This variable defaults to
 .Sy --no-random-seed
 if
