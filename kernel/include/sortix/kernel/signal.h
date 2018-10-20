@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2018 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -34,6 +34,7 @@ namespace Signal {
 
 void Init();
 inline bool IsPending() { return asm_signal_is_pending != 0; }
+void UpdateMask(int how, const sigset_t* set, sigset_t* oldset);
 void DispatchHandler(struct interrupt_context* intctx, void* user);
 void ReturnHandler(struct interrupt_context* intctx, void* user);
 

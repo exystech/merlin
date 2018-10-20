@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2018 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -96,8 +96,10 @@ Thread::Thread()
 	pledged_destruction = false;
 	force_no_signals = false;
 	signal_single = false;
+	has_saved_signal_mask = false;
 	sigemptyset(&signal_pending);
 	sigemptyset(&signal_mask);
+	sigemptyset(&saved_signal_mask);
 	memset(&signal_stack, 0, sizeof(signal_stack));
 	signal_stack.ss_flags = SS_DISABLE;
 	// execute_clock initialized in member constructor.

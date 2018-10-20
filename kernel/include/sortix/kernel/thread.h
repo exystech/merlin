@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2018 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -73,6 +73,7 @@ public:
 	volatile ThreadState state;
 	sigset_t signal_pending;
 	sigset_t signal_mask;
+	sigset_t saved_signal_mask;
 	stack_t signal_stack;
 	addr_t kernelstackpos;
 	size_t kernelstacksize;
@@ -83,6 +84,7 @@ public:
 	bool pledged_destruction;
 	bool force_no_signals;
 	bool signal_single;
+	bool has_saved_signal_mask;
 	Clock execute_clock;
 	Clock system_clock;
 

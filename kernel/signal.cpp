@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2018 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -189,7 +189,9 @@ int sys_sigpending(sigset_t* set)
 	return CopyToUser(set, &thread->signal_pending, sizeof(sigset_t)) ? 0 : -1;
 }
 
-int sys_sigprocmask(int how, const sigset_t* user_set, sigset_t* user_oldset)
+namespace Signal {
+
+void UpdateMask(int how, const sigset_t* set, sigset_t* oldset)
 {
 	Process* process = CurrentProcess();
 	Thread* thread = CurrentThread();
@@ -199,38 +201,46 @@ int sys_sigprocmask(int how, const sigset_t* user_set, sigset_t* user_oldset)
 	ScopedLock lock(&process->signal_lock);
 
 	// Let the caller know the previous signal mask.
-	if ( user_oldset )
-	{
-		if ( !CopyToUser(user_oldset, &thread->signal_mask, sizeof(sigset_t)) )
-			return -1;
-	}
+	if ( oldset )
+		memcpy(oldset, &thread->signal_mask, sizeof(sigset_t));
 
 	// Update the current signal mask according to how.
-	if ( user_set )
+	if ( set )
 	{
-		sigset_t set;
-		if ( !CopyFromUser(&set, user_set, sizeof(sigset_t)) )
-			return -1;
-
 		switch ( how )
 		{
 		case SIG_BLOCK:
-			sigorset(&thread->signal_mask, &thread->signal_mask, &set);
+			sigorset(&thread->signal_mask, &thread->signal_mask, set);
 			break;
 		case SIG_UNBLOCK:
-			signotset(&set, &set);
-			sigandset(&thread->signal_mask, &thread->signal_mask, &set);
+		{
+			sigset_t notset;
+			signotset(&notset, set);
+			sigandset(&thread->signal_mask, &thread->signal_mask, &notset);
 			break;
+		}
 		case SIG_SETMASK:
-			memcpy(&thread->signal_mask, &set, sizeof(sigset_t));
+			memcpy(&thread->signal_mask, set, sizeof(sigset_t));
 			break;
-		default:
-			return errno = EINVAL, -1;
 		};
 
 		UpdatePendingSignals(thread);
 	}
+}
 
+} // namespace Signal
+
+int sys_sigprocmask(int how, const sigset_t* user_set, sigset_t* user_oldset)
+{
+	if ( how != SIG_BLOCK && how != SIG_UNBLOCK && how != SIG_SETMASK )
+		return errno = EINVAL, -1;
+	sigset_t set, oldset;
+	if ( user_set && !CopyFromUser(&set, user_set, sizeof(sigset_t)) )
+		return -1;
+	Signal::UpdateMask(
+		how, user_set ? &set : NULL, user_oldset ? &oldset : NULL);
+	if ( user_oldset && !CopyToUser(user_oldset, &oldset, sizeof(sigset_t)) )
+		return -1;
 	return 0;
 }
 
@@ -563,7 +573,16 @@ retry_another_signal:
 	// Decide which signal to deliver to the thread.
 	int signum = PickImportantSignal(&deliverable_signals);
 	if ( !signum )
+	{
+		if ( has_saved_signal_mask )
+		{
+			memcpy(&signal_mask, &saved_signal_mask, sizeof(sigset_t));
+			has_saved_signal_mask = false;
+			UpdatePendingSignals(this);
+			goto retry_another_signal;
+		}
 		return;
+	}
 
 	// Unmark the selected signal as pending.
 	sigdelset(&signal_pending, signum);
@@ -764,7 +783,20 @@ retry_another_signal:
 
 	// Format the ucontext into the stack frame.
 	stack_frame.ucontext.uc_link = NULL;
-	memcpy(&stack_frame.ucontext.uc_sigmask, &signal_mask, sizeof(signal_mask));
+	if ( has_saved_signal_mask )
+	{
+		// If a system call temporarily set another signal mask, it wants us to
+		// deliver signals for that temporary signal masks, however we must
+		// restore the original saved signal mask in that case.
+		memcpy(&stack_frame.ucontext.uc_sigmask, &saved_signal_mask,
+		       sizeof(saved_signal_mask));
+		// 'has_saved_signal_mask' is set to false below when it's actually
+		// delivered. This handles the case  where the signal delivery fails and
+		// and instead turns into another (we still want to restore the right
+		// saved mask in that case).
+	}
+	else
+		memcpy(&stack_frame.ucontext.uc_sigmask, &signal_mask, sizeof(signal_mask));
 	memcpy(&stack_frame.ucontext.uc_stack, &signal_stack, sizeof(signal_stack));
 	EncodeMachineContext(&stack_frame.ucontext.uc_mcontext, &stopped_regs, intctx);
 
@@ -787,7 +819,9 @@ retry_another_signal:
 		goto retry_another_signal;
 	}
 
-	// Update the current signal mask.
+	// Update the current signal mask. UpdatePendingSignals isn't called because
+	// sa_mask was or'd onto the current signal mask, only blocking signals, so
+	// nothing new can be delivered.
 	memcpy(&signal_mask, &new_signal_mask, sizeof(sigset_t));
 
 	// Update the current alternate signal stack.
@@ -817,6 +851,10 @@ retry_another_signal:
 		signal_count++;
 	if ( (signal_single = signal_count == 1) )
 		signal_single_frame = (uintptr_t) stack;
+
+	// If there was a saved signal mask, it will be restored once the signal
+	// handler complete, so forget it was ever saved.
+	has_saved_signal_mask = false;
 
 	// Run the signal handler by returning to user-space.
 	return;
