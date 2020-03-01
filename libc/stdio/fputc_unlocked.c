@@ -45,15 +45,10 @@ int fputc_unlocked(int c, FILE* fp)
 	fp->flags |= _FILE_LAST_WRITE;
 	fp->flags &= ~_FILE_STATUS_EOF;
 
-	if ( fp->amount_output_buffered == BUFSIZ )
-	{
-		if ( fflush_unlocked(fp) == EOF )
-			return EOF;
-	}
-
 	fp->buffer[fp->amount_output_buffered++] = c;
 
-	if ( fp->buffer_mode == _IOLBF && c == '\n' )
+	if ( fp->amount_output_buffered == BUFSIZ ||
+	     (fp->buffer_mode == _IOLBF && c == '\n') )
 	{
 		if ( fflush_unlocked(fp) == EOF )
 			return EOF;
