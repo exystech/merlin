@@ -54,5 +54,5 @@ int vsscanf(const char* str, const char* format, va_list ap)
 	struct vsscanf_input input;
 	input.str = str;
 	input.offset = 0;
-	return vscanf_callback(&input, vsscanf_fgetc, vsscanf_ungetc, format, ap);
+	return vcbscanf(&input, vsscanf_fgetc, vsscanf_ungetc, format, ap);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2020 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,27 +13,22 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * stdio/vfscanf_unlocked.c
- * Input format conversion.
+ * stdio/cbprintf.c
+ * Formats text and outputs it via callback functions.
  */
 
-#include <errno.h>
+#include <stdarg.h>
 #include <stdio.h>
 
-static int wrap_fgetc(void* fp)
+int cbscanf(void* fp,
+            int (*fgetc)(void*),
+            int (*ungetc)(int, void*),
+            const char* restrict format,
+            ...)
 {
-	return fgetc_unlocked((FILE*) fp);
-}
-
-static int wrap_ungetc(int c, void* fp)
-{
-	return ungetc_unlocked(c, (FILE*) fp);
-}
-
-int vfscanf_unlocked(FILE* fp, const char* format, va_list ap)
-{
-	if ( !(fp->flags & _FILE_READABLE) )
-		return errno = EBADF, fp->flags |= _FILE_STATUS_ERROR, EOF;
-
-	return vcbscanf(fp, wrap_fgetc, wrap_ungetc, format, ap);
+	va_list ap;
+	va_start(ap, format);
+	int result = vcbscanf(fp, fgetc, ungetc, format, ap);
+	va_end(ap);
+	return result;
 }

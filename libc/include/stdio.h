@@ -298,13 +298,22 @@ int fshutdown(FILE* fp);
 #if __USE_SORTIX
 int cbprintf(void*, size_t (*)(void*, const char*, size_t), const char*, ...)
 	__attribute__((__format__ (printf, 3, 4)));
-int vcbprintf(void*, size_t (*)(void*, const char*, size_t), const char*, __gnuc_va_list ap)
+int cbscanf(void*,
+            int (*)(void*),
+            int (*)(int, void*),
+            const char* __restrict,
+            ...)
+	__attribute__((__format__ (scanf, 4, 5)));
+int vcbprintf(void*,
+              size_t (*)(void*, const char*, size_t),
+              const char*,
+              __gnuc_va_list)
 	__attribute__((__format__ (printf, 3, 0)));
-int vscanf_callback(void* fp,
-                    int (*fgetc)(void*),
-                    int (*ungetc)(int, void*),
-                    const char* __restrict format,
-                    __gnuc_va_list ap)
+int vcbscanf(void*,
+             int (*)(void*),
+             int (*)(int, void*),
+             const char* __restrict,
+             __gnuc_va_list)
 	__attribute__((__format__ (scanf, 4, 0)));
 #endif
 

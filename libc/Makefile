@@ -75,6 +75,7 @@ signal/sigorset.o \
 ssp/__stack_chk_fail.o \
 stdio/asprintf.o \
 stdio/cbprintf.o \
+stdio/cbscanf.o \
 stdio/clearerr.o \
 stdio/clearerr_unlocked.o \
 stdio/dprintf.o \
@@ -148,7 +149,7 @@ stdio/vdprintf.o \
 stdio/vfprintf_unlocked.o \
 stdio/vfscanf.o \
 stdio/vfscanf_unlocked.o \
-stdio/vscanf_callback.o \
+stdio/vcbscanf.o \
 stdio/vsnprintf.o \
 stdio/vsprintf.o \
 stdio/vsscanf.o \
