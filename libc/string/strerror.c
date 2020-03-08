@@ -27,7 +27,6 @@ const char* sortix_strerror(int errnum)
 	{
 	case ENOTBLK: return "Block device required";
 	case ENODEV: return "No such device";
-	case EWOULDBLOCK: return "Operation would block";
 	case EBADF: return "Bad file descriptor";
 	case EOVERFLOW: return "Value too large to be stored in data type";
 	case ENOENT: return "No such file or directory";
