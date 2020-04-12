@@ -114,8 +114,6 @@ static bool lnat(const char* source,
 // Retains the trailing slashes unlike basename(3) so ln foo/ bar/ fails.
 static const char* basename_with_slashes(const char* path)
 {
-	if ( !path || !*path )
-		return ".";
 	size_t offset = strlen(path);
 	while ( offset && path[offset - 1] == '/' )
 		offset--;
@@ -186,14 +184,13 @@ static bool ln_into_directory(const char* source,
 		err(1, "malloc");
 	const char* base_name = basename(source_copy);
 	size_t source_length = strlen(source);
-	bool has_slash =
-		source_length && source[source_length - 1] == '/';
+	bool has_slash = source_length && source[source_length - 1] == '/';
 	char* new_target;
 	if ( asprintf(&new_target,
-				  "%s%s%s",
-				  target,
-				  has_slash ? "" : "/",
-				  base_name) < 0 )
+	              "%s%s%s",
+	              target,
+	              has_slash ? "" : "/",
+	              base_name) < 0 )
 		err(1, "malloc");
 	free(source_copy);
 	bool ret = ln(source, new_target, force, symbolic, physical, no_dereference,
