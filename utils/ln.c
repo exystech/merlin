@@ -235,6 +235,7 @@ int main(int argc, char* argv[])
 			while ( (c = *++arg) ) switch ( c )
 			{
 			case 'f': force = true; break;
+			case 'h': no_dereference = true; break;
 			case 'L': physical = false; break;
 			case 'n': no_dereference = true; break;
 			case 'P': physical = true; break;
