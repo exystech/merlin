@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2020 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,8 +21,8 @@
 
 #include <errno.h>
 #include <arpa/inet.h>
-#include <netinet/in.h>
 #include <stdio.h>
+#include <string.h>
 
 const char* inet_ntop(int af,
                       const void* restrict src,
@@ -42,18 +42,53 @@ const char* inet_ntop(int af,
 	}
 	else if ( af == AF_INET6 )
 	{
-		// TODO: Support for :: syntax.
-		// TODO: Support for x:x:x:x:x:x:d.d.d.d syntax.
+		// TODO: When should x:x:x:x:x:x:d.d.d.d notation be used?
 		const unsigned char* ip = (const unsigned char*) src;
-		int len = snprintf(dst, size, "%x:%x:%x:%x:%x:%x:%x:%x",
-		                   ip[0] << 8 | ip[1], ip[2] << 8 | ip[3],
-		                   ip[4] << 8 | ip[5], ip[6] << 8 | ip[7],
-		                   ip[8] << 8 | ip[9], ip[10] << 8 | ip[11],
-		                   ip[12] << 8 | ip[13], ip[14] << 8 | ip[15]);
-		if ( len < 0 )
-			return NULL;
-		if ( size <= (size_t) len )
+		size_t longest_zeroes_offset = 0;
+		size_t longest_zeroes_length = 0;
+		size_t current_zeroes_offset = 0;
+		size_t current_zeroes_length = 0;
+		for ( size_t i = 0; i < 8; i++ )
+		{
+			const unsigned char* data = ip + i * 2;
+			if ( !data[0] && !data[1] )
+			{
+				current_zeroes_length++;
+				if ( longest_zeroes_length < current_zeroes_length )
+				{
+					longest_zeroes_offset = current_zeroes_offset;
+					longest_zeroes_length = current_zeroes_length;
+				}
+			}
+			else
+			{
+				current_zeroes_offset = i + 1;
+				current_zeroes_length = 0;
+			}
+		}
+		char buffer[INET6_ADDRSTRLEN];
+		size_t offset = 0;
+		for ( size_t i = 0; i < 8; i++ )
+		{
+			const unsigned char* data = ip + i * 2;
+			if ( i == longest_zeroes_offset && 2 <= longest_zeroes_length )
+			{
+				buffer[offset++] = ':';
+				buffer[offset++] = ':';
+				i += longest_zeroes_length - 1;
+			}
+			else
+			{
+				if ( offset && buffer[offset - 1] != ':' )
+					buffer[offset++] = ':';
+				offset += snprintf(buffer + offset, sizeof(buffer) - offset,
+				                   "%x", data[0] << 8 | data[1]);
+			}
+		}
+		buffer[offset] = '\0';
+		if ( size <= (size_t) offset )
 			return errno = ENOSPC, (const char*) NULL;
+		memcpy(dst, buffer, offset + 1);
 		return dst;
 	}
 	else

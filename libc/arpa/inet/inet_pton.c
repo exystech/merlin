@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2020 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -61,15 +61,55 @@ int inet_pton(int af, const char* restrict src, void* restrict dst)
 	{
 		unsigned char ip[16];
 		size_t index = 0;
-		// TODO: Support for :: syntax.
-		// TODO: Support for x:x:x:x:x:x:d.d.d.d syntax.
-		for ( int i = 0; i < 8; i++ )
+		int compressed_at = -1;
+		int i;
+		for ( i = 0; i < 8; i++ )
 		{
-			if ( i && src[index++] != ':' )
+			if ( compressed_at == -1 &&
+			     src[index + 0] == ':' &&
+			     src[index + 1] == ':' )
+			{
+				index += 2;
+				compressed_at = i;
+			}
+			else if ( !src[index] )
+				break;
+			else if ( i && src[index++] != ':' )
 				return 0;
 			int num = 0;
 			for ( int j = 0; j < 4; j++ )
 			{
+				if ( src[index] == '.' &&
+				     ((compressed_at == -1 && i == 6) ||
+				      (0 < compressed_at && i <= 6)) )
+				{
+					index -= j;
+					for ( int n = 0; n < 4; n++ )
+					{
+						if ( n && src[index++] != '.' )
+							return 0;
+						num = 0;
+						for ( int m = 0; m < 3; m++ )
+						{
+							if ( !m && src[index] == '0' )
+							{
+								index++;
+								break;
+							}
+							if ( '0' <= src[index] && src[index] <= '9' )
+								num = num * 10 + src[index++] - '0';
+							else if ( !m )
+								return 0;
+							else
+								break;
+						}
+						if ( 255 < num )
+							return 0;
+						ip[2 * i + n] = num;
+					}
+					i += 2;
+					goto done;
+				}
 				int dgt;
 				if ( '0' <= src[index] && src[index] <= '9' )
 					dgt = src[index] - '0';
@@ -89,7 +129,18 @@ int inet_pton(int af, const char* restrict src, void* restrict dst)
 			ip[2 * i + 0] = num >> 8 & 0xFF;
 			ip[2 * i + 1] = num >> 0 & 0xFF;
 		}
+done:
 		if ( src[index] )
+			return 0;
+		if ( 0 <= compressed_at )
+		{
+			if ( i == 8 )
+				return 0;
+			memmove(ip + 16 - 2 * (i - compressed_at), ip + 2 * compressed_at,
+			        (i - compressed_at) * 2);
+			memset(ip + 2 * compressed_at, 0, (8 - i) * 2);
+		}
+		else if ( i < 8 )
 			return 0;
 		memcpy(dst, ip, sizeof(ip));
 		return 1;
