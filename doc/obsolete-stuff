@@ -156,19 +156,11 @@ This function only supports IPv4 and it supports a variety of weird ways to type
 IPv4 addresses. Use inet_pton instead, which supports other address families as
 well and only support standard address notations.
 
-Soritx currently implements a stub of this function that calls abort(), this is
-for compatibility to get some ports to compile (the ports should be patched to
-use inet_pton instead).
-
 inet_ntoa
 ---------
 
 This function only supports IPv4 and it isn't thread safe. Use inet_ntop instead
 which is thread safe and supports other address families.
-
-Soritx currently implements a stub of this function that calls abort(), this is
-for compatibility to get some ports to compile (the ports should be patched to
-use inet_ntop instead).
 
 lockf
 -----

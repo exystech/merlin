@@ -28,14 +28,6 @@
 extern "C" {
 #endif
 
-/* Functions from POSIX that is considered obsolete due to bad design. */
-#if __USE_SORTIX || __USE_POSIX
-__attribute__((__warning__("inet_addr is deprecated by inet_pton")))
-in_addr_t inet_addr(const char*);
-__attribute__((__warning__("inet_ntoa is deprecated by inet_ntop")))
-char* inet_ntoa(struct in_addr);
-#endif
-
 /* Functions from POSIX. */
 #if __USE_SORTIX || __USE_POSIX
 const char* inet_ntop(int, const void* __restrict, char* __restrict, socklen_t);

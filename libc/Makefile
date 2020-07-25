@@ -327,8 +327,6 @@ wctype/towupper.o \
 wctype/wctype.o \
 
 HOSTEDOBJS=\
-arpa/inet/inet_addr.o \
-arpa/inet/inet_ntoa.o \
 blf/blowfish.o \
 $(CPUDIR)/fork.o \
 $(CPUDIR)/setjmp.o \
