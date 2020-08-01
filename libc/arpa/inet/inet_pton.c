@@ -23,6 +23,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <stdbool.h>
 
 int inet_pton(int af, const char* restrict src, void* restrict dst)
 {
@@ -65,23 +66,24 @@ int inet_pton(int af, const char* restrict src, void* restrict dst)
 		int i;
 		for ( i = 0; i < 8; i++ )
 		{
-			if ( compressed_at == -1 &&
-			     src[index + 0] == ':' &&
-			     src[index + 1] == ':' )
+			bool compressing = compressed_at == -1 &&
+			                   src[index + 0] == ':' &&
+			                   src[index + 1] == ':';
+			if ( compressing )
 			{
 				index += 2;
 				compressed_at = i;
 			}
-			else if ( !src[index] )
+			if ( !src[index] )
 				break;
-			else if ( i && src[index++] != ':' )
+			if ( i && !compressing && src[index++] != ':' )
 				return 0;
 			int num = 0;
 			for ( int j = 0; j < 4; j++ )
 			{
 				if ( src[index] == '.' &&
 				     ((compressed_at == -1 && i == 6) ||
-				      (0 < compressed_at && i <= 6)) )
+				      (0 <= compressed_at && i <= 6)) )
 				{
 					index -= j;
 					for ( int n = 0; n < 4; n++ )
