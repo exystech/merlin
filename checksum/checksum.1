@@ -1,0 +1,216 @@
+.Dd September 27, 2020
+.Dt CHECKSUM 1
+.Os
+.Sh NAME
+.Nm checksum
+.Nm sha224sum
+.Nm sha256sum
+.Nm sha384sum
+.Nm sha512sum
+.Nd compute and check cryptographic hashes
+.Sh SYNOPSIS
+.Nm checksum
+.Op Fl ciqs
+.Fl a Ar algorithm
+.Op Fl C Ar checklist
+.Op Ar
+.Nm sha224sum
+.Op Fl ciqs
+.Op Fl C Ar checklist
+.Op Ar
+.Nm sha256sum
+.Op Fl ciqs
+.Op Fl C Ar checklist
+.Op Ar
+.Nm sha384sum
+.Op Fl ciqs
+.Op Fl C Ar checklist
+.Op Ar
+.Nm sha512sum
+.Op Fl ciqs
+.Op Fl C Ar checklist
+.Op Ar
+.Sh DESCRIPTION
+.Nm
+is used to check the cryptographic integrity of files by calculating their
+cryptographic hashes and later check the files retain the same hash, thus
+guaranteeing it would be vanishingly unlikely the files have been modified
+unless the cryptographic hash algorithm has been broken.
+.Pp
+.Nm
+uses the requested cryptographic hash
+.Ar algorithm
+to calculate the hashes of the input files, or the standard input if no files
+are specified.
+The standard input can be specified using the
+.Sq -
+path.
+.Pp
+.Nm
+writes a checklist of the inputs' hashes that can later be checked using the
+.Fl c
+or
+.Fl C
+options.
+Checklists have a line for each file consisting of its checksum (the
+cryptographic hash) in lowercase hexadecimal followed by two spaces and the
+file's path
+.Sq ( -
+in case of the standard input).
+.Pp
+If the
+.Fl c
+or
+.Fl C
+options are set,
+.Nm
+instead checks the files.
+It writes a line for each file containing its path followed by a colon and a
+space, and
+.Sq OK
+if the file's hash matched the checksum or
+.Sq FAILED
+if it did not.
+After each checklist has been processed, a diagnostic is written to the standard
+error with how many files couldn't be read (if any couldn't be read), and a
+diagnostic is written to the standard error with how many checksums didn't match
+(if any didn't match).
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl a , Fl \-algorithm Ns "=" Ns Ar algorithm
+Use the case-insensitive cryptographic hash
+.Ar algorithm :
+.Bl -bullet -compact
+.It
+SHA224
+.It
+SHA256
+.It
+SHA384
+.It
+SHA512/256
+.It
+SHA512
+.El
+.Pp
+The algorithm is set by default if
+.Nm
+is invoked by the
+.Nm sha224sum ,
+.Nm sha256sum ,
+.Nm sha384sum ,
+or
+.Nm sha512sum
+names.
+.It Fl c , Fl \-check
+Each input is interpreted as a checklist of files to be checked.
+.It Fl C , Fl \-checklist Ns "=" Ns Ar checklist
+Check the inputs using the
+.Ar checklist
+file
+.Sq ( -
+for the standard input).
+This option is useful for checking a subset of files in a checklist.
+.It Fl i , Fl \-ignore-missing
+Ignore non-existent files when checking.
+.It Fl q , Fl \-quiet
+Only mention files with the wrong hash when checking.
+.It Fl s , Fl \-status
+Don't mention any files when checking and only provide the exit status.
+.El
+.Sh EXIT STATUS
+If
+.Fl c
+or
+.Fl C
+are set,
+.Nm
+will exit 1 if any error occurred or the checklist was malformed; and otherwise
+exit 2 if any files had the wrong hash, and exit 0 if all files passed the
+check.
+.Pp
+Otherwise
+.Nm
+will exit 0 if all files were hashed, or exit 1 if an error occurred.
+.Sh EXAMPLES
+Compute the SHA256 hash of a file:
+.Bd -literal
+$ sha256sum foo
+b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c  foo
+.Ed
+.Pp
+Check the SHA256 hash of a file:
+.Bd -literal
+$ sha256sum foo > foo.sha256sum
+$ sha256sum -c foo.sha256sum
+foo: OK
+.Ed
+.Pp
+Check every file in a checklist and only mention failures:
+.Bd -literal
+$ echo foo > foo
+$ echo bar > bar
+$ sha256sum foo bar > checklist
+$ sha256sum -cq checklist
+$ echo foo > bar
+$ sha256sum -cq checklist
+bar: FAILED
+sha256sum: WARNING: 1 computed checksum did NOT match
+.Ed
+.Pp
+Check the hash of only some files in a checklist:
+.Bd -literal
+$ sha256sum foo bar qux > checklist
+$ sha256sum -C checklist foo qux
+foo: OK
+qux: OK
+.Ed
+.Pp
+Check the standard input is expected:
+.Bd -literal
+$ sha256sum < reference > checklist
+$ sha256sum -C checklist < input
+-: OK
+.Ed
+.Sh SEE ALSO
+.Xr cmp 1 ,
+.Xr sha2 3
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 1.1.
+.Pp
+.Nm
+is similar to a subset of GNU
+.Nm sha256sum ,
+mixed with the BSD
+.Fl a
+and
+.Fl C
+extensions to POSIX
+.Nm cksum .
+The
+.Fl iqs
+short options are extensions to GNU
+.Nm sha256sum ,
+which only provides these features through the long options.
+.Nm
+is always strict and errors on malformed checklists unlike GNU
+.Nm sha256sum.
+.Sh CAVEATS
+Insecure cryptographic hash algorithms such as MD5 and SHA1 are not
+implemented.
+.Pp
+.Nm
+does not have the
+.Fl b
+and
+.Fl t
+options from GNU sha256sum to select binary/text mode.
+The text mode being default is poor design but only matters on some
+implementations for Windows.
+This implementation removes that complexity and always operates in binary mode.
+The double space checklist delimiter is used for simplicity and compatibility as
+all sensible implementations are always in binary mode by default.
+The space asterisk checklist delimiter to explicitly request binary mode is not
+supported for simplicity.
