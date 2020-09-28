@@ -15,6 +15,7 @@ basename \
 cat \
 chkblayout \
 chmod \
+chown \
 chvideomode \
 clear \
 colormake \
