@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2020 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  * chmod.c
- * Change file mode bits.
+ * Change file permissions.
  */
 
 #include <sys/types.h>
@@ -22,8 +22,8 @@
 
 #include <assert.h>
 #include <dirent.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <inttypes.h>
 #include <stdbool.h>
@@ -37,6 +37,7 @@
 static const int FLAG_CHANGES = 1 << 0;
 static const int FLAG_VERBOSE = 1 << 1;
 static const int FLAG_RECURSIVE = 1 << 2;
+static const int FLAG_NOFOLLOW = 1 << 3;
 
 enum symderef
 {
@@ -182,14 +183,14 @@ static bool do_chmod(int dirfd,
 	int fd = openat(dirfd, relpath, fd_open_flags);
 	if ( fd < 0 )
 	{
-		error(0, errno, "`%s'", path);
+		warn("%s", path);
 		return false;
 	}
 
 	struct stat st;
 	if ( fstat(fd, &st) < 0 )
 	{
-		error(0, errno, "stat: `%s'", path);
+		warn("stat: %s", path);
 		close(fd);
 		return false;
 	}
@@ -206,7 +207,7 @@ static bool do_chmod(int dirfd,
 
 	if ( fchmod(fd, new_mode) < 0 )
 	{
-		error(0, errno, "changing permissions: `%s'", path);
+		warn("changing permissions: %s", path);
 		success = false;
 	}
 	else
@@ -215,8 +216,8 @@ static bool do_chmod(int dirfd,
 		assert(naive_mode != (mode_t) -1);
 
 		if ( new_mode & ~naive_mode )
-			error(0, 0, "%s: new permissions are %jo, not %jo",
-			            path, (uintmax_t) new_mode, (uintmax_t) naive_mode);
+			warnx("%s: new permissions are %jo, not %jo",
+			      path, (uintmax_t) new_mode, (uintmax_t) naive_mode);
 
 		if ( (flags & FLAG_VERBOSE) ||
 			 (old_mode != new_mode && (flags & FLAG_CHANGES)) )
@@ -252,14 +253,14 @@ static bool do_chmod_directory(int fd,
 	int fd_copy = dup(fd);
 	if ( fd_copy < 0 )
 	{
-		error(0, errno, "dup: `%s'", path);
+		warn("dup: %s", path);
 		return false;
 	}
 
 	DIR* dir = fdopendir(fd_copy);
 	if ( !dir )
 	{
-		error(0, errno, "fdopendir: `%s'", path);
+		warn("fdopendir: %s", path);
 		close(fd_copy);
 		return false;
 	}
@@ -279,7 +280,7 @@ static bool do_chmod_directory(int fd,
 		char* entry_path;
 		if ( asprintf(&entry_path, "%s%s%s", path, joiner, entry->d_name) < 0 )
 		{
-			error(0, errno, "asprintf: `%s%s%s'", path, joiner, entry->d_name);
+			warn("asprintf: `%s%s%s'", path, joiner, entry->d_name);
 			success = false;
 			continue;
 		}
@@ -292,7 +293,7 @@ static bool do_chmod_directory(int fd,
 
 	if ( errno != 0 )
 	{
-		error(0, errno, "reading directory: `%s'", path);
+		warn("reading directory: %s", path);
 		closedir(dir);
 		return false;
 	}
@@ -323,57 +324,37 @@ static void compact_arguments(int* argc, char*** argv)
 	}
 }
 
-static void help(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "Usage: %s [OPTION]... MODE[,MODE]... FILE\n", argv0);
-	fprintf(fp, "  or:  %s [OPTION]... OCTAL-MODE FILE...\n", argv0);
-#if 0
-	fprintf(fp, "  or:  %s [OPTION]... --reference=RFILE FILE...\n", argv0);
-#endif
-}
-
-static void version(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
-}
-
 int main(int argc, char* argv[])
 {
 	int flags = 0;
 	enum symderef symderef = SYMDEREF_DEFAULT;
 
-	const char* argv0 = argv[0];
 	for ( int i = 1; i < argc; i++ )
 	{
 		const char* arg = argv[i];
 		if ( arg[0] != '-' || !arg[1] )
 			continue;
-		if ( !strcmp(arg, "--") )
-			break;
 		if ( is_ambiguous_option(arg) )
 			continue;
 		argv[i] = NULL;
+		if ( !strcmp(arg, "--") )
+			break;
 		if ( arg[1] != '-' )
 		{
 			char c;
 			while ( (c = *++arg) ) switch ( c )
 			{
 			case 'c': flags |= FLAG_CHANGES; break;
+			case 'h': flags |= FLAG_NOFOLLOW; break;
 			case 'H': symderef = SYMDEREF_ARGUMENTS; break;
 			case 'L': symderef = SYMDEREF_ALWAYS; break;
 			case 'P': symderef = SYMDEREF_NONE; break;
 			case 'R': flags |= FLAG_RECURSIVE; break;
 			case 'v': flags |= FLAG_VERBOSE; break;
 			default:
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				help(stderr, argv0);
-				exit(1);
+				errx(1, "unknown option -- '%c'", c);
 			}
 		}
-		else if ( !strcmp(arg, "--help") )
-			help(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--version") )
-			version(stdout, argv0), exit(0);
 		else if ( !strcmp(arg, "--changes") )
 			flags |= FLAG_CHANGES;
 		else if ( !strcmp(arg, "--verbose") )
@@ -381,14 +362,13 @@ int main(int argc, char* argv[])
 		else if ( !strcmp(arg, "--recursive") )
 			flags |= FLAG_RECURSIVE;
 		else
-		{
-			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			help(stderr, argv0);
-			exit(1);
-		}
+			errx(1, "unknown option: %s", arg);
 	}
 
 	compact_arguments(&argc, &argv);
+
+	if ( (flags & FLAG_RECURSIVE) && (flags & FLAG_NOFOLLOW) )
+		errx(1, "the -R and -h options are mutually incompatible");
 
 	if ( flags & FLAG_RECURSIVE )
 	{
@@ -396,20 +376,18 @@ int main(int argc, char* argv[])
 			symderef = SYMDEREF_NONE;
 	}
 	else
-	{
-		symderef = SYMDEREF_NONE;
-	}
+		symderef = flags & FLAG_NOFOLLOW ? SYMDEREF_NONE : SYMDEREF_ALWAYS;
 
 	if ( argc == 1 )
-		error(1, 0, "missing operand");
+		errx(1, "missing operand");
 
 	const char* modespec = argv[1];
 
 	if ( !is_valid_modespec(modespec) )
-		error(1, 0, "invalid mode: `%s'", modespec);
+		errx(1, "invalid mode: `%s'", modespec);
 
 	if ( argc == 2 )
-		error(1, 0, "missing operand after `%s'", modespec);
+		errx(1, "missing operand after `%s'", modespec);
 
 	bool success = true;
 	for ( int i = 2; i < argc; i++ )
