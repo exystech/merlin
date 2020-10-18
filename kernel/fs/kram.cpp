@@ -198,7 +198,7 @@ Dir::Dir(dev_t dev, ino_t ino, uid_t owner, gid_t group, mode_t mode)
 	if ( !ino )
 		ino = (ino_t) this;
 	dir_lock = KTHREAD_MUTEX_INITIALIZER;
-	this->stat_gid = owner;
+	this->stat_uid = owner;
 	this->stat_gid = group;
 	this->type = S_IFDIR;
 	this->stat_mode = (mode & S_SETABLE) | this->type;
