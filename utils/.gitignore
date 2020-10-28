@@ -3,6 +3,7 @@ basename
 cat
 chkblayout
 chmod
+chown
 chroot
 chvideomode
 clear
