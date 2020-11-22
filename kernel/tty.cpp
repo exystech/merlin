@@ -140,7 +140,7 @@ TTY::TTY(dev_t dev, ino_t ino, mode_t mode, uid_t owner, gid_t group,
 	tio.c_cflag = CS8 /*| CREAD*/ | HUPCL; // CREAD unset for boot security.
 	tio.c_lflag = ECHO | ECHOE | ECHOK | ICANON | IEXTEN | ISIG;
 	tio.c_cc[VEOF] = CONTROL('D');
-	tio.c_cc[VEOL] = M_CONTROL('?');
+	tio.c_cc[VEOL] = 0;
 	tio.c_cc[VERASE] = CONTROL('?');
 	tio.c_cc[VINTR] = CONTROL('C');
 	tio.c_cc[VKILL] = CONTROL('U');
