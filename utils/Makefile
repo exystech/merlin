@@ -55,6 +55,7 @@ rmdir \
 sleep \
 sort \
 stat \
+stty \
 tail \
 tee \
 time \
