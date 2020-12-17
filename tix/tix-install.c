@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2016, 2017, 2020 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -308,7 +308,7 @@ void InstallPackage(const char* tix_path)
 	{
 		printf("Installing %s", package_name);
 		if ( strcmp(collection, "/") != 0 )
-			printf(" into `%s'\n", collection);
+			printf(" into `%s'", collection);
 		printf("...\n");
 	}
 
