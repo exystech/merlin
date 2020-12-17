@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016, 2020 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -264,14 +264,11 @@ static void emit_pkg_config_wrapper(struct metainfo* minfo, const char* bindir)
 	// Create a pkg-config script for the host system.
 	char* var_pkg_config_libdir =
 		print_string("%s%s/lib/pkgconfig",
-		             minfo->sysroot, minfo->exec_prefix);
+		             minfo->sysroot ? minfo->sysroot : "", minfo->exec_prefix);
 	if ( !var_pkg_config_libdir )
 		err(1, "malloc");
 	char* var_pkg_config_path = strdup(var_pkg_config_libdir);
 	if ( !var_pkg_config_path )
-		err(1, "malloc");
-	char* var_pkg_config_sysroot_dir = strdup(minfo->sysroot);
-	if ( !var_pkg_config_sysroot_dir )
 		err(1, "malloc");
 	char* pkg_config_name = print_string("%s-pkg-config", minfo->host);
 	if ( !pkg_config_name )
@@ -289,7 +286,7 @@ static void emit_pkg_config_wrapper(struct metainfo* minfo, const char* bindir)
 	fprint_shell_variable_assignment(pkg_config,
 		"PKG_CONFIG_PATH", var_pkg_config_path);
 	fprint_shell_variable_assignment(pkg_config,
-		"PKG_CONFIG_SYSROOT_DIR", var_pkg_config_sysroot_dir);
+		"PKG_CONFIG_SYSROOT_DIR", minfo->sysroot);
 	fprint_shell_variable_assignment(pkg_config,
 		"PKG_CONFIG_LIBDIR", var_pkg_config_libdir);
 	// Pass --static as Sortix only static links at the moment.
@@ -303,7 +300,6 @@ static void emit_pkg_config_wrapper(struct metainfo* minfo, const char* bindir)
 	free(pkg_config_path);
 	free(var_pkg_config_libdir);
 	free(var_pkg_config_path);
-	free(var_pkg_config_sysroot_dir);
 }
 
 static void append_to_path(const char* directory)
