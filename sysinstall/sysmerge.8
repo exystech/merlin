@@ -27,6 +27,9 @@ installs the
 manifest from the tix repository in the
 .Ar source
 directory, as well as all the ports found.
+Upgrade hooks will be run if further actions are needed to migrate the system to
+the new version as described in
+.Xr following-development 7 .
 The
 .Xr initrd 7
 is regenerated using
@@ -41,8 +44,7 @@ It is meant to be used as part of the development process to upgrade to locally
 built versions.
 The
 .Xr sysupgrade 8
-program is by contrast an interactive program, meant to help upgrading across
-much larger development distances.
+program is by contrast an interactive program.
 .Pp
 The options are as follows:
 .Bl -tag -width "12345678"
@@ -67,14 +69,14 @@ directory and restore the old
 and
 .Xr initrd 7 .
 .It Fl \-hook-finalize
-Run the pre-installation compatibility hooks.
+Run the post-upgrade hooks.
 This is meant to be used by the old
 .Nm
 when it invokes the new
 .Nm
 during a non-waiting upgrade.
 .It Fl \-hook-prepare
-Run the post-prepare compatibility hooks.
+Run the pre-upgrade hooks.
 This is meant to be used by the old
 .Nm
 when it invokes the new
@@ -124,6 +126,8 @@ the current system release
 .It Pa /etc/upgrade.conf
 controls the bootloader upgrade behavior (see
 .Xr upgrade.conf 5 )
+.It Pa /share/sysinstall/hooks
+A file per upgrade hook indicating that it doesn't need to be run.
 .It Pa /sysmerge
 pending upgrade is stored here
 .El

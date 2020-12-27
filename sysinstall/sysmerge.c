@@ -278,13 +278,11 @@ int main(int argc, char* argv[])
 			       new_release.pretty_name, source);
 	}
 
-	// Compatibility hooks that runs before the old system is replaced.
+	// Upgrade hooks that runs before the old system is replaced.
 	if ( run_prepare )
 	{
 		if ( my_prepare )
-		{
-			upgrade_prepare(&old_release, &new_release, source, "/");
-		}
+			upgrade_prepare(&old_release, &new_release, source, "");
 		else
 		{
 			char* new_sysmerge = join_paths(source, "sbin/sysmerge");
@@ -331,13 +329,11 @@ int main(int argc, char* argv[])
 		return 0;
 	}
 
-	// Compatibility hooks that run after the new system is installed.
+	// Upgrade hooks that run after the new system is installed.
 	if ( run_finalize )
 	{
 		if ( my_finalize )
-		{
-			upgrade_finalize(&old_release, &new_release, source, "/");
-		}
+			upgrade_finalize(&old_release, &new_release, source, "");
 		else
 		{
 			char* new_sysmerge = join_paths(source, "sbin/sysmerge");

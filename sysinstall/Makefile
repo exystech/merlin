@@ -48,6 +48,9 @@ install: all
 	cp sysinstall.8 $(DESTDIR)$(MANDIR)/man8/sysinstall.8
 	cp sysmerge.8 $(DESTDIR)$(MANDIR)/man8/sysmerge.8
 	cp sysupgrade.8 $(DESTDIR)$(MANDIR)/man8/sysupgrade.8
+	mkdir -p $(DESTDIR)$(DATADIR)/sysinstall/hooks
+	# TODO: After releasing Sortix 1.1, remove this compatibility.
+	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-random-seed
 
 sysinstall: $(SYSINSTALL_OBJS)
 	$(CC) $(SYSINSTALL_OBJS) -o $@ -lmount

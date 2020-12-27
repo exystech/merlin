@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2017, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2017, 2018, 2020, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  * hooks.c
- * Upgrade compatibility hooks.
+ * Upgrade hooks.
  */
 
 #include <sys/types.h>
@@ -33,7 +33,7 @@
 // incompatible operating system change is made that needs additional actions.
 // These files are part of the system manifest and their lack can be tested
 // in upgrade_prepare, but not in upgrade_finalize (as they would have been
-// installed there). If a file is lacking, then a hook should be run taking
+// installed by then). If a file is lacking, then a hook should be run taking
 // the needed action. For instance, if /etc/foo becomes the different /etc/bar,
 // then /share/sysinstall/hooks/osname-x.y-bar would be made, and if it is
 // absent then upgrade_prepare converts /etc/foo to /etc/bar. The file is then
@@ -41,22 +41,29 @@
 //
 // Hooks are meant to run once. However, they must handle if the upgrade fails
 // between the hook running and the hook file being installed when the system
-// manifest is installed.
+// manifest is installed. I.e. they need to be reentrant and idempotent.
 //
 // If this system is used, follow the instructions in following-development(7)
 // and add an entry in that manual page about the change.
 __attribute__((used))
-static bool hook_needs_to_be_run(const char* target_prefix, const char* hook)
+static bool hook_needs_to_be_run(const char* source_prefix,
+                                 const char* target_prefix,
+                                 const char* hook)
 {
-	char* path;
-	if ( asprintf(&path, "%sshare/sysinstall/hooks/%s",
+	char* source_path;
+	char* target_path;
+	if ( asprintf(&source_path, "%s/share/sysinstall/hooks/%s",
+	              source_prefix, hook) < 0 ||
+	     asprintf(&target_path, "%s/share/sysinstall/hooks/%s",
 	              target_prefix, hook) < 0 )
 	{
-		warn("asprintf");
+		warn("malloc");
 		_exit(2);
 	}
-	bool result = access_or_die(path, F_OK) < 0;
-	free(path);
+	bool result = access_or_die(source_path, F_OK) == 0 &&
+	              access_or_die(target_path, F_OK) < 0;
+	free(source_path);
+	free(target_path);
 	return result;
 }
 
@@ -71,13 +78,14 @@ void upgrade_prepare(const struct release* old_release,
 	(void) target_prefix;
 
 	// TODO: After releasing Sortix 1.1, remove this compatibility.
-	if ( hook_needs_to_be_run(target_prefix, "sortix-1.1-random-seed") )
+	if ( hook_needs_to_be_run(source_prefix, target_prefix,
+	                          "sortix-1.1-random-seed") )
 	{
-		char* random_seed_path;
-		if ( asprintf(&random_seed_path, "%sboot/random.seed", target_prefix) < 0 )
+		char* random_seed_path = join_paths(target_prefix, "/boot/random.seed");
+		if ( !random_seed_path )
 		{
-			warn("asprintf");
-			_exit(1);
+			warn("malloc");
+			_exit(2);
 		}
 		if ( access_or_die(random_seed_path, F_OK) < 0 )
 		{

@@ -80,6 +80,8 @@ into
 .Pa /oldsrc .
 .It Sy system Ns "=" Ns Oo Sy no "|" yes Oc (default Sy yes ) .
 Install the new system.
+The upgrade hooks are run if needed as described in
+.Xr following-development 7 .
 This will run
 .Xr update-initrd 8
 and if

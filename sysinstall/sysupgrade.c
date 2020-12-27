@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2020, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -807,7 +807,7 @@ int main(void)
 		//       untracked or moved from one manifest to another.
 		if ( conf.system )
 		{
-			upgrade_prepare(target_release, &new_release, "/", "");
+			upgrade_prepare(target_release, &new_release, "", ".");
 			install_manifest("system", "", ".");
 		}
 		if ( has_manifest("src") )
@@ -848,7 +848,7 @@ int main(void)
 		if ( conf.ports )
 			install_ports("", ".");
 		if ( conf.system )
-			upgrade_finalize(target_release, &new_release, "/", "");
+			upgrade_finalize(target_release, &new_release, "", ".");
 		if ( conf.system )
 		{
 			printf(" - Creating initrd...\n");

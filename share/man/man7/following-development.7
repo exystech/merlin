@@ -28,6 +28,9 @@ and
 .Xr sysupgrade 8
 programs automatically handle compatibility issues when upgrading an existing
 system to a new build.
+This is done using upgrade hooks built into the programs that are run if the
+installation does not have the appropriate files in
+.Pa /share/sysinstall/hooks .
 They can handle incompatible ABI changes and automatically fix configuration
 files and other issues.
 .Pp
