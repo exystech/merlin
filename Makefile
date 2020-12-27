@@ -122,7 +122,7 @@ sysroot-fsh:
 	mkdir -p "$(SYSROOT)/tix/manifest"
 	mkdir -p "$(SYSROOT)/tmp"
 	mkdir -p "$(SYSROOT)/var"
-	mkdir -p "$(SYSROOT)/var/empty"
+	mkdir -p "$(SYSROOT)/var/empty" -m 555
 	ln -sfT . "$(SYSROOT)/usr"
 
 .PHONY: sysroot-base-headers
