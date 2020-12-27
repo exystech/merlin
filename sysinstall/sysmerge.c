@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2018, 2020 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -91,7 +91,7 @@ int main(int argc, char* argv[])
 			char c;
 			while ( (c = *++arg) ) switch ( c )
 			{
-			case 'c': cancel = false; break;
+			case 'c': cancel = true; break;
 			case 'w': wait = true; break;
 			default:
 				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
