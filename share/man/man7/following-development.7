@@ -69,6 +69,13 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Fix /tix/manifest permissions in installations
+The
+.Pa /tix/manifest
+directory was accidentally installed by
+.Xr sysinstall 8
+as mode 6603 instead of 7555.
+This problem is fixed with an upgrade hook.
 .Ss Add socket(2)
 The
 .Pa /dev/net

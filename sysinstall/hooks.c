@@ -17,6 +17,7 @@
  * Upgrade hooks.
  */
 
+#include <sys/stat.h>
 #include <sys/types.h>
 
 #include <err.h>
@@ -93,6 +94,37 @@ void upgrade_prepare(const struct release* old_release,
 			write_random_seed(random_seed_path);
 		}
 		free(random_seed_path);
+	}
+
+	// TODO: After releasing Sortix 1.1, remove this compatibility.
+	if ( hook_needs_to_be_run(source_prefix, target_prefix,
+	                          "sortix-1.1-tix-manifest-mode") )
+	{
+		// The mode of /tix/manifest was accidentally set to 7555 (decimal)
+		// instead of 0755 (octal) in sysinstall.c, i.e. mode 06603. Fix it to
+		// 0755.
+		char* path = join_paths(target_prefix, "/tix/manifest");
+		if ( !path )
+		{
+			warn("malloc");
+			_exit(2);
+		}
+		struct stat st;
+		if ( stat(path, &st) < 0 )
+		{
+			warn("%s", path);
+			_exit(2);
+		}
+		if ( (st.st_mode & 07777) == (7555 & 07777) )
+		{
+			printf(" - Fixing /tix/manifest permissions...\n");
+			if ( chmod(path, 0755) < 0 )
+			{
+				warn("chmod: %s", path);
+				_exit(2);
+			}
+		}
+		free(path);
 	}
 }
 

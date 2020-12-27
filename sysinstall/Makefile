@@ -51,6 +51,7 @@ install: all
 	mkdir -p $(DESTDIR)$(DATADIR)/sysinstall/hooks
 	# TODO: After releasing Sortix 1.1, remove this compatibility.
 	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-random-seed
+	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-tix-manifest-mode
 
 sysinstall: $(SYSINSTALL_OBJS)
 	$(CC) $(SYSINSTALL_OBJS) -o $@ -lmount

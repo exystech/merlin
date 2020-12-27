@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2020 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -900,7 +900,7 @@ int main(void)
 		mkdir_or_chmod_or_die("sbin", 0755);
 		mkdir_or_chmod_or_die("share", 0755);
 		mkdir_or_chmod_or_die("tix", 0755);
-		mkdir_or_chmod_or_die("tix/manifest", 7555);
+		mkdir_or_chmod_or_die("tix/manifest", 0755);
 		mkdir_or_chmod_or_die("tmp", 01777);
 		mkdir_or_chmod_or_die("var", 0755);
 		mkdir_or_chmod_or_die("var/empty", 0555);
