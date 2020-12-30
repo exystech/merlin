@@ -185,7 +185,7 @@ sysroot-system: sysroot-fsh sysroot-base-headers
 sysroot-source: sysroot-fsh
 ifeq ($(SORTIX_INCLUDE_SOURCE),git)
 	rm -rf "$(SYSROOT)/src"
-	git clone --no-hardlinks $(SORTIX_INCLUDE_SOURCE_GIT_CLONE_OPTIONS) -- $(SORTIX_INCLUDE_SOURCE_GIT_REPO) "$(SYSROOT)/src"
+	git clone --no-hardlinks $(SORTIX_INCLUDE_SOURCE_GIT_CLONE_OPTIONS) -- "$(SORTIX_INCLUDE_SOURCE_GIT_REPO)" "$(SYSROOT)/src"
 	-cd "$(SYSROOT)/src" && for BRANCH in $(SORTIX_INCLUDE_SOURCE_GIT_BRANCHES); do \
 	  git fetch origin $$BRANCH && \
 	  (git branch -f $$BRANCH FETCH_HEAD || true) ; \
