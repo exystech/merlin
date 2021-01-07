@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -709,7 +709,8 @@ int main(void)
 		if ( !strcasecmp(input, "no") )
 			errx(2, "Upgrade aborted due to pending sysmerge(8) upgrade");
 		text("\n");
-		execute((const char*[]) { "chroot", "-d", "sysmerge", "--cancel", NULL }, "e");
+		execute((const char*[]) { "chroot", "-d", ".", "sysmerge", "--cancel",
+		                          NULL }, "e");
 	}
 
 	bool do_upgrade_bootloader;
