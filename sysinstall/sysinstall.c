@@ -135,6 +135,7 @@ static bool should_install_bootloader_path(const char* mnt,
 	}
 	free(release_path);
 	free(release_errpath);
+	release_free(&release);
 	char* conf_path;
 	if ( asprintf(&conf_path, "%s/etc/upgrade.conf", mnt) < 0 )
 	{
@@ -402,6 +403,8 @@ int main(void)
 	if ( !mkdtemp(etc) )
 		err(2, "mkdtemp: %s", "/tmp/etc.XXXXXX");
 	etc_made = true;
+	// Export for the convenience of users escaping to a shell.
+	setenv("SYSINSTALL_ETC", fs, 1);
 
 	if ( chdir(etc) < 0 )
 		err(2, "chdir: %s", etc);
@@ -859,6 +862,7 @@ int main(void)
 	if ( !mkdtemp(fs) )
 		err(2, "mkdtemp: %s", "/tmp/fs.XXXXXX");
 	fs_made = true;
+	// Export for the convenience of users escaping to a shell.
 	setenv("SYSINSTALL_TARGET", fs, 1);
 
 	for ( size_t i = 0; i < mountpoints_used; i++ )

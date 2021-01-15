@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -69,7 +69,8 @@ void unscan_filesystem(struct blockdevice* bdev)
 
 void scan_filesystem(struct blockdevice* bdev)
 {
-	enum filesystem_error fserr = blockdevice_inspect_filesystem(&bdev->fs, bdev);
+	enum filesystem_error fserr =
+		blockdevice_inspect_filesystem(&bdev->fs, bdev);
 	if ( fserr == FILESYSTEM_ERROR_ABSENT ||
 	     fserr == FILESYSTEM_ERROR_UNRECOGNIZED )
 		return;
@@ -94,7 +95,8 @@ void scan_device(struct harddisk* hd)
 {
 	unscan_device(hd);
 	struct blockdevice* bdev = &hd->bdev;
-	enum partition_error parterr = blockdevice_get_partition_table(&bdev->pt, bdev);
+	enum partition_error parterr =
+		blockdevice_get_partition_table(&bdev->pt, bdev);
 	if ( parterr == PARTITION_ERROR_ABSENT ||
 	     parterr == PARTITION_ERROR_UNRECOGNIZED )
 	{
@@ -261,9 +263,14 @@ bool load_mountpoints(const char* fstab_path,
 	FILE* fp = fopen(fstab_path, "r");
 	if ( !fp )
 		return false;
-	struct mountpoint* mountpoints = NULL;
+	struct mountpoint* mountpoints = malloc(sizeof(struct mountpoint));
+	if ( !mountpoints )
+	{
+		fclose(fp);
+		return false;
+	}
 	size_t mountpoints_used = 0;
-	size_t mountpoints_length = 0;
+	size_t mountpoints_length = 1;
 	char* line = NULL;
 	size_t line_size;
 	ssize_t line_length;
@@ -276,11 +283,9 @@ bool load_mountpoints(const char* fstab_path,
 			continue;
 		if ( mountpoints_used == mountpoints_length )
 		{
-			size_t new_length = 2 * mountpoints_length;
-			if ( !new_length )
-				new_length = 16;
 			struct mountpoint* new_mountpoints = (struct mountpoint*)
-				reallocarray(mountpoints, new_length, sizeof(struct mountpoint));
+				reallocarray(mountpoints, mountpoints_length,
+				             2 * sizeof(struct mountpoint));
 			if ( !new_mountpoints )
 			{
 				free_mountpoints(mountpoints, mountpoints_used);
@@ -289,7 +294,7 @@ bool load_mountpoints(const char* fstab_path,
 				return false;
 			}
 			mountpoints = new_mountpoints;
-			mountpoints_length = new_length;
+			mountpoints_length *= 2;
 		}
 		struct mountpoint* mountpoint = &mountpoints[mountpoints_used++];
 		memset(mountpoint, 0, sizeof(*mountpoint));
@@ -326,7 +331,7 @@ bool mountpoint_mount(struct mountpoint* mountpoint)
 	// TODO: It would be ideal to get an exclusive lock so that no other
 	//       processes have currently mounted that filesystem.
 	struct blockdevice* bdev = fs->bdev;
-	const char* bdev_path = bdev->p ? bdev->p->path : bdev->hd->path;
+	const char* bdev_path = path_of_blockdevice(bdev);
 	assert(bdev_path);
 	if ( fs->flags & FILESYSTEM_FLAG_FSCK_MUST && !fsck(fs) )
 	{

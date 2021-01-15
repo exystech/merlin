@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2017, 2020 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017, 2020, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -55,7 +55,7 @@ int mkdir_p(const char* path, mode_t mode)
 		char* prev = strdup(path);
 		if ( !prev )
 			return -1;
-		int status =  mkdir_p(dirname(prev), mode | 0500);
+		int status = mkdir_p(dirname(prev), mode | 0500);
 		free(prev);
 		if ( status < 0 )
 			return -1;
@@ -92,9 +92,11 @@ void mkdir_or_chmod_or_die(const char* path, mode_t mode)
 	{
 		if ( chmod(path, mode) == 0 )
 			return;
-		err(2, "chmod: %s", path);
+		warn("chmod: %s", path);
+		_exit(2);
 	}
-	err(2, "mkdir: %s", path);
+	warn("mkdir: %s", path);
+	_exit(2);
 }
 
 void write_random_seed(const char* path)

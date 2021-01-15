@@ -142,6 +142,7 @@ static void search_installation_path(const char* mnt, struct blockdevice* bdev)
 	if ( asprintf(&machine_path, "%s/etc/machine", mnt) < 0 )
 	{
 		warn("%s: malloc", path_of_blockdevice(bdev));
+		free_mountpoints(mountpoints, mountpoints_used);
 		release_free(&release);
 		return;
 	}
@@ -150,12 +151,14 @@ static void search_installation_path(const char* mnt, struct blockdevice* bdev)
 	if ( !machine )
 	{
 		warn("%s/etc/machine", path_of_blockdevice(bdev));
+		free_mountpoints(mountpoints, mountpoints_used);
 		release_free(&release);
 		return;
 	}
 	if ( !add_installation(bdev, &release, mountpoints, mountpoints_used,
 	                       machine) )
 	{
+		free(machine);
 		free_mountpoints(mountpoints, mountpoints_used);
 		release_free(&release);
 		return;
@@ -278,7 +281,7 @@ static void preserve_src(const char* where)
 		if ( mkdir("oldsrc", 0755) < 0 )
 		{
 			warn("oldsrc");
-			_exit(1);
+			_exit(2);
 		}
 	}
 	time_t now = time(NULL);
@@ -298,7 +301,7 @@ static void preserve_src(const char* where)
 			if ( !mkdtemp(buf) )
 			{
 				warnx("failed to find location to store old /%s", where);
-				_exit(1);
+				_exit(2);
 			}
 			rmdir(buf);
 		}
@@ -307,7 +310,7 @@ static void preserve_src(const char* where)
 	if ( rename(where, buf) < 0 )
 	{
 		warn("rename: %s -> %s", where, buf);
-		_exit(1);
+		_exit(2);
 	}
 }
 
@@ -502,6 +505,9 @@ int main(void)
 
 	if ( !mkdtemp(fs) )
 		err(2, "mkdtemp: %s", "/tmp/fs.XXXXXX");
+	fs_made = true;
+	// Export for the convenience of users escaping to a shell.
+	setenv("SYSINSTALL_TARGET", fs, 1);
 
 	struct installation* target = NULL;
 	while ( true )
@@ -817,7 +823,7 @@ int main(void)
 					if ( rename("src", "src.tmp") < 0 )
 					{
 						warn("rename: /src -> /src.tmp");
-						_exit(1);
+						_exit(2);
 					}
 				}
 				install_manifest("src", "", ".", (const char*[]){}, 0);
@@ -826,12 +832,12 @@ int main(void)
 					if ( rename("src", "newsrc") < 0 )
 					{
 						warn("rename: /src -> /newsrc");
-						_exit(1);
+						_exit(2);
 					}
 					if ( rename("src.tmp", "src") < 0 )
 					{
 						warn("rename: /src.tmp -> /src");
-						_exit(1);
+						_exit(2);
 					}
 				}
 			}

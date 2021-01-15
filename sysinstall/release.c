@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -91,7 +91,12 @@ static char* os_release_eval(const char* string)
 			doubly_quote = !doubly_quote;
 		else
 		{
-			fputc((unsigned char) c, fp);
+			if ( fputc((unsigned char) c, fp) == EOF )
+			{
+				fclose(fp);
+				free(result);
+				return NULL;
+			}
 			escaped = false;
 		}
 	}
