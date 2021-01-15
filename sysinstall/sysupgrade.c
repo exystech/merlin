@@ -80,15 +80,15 @@ static bool add_installation(struct blockdevice* bdev,
 {
 	if ( installations_count == installations_length )
 	{
-			size_t new_length = installations_length;
-			if ( !new_length )
-				new_length = 16;
+			size_t length = installations_length;
+			if ( !length )
+				length = 8;
 			struct installation* new_installations = (struct installation*)
-				reallocarray(NULL, new_length, sizeof(struct installation));
+				reallocarray(NULL, length, 2 * sizeof(struct installation));
 			if ( !new_installations )
 				return false;
 			installations = new_installations;
-			installations_length = new_length;
+			installations_length = 2 * length;
 	}
 	struct installation* installation = &installations[installations_count++];
 	installation->bdev = bdev;
