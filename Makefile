@@ -120,7 +120,7 @@ sysroot-fsh:
 	mkdir -p "$(SYSROOT)/src"
 	mkdir -p "$(SYSROOT)/tix"
 	mkdir -p "$(SYSROOT)/tix/manifest"
-	mkdir -p "$(SYSROOT)/tmp"
+	mkdir -p "$(SYSROOT)/tmp" -m 1777
 	mkdir -p "$(SYSROOT)/var"
 	mkdir -p "$(SYSROOT)/var/empty" -m 555
 	ln -sfT . "$(SYSROOT)/usr"
