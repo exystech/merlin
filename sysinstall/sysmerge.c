@@ -20,6 +20,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <ctype.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -28,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <termios.h>
 #include <unistd.h>
 
 #include "conf.h"
@@ -36,6 +38,50 @@
 #include "fileops.h"
 #include "manifest.h"
 #include "release.h"
+
+static char* atcgetblob(int fd, const char* name, size_t* size_ptr)
+{
+	ssize_t size = tcgetblob(fd, name, NULL, 0);
+	if ( size < 0 )
+		return NULL;
+	char* result = (char*) malloc((size_t) size + 1);
+	if ( !result )
+		return NULL;
+	ssize_t second_size = tcgetblob(fd, name, result, (size_t) size);
+	if ( second_size != size )
+		return free(result), (char*) NULL;
+	result[(size_t) size] = '\0';
+	if ( size_ptr )
+		*size_ptr = (size_t) size;
+	return result;
+}
+
+static bool is_partition_name(const char* path)
+{
+	const char* name = path;
+	for ( size_t i = 0; path[i]; i++ )
+		if ( path[i] == '/' )
+			name = path + i + 1;
+	if ( !isalpha((unsigned char) *name) )
+		return false;
+	name++;
+	while ( isalpha((unsigned char) *name) )
+		name++;
+	if ( !isdigit((unsigned char) *name) )
+		return false;
+	name++;
+	while ( isdigit((unsigned char) *name) )
+		name++;
+	if ( *name != 'p' )
+		return false;
+	name++;
+	if ( !isdigit((unsigned char) *name) )
+		return false;
+	name++;
+	while ( isdigit((unsigned char) *name) )
+		name++;
+	return *name == '\0';
+}
 
 static void compact_arguments(int* argc, char*** argv)
 {
@@ -57,17 +103,6 @@ static bool has_pending_upgrade(void)
 	       access_or_die("/sysmerge", F_OK) == 0;
 }
 
-static void help(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "Usage: %s [OPTION]... SOURCE\n", argv0);
-	fprintf(fp, "Merge the files from SOURCE onto the current system.\n");
-}
-
-static void version(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
-}
-
 int main(int argc, char* argv[])
 {
 	setvbuf(stdout, NULL, _IOLBF, 0); // Pipes.
@@ -79,7 +114,6 @@ int main(int argc, char* argv[])
 	bool hook_prepare = false;
 	bool wait = false;
 
-	const char* argv0 = argv[0];
 	for ( int i = 1; i < argc; i++ )
 	{
 		const char* arg = argv[i];
@@ -97,15 +131,9 @@ int main(int argc, char* argv[])
 			case 'f': full = true; break;
 			case 'w': wait = true; break;
 			default:
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				help(stderr, argv0);
-				exit(1);
+				errx(1, "unknown option -- '%c'", c);
 			}
 		}
-		else if ( !strcmp(arg, "--help") )
-			help(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--version") )
-			version(stdout, argv0), exit(0);
 		else if ( !strcmp(arg, "--booting") )
 			booting = true;
 		else if ( !strcmp(arg, "--cancel") )
@@ -119,11 +147,7 @@ int main(int argc, char* argv[])
 		else if ( !strcmp(arg, "--wait") )
 			wait = true;
 		else
-		{
-			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			help(stderr, argv0);
-			exit(1);
-		}
+			errx(1, "unknown option: %s", arg);
 	}
 
 	compact_arguments(&argc, &argv);
@@ -293,7 +317,7 @@ int main(int argc, char* argv[])
 		{
 			char* new_sysmerge = join_paths(source, "sbin/sysmerge");
 			if ( !new_sysmerge )
-				err(2, "asprintf");
+				err(2, "malloc");
 			execute((const char*[]) { new_sysmerge, "--hook-prepare", source,
 			                          NULL }, "e");
 			free(new_sysmerge);
@@ -327,9 +351,11 @@ int main(int argc, char* argv[])
 			close(fd);
 		}
 		execute((const char*[]) { "cp", "/boot/sortix.bin",
-		                                "/boot/sortix.bin.sysmerge.orig", NULL }, "e");
+		                                "/boot/sortix.bin.sysmerge.orig",
+		                                NULL }, "e");
 		execute((const char*[]) { "cp", "/boot/sortix.initrd",
-		                                "/boot/sortix.initrd.sysmerge.orig", NULL }, "e");
+		                                "/boot/sortix.initrd.sysmerge.orig",
+		                                NULL }, "e");
 		execute((const char*[]) { "cp", "/sysmerge/boot/sortix.bin",
 		                                "/boot/sortix.bin", NULL }, "e");
 		execute((const char*[]) { "/sysmerge/sbin/update-initrd", NULL }, "e");
@@ -373,9 +399,21 @@ int main(int argc, char* argv[])
 
 		if ( conf.grub )
 		{
-			// TODO: Figure out the root device.
-			//printf(" - Installing bootloader...\n");
-			//execute((const char*[]) { "grub-install", "/", NULL }, "eqQ");
+			int boot_fd = open("/boot", O_RDONLY);
+			if ( boot_fd < 0 )
+				err(2, "/boot");
+			char* boot_device = atcgetblob(boot_fd, "device-path", NULL);
+			if ( !boot_device )
+				err(2, "Failed to find device of filesystem: /boot");
+			close(boot_fd);
+			// TODO: A better design for finding the parent block device of a
+			//       partition without scanning every block device.
+			if ( is_partition_name(boot_device) )
+				*strrchr(boot_device, 'p') = '\0';
+			printf(" - Installing bootloader...\n");
+			execute((const char*[]) { "grub-install", boot_device,
+			                          NULL },"eqQ");
+			free(boot_device);
 			printf(" - Configuring bootloader...\n");
 			execute((const char*[]) { "update-grub", NULL }, "eqQ");
 		}
