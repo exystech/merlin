@@ -142,27 +142,16 @@ static bool should_install_bootloader_path(const char* mnt,
 		warn("malloc");
 		return false;
 	}
-	// TODO: The load_upgrade_conf function might exit the process on failure,
-	//       but we don't want that. Redesign the mountpoint code so the caller
-	//       controls this.
-	pid_t pid = fork();
-	if ( pid < 0 )
-	{
-		warn("fork");
-		free(conf_path);
-		return false;
-	}
-	if ( !pid )
-	{
-		struct conf conf;
-		load_upgrade_conf(&conf, conf_path);
-		bool should = conf.grub;
-		_exit(should ? 0 : 1);
-	}
-	int status;
-	if ( waitpid(pid, &status, 0) < 0 )
-		return false;
-	return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+	struct conf conf;
+	conf_init(&conf);
+	bool result = false;
+	if ( conf_load(&conf, conf_path) )
+		result = conf.grub;
+	else if ( errno != ENOENT )
+		warn("%s: /etc/upgrade.conf", path_of_blockdevice(bdev));
+	conf_free(&conf);
+	free(conf_path);
+	return result;
 }
 
 static bool should_install_bootloader_bdev(struct blockdevice* bdev)
@@ -411,6 +400,11 @@ int main(void)
 
 	struct utsname uts;
 	uname(&uts);
+
+	struct conf conf;
+	conf_init(&conf);
+	if ( !conf_load(&conf, "/etc/upgrade.conf") && errno != ENOENT )
+		warn("/etc/upgrade.conf");
 
 	static char input[256];
 

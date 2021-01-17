@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,54 +28,67 @@
 
 #include "conf.h"
 
-static bool conf_boolean(const char* name, const char* value, const char* path)
+void conf_init(struct conf* conf)
+{
+	memset(conf, 0, sizeof(*conf));
+	conf->ports = true;
+	conf->system = true;
+}
+
+void conf_free(struct conf* conf)
+{
+	conf_init(conf);
+}
+
+static bool conf_boolean(const char* name,
+                         const char* value,
+                         const char* path,
+                         off_t line_number)
 {
 	if ( !strcmp(value, "yes") )
 		return true;
 	if ( !strcmp(value, "no") )
 		return false;
-	printf("%s: %s: Expected yes or no instead of unsupported value\n",
-	       path, name);
+	printf("%s:%ji: %s: Expected yes or no instead of unsupported value\n",
+	       path, (intmax_t) line_number, name);
 	return false;
 }
 
-static void conf_assign(struct conf* conf,
+static bool conf_assign(struct conf* conf,
                         const char* name,
                         const char* value,
-                        const char* path)
+                        const char* path,
+                        off_t line_number)
 {
 	if ( !strcmp(name, "grub") )
-		conf->grub = conf_boolean(name, value, path);
+		conf->grub = conf_boolean(name, value, path, line_number);
 	else if ( !strcmp(name, "newsrc") )
-		conf->newsrc = conf_boolean(name, value, path);
+		conf->newsrc = conf_boolean(name, value, path, line_number);
 	else if ( !strcmp(name, "ports") )
-		conf->ports = conf_boolean(name, value, path);
+		conf->ports = conf_boolean(name, value, path, line_number);
 	else if ( !strcmp(name, "src") )
-		conf->src = conf_boolean(name, value, path);
+		conf->src = conf_boolean(name, value, path, line_number);
 	else if ( !strcmp(name, "system") )
-		conf->system = conf_boolean(name, value, path);
+		conf->system = conf_boolean(name, value, path, line_number);
 	else
-		printf("%s: %s: Unsupported variable\n", path, name);
+		printf("%s:%ji: Unsupported variable: %s\n", path,
+		       (intmax_t) line_number, name);
+	return true;
 }
 
-void load_upgrade_conf(struct conf* conf, const char* path)
+bool conf_load(struct conf* conf, const char* path)
 {
-	memset(conf, 0, sizeof(*conf));
-	conf->ports = true;
-	conf->system = true;
-
 	FILE* fp = fopen(path, "r");
 	if ( !fp )
-	{
-		if ( errno == ENOENT )
-			return;
-		err(2, "%s", path);
-	}
+		return false;
 	char* line = NULL;
 	size_t line_size = 0;
 	ssize_t line_length;
+	intmax_t line_number = 0;
+	bool success = true;
 	while ( 0 < (line_length = getline(&line, &line_size, fp)) )
 	{
+		line_number++;
 		if ( line[line_length - 1] == '\n' )
 			line[--line_length] = '\0';
 		line_length = 0;
@@ -87,8 +100,13 @@ void load_upgrade_conf(struct conf* conf, const char* path)
 		char* name = line;
 		while ( *name && isblank((unsigned char) *name) )
 			name++;
-		if ( !*name || *name == '=' )
+		if ( !*name )
 			continue;
+		if ( *name == '=' )
+		{
+			printf("%s:%ji: Ignoring malformed line\n", path, line_number);
+			continue;
+		}
 		size_t name_length = 1;
 		while ( name[name_length] &&
 		        !isblank((unsigned char) name[name_length]) &&
@@ -98,15 +116,23 @@ void load_upgrade_conf(struct conf* conf, const char* path)
 		while ( *value && isblank((unsigned char) *value) )
 			value++;
 		if ( *value != '=' )
+		{
+			printf("%s:%ji: Ignoring malformed line\n", path, line_number);
 			continue;
+		}
 		value++;
 		while ( *value && isblank((unsigned char) *value) )
 			value++;
 		name[name_length] = '\0';
-		conf_assign(conf, name, value, path);
+		if ( !conf_assign(conf, name, value, path, line_number) )
+		{
+			success = false;
+			break;
+		}
 	}
 	if ( ferror(fp) )
-		err(2, "%s", path);
+		success = false;
 	free(line);
 	fclose(fp);
+	return success;
 }

@@ -241,7 +241,9 @@ int main(int argc, char* argv[])
 	// TODO: Check for version (skipping, downgrading).
 
 	struct conf conf;
-	load_upgrade_conf(&conf, "/etc/upgrade.conf");
+	conf_init(&conf);
+	if ( !conf_load(&conf, "/etc/upgrade.conf") && errno == ENOENT )
+		err(2, "/etc/upgrade.conf");
 
 	bool can_run_new_abi =
 		abi_compatible(new_release.abi_major, new_release.abi_minor,

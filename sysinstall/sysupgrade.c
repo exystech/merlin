@@ -721,9 +721,12 @@ int main(void)
 
 	bool do_upgrade_bootloader;
 	struct conf conf;
+	conf_init(&conf);
 	while ( true )
 	{
-		load_upgrade_conf(&conf, "etc/upgrade.conf");
+		conf_free(&conf);
+		if ( !conf_load(&conf, "etc/upgrade.conf") && errno != ENOENT )
+			err(2, "etc/upgrade.conf");
 
 		do_upgrade_bootloader =
 			conf.grub && (conf.ports || (conf.system && can_run_old_abi));
