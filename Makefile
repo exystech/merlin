@@ -74,6 +74,14 @@ all: sysroot
 sysmerge: sysroot
 	sysmerge "$(SYSROOT)"
 
+.PHONY: sysmerge-full
+sysmerge-full: sysroot
+	sysmerge --full "$(SYSROOT)"
+
+.PHONY: sysmerge-full-wait
+sysmerge-full-wait: sysroot
+	sysmerge --full --wait "$(SYSROOT)"
+
 .PHONY: sysmerge-wait
 sysmerge-wait: sysroot
 	sysmerge --wait "$(SYSROOT)"

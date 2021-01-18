@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2020 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2020, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -884,40 +884,19 @@ int main(void)
 	if ( install_pid == 0 )
 	{
 		printf(" - Populating root filesystem...\n");
-		umask(0000);
 		chmod(".", 0755);
-		mkdir_or_chmod_or_die("bin", 0755);
-		mkdir_or_chmod_or_die("boot", 0755);
-		mkdir_or_chmod_or_die("dev", 0755);
-		mkdir_or_chmod_or_die("etc", 0755);
-		mkdir_or_chmod_or_die("etc/skel", 0755);
-		mkdir_or_chmod_or_die("etc/init", 0755);
-		mkdir_or_chmod_or_die("home", 0755);
-		mkdir_or_chmod_or_die("include", 0755);
-		mkdir_or_chmod_or_die("lib", 0755);
-		mkdir_or_chmod_or_die("mnt", 0755);
-		mkdir_or_chmod_or_die("root", 0700);
-		mkdir_or_chmod_or_die("sbin", 0755);
-		mkdir_or_chmod_or_die("share", 0755);
-		mkdir_or_chmod_or_die("tix", 0755);
-		mkdir_or_chmod_or_die("tix/manifest", 0755);
-		mkdir_or_chmod_or_die("tmp", 01777);
-		mkdir_or_chmod_or_die("var", 0755);
-		mkdir_or_chmod_or_die("var/empty", 0555);
-		umask(0022);
 		if ( access("tix/collection.conf", F_OK) < 0 )
 			execute((const char*[]) { "tix-collection", ".", "create",
 			                          "--prefix=", NULL }, "_e");
-		install_manifest("system", "", ".");
+		install_manifests_detect("", ".", true, true, true);
 		// TODO: Preserve the existing /src if it exists like in sysupgrade.
 		if ( has_manifest("src") )
-			install_manifest("src", "", ".");
+			install_manifest("src", "", ".", (const char*[]){}, 0);
 		printf(" - Creating configuration files...\n");
 		// TODO: Preserve mode/ownership/timestamps?
 		execute((const char*[]) { "cp", "-RTP", etc, "etc", NULL }, "_e");
 		// TODO: Auto detect appropriate bcrypt rounds and set up etc/login.conf
 		//       and use those below instead of blowfish,a.
-		install_ports("", ".");
 		if ( access_or_die("boot/random.seed", F_OK) < 0 )
 		{
 			printf(" - Creating random seed...\n");
@@ -991,6 +970,16 @@ int main(void)
 	}
 	text("\n");
 
+	if ( mkdir("root", 0700) < 0 )
+	{
+		if ( errno == EEXIST )
+		{
+			if ( chmod("root", 0700) < 0 )
+				warn("chmod: root");
+		}
+		else
+			warn("mkdir: root");
+	}
 	if ( passwd_has_uid("etc/passwd", 0) ||
 	     passwd_has_name("etc/passwd", "root") )
 	{
@@ -1036,6 +1025,16 @@ int main(void)
 	}
 	text("\n");
 
+	if ( mkdir("etc/init", 0755) < 0 )
+	{
+		if ( errno == EEXIST )
+		{
+			if ( chmod("etc/init", 0755) < 0 )
+				warn("chmod: etc/init");
+		}
+		else
+			warn("mkdir: etc/init");
+	}
 	install_configurationf("etc/init/target", "w", "multi-user\n");
 
 	text("Congratulations, the system is now functional! This is a good time "

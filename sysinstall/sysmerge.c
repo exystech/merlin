@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2018, 2020 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2018, 2020, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,6 +22,7 @@
 
 #include <err.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -73,6 +74,7 @@ int main(int argc, char* argv[])
 
 	bool booting = false;
 	bool cancel = false;
+	bool full = false;
 	bool hook_finalize = false;
 	bool hook_prepare = false;
 	bool wait = false;
@@ -92,6 +94,7 @@ int main(int argc, char* argv[])
 			while ( (c = *++arg) ) switch ( c )
 			{
 			case 'c': cancel = true; break;
+			case 'f': full = true; break;
 			case 'w': wait = true; break;
 			default:
 				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
@@ -107,6 +110,8 @@ int main(int argc, char* argv[])
 			booting = true;
 		else if ( !strcmp(arg, "--cancel") )
 			cancel = true;
+		else if ( !strcmp(arg, "--full") )
+			full = true;
 		else if ( !strcmp(arg, "--hook-finalize") )
 			hook_finalize = true;
 		else if ( !strcmp(arg, "--hook-prepare") )
@@ -142,6 +147,7 @@ int main(int argc, char* argv[])
 		source = "/sysmerge";
 		if ( 1 < argc )
 			errx(2, "Unexpected extra operand `%s'", argv[1]);
+		full = access_or_die("/sysmerge/tix/sysmerge.full", F_OK) == 0;
 	}
 	else
 	{
@@ -307,13 +313,19 @@ int main(int argc, char* argv[])
 			execute((const char*[]) { "tix-collection", "/sysmerge", "create",
 				                      NULL }, "e");
 		}
-		install_manifest("system", source, target);
-		install_ports(source, target);
+		install_manifests_detect(source, target, true, true, full);
 	}
 
 	if ( wait )
 	{
 		printf(" - Scheduling upgrade on next boot...\n");
+		if ( full )
+		{
+			int fd = open("/sysmerge/tix/sysmerge.full", O_WRONLY | O_CREAT);
+			if ( fd < 0 )
+				err(1, "/sysmerge/tix/sysmerge.full");
+			close(fd);
+		}
 		execute((const char*[]) { "cp", "/boot/sortix.bin",
 		                                "/boot/sortix.bin.sysmerge.orig", NULL }, "e");
 		execute((const char*[]) { "cp", "/boot/sortix.initrd",

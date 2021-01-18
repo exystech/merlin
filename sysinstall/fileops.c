@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017, 2020 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,6 +32,7 @@
 #include <unistd.h>
 
 #include "fileops.h"
+#include "string_array.h"
 
 char* join_paths(const char* a, const char* b)
 {
@@ -175,4 +176,46 @@ char* read_string_file(const char* path)
 	else
 		content[amount] = '\0';
 	return content;
+}
+
+char** read_lines_file(const char* path, size_t* out_count)
+{
+	FILE* fp = fopen(path, "r");
+	if ( !fp )
+		return NULL;
+	size_t count;
+	size_t length;
+	char** lines;
+	if ( !string_array_init(&lines, &count, &length) )
+	{
+		fclose(fp);
+		return NULL;
+	}
+	char* line = NULL;
+	size_t line_size = 0;
+	ssize_t line_length;
+	while ( 0 < (errno = 0, line_length = getline(&line, &line_size, fp)) )
+	{
+		if ( line[line_length-1] == '\n' )
+			line[--line_length] = '\0';
+		if ( !string_array_append_nodup(&lines, &count, &length, line) )
+		{
+			free(line);
+			string_array_free(&lines, &count, &length);
+			fclose(fp);
+			return false;
+		}
+		line = NULL;
+		line_size = 0;
+	}
+	free(line);
+	if ( ferror(fp) )
+	{
+		string_array_free(&lines, &count, &length);
+		fclose(fp);
+		return NULL;
+	}
+	fclose(fp);
+	*out_count = count;
+	return lines;
 }

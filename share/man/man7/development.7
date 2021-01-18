@@ -121,10 +121,22 @@ and place it in the current directory as
 Upgrade the current operating system using the sysroot after making the
 .Sy all
 target.
+.It Sy sysmerge-full
+Like
+.Sy sysmerge
+but do a full operating system upgrade that uninstalls ports not present in the
+sysroot using
+.Fl \-full .
+.It Sy sysmerge-full-wait
+The combination of
+.Sy sysmerge-full
+and
+.Sy sysmerge-full-wait .
 .It Sy sysmerge-wait
 Like
 .Sy sysmerge
-but delay the upgrade until the next boot.
+but delay the upgrade until the next boot using
+.Fl \-wait .
 .It Sy sysroot-base-headers
 Create the sysroot and install only the headers of the standard library and
 kernel into it.
@@ -189,6 +201,16 @@ For instance, to build and install libc, run as root:
     make
     make install
 .Ed
+.Pp
+Note the individual makefiles only install the new system files and leak any
+files that don't exist anymore; and they also don't run any upgrade hooks to
+migrate the current system.
+This mechanism isn't supported unless you are building the same source code as
+the current operating system.
+The global
+.Sy sysmerge
+makefile targets should be used instead as the supported mechanism for operating
+system upgrades.
 .Pp
 System libraries are statically linked and you will have to relink programs with
 the new library for changes to take effect.

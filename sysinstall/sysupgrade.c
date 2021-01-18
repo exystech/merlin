@@ -803,13 +803,9 @@ int main(void)
 	if ( upgrade_pid == 0 )
 	{
 		umask(0022);
-		// TODO: Use an upgrade manifest system that notices files that are now
-		//       untracked or moved from one manifest to another.
 		if ( conf.system )
-		{
 			upgrade_prepare(target_release, &new_release, "", ".");
-			install_manifest("system", "", ".");
-		}
+		install_manifests_detect("", ".", conf.system, conf.ports, conf.ports);
 		if ( has_manifest("src") )
 		{
 			if ( conf.newsrc )
@@ -824,7 +820,7 @@ int main(void)
 						_exit(1);
 					}
 				}
-				install_manifest("src", "", ".");
+				install_manifest("src", "", ".", (const char*[]){}, 0);
 				if ( has_src )
 				{
 					if ( rename("src", "newsrc") < 0 )
@@ -842,11 +838,9 @@ int main(void)
 			else if ( conf.src )
 			{
 				preserve_src("src");
-				install_manifest("src", "", ".");
+				install_manifest("src", "", ".", (const char*[]){}, 0);
 			}
 		}
-		if ( conf.ports )
-			install_ports("", ".");
 		if ( conf.system )
 			upgrade_finalize(target_release, &new_release, "", ".");
 		if ( conf.system )

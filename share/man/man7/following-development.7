@@ -69,6 +69,26 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Fix system upgrade leaking files
+.Xr sysupgrade 8
+and
+.Xr sysmerge 8
+will now delete files that no longer exist in the new system and ports.
+However, files may already have leaked if a 1.0 installation was upgraded to
+a development build prior to this change.
+An upgrade hook will delete any well known leaked files.
+.Pp
+Note:
+You must use the
+.Fl \-wait
+option to do a two-stage upgrade if doing a
+.Xr sysmerge 8
+upgrade from an installation prior to this change to a version after this
+change.
+This requirement is because the old
+.Xr sysmerge 8
+will leak files and the upgrade hook only deal with well known files as of this
+change, and doesn't handle future changes.
 .Ss Fix /tix/manifest permissions in installations
 The
 .Pa /tix/manifest

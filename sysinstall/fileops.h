@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2020 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,5 +26,6 @@ int access_or_die(const char* path, int mode);
 void mkdir_or_chmod_or_die(const char* path, mode_t mode);
 void write_random_seed(const char* path);
 char* read_string_file(const char* path);
+char** read_lines_file(const char* path, size_t* out_count);
 
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2018, 2020, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,25 +27,83 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include "execute.h"
 #include "fileops.h"
 #include "manifest.h"
+#include "string_array.h"
 
 bool has_manifest(const char* manifest)
 {
-	char* path;
-	if ( asprintf(&path, "/tix/manifest/%s", manifest) < 0 )
+	char* path = join_paths("/tix/manifest", manifest);
+	if ( !path )
 	{
 		warn("asprintf");
 		_exit(2);
 	}
-	bool result = access(path, F_OK) == 0;
+	bool result = access_or_die(path, F_OK) == 0;
 	free(path);
 	return result;
+}
+
+char** read_manifest(const char* path, size_t* out_count)
+{
+	char** files = read_lines_file(path, out_count);
+	if ( !files )
+		return NULL;
+	// TODO: Remove this compatibility after releasing Sortix 1.1. The manifests
+	//       in Sortix 1.0 have spurious trailing slashes due to a bug in the
+	//       kernel binary package extractor. Remove them here to normalize the
+	//       manifests.
+	for ( size_t i = 0; i < *out_count; i++ )
+	{
+		char* file = files[i];
+		size_t len = strlen(file);
+		if ( 2 <= len && file[len - 1] == '/' )
+			file[len - 1] = '\0';
+	}
+	string_array_sort_strcmp(files, *out_count);
+	return files;
+}
+
+static void unlink_rename_conflict(const char* path)
+{
+	if ( !unlink(path) || errno == ENOENT )
+		return;
+	if ( errno != EISDIR )
+	{
+		warn("unlink: %s", path);
+		_exit(2);
+	}
+	if ( !rmdir(path) )
+		return;
+	if ( errno != ENOTEMPTY && errno != EEXIST )
+	{
+		warn("rmdir: %s", path);
+		_exit(2);
+	}
+	char* conflict;
+	if ( asprintf(&conflict, "%s.conflict.XXXXXX", path) < 0 )
+	{
+		warn("malloc");
+		_exit(2);
+	}
+	if ( !mkdtemp(conflict) )
+	{
+		warn("mkdtemp: %s.conflict.XXXXXX", path);
+		_exit(2);
+	}
+	if ( rename(path, conflict) < 0 )
+	{
+		warn("rename: %s -> %s", path, conflict);
+		rmdir(conflict);
+		_exit(2);
+	}
+	printf("warning: Moving conflicting directory %s to %s\n", path, conflict);
+	free(conflict);
 }
 
 struct hardlink
@@ -57,9 +115,10 @@ struct hardlink
 
 void install_manifest(const char* manifest,
                       const char* from_prefix,
-                      const char* to_prefix)
+                      const char* to_prefix,
+                      const char* const* preserved,
+                      size_t preserved_count)
 {
-	printf(" - Installing %s...\n", manifest);
 	struct hardlink* hardlinks = NULL;
 	size_t hardlinks_used = 0;
 	size_t hardlinks_length = 0;
@@ -71,52 +130,141 @@ void install_manifest(const char* manifest,
 		_exit(2);
 	}
 	mode_t old_umask = umask(0000);
+	// Read the input and output manifests if they exist. Consider a manifest
+	// that doesn't exist as being empty.
 	char* inmanifest;
-	if ( asprintf(&inmanifest, "%s/tix/manifest/%s", from_prefix, manifest) < 0 )
-	{
-		warn("asprintf");
-		_exit(2);
-	}
 	char* outmanifest;
-	if ( asprintf(&outmanifest, "%s/tix/manifest/%s", to_prefix, manifest) < 0 )
+	char* outnewmanifest;
+	if ( asprintf(&inmanifest, "%s/tix/manifest/%s", from_prefix,
+	              manifest) < 0 ||
+	     asprintf(&outmanifest, "%s/tix/manifest/%s", to_prefix,
+	              manifest) < 0 ||
+	     asprintf(&outnewmanifest, "%s/tix/manifest/%s.new", to_prefix,
+	              manifest) < 0 )
 	{
-		warn("asprintf");
+		warn("malloc");
 		_exit(2);
 	}
-	FILE* fpin = fopen(inmanifest, "r");
-	if ( !fpin )
+	bool in_exists = !access_or_die(inmanifest, F_OK);
+	bool out_exists = !access_or_die(outmanifest, F_OK);
+	const char* action = in_exists && out_exists ? "Upgrading" :
+	                     in_exists ? "Installing" :
+	                     "Uninstalling";
+	printf(" - %s %s...\n", action, manifest);
+	char** empty = (char*[]){};
+	char** in_files = empty;
+	size_t in_files_count = 0;
+	if ( in_exists &&
+	     !(in_files = read_manifest(inmanifest, &in_files_count)) )
 	{
 		warn("%s", inmanifest);
 		_exit(2);
 	}
-	FILE* fpout = fopen(outmanifest, "w");
-	if ( !fpout )
+	char** out_files = empty;
+	size_t out_files_count = 0;
+	if ( out_exists &&
+	     !(out_files = read_manifest(outmanifest, &out_files_count)) )
 	{
 		warn("%s", outmanifest);
 		_exit(2);
 	}
-	char* line = NULL;
-	size_t line_size = 0;
-	ssize_t line_length;
-	while ( 0 < (line_length = getline(&line, &line_size, fpin)) )
+	// Directories to be cleaned up afterwards when they might be empty.
+	size_t rmdirs_count;
+	size_t rmdirs_length;
+	char** rmdirs;
+	if ( !string_array_init(&rmdirs, &rmdirs_count, &rmdirs_length) )
 	{
-		if ( line[line_length-1] == '\n' )
-			line[--line_length] = '\0';
-		if ( fprintf(fpout, "%s\n", line) < 0 )
+		warn("malloc");
+		_exit(2);
+	}
+	// Find the differences by mutually iterating the manifests in sorted
+	// order.
+	size_t in_i = 0;
+	size_t out_i = 0;
+	while ( in_i < in_files_count || out_i < out_files_count )
+	{
+		const char* in = in_i < in_files_count ? in_files[in_i] : NULL;
+		const char* out = out_i < out_files_count ? out_files[out_i] : NULL;
+		if ( !in || (out && strcmp(in, out) > 0) )
 		{
-			warn("write: %s", outmanifest);
-			_exit(2);
-		}
-		if ( line[0] != '/' )
+			out_i++;
+			const char* path = out;
+			char* out_path = join_paths(to_prefix, path);
+			if ( !out_path )
+			{
+				warn("asprintf");
+				_exit(2);
+			}
+			// Don't delete a path if it will be added in later by another
+			// manifest. This supports files moving from one manifest to another
+			// and directories only being cleaned up when no manifest mentions
+			// them.
+			if ( string_array_contains_bsearch_strcmp(preserved,
+			                                          preserved_count, path) )
+			{
+				// Handle a directory becoming a symbolic link, which will be
+				// renamed to a conflict directory and replaced with a symbolic
+				// link, but we must take care not to delete anything through
+				// the symbolic link. This case happens if the directory becomes
+				// a symlink in another manifest.
+				struct stat outst;
+				if ( !lstat(out_path, &outst) )
+				{
+					if ( S_ISLNK(outst.st_mode) )
+					{
+						size_t path_length = strlen(path);
+						while ( out_i < out_files_count &&
+						        !strncmp(path, out_files[out_i], path_length) &&
+						        out_files[out_i][path_length] == '/' )
+							out_i++;
+					}
+				}
+				else if ( errno != ENOENT && errno != ENOTDIR )
+				{
+					warn("%s", out_path);
+					_exit(2);
+				}
+				free(out_path);
+				continue;
+			}
+			if ( unlink(out_path) < 0 )
+			{
+				if ( errno == EISDIR )
+				{
+					if ( rmdir(out_path) < 0 )
+					{
+						if ( errno == ENOTEMPTY || errno == EEXIST )
+						{
+							if ( !string_array_append(&rmdirs, &rmdirs_count,
+							                          &rmdirs_length, path) )
+							{
+								warn("malloc");
+								_exit(2);
+							}
+						}
+						else if ( errno != ENOENT )
+						{
+							warn("unlink: %s", out_path);
+							_exit(2);
+						}
+					}
+				}
+				else if ( errno != ENOENT )
+				{
+					warn("unlink: %s", out_path);
+					_exit(2);
+				}
+			}
+			free(out_path);
 			continue;
-		char* in_path;
-		if ( asprintf(&in_path, "%s%s", from_prefix, line) < 0 )
-		{
-			warn("asprintf");
-			_exit(2);
 		}
-		char* out_path = line;
-		if ( asprintf(&out_path, "%s%s", to_prefix, line) < 0 )
+		in_i++;
+		if ( out && !strcmp(in, out) )
+			out_i++;
+		const char* path = in;
+		char* in_path = join_paths(from_prefix, path);
+		char* out_path = join_paths(to_prefix, path);
+		if ( !in_path || !out_path )
 		{
 			warn("asprintf");
 			_exit(2);
@@ -141,7 +289,7 @@ void install_manifest(const char* manifest,
 		}
 		if ( hardlink )
 		{
-			unlink(out_path);
+			unlink_rename_conflict(out_path);
 			if ( link(hardlink->path, out_path) < 0 )
 			{
 				warn("link: %s -> %s", hardlink->path, out_path);
@@ -150,23 +298,38 @@ void install_manifest(const char* manifest,
 		}
 		else if ( S_ISDIR(inst.st_mode) )
 		{
-			if ( mkdir(out_path, inst.st_mode & 07777) < 0 && errno != EEXIST )
+			if ( unlink(out_path) < 0 && errno != ENOENT && errno != EISDIR )
 			{
-				warn("mkdir: %s", out_path);
+				warn("unlink: %s", out_path);
 				_exit(2);
+			}
+			if ( mkdir(out_path, inst.st_mode & 07777) < 0 )
+			{
+				if ( errno == EEXIST )
+				{
+					if ( chmod(out_path, inst.st_mode & 07777) < 0 )
+					{
+						warn("chmod: %s", out_path);
+						_exit(2);
+					}
+				}
+				else
+				{
+					warn("mkdir: %s", out_path);
+					_exit(2);
+				}
 			}
 		}
 		else if ( S_ISREG(inst.st_mode) )
 		{
-
+			unlink_rename_conflict(out_path);
 			int in_fd = open(in_path, O_RDONLY);
 			if ( in_fd < 0 )
 			{
 				warn("%s", in_path);
 				_exit(2);
 			}
-			unlink(out_path);
-			int out_fd = open(out_path, O_WRONLY | O_CREAT | O_TRUNC,
+			int out_fd = open(out_path, O_WRONLY | O_CREAT | O_TRUNC | O_EXCL,
 			                  inst.st_mode & 07777);
 			if ( out_fd < 0 )
 			{
@@ -183,7 +346,8 @@ void install_manifest(const char* manifest,
 				}
 				if ( amount == 0 )
 					break;
-				if ( writeall(out_fd, buffer, (size_t) amount) < (size_t) amount )
+				if ( writeall(out_fd, buffer, (size_t) amount) <
+				     (size_t) amount )
 				{
 					warn("write: %s", out_path);
 					_exit(2);
@@ -195,17 +359,17 @@ void install_manifest(const char* manifest,
 			{
 				if ( hardlinks_used == hardlinks_length )
 				{
-					// TODO: Multiplication overflow.
-					size_t new_length = hardlinks_length ? 2 * hardlinks_length : 16;
-					struct hardlink* new_hardlinks = (struct hardlink*)
-						reallocarray(hardlinks, new_length, sizeof(struct hardlink));
+					size_t new_length = hardlinks_length ? hardlinks_length : 8;
+					struct hardlink* new_hardlinks =
+						reallocarray(hardlinks, new_length,
+						             2 * sizeof(struct hardlink));
 					if ( !new_hardlinks )
 					{
 						warn("malloc");
 						_exit(2);
 					}
 					hardlinks = new_hardlinks;
-					hardlinks_length = new_length;
+					hardlinks_length = 2 * new_length;
 				}
 				hardlinks[hardlinks_used].ino = inst.st_ino;
 				hardlinks[hardlinks_used].dev = inst.st_dev;
@@ -226,12 +390,22 @@ void install_manifest(const char* manifest,
 				_exit(2);
 			}
 			buffer[amount] = '\0';
-			unlink(out_path);
+			unlink_rename_conflict(out_path);
 			if ( symlink(buffer, out_path) < 0 && errno != EEXIST )
 			{
 				warn("symlink: %s", out_path);
 				_exit(2);
 			}
+			// Handle a directory becoming a symbolic link, which will be
+			// renamed to a conflict directory and replaced with a symbolic
+			// link, but we must take care not to delete anything through
+			// the symbolic link. This case happens if the directory becomes a
+			// symlink in the same manifest.
+			size_t path_length = strlen(path);
+			while ( out_i < out_files_count &&
+			        !strncmp(path, out_files[out_i], path_length) &&
+			        out_files[out_i][path_length] == '/' )
+				out_i++;
 		}
 		else
 		{
@@ -241,20 +415,218 @@ void install_manifest(const char* manifest,
 		free(in_path);
 		free(out_path);
 	}
-	free(line);
-	if ( ferror(fpin) )
+	// Delete directories that might not be empty in backwards order to ensure
+	// subdirectories are deleted before their parent directories.
+	for ( size_t i = rmdirs_count; i; i-- )
 	{
-		warn("%s", inmanifest);
+		const char* path = rmdirs[i - 1];
+		char* out_path;
+		if ( asprintf(&out_path, "%s%s", to_prefix, path) < 0 )
+		{
+			warn("asprintf");
+			_exit(2);
+		}
+		if ( rmdir(out_path) < 0 &&
+		     errno != ENOTEMPTY && errno != EEXIST && errno != ENOENT )
+		{
+			warn("unlink: %s", out_path);
+			_exit(2);
+		}
+		free(out_path);
+		(void) path;
+	}
+	string_array_free(&rmdirs, &rmdirs_count, &rmdirs_length);
+	if ( in_exists )
+	{
+		if ( unlink(outnewmanifest) < 0 && errno != ENOENT )
+		{
+			warn("unlink: %s", outnewmanifest);
+			_exit(2);
+		}
+		mode_t temp_umask = umask(0022);
+		FILE* fp = fopen(outnewmanifest, "w");
+		if ( !fp )
+		{
+			warn("%s", outnewmanifest);
+			_exit(2);
+		}
+		umask(temp_umask);
+		for ( size_t i = 0; i < in_files_count; i++ )
+		{
+			const char* path = in_files[i];
+			if ( fputs(path, fp) == EOF || fputc('\n', fp) == EOF )
+			{
+				warn("%s", outnewmanifest);
+				_exit(2);
+			}
+		}
+		if ( fclose(fp) == EOF )
+		{
+			warn("%s", outnewmanifest);
+			_exit(2);
+		}
+		if ( rename(outnewmanifest, outmanifest) < 0 )
+		{
+			warn("rename: %s -> %s", outnewmanifest, outmanifest);
+			_exit(2);
+		}
+	}
+	else if ( out_exists )
+	{
+		if ( unlink(outmanifest) < 0 && errno != ENOENT )
+		{
+			warn("unlink: %s", outmanifest);
+			_exit(2);
+		}
+	}
+	// Write out the new manifests atomically afterwards to ensure no paths are
+	// leaked if the operation is aborted part way.
+	char* in_tixinfo;
+	char* out_tixinfo;
+	if ( asprintf(&in_tixinfo, "%s/tix/tixinfo/%s", from_prefix,
+	              manifest) < 0 ||
+	     asprintf(&out_tixinfo, "%s/tix/tixinfo/%s", to_prefix,
+	              manifest) < 0 )
+	{
+		warn("malloc");
 		_exit(2);
 	}
-	fclose(fpin);
-	if ( fclose(fpout) == EOF )
+	// Update or delete the tixinfo accordingly.
+	bool is_tix = !access_or_die(in_tixinfo, F_OK);
+	if ( is_tix )
 	{
-		warn("close: %s", outmanifest);
+		int in_fd = open(in_tixinfo, O_RDONLY);
+		if ( in_fd < 0 )
+		{
+			warn("%s", in_tixinfo);
+			_exit(2);
+		}
+		unlink(out_tixinfo);
+		int out_fd = open(out_tixinfo, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+		if ( out_fd < 0 )
+		{
+			warn("%s", out_tixinfo);
+			_exit(2);
+		}
+		while ( true )
+		{
+			ssize_t amount = read(in_fd, buffer, buffer_size);
+			if ( amount < 0 )
+			{
+				warn("read: %s", in_tixinfo);
+				_exit(2);
+			}
+			if ( amount == 0 )
+				break;
+			if ( writeall(out_fd, buffer, (size_t) amount) < (size_t) amount )
+			{
+				warn("write: %s", out_tixinfo);
+				_exit(2);
+			}
+		}
+		close(out_fd);
+		close(in_fd);
+	}
+	else
+	{
+		if ( unlink(out_tixinfo) < 0 && errno != ENOENT )
+		{
+			warn("unlink: %s", out_tixinfo);
+			_exit(2);
+		}
+	}
+	free(in_tixinfo);
+	free(out_tixinfo);
+	// Likewise write out the new installation list atomically afterwards to
+	// ensure no manifests are leaked if the operation is aborted part way.
+	char* installed_path;
+	char* installed_path_new;
+	if ( asprintf(&installed_path, "%s/tix/installed.list", to_prefix) < 0 ||
+	     asprintf(&installed_path_new, "%s/tix/installed.list.new",
+		          to_prefix) < 0 )
+	{
+		warn("malloc");
 		_exit(2);
+	}
+	size_t installed_count;
+	char** installed = read_lines_file(installed_path, &installed_count);
+	if ( !installed )
+	{
+		warn("%s", installed_path);
+		_exit(2);
+	}
+	size_t installed_length = installed_count;
+	if ( is_tix )
+	{
+		bool found = false;
+		for ( size_t i = 0; !found && i < installed_count; i++ )
+			found = !strcmp(installed[i], manifest);
+		if ( !found && !string_array_append(&installed, &installed_count,
+		                                    &installed_length, manifest) )
+		{
+			warn("malloc");
+			_exit(2);
+		}
+	}
+	else
+	{
+		size_t o = 0;
+		for ( size_t i = 0; i < installed_count; i++ )
+		{
+			if ( !strcmp(installed[i], manifest) )
+				free(installed[i]);
+			else
+				installed[o++] = installed[i];
+		}
+		installed_count = o;
+	}
+	string_array_sort_strcmp(installed, installed_count);
+	mode_t temp_umask = umask(0022);
+	FILE* installed_fp = fopen(installed_path_new, "w");
+	if ( !installed_fp )
+	{
+		warn("%s", installed_path_new);
+		_exit(2);
+	}
+	umask(temp_umask);
+	for ( size_t i = 0; i < installed_count; i++ )
+	{
+		const char* name = installed[i];
+		if ( fputs(name, installed_fp) == EOF ||
+		     fputc('\n', installed_fp) == EOF )
+		{
+			warn("%s", installed_path_new);
+			_exit(2);
+		}
+	}
+	if ( fclose(installed_fp) == EOF )
+	{
+		warn("%s", installed_path_new);
+		_exit(2);
+	}
+	if ( rename(installed_path_new, installed_path) < 0 )
+	{
+		warn("rename: %s -> %s", installed_path_new, installed_path);
+		_exit(2);
+	}
+	string_array_free(&installed, &installed_count, &installed_length);
+	free(installed_path);
+	free(installed_path_new);
+	if ( in_files != empty )
+	{
+		for ( size_t i = 0; i < in_files_count; i++ )
+			free(in_files[i]);
+		free(in_files);
+	}
+	if ( out_files != empty )
+	{
+		for ( size_t i = 0; i < out_files_count; i++ )
+			free(out_files[i]);
+		free(out_files);
 	}
 	free(inmanifest);
 	free(outmanifest);
+	free(outnewmanifest);
 	umask(old_umask);
 	free(buffer);
 	for ( size_t i = 0; i < hardlinks_used; i++ )
@@ -262,148 +634,152 @@ void install_manifest(const char* manifest,
 	free(hardlinks);
 }
 
-bool check_installed(const char* path, const char* package)
+void install_manifests(const char* const* manifests,
+                       size_t manifests_count,
+                       const char* from_prefix,
+                       const char* to_prefix)
 {
-	FILE* fp = fopen(path, "r");
-	if ( !fp )
+	// Load all the paths mentioned in the new set of manifests, which are used
+	// to ensure no files and directories are deleted part way if they are moved
+	// from one manifest to another.
+	printf(" - Loading manifests...\n");
+	size_t all_count;
+	size_t all_length;
+	char** all;
+	if ( !string_array_init(&all, &all_count, &all_length) )
 	{
-		if ( errno != ENOENT )
-			warn("%s", path);
-		return false;
-	}
-	char* line = NULL;
-	size_t line_size = 0;
-	ssize_t line_length;
-	while ( 0 < (line_length = getline(&line, &line_size, fp)) )
-	{
-		if ( line[line_length-1] == '\n' )
-			line[--line_length] = '\0';
-		if ( !strcmp(line, package) )
-		{
-			free(line);
-			fclose(fp);
-			return true;
-		}
-	}
-	if ( ferror(fp) )
-		warn("%s", path);
-	free(line);
-	fclose(fp);
-	return false;
-}
-
-static char* shell_single_quote(const char* string)
-{
-	char* result;
-	size_t result_size;
-	FILE* fp = open_memstream(&result, &result_size);
-	if (!fp)
-		return NULL;
-	fputc('\'', fp);
-	for ( size_t i = 0; string[i]; i++ )
-	{
-		if ( string[i] == '\'' )
-			fputs("\'\\\'\'", fp);
-		else
-			fputc((unsigned char) string[i], fp);
-	}
-	fputc('\'', fp);
-	fflush(fp);
-	int waserr = ferror(fp);
-	fclose(fp);
-	if (waserr) {
-		free(result);
-		return NULL;
-	}
-	return result;
-}
-
-static char* sort_file_cmd(const char* file)
-{
-	char* file_esc = shell_single_quote(file);
-	if ( !file_esc )
-		return NULL;
-	char* cmd;
-	if ( asprintf(&cmd, "sort -- %s", file_esc) < 0 )
-	{
-		free(file_esc);
-		return NULL;
-	}
-	free(file_esc);
-	return cmd;
-}
-
-void install_ports(const char* from_prefix, const char* to_prefix)
-{
-	char* inst_in_path;
-	char* inst_out_path;
-	if ( asprintf(&inst_in_path, "%s/tix/installed.list", from_prefix) < 0 ||
-	     asprintf(&inst_out_path, "%s/tix/installed.list", to_prefix) < 0 )
-	{
-		warn("asprintf");
+		warn("malloc");
 		_exit(2);
 	}
-	if ( access_or_die(inst_in_path, F_OK) < 0 )
+	for ( size_t i = 0; i < manifests_count; i++ )
 	{
-		free(inst_in_path);
-		free(inst_out_path);
-		return;
-	}
-	char* cmd = sort_file_cmd(inst_in_path);
-	if ( !cmd )
-	{
-		warn("sort_file_cmd");
-		_exit(2);
-	}
-	FILE* fp = popen(cmd, "r");
-	if ( !fp )
-	{
-		warn("%s", cmd);
-		_exit(2);
-	}
-	char* line = NULL;
-	size_t line_size = 0;
-	ssize_t line_length;
-	while ( 0 < (line_length = getline(&line, &line_size, fp)) )
-	{
-		if ( line[line_length-1] == '\n' )
-			line[--line_length] = '\0';
-		if ( !check_installed(inst_out_path, line) )
-		{
-			FILE* inst_out_fp = fopen(inst_out_path, "a");
-			if ( !inst_out_fp ||
-				 fprintf(inst_out_fp, "%s\n", line) < 0 ||
-				 fflush(inst_out_fp) == EOF )
-			{
-				warn("%s", inst_out_path);
-				pclose(fp);
-				_exit(2);
-			}
-			fclose(inst_out_fp);
-		}
-		char* tixinfo_in;
-		char* tixinfo_out;
-		if ( asprintf(&tixinfo_in, "%s/tix/tixinfo/%s", from_prefix, line) < 0 ||
-		     asprintf(&tixinfo_out, "%s/tix/tixinfo/%s", to_prefix, line) < 0 )
+		// Read the input manifests if they exist. Consider a manifest that
+		// doesn't exist as being empty.
+		const char* manifest = manifests[i];
+		char* inmanifest;
+		if ( asprintf(&inmanifest, "%s/tix/manifest/%s", from_prefix,
+		              manifest) < 0 )
 		{
 			warn("asprintf");
-			pclose(fp);
 			_exit(2);
 		}
-		execute((const char*[]) { "cp", "--", tixinfo_in, tixinfo_out, NULL }, "_e");
-		free(tixinfo_in);
-		free(tixinfo_out);
-		install_manifest(line, from_prefix, to_prefix);
+		char** empty = (char*[]){};
+		char** in_files = empty;
+		size_t in_files_count = 0;
+		if ( !access_or_die(inmanifest, F_OK) &&
+		     !(in_files = read_manifest(inmanifest, &in_files_count)) )
+		{
+			warn("%s", inmanifest);
+			_exit(2);
+		}
+		// Directories can appear in multiple manifests, so keep track of all
+		// input paths so we later can find duplicates.
+		for ( size_t i = 0; i < in_files_count; i++ )
+		{
+			if ( !string_array_append(&all, &all_count, &all_length,
+			                          in_files[i]) )
+			{
+				warn("malloc");
+				_exit(2);
+			}
+		}
+		if ( in_files != empty )
+		{
+			for ( size_t i = 0; i < in_files_count; i++ )
+				free(in_files[i]);
+			free(in_files);
+		}
+		free(inmanifest);
 	}
-	free(line);
-	if ( ferror(fp) )
+	string_array_sort_strcmp(all, all_count);
+	all_count = string_array_deduplicate(all, all_count);
+	for ( size_t i = 0; i < manifests_count; i++ )
+		install_manifest(manifests[i], from_prefix, to_prefix,
+		                 (const char* const*) all, all_count);
+	string_array_free(&all, &all_count, &all_length);
+}
+
+char** read_installed_list(const char* prefix, size_t* out_count)
+{
+	char* path;
+	if ( asprintf(&path, "%s/tix/installed.list", prefix) < 0 )
 	{
-		warn("%s", cmd);
-		pclose(fp);
+		warn("malloc");
 		_exit(2);
 	}
-	pclose(fp);
-	free(cmd);
-	free(inst_in_path);
-	free(inst_out_path);
+	char** installed;
+	size_t installed_count;
+	if ( !access_or_die(path, F_OK) )
+	{
+		if ( !(installed = read_lines_file(path, &installed_count)) )
+		{
+			warn("%s", path);
+			_exit(2);
+		}
+		string_array_sort_strcmp(installed, installed_count);
+	}
+	else
+	{
+		installed = malloc(1);
+		if ( !installed )
+		{
+			warn("malloc");
+			_exit(2);
+		}
+		installed_count = 0;
+	}
+	free(path);
+	*out_count = installed_count;
+	return installed;
+}
+
+void install_manifests_detect(const char* from_prefix,
+                              const char* to_prefix,
+                              bool system,
+                              bool detect_from,
+                              bool detect_to)
+{
+	char** manifests;
+	size_t manifests_count;
+	size_t manifests_length;
+	string_array_init(&manifests, &manifests_count, &manifests_length);
+	if ( system &&
+	     !string_array_append(&manifests, &manifests_count, &manifests_length,
+	                          "system") )
+	{
+		warn("malloc");
+		_exit(2);
+	}
+	size_t system_offset = system ? 1 : 0;
+	const char* prefixes[] =
+	{
+		detect_from ? from_prefix : NULL,
+		detect_to ? to_prefix : NULL,
+	};
+	for ( size_t i = 0; i < sizeof(prefixes) / sizeof(prefixes[0]); i++ )
+	{
+		const char* prefix = prefixes[i];
+		if ( !prefix )
+			continue;
+		size_t installed_count;
+		char** installed = read_installed_list(prefix, &installed_count);
+		for ( size_t i = 0; i < installed_count; i++ )
+		{
+			if ( !string_array_append(&manifests, &manifests_count,
+			                          &manifests_length, installed[i]) )
+			{
+				warn("malloc");
+				_exit(2);
+			}
+			free(installed[i]);
+		}
+		free(installed);
+	}
+	// Keep the system manifest first and otherwise sort and deduplicate.
+	string_array_sort_strcmp(manifests + system_offset,
+	                         manifests_count - system_offset);
+	manifests_count = string_array_deduplicate(manifests, manifests_count);
+	install_manifests((const char* const*) manifests, manifests_count,
+	                  from_prefix, to_prefix);
+	string_array_free(&manifests, &manifests_count, &manifests_length);
 }

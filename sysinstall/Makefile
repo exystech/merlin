@@ -24,12 +24,13 @@ hooks.o \
 interactive.o \
 manifest.o \
 release.o \
+string_array.o \
 
 OBJS=$(MAIN_OBJS) $(UTIL_OBJS)
 
-SYSINSTALL_DEPS=conf devices execute fileops interactive manifest release
-SYSMERGE_DEPS=conf fileops execute hooks manifest release
-SYSUPGRADE_DEPS=conf devices execute fileops hooks interactive manifest release
+SYSINSTALL_DEPS=conf devices execute fileops interactive manifest release string_array
+SYSMERGE_DEPS=conf fileops execute hooks manifest release string_array
+SYSUPGRADE_DEPS=conf devices execute fileops hooks interactive manifest release string_array
 
 SYSINSTALL_OBJS:=sysinstall.o $(SYSINSTALL_DEPS:=.o)
 SYSMERGE_OBJS:=sysmerge.o $(SYSMERGE_DEPS:=.o)
@@ -52,6 +53,7 @@ install: all
 	# TODO: After releasing Sortix 1.1, remove this compatibility.
 	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-random-seed
 	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-tix-manifest-mode
+	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-leaked-files
 
 sysinstall: $(SYSINSTALL_OBJS)
 	$(CC) $(SYSINSTALL_OBJS) -o $@ -lmount
@@ -71,10 +73,11 @@ sysupgrade.o: $(SYSUPGRADE_DEPS:=.h)
 conf.o: conf.h
 devices.o: devices.h
 execute.o: execute.h
-fileops.o: fileops.h
-hooks.o: fileops.h release.h
+fileops.o: fileops.h string_array.h
+string_array.o: string_array.h
+hooks.o: fileops.h manifest.h release.h string_array.h
 interactive.o: interactive.h execute.h
-manifest.o: manifest.h execute.h fileops.h
+manifest.o: manifest.h fileops.h string_array.h
 release.o: release.h
 
 clean:

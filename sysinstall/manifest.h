@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2020 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,10 +21,21 @@
 #define MANIFEST_H
 
 bool has_manifest(const char* manifest);
+char** read_manifest(const char* path, size_t* out_count);
 void install_manifest(const char* manifest,
                       const char* from_prefix,
-                      const char* to_prefix);
-bool check_installed(const char* path, const char* package);
-void install_ports(const char* from_prefix, const char* to_prefix);
+                      const char* to_prefix,
+                      const char* const* preserved,
+                      size_t preserved_count);
+void install_manifests(const char* const* manifests,
+                       size_t manifests_count,
+                       const char* from_prefix,
+                       const char* to_prefix);
+char** read_installed_list(const char* prefix, size_t* out_count);
+void install_manifests_detect(const char* from_prefix,
+                              const char* to_prefix,
+                              bool system,
+                              bool detect_from,
+                              bool detect_to);
 
 #endif

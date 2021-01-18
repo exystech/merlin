@@ -6,7 +6,7 @@
 .Nd upgrade current operating system from a sysroot
 .Sh SYNOPSIS
 .Nm sysmerge
-.Op Fl cw
+.Op Fl cfw
 .Op Fl \-booting
 .Op Fl \-hook-finalize
 .Op Fl \-hook-prepare
@@ -27,6 +27,7 @@ installs the
 manifest from the tix repository in the
 .Ar source
 directory, as well as all the ports found.
+If a full upgrade is done, then all ports not found will be uninstalled.
 Upgrade hooks will be run if further actions are needed to migrate the system to
 the new version as described in
 .Xr following-development 7 .
@@ -68,6 +69,10 @@ directory and restore the old
 .Xr kernel 7
 and
 .Xr initrd 7 .
+.It Fl f , Fl \-full
+Full system upgrade that uninstalls ports not present in the
+.Ar source
+directory.
 .It Fl \-hook-finalize
 Run the post-upgrade hooks.
 This is meant to be used by the old
