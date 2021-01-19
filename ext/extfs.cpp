@@ -123,8 +123,7 @@ void StatInode(Inode* inode, struct stat* st)
 	st->st_mtim.tv_sec = inode->data->i_mtime;
 	st->st_mtim.tv_nsec = 0;
 	st->st_blksize = inode->filesystem->block_size;
-	st->st_blocks = ((uint64_t) inode->data->i_blocks *
-	                 (uint64_t) inode->filesystem->block_size) / 512;
+	st->st_blocks = inode->data->i_blocks;
 }
 
 static void compact_arguments(int* argc, char*** argv)
