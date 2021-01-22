@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2018 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,15 +22,11 @@
 
 #include <sys/cdefs.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /* Options at the IPPROTO_TCP socket level. */
 #define TCP_NODELAY 1
-
-#ifdef __cplusplus
-} /* extern "C" */
+#if __USE_SORTIX
+#define TCP_MAXSEG 2
+#define TCP_NOPUSH 3
 #endif
 
 #endif
