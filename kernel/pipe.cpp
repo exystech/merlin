@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -435,7 +435,7 @@ short PipeChannel::WritePollEventStatus()
 
 int PipeChannel::read_poll(ioctx_t* /*ctx*/, PollNode* node)
 {
-	ScopedLockSignal lock(&pipelock);
+	ScopedLock lock(&pipelock);
 	short ret_status = ReadPollEventStatus() & node->events;
 	if ( ret_status )
 		return node->master->revents |= ret_status, 0;
@@ -445,7 +445,7 @@ int PipeChannel::read_poll(ioctx_t* /*ctx*/, PollNode* node)
 
 int PipeChannel::write_poll(ioctx_t* /*ctx*/, PollNode* node)
 {
-	ScopedLockSignal lock(&pipelock);
+	ScopedLock lock(&pipelock);
 	short ret_status = WritePollEventStatus() & node->events;
 	if ( ret_status )
 		return node->master->revents |= ret_status, 0;
@@ -455,31 +455,31 @@ int PipeChannel::write_poll(ioctx_t* /*ctx*/, PollNode* node)
 
 bool PipeChannel::GetSIGPIPEDelivery()
 {
-	ScopedLockSignal lock(&pipelock);
+	ScopedLock lock(&pipelock);
 	return is_sigpipe_enabled;
 }
 
 void PipeChannel::SetSIGPIPEDelivery(bool deliver_sigpipe)
 {
-	ScopedLockSignal lock(&pipelock);
+	ScopedLock lock(&pipelock);
 	is_sigpipe_enabled = deliver_sigpipe;
 }
 
 size_t PipeChannel::ReadSize()
 {
-	ScopedLockSignal lock(&pipelock);
+	ScopedLock lock(&pipelock);
 	return pretended_read_buffer_size;
 }
 
 size_t PipeChannel::WriteSize()
 {
-	ScopedLockSignal lock(&pipelock);
+	ScopedLock lock(&pipelock);
 	return buffersize;
 }
 
 bool PipeChannel::ReadResize(size_t new_size)
 {
-	ScopedLockSignal lock(&pipelock);
+	ScopedLock lock(&pipelock);
 	if ( !new_size )
 		return errno = EINVAL, false;
 	// The read and write end share the same buffer, so let the write end decide
@@ -490,7 +490,7 @@ bool PipeChannel::ReadResize(size_t new_size)
 
 bool PipeChannel::WriteResize(size_t new_size)
 {
-	ScopedLockSignal lock(&pipelock);
+	ScopedLock lock(&pipelock);
 	if ( !new_size )
 		return errno = EINVAL, false;
 

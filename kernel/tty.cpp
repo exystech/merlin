@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -648,6 +648,8 @@ ssize_t TTY::read(ioctx_t* ctx, uint8_t* userbuf, size_t count)
 ssize_t TTY::write(ioctx_t* ctx, const uint8_t* io_buffer, size_t count)
 {
 	ScopedLockSignal lock(&termlock);
+	if ( !lock.IsAcquired() )
+		return errno = EINTR, -1;
 	if ( hungup )
 		return errno = EIO, -1;
 	if ( tio.c_lflag & TOSTOP && !RequireForeground(SIGTTOU) )
@@ -726,7 +728,7 @@ short TTY::PollEventStatus()
 
 int TTY::poll(ioctx_t* /*ctx*/, PollNode* node)
 {
-	ScopedLockSignal lock(&termlock);
+	ScopedLock lock(&termlock);
 	short ret_status = PollEventStatus() & node->events;
 	if ( ret_status )
 	{
@@ -739,7 +741,7 @@ int TTY::poll(ioctx_t* /*ctx*/, PollNode* node)
 
 int TTY::tcdrain(ioctx_t* /*ctx*/)
 {
-	ScopedLockSignal lock(&termlock);
+	ScopedLock lock(&termlock);
 	if ( hungup )
 		return errno = EIO, -1;
 	if ( !RequireForeground(SIGTTOU) )
@@ -749,7 +751,7 @@ int TTY::tcdrain(ioctx_t* /*ctx*/)
 
 int TTY::tcflow(ioctx_t* /*ctx*/, int action)
 {
-	ScopedLockSignal lock(&termlock);
+	ScopedLock lock(&termlock);
 	if ( !RequireForeground(SIGTTOU) )
 		return -1;
 	switch ( action )
@@ -767,7 +769,7 @@ int TTY::tcflush(ioctx_t* /*ctx*/, int queue_selector)
 {
 	if ( queue_selector & ~TCIOFLUSH )
 		return errno = EINVAL, -1;
-	ScopedLockSignal lock(&termlock);
+	ScopedLock lock(&termlock);
 	if ( hungup )
 		return errno = EIO, -1;
 	if ( !RequireForeground(SIGTTOU) )
@@ -779,7 +781,7 @@ int TTY::tcflush(ioctx_t* /*ctx*/, int queue_selector)
 
 int TTY::tcgetattr(ioctx_t* ctx, struct termios* io_tio)
 {
-	ScopedLockSignal lock(&termlock);
+	ScopedLock lock(&termlock);
 	if ( hungup )
 		return errno = EIO, -1;
 	if ( !ctx->copy_to_dest(io_tio, &tio, sizeof(tio)) )
@@ -789,7 +791,7 @@ int TTY::tcgetattr(ioctx_t* ctx, struct termios* io_tio)
 
 pid_t TTY::tcgetsid(ioctx_t* /*ctx*/)
 {
-	ScopedLockSignal lock(&termlock);
+	ScopedLock lock(&termlock);
 	if ( hungup )
 		return errno = EIO, -1;
 	return sid;
@@ -797,7 +799,7 @@ pid_t TTY::tcgetsid(ioctx_t* /*ctx*/)
 
 int TTY::tcsendbreak(ioctx_t* /*ctx*/, int /*duration*/)
 {
-	ScopedLockSignal lock(&termlock);
+	ScopedLock lock(&termlock);
 	if ( hungup )
 		return errno = EIO, -1;
 	if ( !RequireForeground(SIGTTOU) )
@@ -807,7 +809,7 @@ int TTY::tcsendbreak(ioctx_t* /*ctx*/, int /*duration*/)
 
 int TTY::tcsetattr(ioctx_t* ctx, int actions, const struct termios* io_tio)
 {
-	ScopedLockSignal lock(&termlock);
+	ScopedLock lock(&termlock);
 	if ( hungup )
 		return errno = EIO, -1;
 	if ( !RequireForeground(SIGTTOU) )
@@ -834,7 +836,7 @@ int TTY::tcsetattr(ioctx_t* ctx, int actions, const struct termios* io_tio)
 
 int TTY::ioctl(ioctx_t* ctx, int cmd, uintptr_t arg)
 {
-	ScopedLockSignal lock(&termlock);
+	ScopedLock lock(&termlock);
 	if ( hungup )
 		return errno = EIO, -1;
 	if ( cmd == TIOCSCTTY )

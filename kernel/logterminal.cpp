@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -249,7 +249,7 @@ void LogTerminal::ProcessKeystroke(int kbkey)
 
 ssize_t LogTerminal::tcgetblob(ioctx_t* ctx, const char* name, void* buffer, size_t count)
 {
-	ScopedLockSignal lock(&termlock);
+	ScopedLock lock(&termlock);
 	if ( hungup )
 		return errno = EIO, -1;
 	if ( !name )
@@ -280,7 +280,7 @@ ssize_t LogTerminal::tcgetblob(ioctx_t* ctx, const char* name, void* buffer, siz
 
 ssize_t LogTerminal::tcsetblob(ioctx_t* ctx, const char* name, const void* buffer, size_t count)
 {
-	ScopedLockSignal lock(&termlock);
+	ScopedLock lock(&termlock);
 	if ( hungup )
 		return errno = EIO, -1;
 	if ( !name )

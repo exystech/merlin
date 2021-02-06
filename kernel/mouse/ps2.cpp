@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -240,7 +240,7 @@ short PS2MouseDevice::PollEventStatus()
 
 int PS2MouseDevice::poll(ioctx_t* /*ctx*/, PollNode* node)
 {
-	ScopedLockSignal lock(&devlock);
+	ScopedLock lock(&devlock);
 	short ret_status = PollEventStatus() & node->events;
 	if ( ret_status )
 	{
@@ -253,7 +253,7 @@ int PS2MouseDevice::poll(ioctx_t* /*ctx*/, PollNode* node)
 
 void PS2MouseDevice::OnMouseByte(PS2Mouse* /*mouse*/, void* /*user*/)
 {
-	ScopedLockSignal lock(&devlock);
+	ScopedLock lock(&devlock);
 	poll_channel.Signal(PollEventStatus());
 	kthread_cond_signal(&datacond);
 }
