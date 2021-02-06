@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,13 +17,27 @@
  * Broadcasts a condition.
  */
 
+#include <sys/futex.h>
+
+#include <stddef.h>
 #include <pthread.h>
 
 int pthread_cond_broadcast(pthread_cond_t* cond)
 {
-	int ret;
+	pthread_mutex_lock(&cond->lock);
 	while ( cond->first )
-		if ( (ret = pthread_cond_signal(cond)) )
-			return ret;
+	{
+		struct pthread_cond_elem* elem = cond->first;
+		if ( elem->next )
+			elem->next->prev = elem->prev;
+		else
+			cond->last = elem->prev;
+		cond->first = elem->next;
+		elem->next = NULL;
+		elem->prev = NULL;
+		__atomic_store_n(&elem->woken, 1, __ATOMIC_SEQ_CST);
+		futex(&elem->woken, FUTEX_WAKE, 1, NULL);
+	}
+	pthread_mutex_unlock(&cond->lock);
 	return 0;
 }

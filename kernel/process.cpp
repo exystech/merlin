@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -140,6 +140,10 @@ Process::Process()
 	threadlock = KTHREAD_MUTEX_INITIALIZER;
 	threads_not_exiting_count = 0;
 	threads_exiting = false;
+
+	futex_lock = KTHREAD_MUTEX_INITIALIZER;
+	futex_first_waiting = NULL;
+	futex_last_waiting = NULL;
 
 	segments = NULL;
 	segments_used = 0;
@@ -1550,7 +1554,8 @@ pid_t sys_tfork(int flags, struct tfork* user_regs)
 
 	// If the thread could not be created, make the process commit suicide
 	// in a manner such that we don't wait for its zombie.
-	Thread* thread = CreateKernelThread(child_process, &cpuregs);
+	Thread* thread = CreateKernelThread(child_process, &cpuregs,
+	                                    making_process ? "main" : "second");
 	process_family_lock_lock.Reset();
 	if ( !thread )
 	{

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2016, 2017, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016, 2017, 2018, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +25,7 @@
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/kthread.h>
 #include <sortix/kernel/signal.h>
+#include <sortix/kernel/thread.h>
 #include <sortix/kernel/timer.h>
 #include <sortix/kernel/worker.h>
 
@@ -260,60 +261,61 @@ bool Clock::TryCancel(Timer* timer)
 	return active;
 }
 
+static void timer_wakeup(Clock* /*clock*/, Timer* /*timer*/, void* ctx)
+{
+	Thread* thread = (Thread*) ctx;
+	thread->timer_woken = true;
+	kthread_wake_futex(thread);
+}
 
-// TODO: We need some method for threads to sleep for real but still be
-//       interrupted by signals.
 struct timespec Clock::SleepDelay(struct timespec duration)
 {
-	struct timespec start_advancement;
-	struct timespec elapsed = timespec_nul();
-	bool start_advancement_set = false;
-
-	while ( timespec_lt(elapsed, duration) )
-	{
-		if ( start_advancement_set )
-		{
-			if ( Signal::IsPending() )
-				return duration;
-
-			kthread_yield();
-		}
-
-		LockClock();
-
-		if ( !start_advancement_set )
-		{
-			start_advancement = current_advancement;
-			start_advancement_set = true;
-		}
-
-		elapsed = timespec_sub(current_advancement, start_advancement);
-
-		UnlockClock();
-	}
-
+	LockClock();
+	struct timespec start_advancement = current_advancement;
+	UnlockClock();
+	Thread* thread = CurrentThread();
+	thread->futex_woken = false;
+	thread->timer_woken = false;
+	Timer timer;
+	timer.Attach(this);
+	struct itimerspec timerspec;
+	timerspec.it_value = duration;
+	timerspec.it_interval.tv_sec = 0;
+	timerspec.it_interval.tv_nsec = 0;
+	int timer_flags = TIMER_FUNC_INTERRUPT_HANDLER;
+	timer.Set(&timerspec, NULL, timer_flags, timer_wakeup, thread);
+	kthread_wait_futex_signal();
+	timer.Cancel();
+	LockClock();
+	struct timespec end_advancement = current_advancement;
+	UnlockClock();
+	struct timespec elapsed = timespec_sub(end_advancement, start_advancement);
+	if ( timespec_lt(elapsed, duration) )
+		return timespec_sub(duration, elapsed);
 	return timespec_nul();
 }
 
-// TODO: We need some method for threads to sleep for real but still be
-//       interrupted by signals.
 struct timespec Clock::SleepUntil(struct timespec expiration)
 {
-	while ( true )
-	{
-		LockClock();
-		struct timespec now = current_time;
-		UnlockClock();
-
-		if ( timespec_le(expiration, now) )
-			break;
-
-		if ( Signal::IsPending() )
-			return timespec_sub(expiration, now);
-
-		kthread_yield();
-	}
-
+	Thread* thread = CurrentThread();
+	thread->futex_woken = false;
+	thread->timer_woken = false;
+	Timer timer;
+	timer.Attach(this);
+	struct itimerspec timerspec;
+	timerspec.it_value = expiration;
+	timerspec.it_interval.tv_sec = 0;
+	timerspec.it_interval.tv_nsec = 0;
+	int timer_flags = TIMER_ABSOLUTE | TIMER_FUNC_INTERRUPT_HANDLER;
+	timer.Set(&timerspec, NULL, timer_flags, timer_wakeup, thread);
+	kthread_wait_futex_signal();
+	timer.Cancel();
+	LockClock();
+	struct timespec now = current_time;
+	UnlockClock();
+	struct timespec remaining = timespec_sub(expiration, now);
+	if ( timespec_lt(timespec_nul(), remaining) )
+		return remaining;
 	return timespec_nul();
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,28 +17,11 @@
  * Waits on a condition.
  */
 
+#include <stddef.h>
 #include <pthread.h>
-#include <sched.h>
-#include <time.h>
-#include <timespec.h>
-#include <unistd.h>
 
 int pthread_cond_wait(pthread_cond_t* restrict cond,
                       pthread_mutex_t* restrict mutex)
 {
-	struct pthread_cond_elem elem;
-	elem.next = NULL;
-	elem.woken = 0;
-	if ( cond->last )
-		cond->last->next = &elem;
-	if ( !cond->last )
-		cond->first = &elem;
-	cond->last = &elem;
-	while ( !elem.woken )
-	{
-		pthread_mutex_unlock(mutex);
-		sched_yield();
-		pthread_mutex_lock(mutex);
-	}
-	return 0;
+	return pthread_cond_timedwait(cond, mutex, NULL);
 }

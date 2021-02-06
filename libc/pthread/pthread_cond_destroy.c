@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,6 +21,6 @@
 
 int pthread_cond_destroy(pthread_cond_t* restrict cond)
 {
-	(void) cond;
+	pthread_mutex_destroy(&cond->lock);
 	return 0;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,6 +29,7 @@ int pthread_cond_init(pthread_cond_t* restrict cond,
 		attr = &default_attr;
 	}
 
+	pthread_mutex_init(&cond->lock, NULL);
 	cond->first = NULL;
 	cond->last = NULL;
 	cond->clock = attr->clock;

@@ -23,12 +23,14 @@
 namespace Sortix {
 
 // TODO: This is likely not the most optimal way to perform these operations.
+// TODO: Just discard this whole thing in favor of __atomic_?
 
 ilret_t InterlockedModify(unsigned long* ptr,
                           ilockfunc f,
                           unsigned long user)
 {
 	unsigned long old_value, new_value;
+	// TODO: Migrate to __atomic.
 	do
 	{
 		old_value = *((volatile unsigned long*) ptr); /* TODO: Need volatile? */

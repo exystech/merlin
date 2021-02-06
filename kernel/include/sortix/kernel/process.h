@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 205, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -137,6 +137,11 @@ public:
 	kthread_mutex_t threadlock;
 	size_t threads_not_exiting_count;
 	bool threads_exiting;
+
+public:
+	kthread_mutex_t futex_lock;
+	Thread* futex_first_waiting;
+	Thread* futex_last_waiting;
 
 public:
 	struct segment* segments;

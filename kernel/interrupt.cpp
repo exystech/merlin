@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,6 +24,7 @@
 #include <sortix/kernel/interrupt.h>
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/kthread.h>
+#include <sortix/kernel/thread.h>
 
 namespace Sortix {
 namespace Interrupt {
@@ -33,12 +34,16 @@ bool interrupt_worker_thread_boost = false;
 
 static struct interrupt_work* first;
 static struct interrupt_work* last;
+static bool interrupt_worker_idle = false;
 
 void WorkerThread(void* /*user*/)
 {
+	Thread* thread = CurrentThread();
 	assert(Interrupt::IsEnabled());
 	while ( true )
 	{
+		thread->futex_woken = false;
+		thread->timer_woken = false;
 		struct interrupt_work* work;
 		Interrupt::Disable();
 		work = first;
@@ -47,8 +52,9 @@ void WorkerThread(void* /*user*/)
 		Interrupt::Enable();
 		if ( !work )
 		{
-			// TODO: Make this thread not run until work arrives.
-			kthread_yield();
+			interrupt_worker_idle = true;
+			kthread_wait_futex();
+			interrupt_worker_idle = false;
 			continue;
 		}
 		while ( work )
@@ -67,6 +73,11 @@ void ScheduleWork(struct interrupt_work* work)
 	work->next = NULL;
 	last = work;
 	interrupt_worker_thread_boost = true;
+	if ( interrupt_worker_idle )
+	{
+		interrupt_worker_thread->futex_woken = true;
+		kthread_wake_futex(interrupt_worker_thread);
+	}
 }
 
 } // namespace Interrupt

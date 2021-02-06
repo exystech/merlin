@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2018, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -39,19 +39,30 @@ class Process;
 class Thread;
 
 // These functions create a new kernel process but doesn't start it.
-Thread* CreateKernelThread(Process* process, struct thread_registers* regs);
+Thread* CreateKernelThread(Process* process, struct thread_registers* regs,
+                           const char* name);
 Thread* CreateKernelThread(Process* process, void (*entry)(void*), void* user,
+                           const char* name, size_t stacksize = 0);
+Thread* CreateKernelThread(void (*entry)(void*), void* user, const char* name,
                            size_t stacksize = 0);
-Thread* CreateKernelThread(void (*entry)(void*), void* user, size_t stacksize = 0);
 
 // This function can be used to start a thread from the above functions.
 void StartKernelThread(Thread* thread);
 
 // Alternatively, these functions both create and start the thread.
-Thread* RunKernelThread(Process* process, struct thread_registers* regs);
+Thread* RunKernelThread(Process* process, struct thread_registers* regs,
+                        const char* name);
 Thread* RunKernelThread(Process* process, void (*entry)(void*), void* user,
+                        const char* name, size_t stacksize = 0);
+Thread* RunKernelThread(void (*entry)(void*), void* user, const char* name,
                         size_t stacksize = 0);
-Thread* RunKernelThread(void (*entry)(void*), void* user, size_t stacksize = 0);
+
+enum yield_operation
+{
+	YIELD_OPERATION_NONE,
+	YIELD_OPERATION_WAIT_FUTEX,
+	YIELD_OPERATION_WAIT_FUTEX_SIGNAL,
+};
 
 class Thread
 {
@@ -60,6 +71,7 @@ public:
 	~Thread();
 
 public:
+	const char* name;
 	uintptr_t system_tid;
 	uintptr_t yield_to_tid;
 	struct thread_registers registers;
@@ -87,6 +99,12 @@ public:
 	bool has_saved_signal_mask;
 	Clock execute_clock;
 	Clock system_clock;
+	uintptr_t futex_address;
+	bool futex_woken;
+	bool timer_woken;
+	Thread* futex_prev_waiting;
+	Thread* futex_next_waiting;
+	enum yield_operation yield_operation;
 
 public:
 	void HandleSignal(struct interrupt_context* intctx);

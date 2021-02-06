@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -202,6 +202,7 @@ void* syscall_list[SYSCALL_MAX_NUM + 1] =
 	[SYSCALL_SOCKET] = (void*) sys_socket,
 	[SYSCALL_GETDNSCONFIG] = (void*) sys_getdnsconfig,
 	[SYSCALL_SETDNSCONFIG] = (void*) sys_setdnsconfig,
+	[SYSCALL_FUTEX] = (void*) sys_futex,
 	[SYSCALL_MAX_NUM] = (void*) sys_bad_syscall,
 };
 } /* extern "C" */

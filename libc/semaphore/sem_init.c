@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,11 +25,9 @@ int sem_init(sem_t* sem, int pshared, unsigned int value)
 {
 	if ( pshared )
 		return errno = ENOSYS, -1;
-
 	if ( (unsigned int) INT_MAX < value )
 		return errno = EINVAL, -1;
-
 	sem->value = (int) value;
-
+	sem->waiters = 0;
 	return 0;
 }

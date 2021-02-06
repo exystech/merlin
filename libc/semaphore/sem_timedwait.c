@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,57 +14,39 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  * semaphore/sem_timedwait.c
- * Lock a semaphore.
+ * Lock a semaphore with a timeout.
  */
 
+#include <sys/futex.h>
+
 #include <errno.h>
-#include <sched.h>
 #include <semaphore.h>
-#include <signal.h>
-#include <stddef.h>
+#include <stdbool.h>
 #include <time.h>
-#include <timespec.h>
 
 int sem_timedwait(sem_t* restrict sem, const struct timespec* restrict abstime)
 {
-	if ( sem_trywait(sem) == 0 )
-		return 0;
-	if ( errno != EAGAIN )
-		return -1;
-
-	sigset_t old_set_mask;
-	sigset_t old_set_allowed;
-	sigset_t all_signals;
-	sigfillset(&all_signals);
-	sigprocmask(SIG_SETMASK, &all_signals, &old_set_mask);
-	signotset(&old_set_allowed, &old_set_mask);
-
-	while ( sem_trywait(sem) != 0 )
+	while ( true )
 	{
-		// TODO: Using CLOCK_REALTIME for this is bad as it is not monotonic. We
-		//       need to enchance the semaphore API so a better clock can be
-		//       used instead.
-		if ( errno == EAGAIN )
+		int old = __atomic_load_n(&sem->value, __ATOMIC_SEQ_CST);
+		int new = old != -1 ? old - 1 : -1;
+		bool waiting = new == -1;
+		if ( waiting )
+			__atomic_add_fetch(&sem->waiters, 1, __ATOMIC_SEQ_CST);
+		if ( old != new &&
+		     !__atomic_compare_exchange_n(&sem->value, &old, new, false,
+		                                  __ATOMIC_SEQ_CST, __ATOMIC_RELAXED) )
 		{
-			struct timespec now;
-			clock_gettime(CLOCK_REALTIME, &now);
-			if ( timespec_le(*abstime, now) )
-				errno = ETIMEDOUT;
+			if ( waiting )
+				__atomic_sub_fetch(&sem->waiters, 1, __ATOMIC_SEQ_CST);
+			continue;
 		}
-
-		if ( errno == EAGAIN && sigpending(&old_set_allowed) )
-			errno = EINTR;
-
-		if ( errno != EAGAIN )
-		{
-			sigprocmask(SIG_SETMASK, &old_set_mask, NULL);
+		if ( !waiting )
+			return 0;
+		int op = FUTEX_WAIT | FUTEX_ABSOLUTE | FUTEX_CLOCK(CLOCK_REALTIME);
+		int ret = futex(&sem->value, op, -1, abstime);
+		__atomic_sub_fetch(&sem->waiters, 1, __ATOMIC_SEQ_CST);
+		if ( ret < 0 && errno != EAGAIN )
 			return -1;
-		}
-
-		sched_yield();
 	}
-
-	sigprocmask(SIG_SETMASK, &old_set_mask, NULL);
-
-	return 0;
 }

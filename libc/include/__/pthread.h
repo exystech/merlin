@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2017, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -46,40 +46,12 @@ typedef int __pthread_barrier_t;
 
 typedef int __pthread_barrierattr_t;
 
-#if defined(__is_sortix_libc)
-typedef struct
-{
-	struct pthread_cond_elem* first;
-	struct pthread_cond_elem* last;
-	__clock_t clock;
-} __pthread_cond_t;
-#else
-typedef struct
-{
-	void* __pthread_first;
-	void* __pthread_last;
-	__clock_t __pthread_clock;
-} __pthread_cond_t;
-#endif
-
-#if defined(__is_sortix_libc)
-typedef struct
-{
-	__clock_t clock;
-} __pthread_condattr_t;
-#else
-typedef struct
-{
-	__clock_t __pthread_clock;
-} __pthread_condattr_t;
-#endif
-
 typedef __SIZE_TYPE__ __pthread_key_t;
 
 #if defined(__is_sortix_libc)
 typedef struct
 {
-	unsigned long lock;
+	int lock;
 	unsigned long type;
 	unsigned long owner;
 	unsigned long recursion;
@@ -87,7 +59,7 @@ typedef struct
 #else
 typedef struct
 {
-	unsigned long __pthread_lock;
+	int __pthread_lock;
 	unsigned long __pthread_type;
 	unsigned long __pthread_owner;
 	unsigned long __pthread_recursion;
@@ -104,6 +76,36 @@ typedef struct
 {
 	int __pthread_type;
 } __pthread_mutexattr_t;
+#endif
+
+#if defined(__is_sortix_libc)
+typedef struct
+{
+	__pthread_mutex_t lock;
+	struct pthread_cond_elem* first;
+	struct pthread_cond_elem* last;
+	__clockid_t clock;
+} __pthread_cond_t;
+#else
+typedef struct
+{
+	__pthread_mutex_t __pthread_lock;
+	void* __pthread_first;
+	void* __pthread_last;
+	__clockid_t __pthread_clock;
+} __pthread_cond_t;
+#endif
+
+#if defined(__is_sortix_libc)
+typedef struct
+{
+	__clockid_t clock;
+} __pthread_condattr_t;
+#else
+typedef struct
+{
+	__clockid_t __pthread_clock;
+} __pthread_condattr_t;
 #endif
 
 #if defined(__is_sortix_libc)

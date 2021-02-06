@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -265,10 +265,17 @@ static void SwitchRegisters(struct interrupt_context* intctx,
 	current_thread = next;
 }
 
+static Thread* idle_thread;
+static Thread* first_runnable_thread;
+static Thread* true_current_thread;
+static Process* init_process;
+
 static void SwitchThread(struct interrupt_context* intctx,
                          Thread* old_thread,
                          Thread* new_thread)
 {
+	assert(new_thread->state == ThreadState::RUNNABLE ||
+	       new_thread == idle_thread);
 	SwitchRegisters(intctx, old_thread, new_thread);
 	if ( intctx->signal_pending && InUserspace(intctx) )
 	{
@@ -290,14 +297,11 @@ static void SwitchThread(struct interrupt_context* intctx,
 	}
 }
 
-static Thread* idle_thread;
-static Thread* first_runnable_thread;
-static Thread* true_current_thread;
-static Process* init_process;
-
 static Thread* FindRunnableThreadWithSystemTid(uintptr_t system_tid)
 {
-	Thread* begun_thread = current_thread;
+	Thread* begun_thread = first_runnable_thread;
+	if ( !begun_thread )
+		return NULL;
 	Thread* iter = begun_thread;
 	do
 	{
@@ -329,8 +333,6 @@ static Thread* PopNextThread(bool yielded)
 		result = idle_thread;
 	}
 
-	true_current_thread = result;
-
 	return result;
 }
 
@@ -339,7 +341,10 @@ void SwitchTo(struct interrupt_context* intctx, Thread* new_thread)
 	Thread* old_thread = CurrentThread();
 	if ( new_thread == old_thread )
 		return;
-	first_runnable_thread = old_thread;
+	if ( new_thread->state != ThreadState::RUNNABLE )
+		return;
+	if ( old_thread != idle_thread )
+		first_runnable_thread = old_thread;
 	true_current_thread = new_thread;
 	SwitchThread(intctx, old_thread, new_thread);
 }
@@ -348,6 +353,7 @@ static void RealSwitch(struct interrupt_context* intctx, bool yielded)
 {
 	Thread* old_thread = CurrentThread();
 	Thread* new_thread = PopNextThread(yielded);
+	true_current_thread = new_thread;
 	SwitchThread(intctx, old_thread, new_thread);
 }
 
@@ -358,7 +364,28 @@ void Switch(struct interrupt_context* intctx)
 
 void InterruptYieldCPU(struct interrupt_context* intctx, void* /*user*/)
 {
-	RealSwitch(intctx, true);
+	if ( current_thread->yield_operation == YIELD_OPERATION_NONE )
+		RealSwitch(intctx, true);
+	else if ( current_thread->yield_operation == YIELD_OPERATION_WAIT_FUTEX )
+	{
+		if ( !current_thread->futex_woken &&
+		     !current_thread->timer_woken &&
+		     !asm_signal_is_pending )
+		{
+			SetThreadState(current_thread, ThreadState::FUTEX_WAITING);
+			RealSwitch(intctx, false);
+		}
+	}
+	else if ( current_thread->yield_operation ==
+	          YIELD_OPERATION_WAIT_FUTEX_SIGNAL )
+	{
+		if ( !current_thread->futex_woken &&
+		     !current_thread->timer_woken )
+		{
+			SetThreadState(current_thread, ThreadState::FUTEX_WAITING);
+			RealSwitch(intctx, false);
+		}
+	}
 }
 
 void ThreadExitCPU(struct interrupt_context* intctx, void* /*user*/)
@@ -395,9 +422,13 @@ Process* GetKernelProcess()
 	return idle_thread->process;
 }
 
-void SetThreadState(Thread* thread, ThreadState state)
+void SetThreadState(Thread* thread, ThreadState state, bool wake_only)
 {
-	bool wasenabled = Interrupt::SetEnabled(false);
+	bool was_enabled = Interrupt::SetEnabled(false);
+
+	// Avoid transitioning to the RUNNABLE state from unintended states.
+	if ( wake_only && thread->state != ThreadState::FUTEX_WAITING )
+		state = thread->state;
 
 	// Remove the thread from the list of runnable threads.
 	if ( thread->state == ThreadState::RUNNABLE &&
@@ -432,7 +463,14 @@ void SetThreadState(Thread* thread, ThreadState state)
 	assert(thread->state != ThreadState::RUNNABLE || thread->scheduler_list_prev);
 	assert(thread->state != ThreadState::RUNNABLE || thread->scheduler_list_next);
 
-	Interrupt::SetEnabled(wasenabled);
+	Interrupt::SetEnabled(was_enabled);
+}
+
+void SetSignalPending(Thread* thread, unsigned long is_pending)
+{
+	thread->registers.signal_pending = is_pending;
+	if ( is_pending )
+		Scheduler::SetThreadState(thread, ThreadState::RUNNABLE, true);
 }
 
 ThreadState GetThreadState(Thread* thread)
@@ -457,14 +495,14 @@ namespace Scheduler {
 
 void ScheduleTrueThread()
 {
-	bool wasenabled = Interrupt::SetEnabled(false);
+	bool was_enabled = Interrupt::SetEnabled(false);
 	if ( true_current_thread != current_thread )
 	{
 		current_thread->yield_to_tid = 0;
 		first_runnable_thread = true_current_thread;
 		kthread_yield();
 	}
-	Interrupt::SetEnabled(wasenabled);
+	Interrupt::SetEnabled(was_enabled);
 }
 
 } // namespace Scheduler

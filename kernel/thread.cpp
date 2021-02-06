@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2018, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,16 +21,21 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <timespec.h>
 
+#include <sortix/clock.h>
 #include <sortix/exit.h>
+#include <sortix/futex.h>
 #include <sortix/mman.h>
 #include <sortix/signal.h>
 
 #include <sortix/kernel/copy.h>
 #include <sortix/kernel/interrupt.h>
+#include <sortix/kernel/ioctx.h>
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/kthread.h>
 #include <sortix/kernel/memorymanagement.h>
@@ -77,6 +82,7 @@ void FreeThread(Thread* thread)
 Thread::Thread()
 {
 	assert(!((uintptr_t) registers.fpuenv & 0xFUL));
+	name = "";
 	system_tid = (uintptr_t) this;
 	yield_to_tid = 0;
 	id = 0; // TODO: Make a thread id.
@@ -105,6 +111,11 @@ Thread::Thread()
 	// execute_clock initialized in member constructor.
 	// system_clock initialized in member constructor.
 	Time::InitializeThreadClocks(this);
+	futex_address = 0;
+	futex_woken = false;
+	futex_prev_waiting = NULL;
+	futex_next_waiting = NULL;
+	yield_operation = YIELD_OPERATION_NONE;
 }
 
 Thread::~Thread()
@@ -116,7 +127,9 @@ Thread::~Thread()
 		delete[] (uint8_t*) kernelstackpos;
 }
 
-Thread* CreateKernelThread(Process* process, struct thread_registers* regs)
+Thread* CreateKernelThread(Process* process,
+                           struct thread_registers* regs,
+                           const char* name)
 {
 	assert(process && regs && process->addrspace);
 
@@ -142,6 +155,7 @@ Thread* CreateKernelThread(Process* process, struct thread_registers* regs)
 	Thread* thread = AllocateThread();
 	if ( !thread )
 		return NULL;
+	thread->name = name;
 
 	memcpy(&thread->registers, regs, sizeof(struct thread_registers));
 
@@ -254,7 +268,7 @@ static void SetupKernelThreadRegs(struct thread_registers* regs,
 }
 
 Thread* CreateKernelThread(Process* process, void (*entry)(void*), void* user,
-                           size_t stacksize)
+                           const char* name, size_t stacksize)
 {
 	const size_t DEFAULT_KERNEL_STACK_SIZE = 8 * 1024UL;
 	if ( !stacksize )
@@ -264,9 +278,10 @@ Thread* CreateKernelThread(Process* process, void (*entry)(void*), void* user,
 		return NULL;
 
 	struct thread_registers regs;
-	SetupKernelThreadRegs(&regs, process, entry, user, (uintptr_t) stack, stacksize);
+	SetupKernelThreadRegs(&regs, process, entry, user, (uintptr_t) stack,
+	                      stacksize);
 
-	Thread* thread = CreateKernelThread(process, &regs);
+	Thread* thread = CreateKernelThread(process, &regs, name);
 	if ( !thread ) { delete[] stack; return NULL; }
 
 	thread->kernelstackpos = (uintptr_t) stack;
@@ -276,9 +291,10 @@ Thread* CreateKernelThread(Process* process, void (*entry)(void*), void* user,
 	return thread;
 }
 
-Thread* CreateKernelThread(void (*entry)(void*), void* user, size_t stacksize)
+Thread* CreateKernelThread(void (*entry)(void*), void* user, const char* name,
+                           size_t stacksize)
 {
-	return CreateKernelThread(CurrentProcess(), entry, user, stacksize);
+	return CreateKernelThread(CurrentProcess(), entry, user, name, stacksize);
 }
 
 void StartKernelThread(Thread* thread)
@@ -286,9 +302,10 @@ void StartKernelThread(Thread* thread)
 	Scheduler::SetThreadState(thread, ThreadState::RUNNABLE);
 }
 
-Thread* RunKernelThread(Process* process, struct thread_registers* regs)
+Thread* RunKernelThread(Process* process, struct thread_registers* regs,
+                        const char* name)
 {
-	Thread* thread = CreateKernelThread(process, regs);
+	Thread* thread = CreateKernelThread(process, regs, name);
 	if ( !thread )
 		return NULL;
 	StartKernelThread(thread);
@@ -296,18 +313,19 @@ Thread* RunKernelThread(Process* process, struct thread_registers* regs)
 }
 
 Thread* RunKernelThread(Process* process, void (*entry)(void*), void* user,
-                        size_t stacksize)
+                        const char* name, size_t stacksize)
 {
-	Thread* thread = CreateKernelThread(process, entry, user, stacksize);
+	Thread* thread = CreateKernelThread(process, entry, user, name, stacksize);
 	if ( !thread )
 		return NULL;
 	StartKernelThread(thread);
 	return thread;
 }
 
-Thread* RunKernelThread(void (*entry)(void*), void* user, size_t stacksize)
+Thread* RunKernelThread(void (*entry)(void*), void* user, const char* name,
+                        size_t stacksize)
 {
-	Thread* thread = CreateKernelThread(entry, user, stacksize);
+	Thread* thread = CreateKernelThread(entry, user, name, stacksize);
 	if ( !thread )
 		return NULL;
 	StartKernelThread(thread);
@@ -323,7 +341,8 @@ int sys_exit_thread(int requested_exit_code,
 	               EXIT_THREAD_ZERO |
 	               EXIT_THREAD_TLS_UNMAP |
 	               EXIT_THREAD_PROCESS |
-	               EXIT_THREAD_DUMP_CORE) )
+	               EXIT_THREAD_DUMP_CORE |
+	               EXIT_THREAD_FUTEX_WAKE) )
 		return errno = EINVAL, -1;
 
 	if ( (flags & EXIT_THREAD_ONLY_IF_OTHERS) && (flags & EXIT_THREAD_PROCESS) )
@@ -395,6 +414,9 @@ int sys_exit_thread(int requested_exit_code,
 	if ( flags & EXIT_THREAD_ZERO )
 		ZeroUser(extended.zero_from, extended.zero_size);
 
+	if ( flags & EXIT_THREAD_FUTEX_WAKE )
+		sys_futex((int*) extended.zero_from, FUTEX_WAKE, 1, NULL);
+
 	if ( do_exit )
 	{
 		// Validate the requested exit code such that the process can't exit
@@ -429,6 +451,119 @@ int sys_exit_thread(int requested_exit_code,
 	}
 
 	kthread_exit();
+}
+
+static void futex_timeout(Clock* /*clock*/, Timer* /*timer*/, void* ctx)
+{
+	Thread* thread = (Thread*) ctx;
+	thread->timer_woken = true;
+	kthread_wake_futex(thread);
+}
+
+int sys_futex(int* user_address,
+              int op,
+              int value,
+              const struct timespec* user_timeout)
+{
+	ioctx_t ctx; SetupKernelIOCtx(&ctx);
+	Thread* thread = CurrentThread();
+	Process* process = thread->process;
+	if ( FUTEX_GET_OP(op) == FUTEX_WAIT )
+	{
+		kthread_mutex_lock(&process->futex_lock);
+		thread->futex_address = (uintptr_t) user_address;
+		thread->futex_woken = false;
+		thread->futex_prev_waiting = process->futex_last_waiting;
+		thread->futex_next_waiting = NULL;
+		(process->futex_last_waiting ?
+		 process->futex_last_waiting->futex_next_waiting :
+		 process->futex_first_waiting) = thread;
+		process->futex_last_waiting = thread;
+		kthread_mutex_unlock(&process->futex_lock);
+		thread->timer_woken = false;
+		Timer timer;
+		if ( user_timeout )
+		{
+			clockid_t clockid = FUTEX_GET_CLOCK(op);
+			bool absolute = op & FUTEX_ABSOLUTE;
+			struct timespec timeout;
+			if ( !CopyFromUser(&timeout, user_timeout, sizeof(timeout)) )
+				return -1;
+			if ( !timespec_is_canonical(timeout) )
+				return errno = EINVAL, -1;
+			Clock* clock = Time::GetClock(clockid);
+			timer.Attach(clock);
+			struct itimerspec timerspec;
+			timerspec.it_value = timeout;
+			timerspec.it_interval.tv_sec = 0;
+			timerspec.it_interval.tv_nsec = 0;
+			int timer_flags = (absolute ? TIMER_ABSOLUTE : 0) |
+			                  TIMER_FUNC_INTERRUPT_HANDLER;
+			timer.Set(&timerspec, NULL, timer_flags, futex_timeout, thread);
+		}
+		int result = 0;
+		int current;
+		if ( !ReadAtomicFromUser(&current, user_address) )
+			result = -1;
+		else if ( current != value )
+		{
+			errno = EAGAIN;
+			result = -1;
+		}
+		else
+			kthread_wait_futex_signal();
+		if ( user_timeout )
+			timer.Cancel();
+		kthread_mutex_lock(&process->futex_lock);
+		if ( result == 0 && !thread->futex_woken )
+		{
+			if ( Signal::IsPending() )
+			{
+				errno = EINTR;
+				result = -1;
+			}
+			else if ( thread->timer_woken )
+			{
+				errno = ETIMEDOUT;
+				result = -1;
+			}
+		}
+		thread->futex_address = 0;
+		thread->futex_woken = false;
+		(thread->futex_prev_waiting ?
+		 thread->futex_prev_waiting->futex_next_waiting :
+		 process->futex_first_waiting) = thread->futex_next_waiting;
+		(thread->futex_next_waiting ?
+		 thread->futex_next_waiting->futex_prev_waiting :
+		 process->futex_last_waiting) = thread->futex_prev_waiting;
+		thread->futex_prev_waiting = NULL;
+		thread->futex_next_waiting = NULL;
+		kthread_mutex_unlock(&process->futex_lock);
+		return result;
+	}
+	else if ( FUTEX_GET_OP(op) == FUTEX_WAKE )
+	{
+		kthread_mutex_lock(&process->futex_lock);
+		int result = 0;
+		for ( Thread* waiter = process->futex_first_waiting;
+		      0 < value && waiter;
+		      waiter = waiter->futex_next_waiting )
+		{
+			if ( waiter->futex_address == (uintptr_t) user_address )
+			{
+				waiter->futex_woken = true;
+				kthread_wake_futex(waiter);
+				if ( value != INT_MAX )
+					value--;
+				if ( result != INT_MAX )
+					result++;
+			}
+		}
+		kthread_mutex_unlock(&process->futex_lock);
+		return result;
+	}
+	else
+		return errno = EINVAL, -1;
 }
 
 } // namespace Sortix

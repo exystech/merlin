@@ -69,6 +69,16 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Implement threading primitives that truly sleep
+The
+.Xr futex 2
+system system call for efficient thread waiting has been added.
+The
+.Xr exit_thread 2
+system call has gained a
+.Dv EXIT_THREAD_FUTEX_WAKE
+flag for waking a single waiter on a futex.
+This is a minor compatible ABI change.
 .Ss Fix system upgrade leaking files
 .Xr sysupgrade 8
 and

@@ -82,7 +82,6 @@ alarm.o \
 clock.o \
 com.o \
 copy.o \
-$(CPUDIR)/kthread.o \
 descriptor.o \
 disk/ahci/ahci.o \
 disk/ahci/hba.o \

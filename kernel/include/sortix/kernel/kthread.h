@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,15 +26,18 @@
 
 namespace Sortix {
 
-extern "C" {
+class Thread;
 
-inline static void kthread_yield(void) { asm volatile ("int $129"); }
+void kthread_yield();
+void kthread_wait_futex();
+void kthread_wait_futex_signal();
+void kthread_wake_futex(Thread* thread);
 __attribute__((noreturn)) void kthread_exit();
-typedef unsigned kthread_mutex_t;
+typedef int kthread_mutex_t;
 const kthread_mutex_t KTHREAD_MUTEX_INITIALIZER = 0;
-unsigned kthread_mutex_trylock(kthread_mutex_t* mutex);
+bool kthread_mutex_trylock(kthread_mutex_t* mutex);
 void kthread_mutex_lock(kthread_mutex_t* mutex);
-unsigned long kthread_mutex_lock_signal(kthread_mutex_t* mutex);
+bool kthread_mutex_lock_signal(kthread_mutex_t* mutex);
 void kthread_mutex_unlock(kthread_mutex_t* mutex);
 struct kthread_cond_elem;
 typedef struct kthread_cond_elem kthread_cond_elem_t;
@@ -46,11 +49,9 @@ struct kthread_cond
 typedef struct kthread_cond kthread_cond_t;
 const kthread_cond_t KTHREAD_COND_INITIALIZER = { NULL, NULL };
 void kthread_cond_wait(kthread_cond_t* cond, kthread_mutex_t* mutex);
-unsigned long kthread_cond_wait_signal(kthread_cond_t* cond, kthread_mutex_t* mutex);
+bool kthread_cond_wait_signal(kthread_cond_t* cond, kthread_mutex_t* mutex);
 void kthread_cond_signal(kthread_cond_t* cond);
 void kthread_cond_broadcast(kthread_cond_t* cond);
-
-} /* extern "C" */
 
 class ScopedLock
 {

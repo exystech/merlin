@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,8 +32,10 @@ typedef struct
 {
 #if defined(__is_sortix_libc)
 	int value;
+	int waiters;
 #else
 	int __value;
+	int __waiters;
 #endif
 } sem_t;
 

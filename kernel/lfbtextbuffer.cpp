@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -119,7 +119,8 @@ LFBTextBuffer* CreateLFBTextBuffer(uint8_t* lfb, uint32_t lfbformat,
 		return ret;
 
 	ret->queue_thread = true; // Visible to new thread.
-	if ( !RunKernelThread(kernel_process, LFBTextBuffer__RenderThread, ret) )
+	if ( !RunKernelThread(kernel_process, LFBTextBuffer__RenderThread, ret,
+	                      "console") )
 		ret->queue_thread = false;
 
 	return ret;
@@ -142,7 +143,8 @@ void LFBTextBuffer::SpawnThreads()
 		return;
 	Process* kernel_process = Scheduler::GetKernelProcess();
 	queue_thread = true; // Visible to new thread.
-	if ( !RunKernelThread(kernel_process, LFBTextBuffer__RenderThread, this) )
+	if ( !RunKernelThread(kernel_process, LFBTextBuffer__RenderThread, this,
+	                      "console") )
 		queue_thread = false;
 }
 

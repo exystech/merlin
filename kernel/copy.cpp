@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -127,6 +127,24 @@ bool CopyFromUser(void* kdst_ptr, const void* usersrc_ptr, size_t count)
 	}
 	kthread_mutex_unlock(&process->segment_lock);
 	return result;
+}
+
+bool ReadAtomicFromUser(int* kdst_ptr, const int* usersrc_ptr)
+{
+	uintptr_t usersrc = (uintptr_t) usersrc_ptr;
+	if ( usersrc & (sizeof(int) - 1) )
+		return errno = EINVAL, false;
+	Process* process = CurrentProcess();
+	assert(IsInProcessAddressSpace(process));
+	ScopedLock lock(&process->segment_lock);
+	struct segment* segment = FindSegment(process, usersrc);
+	if ( !segment || !(segment->prot & PROT_READ) )
+		return errno = EFAULT, false;
+	size_t segment_available = segment->addr + segment->size - usersrc;
+	if ( segment_available < sizeof(int) )
+		return errno = EFAULT, false;
+	*kdst_ptr = __atomic_load_n(usersrc_ptr, __ATOMIC_SEQ_CST);
+	return true;
 }
 
 bool CopyToKernel(void* kdst, const void* ksrc, size_t count)

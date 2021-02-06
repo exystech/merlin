@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2018, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -193,7 +193,6 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 	// Display the logo.
 	Log::PrintF("\e[37;41m\e[2J");
 	Log::Center(BRAND_LOGO);
-
 #if defined(__x86_64__)
 	// TODO: Remove this hack when qemu 1.4.x and 1.5.0 are obsolete.
 	// Verify that we are not running under a buggy qemu where the instruction
@@ -375,6 +374,7 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 	// scheduler's set of runnable threads, but rather run whenever there is
 	// _nothing_ else to run on this CPU.
 	Thread* idlethread = AllocateThread();
+	idlethread->name = "idle";
 	idlethread->process = system;
 	idlethread->kernelstackpos = (addr_t) stack;
 	idlethread->kernelstacksize = STACK_SIZE;
@@ -387,7 +387,7 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 	// Note that we don't do the work here: if all other threads are not running
 	// and this thread isn't runnable, then there is nothing to run. Therefore
 	// we must become the system idle thread.
-	RunKernelThread(BootThread, NULL);
+	RunKernelThread(BootThread, NULL, "boot");
 
 	// The time driver will run the scheduler on the next timer interrupt.
 	Time::Start();
@@ -401,7 +401,14 @@ static void SystemIdleThread(void* /*user*/)
 	// Alright, we are now the system idle thread. If there is nothing to do,
 	// then we are run. Note that we must never do any real work here as the
 	// idle thread must always be runnable.
-	while(true);
+	while ( true )
+	{
+#if defined(__i386__) || defined(__x86_64__)
+		asm volatile ("hlt");
+#else
+#warning "Implement a power efficient kernel idle thread"
+#endif
+	}
 }
 
 static void BootThread(void* /*user*/)
@@ -425,7 +432,7 @@ static void BootThread(void* /*user*/)
 	// Let's create the interrupt worker thread that executes additional work
 	// requested by interrupt handlers, where such work isn't safe.
 	Interrupt::interrupt_worker_thread =
-		RunKernelThread(Interrupt::WorkerThread, NULL);
+		RunKernelThread(Interrupt::WorkerThread, NULL, "interrupt");
 	if ( !Interrupt::interrupt_worker_thread )
 		Panic("Could not create interrupt worker");
 
@@ -433,7 +440,7 @@ static void BootThread(void* /*user*/)
 	Worker::Init();
 
 	// Create a general purpose worker thread.
-	Thread* worker_thread = RunKernelThread(Worker::Thread, NULL);
+	Thread* worker_thread = RunKernelThread(Worker::Thread, NULL, "worker");
 	if ( !worker_thread )
 		Panic("Unable to create general purpose worker thread");
 
@@ -644,7 +651,7 @@ static void BootThread(void* /*user*/)
 	init->addrspace = initaddrspace;
 	Scheduler::SetInitProcess(init);
 
-	Thread* initthread = RunKernelThread(init, InitThread, NULL);
+	Thread* initthread = RunKernelThread(init, InitThread, NULL, "main");
 	if ( !initthread )
 		Panic("Could not create init thread");
 

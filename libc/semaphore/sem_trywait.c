@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  * semaphore/sem_trywait.c
- * Lock a semaphore.
+ * Try to lock a semaphore.
  */
 
 #include <errno.h>
@@ -23,11 +23,11 @@
 
 int sem_trywait(sem_t* sem)
 {
-	int old_value = __atomic_load_n(&sem->value, __ATOMIC_SEQ_CST);
-	if ( old_value <= 0 )
+	int old = __atomic_load_n(&sem->value, __ATOMIC_SEQ_CST);
+	if ( old <= 0 )
 			return errno = EAGAIN, -1;
-	int new_value = old_value - 1;
-	if ( !__atomic_compare_exchange_n(&sem->value, &old_value, new_value, false,
+		int new = old != -1 ? old - 1 : -1;
+	if ( !__atomic_compare_exchange_n(&sem->value, &old, new, false,
 	                                  __ATOMIC_SEQ_CST, __ATOMIC_RELAXED) )
 			return errno = EAGAIN, -1;
 	return 0;

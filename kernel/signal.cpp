@@ -100,7 +100,7 @@ void UpdatePendingSignals(Thread* thread) // thread->process->signal_lock held
 	if ( thread == CurrentThread() )
 		asm_signal_is_pending = is_pending;
 	else
-		thread->registers.signal_pending = is_pending;
+		Scheduler::SetSignalPending(thread, is_pending);
 }
 
 void Thread::DoUpdatePendingSignal()

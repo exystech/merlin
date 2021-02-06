@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -89,6 +89,7 @@ int sys_fstatvfs(int, struct statvfs*);
 int sys_fstatvfsat(int, const char*, struct statvfs*, int);
 int sys_fsync(int);
 int sys_ftruncate(int, off_t);
+int sys_futex(int*, int, int, const struct timespec*);
 int sys_futimens(int, const struct timespec*);
 int sys_getdnsconfig(struct dnsconfig*);
 gid_t sys_getegid(void);

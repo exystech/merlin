@@ -561,6 +561,7 @@ sys/ioctl/ioctl.o \
 sys/kernelinfo/kernelinfo.o \
 syslog/closelog.o \
 syslog/connectlog.o \
+sys/futex/futex.o \
 syslog/openlog.o \
 syslog/setlogmask.o \
 syslog/syslog.o \

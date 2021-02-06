@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -62,7 +62,7 @@ void pthread_exit(void* return_value)
 	{
 		extended.zero_from = &thread->join_lock.lock;
 		extended.zero_size = sizeof(thread->join_lock.lock);
-		exit_flags |= EXIT_THREAD_ZERO;
+		exit_flags |= EXIT_THREAD_ZERO | EXIT_THREAD_FUTEX_WAKE;
 	}
 	else
 	{

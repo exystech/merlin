@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -51,6 +51,7 @@ struct exit_thread
 #define EXIT_THREAD_TLS_UNMAP (1<<3)
 #define EXIT_THREAD_PROCESS (1<<4)
 #define EXIT_THREAD_DUMP_CORE (1<<5)
+#define EXIT_THREAD_FUTEX_WAKE (1<<6)
 
 #ifdef __cplusplus
 } /* extern "C" */

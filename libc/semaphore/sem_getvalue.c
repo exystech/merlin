@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,6 +21,7 @@
 
 int sem_getvalue(sem_t* restrict sem, int* restrict value_ptr)
 {
-	*value_ptr = __atomic_load_n(&sem->value, __ATOMIC_SEQ_CST);
+	int value = __atomic_load_n(&sem->value, __ATOMIC_SEQ_CST);
+	*value_ptr = value == -1 ? 0 : value;
 	return 0;
 }

@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2013, 2014, 2021 Jonas 'Sortie' Termansen.
+ /*
+ * Copyright (c) 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,28 +13,18 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * pthread/pthread_mutex_unlock.c
- * Unlocks a mutex.
+ * sys/futex.h
+ * Fast userspace mutexes.
  */
 
-#include <sys/futex.h>
+#ifndef _SYS_FUTEX_H
+#define _SYS_FUTEX_H 1
 
-#include <pthread.h>
-#include <stdbool.h>
+#include <sys/cdefs.h>
 
-static const int UNLOCKED = 0;
-static const int CONTENDED = 2;
+#include <sortix/futex.h>
+#include <sortix/timespec.h>
 
-int pthread_mutex_unlock(pthread_mutex_t* mutex)
-{
-	if ( mutex->type == PTHREAD_MUTEX_RECURSIVE && mutex->recursion )
-	{
-		mutex->recursion--;
-		return 0;
-	}
-	mutex->owner = 0;
-	if ( __atomic_exchange_n(&mutex->lock, UNLOCKED,
-	                         __ATOMIC_SEQ_CST) == CONTENDED )
-		futex(&mutex->lock, FUTEX_WAKE, 1, NULL);
-	return 0;
-}
+int futex(int*, int, int, const struct timespec*);
+
+#endif

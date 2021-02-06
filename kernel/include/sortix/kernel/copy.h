@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,6 +28,7 @@ bool CopyToUser(void* userdst, const void* ksrc, size_t count);
 bool CopyFromUser(void* kdst, const void* usersrc, size_t count);
 bool CopyToKernel(void* kdst, const void* ksrc, size_t count);
 bool CopyFromKernel(void* kdst, const void* ksrc, size_t count);
+bool ReadAtomicFromUser(int* kdst, const int* usersrc);
 bool ZeroKernel(void* kdst, size_t count);
 bool ZeroUser(void* userdst, size_t count);
 char* GetStringFromUser(const char* str);

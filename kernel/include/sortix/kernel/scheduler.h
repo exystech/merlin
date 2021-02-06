@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2017, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,28 +29,16 @@ class Thread;
 } // namespace Sortix
 
 namespace Sortix {
-enum ThreadState { NONE, RUNNABLE, BLOCKING, DEAD };
+enum ThreadState { NONE, RUNNABLE, FUTEX_WAITING, DEAD };
 } // namespace Sortix
 
 namespace Sortix {
 namespace Scheduler {
 
-#if defined(__i386__) || defined(__x86_64__)
-static inline void Yield()
-{
-	asm volatile ("int $129");
-}
-__attribute__ ((noreturn))
-static inline void ExitThread()
-{
-	asm volatile ("int $132");
-	__builtin_unreachable();
-}
-#endif
-
 void Switch(struct interrupt_context* intctx);
 void SwitchTo(struct interrupt_context* intctx, Thread* new_thread);
-void SetThreadState(Thread* thread, ThreadState state);
+void SetThreadState(Thread* thread, ThreadState state, bool wake_only = false);
+void SetSignalPending(Thread* thread, unsigned long is_pending);
 ThreadState GetThreadState(Thread* thread);
 void SetIdleThread(Thread* thread);
 void SetInitProcess(Process* init);

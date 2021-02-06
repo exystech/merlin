@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,28 +13,23 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * pthread/pthread_mutex_unlock.c
- * Unlocks a mutex.
+ * sortix/futex.h
+ * Fast userspace mutexes.
  */
 
-#include <sys/futex.h>
+#ifndef INCLUDE_SORTIX_FUTEX_H
+#define INCLUDE_SORTIX_FUTEX_H
 
-#include <pthread.h>
-#include <stdbool.h>
+#include <sys/cdefs.h>
 
-static const int UNLOCKED = 0;
-static const int CONTENDED = 2;
+#define FUTEX_WAIT 1
+#define FUTEX_WAKE 2
 
-int pthread_mutex_unlock(pthread_mutex_t* mutex)
-{
-	if ( mutex->type == PTHREAD_MUTEX_RECURSIVE && mutex->recursion )
-	{
-		mutex->recursion--;
-		return 0;
-	}
-	mutex->owner = 0;
-	if ( __atomic_exchange_n(&mutex->lock, UNLOCKED,
-	                         __ATOMIC_SEQ_CST) == CONTENDED )
-		futex(&mutex->lock, FUTEX_WAKE, 1, NULL);
-	return 0;
-}
+#define FUTEX_ABSOLUTE (1 << 8)
+
+#define FUTEX_CLOCK(clock) (clock << 24)
+
+#define FUTEX_GET_OP(op) ((op) & 0xFF)
+#define FUTEX_GET_CLOCK(op) ((op) >> 24)
+
+#endif

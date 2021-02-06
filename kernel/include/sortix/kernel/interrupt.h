@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2017, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -110,12 +110,12 @@ inline bool IsCPUInterrupted()
 
 inline bool SetEnabled(bool is_enabled)
 {
-	bool wasenabled = IsEnabled();
+	bool was_enabled = IsEnabled();
 	if ( is_enabled )
 		Enable();
 	else
 		Disable();
-	return wasenabled;
+	return was_enabled;
 }
 
 void RegisterHandler(unsigned int index, struct interrupt_handler* handler);

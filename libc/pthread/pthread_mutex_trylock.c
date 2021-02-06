@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,18 +18,27 @@
  */
 
 #include <errno.h>
+#include <limits.h>
 #include <pthread.h>
+#include <stdbool.h>
 
-static const unsigned long UNLOCKED_VALUE = 0;
-static const unsigned long LOCKED_VALUE = 1;
+static const int UNLOCKED = 0;
+static const int LOCKED = 1;
 
 int pthread_mutex_trylock(pthread_mutex_t* mutex)
 {
-	if ( !__sync_bool_compare_and_swap(&mutex->lock, UNLOCKED_VALUE, LOCKED_VALUE) )
+	int state = UNLOCKED;
+	if ( !__atomic_compare_exchange_n(&mutex->lock, &state, LOCKED, false,
+	                                  __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST) )
 	{
 		if ( mutex->type == PTHREAD_MUTEX_RECURSIVE &&
 		     (pthread_t) mutex->owner == pthread_self() )
-				return mutex->recursion++, 0;
+		{
+			if ( mutex->recursion == ULONG_MAX )
+				return errno = EAGAIN;
+			mutex->recursion++;
+			return 0;
+		}
 		return errno = EBUSY;
 	}
 	mutex->owner = (unsigned long) pthread_self();

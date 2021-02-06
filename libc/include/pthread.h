@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -150,18 +150,21 @@ struct pthread
 struct pthread_cond_elem
 {
 	struct pthread_cond_elem* next;
-	volatile unsigned long woken;
+	struct pthread_cond_elem* prev;
+	int woken;
 };
 #endif
 
-#define PTHREAD_COND_INITIALIZER { NULL, NULL, CLOCK_REALTIME }
+#define PTHREAD_COND_INITIALIZER { PTHREAD_NORMAL_MUTEX_INITIALIZER_NP, NULL, \
+                                   NULL, CLOCK_REALTIME }
 #define PTHREAD_MUTEX_INITIALIZER { 0, PTHREAD_MUTEX_DEFAULT, 0, 0 }
 #define PTHREAD_RWLOCK_INITIALIZER { PTHREAD_COND_INITIALIZER, \
                                      PTHREAD_COND_INITIALIZER, \
                                      PTHREAD_MUTEX_INITIALIZER, 0, 0, 0, 0 }
 
 #define PTHREAD_NORMAL_MUTEX_INITIALIZER_NP { 0, PTHREAD_MUTEX_NORMAL, 0, 0 }
-#define PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP { 0, PTHREAD_MUTEX_RECURSIVE, 0, 0 }
+#define PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP { 0, PTHREAD_MUTEX_RECURSIVE, \
+                                                 0, 0 }
 
 #define PTHREAD_ONCE_INIT { PTHREAD_NORMAL_MUTEX_INITIALIZER_NP, 0 }
 
