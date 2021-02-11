@@ -115,6 +115,12 @@ int sys_psctl(pid_t pid, int request, void* ptr)
 		psst.init_prev = ptable->Prev(pid);
 		psst.init_next = ptable->Next(pid);
 		psst.init_first = pid == 1 ? 1 : -1;
+		kthread_mutex_lock(&process->idlock);
+		psst.uid = process->uid;
+		psst.euid = process->euid;
+		psst.gid = process->gid;
+		psst.egid = process->egid;
+		kthread_mutex_unlock(&process->idlock);
 		kthread_mutex_lock(&process->threadlock);
 		psst.status = process->exit_code;
 		kthread_mutex_unlock(&process->threadlock);
