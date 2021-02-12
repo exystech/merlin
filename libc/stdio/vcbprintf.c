@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -129,11 +129,11 @@ int vcbprintf(void* ctx,
 		size_t precision = SIZE_MAX;
 		if ( *format == '.' && (format++, true) )
 		{
-			precision = 0;
 			if ( *format == '*' && (format++, true) )
 			{
 				int int_precision = va_arg(parameters, int);
-				precision = 0 <= int_precision ? (size_t) int_precision : 0;
+				if ( 0 <= int_precision )
+					precision = (size_t) int_precision;
 			}
 			else if ( *format == '-' && (format++, true) )
 			{
@@ -142,6 +142,7 @@ int vcbprintf(void* ctx,
 			}
 			else
 			{
+				precision = 0;
 				while ( '0' <= *format && *format <= '9' )
 					precision = 10 * precision + *format++ - '0';
 			}
