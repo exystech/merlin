@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2018, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -250,13 +250,13 @@ int sys_sigsuspend(const sigset_t* set)
 	Thread* thread = CurrentThread();
 
 	sigset_t old_signal_mask; sigemptyset(&old_signal_mask);
-	sigset_t new_signal_mask;
 
 	ScopedLock lock(&process->signal_lock);
 
 	// Only accept signals from the user-provided set if given.
 	if ( set )
 	{
+		sigset_t new_signal_mask;
 		if ( !CopyFromUser(&new_signal_mask, set, sizeof(sigset_t)) )
 			return -1;
 		memcpy(&old_signal_mask, &thread->signal_mask, sizeof(sigset_t));
@@ -269,11 +269,13 @@ int sys_sigsuspend(const sigset_t* set)
 	while ( !Signal::IsPending() )
 		kthread_cond_wait_signal(&never_triggered, &process->signal_lock);
 
-	// Restore the previous signal mask if the user gave its own set to wait on.
+	// The pending signal might only be pending with the temporary signal mask,
+	// so don't restore it. Instead ask for the real signal mask to be restored
+	// after the signal has been processed.
 	if ( set )
 	{
-		memcpy(&thread->signal_mask, &old_signal_mask, sizeof(sigset_t));
-		UpdatePendingSignals(thread);
+		thread->has_saved_signal_mask = true;
+		memcpy(&thread->saved_signal_mask, &old_signal_mask, sizeof(sigset_t));
 	}
 
 	// The system call never halts or it halts because a signal interrupted it.
