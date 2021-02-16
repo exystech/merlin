@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,6 +22,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <poll.h>
 #include <string.h>
 
 #include <sortix/clock.h>
@@ -34,6 +35,7 @@
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/kthread.h>
 #include <sortix/kernel/memorymanagement.h>
+#include <sortix/kernel/poll.h>
 #include <sortix/kernel/refcount.h>
 #include <sortix/kernel/time.h>
 
@@ -488,19 +490,13 @@ int AbstractInode::gettermmode(ioctx_t* /*ctx*/, unsigned* /*mode*/)
 	return errno = ENOTTY, -1;
 }
 
-int AbstractInode::poll(ioctx_t* /*ctx*/, PollNode* /*node*/)
+int AbstractInode::poll(ioctx_t* /*ctx*/, PollNode* node)
 {
-#if 0 // TODO: Support poll on regular files as per POSIX.
-	if ( inode_type == INODE_TYPE_FILE )
-	{
-		// TODO: Correct bits?
-		if ( !((POLLIN | POLLOUT) & node->events) )
-			return errno = EAGAIN, -1;
-		node->master->revents |= (POLLIN | POLLOUT) & node->events;
-		return 0;
-	}
-#endif
-	return errno = ENOTSUP, -1;
+	short status = POLLIN | POLLOUT | POLLRDNORM | POLLWRNORM;
+	if ( !(status & node->events) )
+		return errno = EAGAIN, -1;
+	node->master->revents |= status & node->events;
+	return 0;
 }
 
 int AbstractInode::rename_here(ioctx_t* /*ctx*/, Ref<Inode> /*from*/,

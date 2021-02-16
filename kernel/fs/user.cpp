@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -43,6 +43,7 @@
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/kthread.h>
 #include <sortix/kernel/mtable.h>
+#include <sortix/kernel/poll.h>
 #include <sortix/kernel/process.h>
 #include <sortix/kernel/refcount.h>
 #include <sortix/kernel/scheduler.h>
@@ -1444,9 +1445,13 @@ int Unode::gettermmode(ioctx_t* ctx, unsigned* mode)
 	return ret;
 }
 
-int Unode::poll(ioctx_t* /*ctx*/, PollNode* /*node*/)
+int Unode::poll(ioctx_t* /*ctx*/, PollNode* node)
 {
-	return errno = ENOTSUP, -1;
+	short status = POLLIN | POLLOUT | POLLRDNORM | POLLWRNORM;
+	if ( !(status & node->events) )
+		return errno = EAGAIN, -1;
+	node->master->revents |= status & node->events;
+	return 0;
 }
 
 int Unode::rename_here(ioctx_t* ctx, Ref<Inode> from, const char* oldname,
