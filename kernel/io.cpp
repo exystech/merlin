@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -216,7 +216,9 @@ int sys_faccessat(int dirfd, const char* path, int mode, int flags)
 	if ( desc->stat(&kctx, &st) < 0 )
 		return -1;
 	mode_t mask;
-	if ( kctx.uid == st.st_uid )
+	if ( kctx.uid == 0 )
+		mask = 0777;
+	else if ( kctx.uid == st.st_uid )
 		mask = 0700;
 	else if ( kctx.gid == st.st_gid )
 		mask = 0070;
