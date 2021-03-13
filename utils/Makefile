@@ -43,6 +43,7 @@ memstat \
 mkdir \
 mktemp \
 mv \
+nl \
 pager \
 passwd \
 ps \
