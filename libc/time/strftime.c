@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,10 +25,8 @@
 
 #include <sys/cdefs.h>
 
-#include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <time.h>
 #include <wchar.h>
 
@@ -132,13 +130,12 @@ size_t STRFTIME(STRFTIME_CHAR* s,
                 const STRFTIME_CHAR* format,
                 const struct tm* tm)
 {
-	const STRFTIME_CHAR* orig_format = format;
 	size_t ret = 0;
 
 #define OUTPUT_CHAR(expr) \
 	do { \
 		if ( ret == max ) \
-			return errno = ERANGE, 0; \
+			return 0; \
 		s[ret++] = (expr); \
 	} while ( 0 )
 
@@ -147,17 +144,6 @@ size_t STRFTIME(STRFTIME_CHAR* s,
 		const STRFTIME_CHAR* out_str = (expr); \
 		while ( *out_str ) \
 			OUTPUT_CHAR(*out_str++); \
-	} while ( 0 )
-
-#define OUTPUT_STRFTIME(expr) \
-	do { \
-		int old_errno = errno; \
-		errno = 0; \
-		size_t subret = STRFTIME(s + ret, max - ret, (expr), tm); \
-		if ( !subret && errno ) \
-			return 0; \
-		errno = old_errno; \
-		ret += subret; \
 	} while ( 0 )
 
 #define OUTPUT_INT_PADDED(valexpr, widthexpr, padexpr) \
@@ -174,24 +160,6 @@ size_t STRFTIME(STRFTIME_CHAR* s,
 	} while ( 0 )
 
 #define OUTPUT_INT(valexpr) OUTPUT_INT_PADDED(valexpr, 0, STRFTIME_L('\0'))
-
-#if defined(STRFTIME_IS_WCHAR)
-#define OUTPUT_UNSUPPORTED() \
-	do { \
-		fprintf(stderr, "%s:%u: %s: error: unsupported format string \"%ls\" around \"%%%ls\"\n", \
-		        __FILE__, __LINE__, __STRINGIFY(STRFTIME), orig_format, specifiers_begun_at); \
-		return 0; \
-	} while ( 0 )
-#else
-#define OUTPUT_UNSUPPORTED() \
-	do { \
-		fprintf(stderr, "%s:%u: %s: error: unsupported format string \"%s\" around \"%%%s\"\n", \
-		        __FILE__, __LINE__, __STRINGIFY(STRFTIME), orig_format, specifiers_begun_at); \
-		return 0; \
-	} while ( 0 )
-#endif
-
-#define OUTPUT_UNDEFINED() OUTPUT_UNSUPPORTED()
 
 	STRFTIME_CHAR c;
 	while ( (c = *format++) )
@@ -221,7 +189,11 @@ size_t STRFTIME(STRFTIME_CHAR* s,
 
 		// TODO: Support the '+' flag!
 		if ( plus_padding )
-			OUTPUT_UNSUPPORTED();
+		{
+			OUTPUT_CHAR('%');
+			format = specifiers_begun_at;
+			continue;
+		}
 
 		// Process the optional minimum field width.
 		size_t field_width = 0;
@@ -268,21 +240,33 @@ size_t STRFTIME(STRFTIME_CHAR* s,
 			OUTPUT_INT_PADDED((tm->tm_year + 1900) / 100, field_width, padding_char);
 			break;
 		case STRFTIME_L('d'): OUTPUT_INT_PADDED(tm->tm_mday, 2, STRFTIME_L('0')); break; /*O*/
-		case STRFTIME_L('D'): OUTPUT_STRFTIME(STRFTIME_L("%m/%d/%y")); break;
+		case STRFTIME_L('D'):
+			OUTPUT_INT_PADDED(tm->tm_mon + 1, 2, STRFTIME_L('0'));
+			OUTPUT_CHAR('/');
+			OUTPUT_INT_PADDED(tm->tm_mday, 2, STRFTIME_L('0'));
+			OUTPUT_CHAR('/');
+			OUTPUT_INT_PADDED((tm->tm_year + 1900) % 100, 2, STRFTIME_L('0'));
+			break;
 		case STRFTIME_L('e'): OUTPUT_INT_PADDED(tm->tm_mday, 2, STRFTIME_L(' ')); break; /*O*/
 		case STRFTIME_L('F'):
-			// TODO: Revisit this.
-			OUTPUT_UNSUPPORTED();
+			// TODO: Behavior if padding is requested.
+			OUTPUT_INT_PADDED(tm->tm_year + 1900, 4, STRFTIME_L('0'));
+			OUTPUT_CHAR('-');
+			OUTPUT_INT_PADDED(tm->tm_mon + 1, 2, STRFTIME_L('0'));
+			OUTPUT_CHAR('-');
+			OUTPUT_INT_PADDED(tm->tm_mday, 2, STRFTIME_L('0'));
 			break;
 		case STRFTIME_L('g'):
 			// TODO: These require a bit of intelligence.
-			OUTPUT_UNSUPPORTED();
-			break;
+			OUTPUT_CHAR('%');
+			format = specifiers_begun_at;
+			continue;
 		case STRFTIME_L('G'):
 			// TODO: These require a bit of intelligence.
-			OUTPUT_UNSUPPORTED();
-			break;
-		case STRFTIME_L('h'): OUTPUT_STRFTIME(STRFTIME_L("%b")); break;
+			OUTPUT_CHAR('%');
+			format = specifiers_begun_at;
+			continue;
+		case STRFTIME_L('h'): OUTPUT_STRING(GetMonthAbbreviated(tm)); break;
 		case STRFTIME_L('H'): OUTPUT_INT_PADDED(tm->tm_hour, 2, STRFTIME_L('0')); break; /*O*/
 		case STRFTIME_L('I'): OUTPUT_INT_PADDED(tm->tm_hour % 12 + 1, 2, STRFTIME_L('0')); break; /*O*/
 		case STRFTIME_L('j'): OUTPUT_INT_PADDED(tm->tm_yday + 1, 3, STRFTIME_L('0')); break;
@@ -290,40 +274,79 @@ size_t STRFTIME(STRFTIME_CHAR* s,
 		case STRFTIME_L('M'): OUTPUT_INT_PADDED(tm->tm_min, 2, STRFTIME_L('0')); break; /*O*/
 		case STRFTIME_L('n'): OUTPUT_CHAR(STRFTIME_L('\n')); break;
 		case STRFTIME_L('p'): OUTPUT_STRING(tm->tm_hour < 12 ? STRFTIME_L("AM") : STRFTIME_L("PM")); break;
-		case STRFTIME_L('r'): OUTPUT_STRFTIME(STRFTIME_L("%I:%M:%S %p")); break;
-		case STRFTIME_L('R'): OUTPUT_STRFTIME(STRFTIME_L("%H:%M")); break;
+		case STRFTIME_L('r'):
+			OUTPUT_INT_PADDED(tm->tm_hour % 12 + 1, 2, STRFTIME_L('0'));
+			OUTPUT_CHAR(':');
+			OUTPUT_INT_PADDED(tm->tm_min, 2, STRFTIME_L('0'));
+			OUTPUT_CHAR(':');
+			OUTPUT_INT_PADDED(tm->tm_sec, 2, STRFTIME_L('0'));
+			OUTPUT_CHAR(' ');
+			OUTPUT_STRING(tm->tm_hour < 12 ? STRFTIME_L("AM") : STRFTIME_L("PM"));
+			break;
+		case STRFTIME_L('R'):
+			OUTPUT_INT_PADDED(tm->tm_hour, 2, STRFTIME_L('0'));
+			OUTPUT_CHAR(':');
+			OUTPUT_INT_PADDED(tm->tm_min, 2, STRFTIME_L('0'));
+			break;
 		case STRFTIME_L('S'): OUTPUT_INT_PADDED(tm->tm_sec, 2, STRFTIME_L('0')); break; /*O*/
 		case STRFTIME_L('t'): OUTPUT_CHAR(STRFTIME_L('\t')); break;
-		case STRFTIME_L('T'): OUTPUT_STRFTIME(STRFTIME_L("%H:%M:%S")); break;
+		case STRFTIME_L('T'):
+			OUTPUT_INT_PADDED(tm->tm_hour, 2, STRFTIME_L('0'));
+			OUTPUT_CHAR(':');
+			OUTPUT_INT_PADDED(tm->tm_min, 2, STRFTIME_L('0'));
+			OUTPUT_CHAR(':');
+			OUTPUT_INT_PADDED(tm->tm_sec, 2, STRFTIME_L('0'));
+			break;
 		case STRFTIME_L('u'): OUTPUT_INT(tm->tm_yday); break; /*O*/
 		case STRFTIME_L('U'): /*O*/
 			// TODO: These require a bit of intelligence.
-			OUTPUT_UNSUPPORTED();
-			break;
+			OUTPUT_CHAR('%');
+			format = specifiers_begun_at;
+			continue;
 		case STRFTIME_L('V'): /*O*/
 			// TODO: These require a bit of intelligence.
-			OUTPUT_UNSUPPORTED();
-			break;
+			OUTPUT_CHAR('%');
+			format = specifiers_begun_at;
+			continue;
 		case STRFTIME_L('w'): OUTPUT_INT(tm->tm_wday); break; /*O*/
 		case STRFTIME_L('W'): /*O*/
 			// TODO: These require a bit of intelligence.
-			OUTPUT_UNSUPPORTED();
-			break;
-		case STRFTIME_L('x'): OUTPUT_STRFTIME(STRFTIME_L("%m/%d/%y")); break; /*E*/
-		case STRFTIME_L('X'): OUTPUT_STRFTIME(STRFTIME_L("%H:%M:%S")); break; /*E*/
+			OUTPUT_CHAR('%');
+			format = specifiers_begun_at;
+			continue;
+		case STRFTIME_L('x'):
+			OUTPUT_INT_PADDED(tm->tm_mon + 1, 2, STRFTIME_L('0'));
+			OUTPUT_CHAR('/');
+			OUTPUT_INT_PADDED(tm->tm_mday, 2, STRFTIME_L('0'));
+			OUTPUT_CHAR('/');
+			OUTPUT_INT_PADDED((tm->tm_year + 1900) % 100, 2, STRFTIME_L('0'));
+			break; /*E*/
+		case STRFTIME_L('X'):
+			OUTPUT_INT_PADDED(tm->tm_hour, 2, STRFTIME_L('0'));
+			OUTPUT_CHAR(':');
+			OUTPUT_INT_PADDED(tm->tm_min, 2, STRFTIME_L('0'));
+			OUTPUT_CHAR(':');
+			OUTPUT_INT_PADDED(tm->tm_sec, 2, STRFTIME_L('0'));
+			break; /*E*/
 		case STRFTIME_L('y'): OUTPUT_INT_PADDED((tm->tm_year + 1900) % 100, 2, STRFTIME_L('0')); break; /*EO*/
 		case STRFTIME_L('Y'): OUTPUT_INT(tm->tm_year + 1900); break; /*E*/
 		case STRFTIME_L('z'):
 			// TODO: struct tm doesn't have all this information available!
+			OUTPUT_STRING(STRFTIME_L("+0000"));
 			break;
 		case STRFTIME_L('Z'):
 			// TODO: struct tm doesn't have all this information available!
+			OUTPUT_STRING(STRFTIME_L("UTC"));
 			break;
 		case STRFTIME_L('%'): OUTPUT_CHAR(STRFTIME_L('%')); break;
-		default: OUTPUT_UNDEFINED(); break;
+		default:
+			OUTPUT_CHAR('%');
+			format = specifiers_begun_at;
+			continue;
 		}
 	}
 	if ( ret == max )
-		return errno = ERANGE, 0;
-	return s[ret] = STRFTIME_L('\0'), ret;
+		return 0;
+	s[ret] = STRFTIME_L('\0');
+	return ret;
 }
