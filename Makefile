@@ -505,6 +505,10 @@ release-shared: release-man release-readme release-scripts
 
 .PHONY: release
 release: release-arch release-shared
+	cd $(SORTIX_RELEASE_DIR)/$(VERSION) && \
+	find . -type f '!' -name sha256sum -exec sha256sum '{}' ';' | \
+	sed -E 's,^([^ ]*  )\./,\1,' | \
+	LC_ALL=C sort -k 2 > sha256sum
 
 # Virtualization
 .PHONY: run-virtualbox
