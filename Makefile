@@ -466,6 +466,22 @@ $(SORTIX_RELEASE_DIR)/$(VERSION)/scripts/tix-iso-bootconfig: tix/tix-iso-bootcon
 $(SORTIX_RELEASE_DIR)/$(VERSION)/scripts/tix-iso-liveconfig: tix/tix-iso-liveconfig $(SORTIX_RELEASE_DIR)/$(VERSION)/scripts
 	cp $< $@
 
+$(SORTIX_RELEASE_DIR)/$(VERSION)/man:
+	mkdir -p $@
+
+$(SORTIX_RELEASE_DIR)/$(VERSION)/man/ports.list: sysroot $(SORTIX_RELEASE_DIR)/$(VERSION)/man
+	for section in 1 2 3 4 5 6 7 8 9; do mkdir -p $(SORTIX_RELEASE_DIR)/$(VERSION)/man/man$$section; done
+	for port in system `LC_ALL=C ls "$(SYSROOT)/tix/tixinfo"`; do \
+	  for manpage in `grep -E "^/share/man/man[1-9]/.*\.[1-9]$$" "$(SYSROOT)/tix/manifest/$$port" | \
+	                  LC_ALL=C sort | \
+	                  tee $(SORTIX_RELEASE_DIR)/$(VERSION)/man/$$port.list | \
+	                  grep -Eo 'man[1-9]/[^/]*\.[0-9]$$'`; do \
+	    cp -f "$(SYSROOT)/share/man/$$manpage" $(SORTIX_RELEASE_DIR)/$(VERSION)/man/$$manpage && \
+	    chmod 644 $(SORTIX_RELEASE_DIR)/$(VERSION)/man/$$manpage; \
+	  done; \
+	done
+	LC_ALL=C ls "$(SYSROOT)/tix/tixinfo" > $(SORTIX_RELEASE_DIR)/$(VERSION)/man/ports.list
+
 .PHONY: release-scripts
 release-scripts: \
   $(SORTIX_RELEASE_DIR)/$(VERSION)/scripts/tix-iso-add \
@@ -475,6 +491,9 @@ release-scripts: \
 $(SORTIX_RELEASE_DIR)/$(VERSION)/README: README $(SORTIX_RELEASE_DIR)/$(VERSION)
 	cp $< $@
 
+.PHONY: release-man
+release-man: $(SORTIX_RELEASE_DIR)/$(VERSION)/man/ports.list
+
 .PHONY: release-readme
 release-readme: $(SORTIX_RELEASE_DIR)/$(VERSION)/README
 
@@ -482,7 +501,7 @@ release-readme: $(SORTIX_RELEASE_DIR)/$(VERSION)/README
 release-arch: release-builds release-readme
 
 .PHONY: release-shared
-release-shared: release-readme release-scripts
+release-shared: release-man release-readme release-scripts
 
 .PHONY: release
 release: release-arch release-shared
