@@ -482,6 +482,15 @@ $(SORTIX_RELEASE_DIR)/$(VERSION)/man/ports.list: sysroot $(SORTIX_RELEASE_DIR)/$
 	done
 	LC_ALL=C ls "$(SYSROOT)/tix/tixinfo" > $(SORTIX_RELEASE_DIR)/$(VERSION)/man/ports.list
 
+$(SORTIX_RELEASE_DIR)/$(VERSION)/repository/$(HOST):
+	mkdir -p $@
+
+.PHONY: release-repository
+release-repository: sysroot $(SORTIX_RELEASE_DIR)/$(VERSION)/repository/$(HOST)
+	for port in `LC_ALL=C ls "$(SYSROOT)/tix/tixinfo"`; do \
+	  cp $(SORTIX_REPOSITORY_DIR)/$(HOST)/$$port.tix.tar.xz $(SORTIX_RELEASE_DIR)/$(VERSION)/repository/$(HOST); \
+	done
+
 .PHONY: release-scripts
 release-scripts: \
   $(SORTIX_RELEASE_DIR)/$(VERSION)/scripts/tix-iso-add \
@@ -498,7 +507,7 @@ release-man: $(SORTIX_RELEASE_DIR)/$(VERSION)/man/ports.list
 release-readme: $(SORTIX_RELEASE_DIR)/$(VERSION)/README
 
 .PHONY: release-arch
-release-arch: release-builds release-readme
+release-arch: release-builds release-readme release-repository
 
 .PHONY: release-shared
 release-shared: release-man release-readme release-scripts
