@@ -10,6 +10,7 @@ KBLAYOUT_COMPILER?=kblayout-compiler
 LAYOUTS=\
 de \
 dk \
+fi \
 uk \
 us \
 
