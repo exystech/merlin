@@ -49,6 +49,20 @@ bool accept_no_shift(uint32_t combination)
 	return true;
 }
 
+bool accept_no_altgr(uint32_t combination)
+{
+	if ( combination & 0b0100 )
+		return false;
+	return true;
+}
+
+bool accept_altgr(uint32_t combination)
+{
+	if ( !(combination & 0b0100) )
+		return false;
+	return true;
+}
+
 bool accept_no_shift_no_alt_gr(uint32_t combination)
 {
 	if ( combination & 0b0101 )
@@ -529,6 +543,10 @@ int main(int argc, char* argv[])
 			line[--line_length] = '\0';
 			if ( !strcmp(line, "-shift") )
 				condition = accept_no_shift;
+			else if ( !strcmp(line, "-altgr") )
+				condition = accept_no_altgr;
+			else if ( !strcmp(line, "+altgr") )
+				condition = accept_altgr;
 			else if ( !strcmp(line, "-shift & -altgr") )
 				condition = accept_no_shift_no_alt_gr;
 			else if ( !strcmp(line, "+shift & -altgr") )
