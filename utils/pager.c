@@ -162,14 +162,19 @@ static void prompt(bool at_end)
 		}
 		buffer[buffer_used] = '\0';
 
-		if ( !strcmp(buffer, "\n") || !strcmp(buffer, "\e[B") )
+		if ( !strcmp(buffer, "\n") ||
+		     !strcmp(buffer, "j") ||
+		     !strcmp(buffer, "\x0e") /* ^N */ ||
+		     !strcmp(buffer, "\e[B") /* Down Arrow */ )
 		{
 			dprintf(1, "\r\e[J");
 			allowed_lines++;
 			return;
 		}
 
-		if ( !strcmp(buffer, "\e[A") )
+		if ( !strcmp(buffer, "k") ||
+		     !strcmp(buffer, "\x10") /* ^P */ ||
+		     !strcmp(buffer, "\e[A") /* Up Arrow */ )
 		{
 			if ( current_line <= possible_lines )
 				continue;
@@ -180,14 +185,21 @@ static void prompt(bool at_end)
 			return;
 		}
 
-		if ( !strcmp(buffer, " ") || !strcmp(buffer, "\e[6~") )
+		if ( !strcmp(buffer, " ") ||
+		     !strcmp(buffer, "f") ||
+		     !strcmp(buffer, "\x06") /* ^F */ ||
+		     !strcmp(buffer, "\x16") /* ^V */ ||
+		     !strcmp(buffer, "\e[6~") /* Page Down */ )
 		{
 			dprintf(1, "\r\e[J");
 			allowed_lines = possible_lines;
 			return;
 		}
 
-		if ( !strcmp(buffer, "\e[5~") )
+		if ( !strcmp(buffer, "b") ||
+		     !strcmp(buffer, "\x02") /* ^B */ ||
+		     !strcmp(buffer, "\ev") /* ESC-v */ ||
+		     !strcmp(buffer, "\e[5~") /* Page Up */)
 		{
 			if ( current_line <= possible_lines )
 				continue;
@@ -201,7 +213,10 @@ static void prompt(bool at_end)
 			return;
 		}
 
-		if ( !strcmp(buffer, "\e[F") || !strcmp(buffer, "\e[4~") )
+		if ( !strcmp(buffer, ">") ||
+		     !strcmp(buffer, "G") ||
+		     !strcmp(buffer, "\e[F") /* End */ ||
+		     !strcmp(buffer, "\e[4~") /* End (Linux console) */ )
 		{
 			dprintf(1, "\r\e[J");
 			skipping_to_end = true;
@@ -209,7 +224,10 @@ static void prompt(bool at_end)
 			return;
 		}
 
-		if ( !strcmp(buffer, "\e[H") || !strcmp(buffer, "\e[1~") )
+		if ( !strcmp(buffer, "<") ||
+		     !strcmp(buffer, "g") ||
+		     !strcmp(buffer, "\e[H") /* Home */ ||
+		     !strcmp(buffer, "\e[1~") /* Home (Linux console) */ )
 		{
 			if ( current_line <= possible_lines )
 				continue;
