@@ -241,7 +241,7 @@ bootloader so only the default live environment option can be chosen by
 unauthenticated users:
 .Bd -literal
 mkdir -p liveconfig/etc
-# Each user's username is their password hashed with crypt_newhash(3).
+# Each user's password is their username hashed with crypt_newhash(3).
 (printf 'root:%s:0:0:root:/root:sh\\n' \\
         '$2b$10$S/fJmYIJSkRdifk61xDYn.w62y.vNu35tZkznR6xa3Ntg0hsbI8tO' &&
  printf 'alice:%s:1000:1000:alice:/home/alice:sh\\n' \\
