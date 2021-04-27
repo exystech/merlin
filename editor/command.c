@@ -63,12 +63,16 @@ void editor_type_newline(struct editor* editor)
 	keep_line->data = (wchar_t*) malloc(sizeof(wchar_t) * keep_length);
 	keep_line->used = keep_length;
 	keep_line->length = keep_length;
-	memcpy(keep_line->data, old_line.data + 0, sizeof(wchar_t) * keep_length);
+	if ( keep_length )
+		memcpy(keep_line->data, old_line.data + 0,
+		       sizeof(wchar_t) * keep_length);
 
 	move_line->data = (wchar_t*) malloc(sizeof(wchar_t) * move_length);
 	move_line->used = move_length;
 	move_line->length = move_length;
-	memcpy(move_line->data, old_line.data + keep_length, sizeof(wchar_t) * move_length);
+	if ( move_length )
+		memcpy(move_line->data, old_line.data + keep_length,
+		       sizeof(wchar_t) * move_length);
 
 	editor_cursor_set(editor, editor->cursor_row+1, 0);
 
