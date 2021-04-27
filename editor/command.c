@@ -830,7 +830,7 @@ void editor_type_character(struct editor* editor, wchar_t c)
 		switch ( towlower(c) )
 		{
 		case L'c': editor_type_copy(editor); break;
-		case L'i': editor_type_goto_line(editor); break;
+		case L'g': editor_type_goto_line(editor); break;
 		case L'k': editor_type_cut(editor); break;
 		case L'o': editor->shift ?
 		           editor_type_open_as(editor) :
