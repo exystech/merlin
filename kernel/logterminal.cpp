@@ -175,6 +175,8 @@ void LogTerminal::OnKeystroke(Keyboard* kb, void* /*user*/)
 		bool control = modifiers & (MODIFIER_LCONTROL | MODIFIER_RCONTROL);
 		if ( !(tio.c_cflag & ISORTIX_TERMMODE) && unicode == '\b' )
 			unicode = 127;
+		if ( modifiers & MODIFIER_ALT && !(tio.c_lflag & ISORTIX_KBKEY) )
+			ProcessByte('\e');
 		if ( control && unicode == L' ' )
 			ProcessByte(0, unicode);
 		else if ( control && (L'`' <= unicode && unicode <= L'}') )
