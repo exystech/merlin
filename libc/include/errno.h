@@ -94,8 +94,6 @@
 #define ENFILE 82
 #define EPROTOTYPE 83
 #define ENOLCK 84
-#define ENOUSER 85
-#define ENOGROUP 86
 #define ESIGPENDING 87
 #define ESTALE 88
 #define EBADMSG 89

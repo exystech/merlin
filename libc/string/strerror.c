@@ -97,8 +97,6 @@ const char* sortix_strerror(int errnum)
 	case ENFILE: return "Too many open files in system";
 	case EPROTOTYPE: return "Wrong protocol type for socket";
 	case ENOLCK: return "No locks available";
-	case ENOUSER: return "No such user";
-	case ENOGROUP: return "No such group";
 	case ESIGPENDING: return "Signal is already pending";
 	case ESTALE: return "Stale file handle";
 	case EBADMSG: return "Bad message";

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -45,5 +45,5 @@ int getpwnam_r(const char* restrict username,
 		return *ret_ptr = *ret_ptr, 0;
 	}
 	fclose(fpasswd);
-	return *ret_ptr = NULL, errnum ? errnum : (errno = ENOUSER);
+	return *ret_ptr = NULL, errnum ? errnum : 0;
 }

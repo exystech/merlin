@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -44,6 +44,8 @@ int getlogin_r(char* buf, size_t size)
 	                               &passwd)) == ERANGE );
 	if ( errnum )
 		return free(pwdbuf), errno = errnum, -1;
+	if ( !passwd )
+		return free(pwdbuf), errno = ENOENT, -1;
 
 	const char* username = passwd->pw_name;
 	if ( size <= strlcpy(buf, username, size) )

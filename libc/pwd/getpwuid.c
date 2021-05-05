@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,6 +24,7 @@
 
 struct passwd* getpwuid(uid_t uid)
 {
+	int old_errno = errno;
 	static struct passwd result_object;
 	static char* buf = NULL;
 	static size_t buflen = 0;
@@ -50,5 +51,6 @@ retry:
 	}
 	if ( errnum < 0 )
 		return errno = errnum, (struct passwd*) NULL;
+	errno = old_errno;
 	return result;
 }
