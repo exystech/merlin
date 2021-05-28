@@ -224,7 +224,7 @@ static bool prepare_block_device(void* ctx, const char* path)
 	}
 	if ( !harddisk_inspect_blockdevice(hd) )
 	{
-		if ( errno == ENOTBLK )
+		if ( errno == ENOTBLK || errno == ENOMEDIUM )
 			return true;
 		if ( errno == EINVAL )
 			return warning("%s: %m", path), true;

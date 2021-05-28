@@ -110,6 +110,7 @@ const char* sortix_strerror(int errnum)
 	case EPROTO: return "Protocol error";
 	case ETXTBSY: return "Text file busy";
 	case ENOMOUNT: return "No such mountpoint";
+	case ENOMEDIUM: return "No medium found";
 	default: return "Unknown error condition";
 	}
 }

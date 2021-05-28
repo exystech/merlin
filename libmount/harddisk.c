@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -97,6 +97,8 @@ bool harddisk_inspect_blockdevice(struct harddisk* hd)
 		return harddisk_close(hd), false;
 	hd->sectors = (uint16_t) strtoul(str, NULL, 10);
 	free(str);
+	if ( !hd->logical_block_size )
+		return errno = ENOMEDIUM, false;
 	// TODO: To avoid potential overflow bugs (assuming malicious filesystem),
 	//       reject ridiculous block sizes.
 	if ( 65536 < hd->logical_block_size )

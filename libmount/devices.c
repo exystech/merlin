@@ -107,7 +107,7 @@ static bool devices_iterate_open_callback(void* ctx_ptr, const char* path)
 	}
 	if ( !harddisk_inspect_blockdevice(hd) )
 	{
-		bool success = errno == ENOTBLK;
+		bool success = errno == ENOTBLK || errno == ENOMEDIUM;
 		harddisk_close(hd);
 		return success;
 	}
