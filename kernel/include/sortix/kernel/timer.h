@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016, 2017, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -57,6 +57,7 @@ static const int TIMER_FUNC_ADVANCE_THREAD = 1 << 4;
 // otherwise delay the destruction until the timer handler, which also grabs the
 // mutex and checks whether object destruction is supposed to happen.
 static const int TIMER_FUNC_MAY_DEALLOCATE_TIMER = 1 << 5;
+static const int TIMER_DISARM = 1 << 6;
 
 class Timer
 {

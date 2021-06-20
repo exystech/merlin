@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016, 2017, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -129,13 +129,20 @@ void Timer::Set(struct itimerspec* new_value, struct itimerspec* old_value,
 		GetInternal(old_value);
 
 	// Arm the timer if a value was specified.
-	if ( timespec_lt(timespec_nul(), new_value->it_value) )
+	if ( !(new_flags & TIMER_DISARM) )
 	{
 		value = *new_value;
 		flags = new_flags;
 		callback = new_callback;
 		user = new_user;
+		if ( !(flags & TIMER_ABSOLUTE) && value.it_value.tv_sec < 0 )
+			value.it_value = timespec_nul();
 		clock->Register(this);
+	}
+	else
+	{
+		value.it_value = timespec_nul();
+		value.it_interval = timespec_nul();
 	}
 
 	clock->UnlockClock();

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,11 +17,14 @@
  * Utility functions for manipulation of struct timespec.
  */
 
+#include <sys/types.h>
+
+#include <assert.h>
 #include <timespec.h>
 
 static const long NANOSECONDS_PER_SECOND = 1000000000L;
 
-// TODO: The C modulo operator doesn't do exactly what we desire.
+// The C modulo operator doesn't do exactly what we desire.
 static long proper_modulo(long a, long b)
 {
 	if ( 0 <= a )
@@ -37,19 +40,72 @@ struct timespec timespec_canonalize(struct timespec t)
 	return t;
 }
 
+bool timespec_add_overflow(struct timespec a,
+                           struct timespec b,
+                           struct timespec* res)
+{
+	assert(timespec_is_canonical(a) && timespec_is_canonical(b));
+	struct timespec ret;
+	ret.tv_nsec = a.tv_nsec + b.tv_nsec;
+	if ( NANOSECONDS_PER_SECOND <= ret.tv_nsec )
+	{
+		ret.tv_nsec -= NANOSECONDS_PER_SECOND;
+		if ( a.tv_sec != TIME_MAX )
+			a.tv_sec++;
+		else if ( b.tv_sec != TIME_MAX )
+			b.tv_sec++;
+		else
+			goto overflow;
+	}
+	if ( __builtin_add_overflow(a.tv_sec, b.tv_sec, &ret.tv_sec) )
+		goto overflow;
+	*res = ret;
+	return false;
+overflow:
+	*res = b.tv_sec < 0 ?
+	       timespec_make(TIME_MIN, 0) :
+	       timespec_make(TIME_MAX, NANOSECONDS_PER_SECOND - 1);
+	return true;
+}
+
 struct timespec timespec_add(struct timespec a, struct timespec b)
 {
 	struct timespec ret;
-	a = timespec_canonalize(a);
-	b = timespec_canonalize(b);
-	ret.tv_sec = a.tv_sec + b.tv_sec;
-	ret.tv_nsec = a.tv_nsec + b.tv_nsec;
-	return timespec_canonalize(ret);
+	timespec_add_overflow(a, b, &ret);
+	return ret;
+}
+
+bool timespec_sub_overflow(struct timespec a,
+                           struct timespec b,
+                           struct timespec* res)
+{
+	assert(timespec_is_canonical(a) && timespec_is_canonical(b));
+	struct timespec ret;
+	ret.tv_nsec = a.tv_nsec - b.tv_nsec;
+	if ( ret.tv_nsec < 0 )
+	{
+		ret.tv_nsec += NANOSECONDS_PER_SECOND;
+		if ( a.tv_sec != TIME_MIN )
+			a.tv_sec--;
+		else if ( b.tv_sec != TIME_MAX )
+			b.tv_sec++;
+		else
+			goto overflow;
+	}
+	if ( __builtin_sub_overflow(a.tv_sec, b.tv_sec, &ret.tv_sec) )
+		goto overflow;
+	*res = ret;
+	return false;
+overflow:
+	*res = b.tv_sec >= 0 ?
+	       timespec_make(TIME_MIN, 0) :
+	       timespec_make(TIME_MAX, NANOSECONDS_PER_SECOND - 1);
+	return true;
 }
 
 struct timespec timespec_sub(struct timespec a, struct timespec b)
 {
-	a = timespec_canonalize(a);
-	b = timespec_canonalize(b);
-	return timespec_add(a, timespec_neg(b));
+	struct timespec ret;
+	timespec_sub_overflow(a, b, &ret);
+	return ret;
 }

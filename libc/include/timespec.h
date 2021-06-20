@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,17 +28,9 @@
 #include <stdbool.h>
 #endif
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #ifndef __time_t_defined
 #define __time_t_defined
 typedef __time_t time_t;
-#endif
-
-#ifdef __cplusplus
-} /* extern "C" */
 #endif
 
 #include <sortix/timespec.h>
@@ -46,6 +38,11 @@ typedef __time_t time_t;
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+static __inline bool timespec_is_canonical(struct timespec t)
+{
+	return 0 <= t.tv_nsec && t.tv_nsec <= 999999999;
+}
 
 static __inline bool timespec_eq(struct timespec a, struct timespec b)
 {
@@ -91,6 +88,9 @@ static __inline struct timespec timespec_make(time_t sec, long nsec)
 
 static __inline struct timespec timespec_neg(struct timespec t)
 {
+	if ( t.tv_sec == __TIME_MIN )
+		return timespec_make(__TIME_MAX,
+		                     !t.tv_nsec ? 999999999 : 1000000000 - t.tv_nsec);
 	if ( t.tv_nsec )
 		return timespec_make(-t.tv_sec - 1, 1000000000 - t.tv_nsec);
 	return timespec_make(-t.tv_sec, 0);
@@ -101,9 +101,11 @@ static __inline struct timespec timespec_nul(void)
 	return timespec_make(0, 0);
 }
 
-struct timespec timespec_canonalize(struct timespec t);
-struct timespec timespec_add(struct timespec a, struct timespec b);
-struct timespec timespec_sub(struct timespec a, struct timespec b);
+struct timespec timespec_canonalize(struct timespec);
+struct timespec timespec_add(struct timespec, struct timespec);
+struct timespec timespec_sub(struct timespec, struct timespec);
+bool timespec_add_overflow(struct timespec, struct timespec, struct timespec*);
+bool timespec_sub_overflow(struct timespec, struct timespec, struct timespec*);
 
 #ifdef __cplusplus
 } /* extern "C" */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -47,9 +47,15 @@ int sys_alarmns(const struct timespec* user_delay, struct timespec* user_odelay)
 	struct itimerspec delay, odelay;
 	if ( !CopyFromUser(&delay.it_value, user_delay, sizeof(*user_delay)) )
 		return -1;
+	if ( !timespec_is_canonical(delay.it_value) )
+		return errno = EINVAL, -1;
 	delay.it_interval = timespec_nul();
 
-	process->alarm_timer.Set(&delay, &odelay, 0, alarm_handler, (void*) process);
+	int flags = 0;
+	if ( !delay.it_value.tv_sec && !delay.it_value.tv_nsec )
+		flags |= TIMER_DISARM;
+
+	process->alarm_timer.Set(&delay, &odelay, flags, alarm_handler, process);
 
 	if ( !CopyToUser(user_odelay, &odelay.it_value, sizeof(*user_odelay)) )
 		return -1;

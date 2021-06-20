@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,6 +23,6 @@
 
 int usleep(useconds_t usecs)
 {
-	struct timespec delay = timespec_canonalize(timespec_make(0, usecs * 1000));
+	struct timespec delay = timespec_make(usecs / 1000, (usecs % 1000) * 1000);
 	return nanosleep(&delay, NULL);
 }

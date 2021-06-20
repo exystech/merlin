@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014, 2015, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2015, 2018, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -177,6 +177,8 @@ static bool FetchTimespec(struct timespec* dest, const struct timespec* user)
 		dest->tv_nsec = 0;
 	else if ( !CopyFromUser(dest, user, sizeof(*dest)) )
 		return false;
+	else if ( !timespec_is_canonical(*dest) )
+		return errno = EINVAL, -1;
 	return true;
 }
 

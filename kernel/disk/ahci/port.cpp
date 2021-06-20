@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -52,9 +52,10 @@ static inline void ahci_port_flush(volatile struct port_regs* port_regs)
 	(void) port_regs->pxcmd;
 }
 
-static inline void delay(int usecs)
+static inline void delay(unsigned int usecs)
 {
-	struct timespec delay = timespec_make(usecs / 1000000, usecs * 1000);
+	struct timespec delay =
+		timespec_make(usecs / 1000000, (usecs % 1000000) * 1000);
 	Clock* clock = Time::GetClock(CLOCK_BOOT);
 	clock->SleepDelay(delay);
 }

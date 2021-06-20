@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -579,7 +579,7 @@ ssize_t Descriptor::pwritev(ioctx_t* ctx, const struct iovec* iov_ptr,
 
 static inline bool valid_utimens_timespec(struct timespec ts)
 {
-	return ts.tv_nsec < 1000000000 ||
+	return (0 <= ts.tv_nsec && ts.tv_nsec < 1000000000) ||
 	       ts.tv_nsec == UTIME_NOW ||
 	       ts.tv_nsec == UTIME_OMIT;
 }

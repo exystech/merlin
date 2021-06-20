@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -194,6 +194,10 @@ int sys_timer_settime(timer_t timerid,
 	if ( !CopyFromUser(&value, user_value, sizeof(value)) )
 		return -1;
 
+	if ( !timespec_is_canonical(value.it_value) ||
+	     !timespec_is_canonical(value.it_interval) )
+		return errno = EINVAL, -1;
+
 	if ( timespec_lt(value.it_value, timespec_nul()) ||
 	     timespec_lt(value.it_interval, timespec_nul()) ||
 	     (flags & ~(TIMER_ABSTIME)) != 0 )
@@ -202,6 +206,8 @@ int sys_timer_settime(timer_t timerid,
 	int timer_flags = 0;
 	if ( flags & TIMER_ABSTIME )
 		timer_flags |= TIMER_ABSOLUTE;
+	if ( !value.it_value.tv_sec && !value.it_value.tv_nsec )
+		timer_flags |= TIMER_DISARM;
 
 	timer->Set(&value, &ovalue, timer_flags, timer_callback, user_timer);
 
@@ -240,6 +246,11 @@ int sys_clock_settimeres(clockid_t clockid,
 	     (res && !CopyFromUser(&kres, res, sizeof(kres))) )
 		return -1;
 
+	if ( time && !timespec_is_canonical(ktime) )
+		return errno = EINVAL, -1;
+	if ( res && !timespec_is_canonical(kres) )
+		return errno = EINVAL, -1;
+
 	clock->Set(time ? &ktime : NULL, res ? &kres : NULL);
 
 	return 0;
@@ -258,6 +269,9 @@ int sys_clock_nanosleep(clockid_t clockid,
 
 	if ( !CopyFromUser(&time, user_duration, sizeof(time)) )
 		return -1;
+
+	if ( !timespec_is_canonical(time) )
+		return errno = EINVAL, -1;
 
 	time = flags & TIMER_ABSTIME ? clock->SleepUntil(time) :
 	                               clock->SleepDelay(time);
