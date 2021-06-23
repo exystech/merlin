@@ -23,6 +23,7 @@
 
 int usleep(useconds_t usecs)
 {
-	struct timespec delay = timespec_make(usecs / 1000, (usecs % 1000) * 1000);
+	struct timespec delay =
+		timespec_make(usecs / 1000000, (usecs % 1000000) * 1000);
 	return nanosleep(&delay, NULL);
 }
