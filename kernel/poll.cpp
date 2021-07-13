@@ -249,8 +249,6 @@ int sys_ppoll(struct pollfd* user_fds, size_t nfds,
 	kthread_mutex_t wakeup_mutex = KTHREAD_MUTEX_INITIALIZER;
 	kthread_cond_t wakeup_cond = KTHREAD_COND_INITIALIZER;
 
-	kthread_mutex_lock(&wakeup_mutex);
-
 	int ret = -1;
 	bool self_woken = false;
 	bool remote_woken = false;
@@ -304,6 +302,8 @@ int sys_ppoll(struct pollfd* user_fds, size_t nfds,
 
 	if ( timeout_ts.tv_sec == 0 && timeout_ts.tv_nsec == 0 )
 		self_woken = true;
+
+	kthread_mutex_lock(&wakeup_mutex);
 
 	while ( !(self_woken || remote_woken) )
 	{
