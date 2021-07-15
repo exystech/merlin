@@ -711,7 +711,7 @@ PipeNode::PipeNode(dev_t dev, uid_t owner, gid_t group, mode_t mode)
 	this->ino = (ino_t) this;
 	this->stat_uid = owner;
 	this->stat_gid = group;
-	this->type = S_IFCHR;
+	this->type = S_IFIFO;
 	this->stat_mode = (mode & S_SETABLE) | this->type;
 	supports_iovec = true;
 }
