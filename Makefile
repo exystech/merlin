@@ -127,6 +127,7 @@ sysroot-fsh:
 	mkdir -p "$(SYSROOT)/share"
 	mkdir -p "$(SYSROOT)/src"
 	mkdir -p "$(SYSROOT)/tix"
+	mkdir -p "$(SYSROOT)/tix/tixinfo"
 	mkdir -p "$(SYSROOT)/tix/manifest"
 	mkdir -p "$(SYSROOT)/tmp" -m 1777
 	mkdir -p "$(SYSROOT)/var"
@@ -159,6 +160,7 @@ sysroot-system: sysroot-fsh sysroot-base-headers
 	echo /share >> "$(SYSROOT)/tix/manifest/system"
 	echo /src >> "$(SYSROOT)/tix/manifest/system"
 	echo /tix >> "$(SYSROOT)/tix/manifest/system"
+	echo /tix/tixinfo >> "$(SYSROOT)/tix/manifest/system"
 	echo /tix/manifest >> "$(SYSROOT)/tix/manifest/system"
 	echo /tmp >> "$(SYSROOT)/tix/manifest/system"
 	echo /usr >> "$(SYSROOT)/tix/manifest/system"
