@@ -620,6 +620,10 @@ $(SORTIX_RELEASE_DIR)/$(RELEASE)/README: README $(SORTIX_RELEASE_DIR)/$(RELEASE)
 .PHONY: release-man
 release-man: $(SORTIX_RELEASE_DIR)/$(RELEASE)/man/ports.list
 
+.PHONY: release-man-html
+release-man-html: release-man
+	RELEASE="$(RELEASE)" build-aux/manhtml.sh $(SORTIX_RELEASE_DIR)/$(RELEASE)/man
+
 .PHONY: release-readme
 release-readme: $(SORTIX_RELEASE_DIR)/$(RELEASE)/README
 
@@ -627,12 +631,12 @@ release-readme: $(SORTIX_RELEASE_DIR)/$(RELEASE)/README
 release-arch: release-builds release-readme release-repository
 
 .PHONY: release-shared
-release-shared: release-man release-readme release-scripts
+release-shared: release-man release-man-html release-readme release-scripts
 
 .PHONY: release
 release: release-arch release-shared
 	cd $(SORTIX_RELEASE_DIR)/$(RELEASE) && \
-	find . -type f '!' -name sha256sum -exec sha256sum '{}' ';' | \
+	find . -type f '!' -name sha256sum '!' -name '*.html' -exec sha256sum '{}' ';' | \
 	sed -E 's,^([^ ]*  )\./,\1,' | \
 	LC_ALL=C sort -k 2 > sha256sum
 
