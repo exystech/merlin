@@ -60,7 +60,7 @@ endif
 
 include build-aux/dirs.mak
 
-BUILD_NAME:=sortix-$(VERSION)-$(MACHINE)
+BUILD_NAME:=sortix-$(RELEASE)-$(MACHINE)
 
 LIVE_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).live.initrd
 OVERLAY_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).overlay.initrd
@@ -410,103 +410,103 @@ sortix.iso: $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso
 
 # Release
 
-$(SORTIX_RELEASE_DIR)/$(VERSION):
+$(SORTIX_RELEASE_DIR)/$(RELEASE):
 	mkdir -p $@
 
-$(SORTIX_RELEASE_DIR)/$(VERSION)/builds: $(SORTIX_RELEASE_DIR)/$(VERSION)
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/builds: $(SORTIX_RELEASE_DIR)/$(RELEASE)
 	mkdir -p $@
 
-$(SORTIX_RELEASE_DIR)/$(VERSION)/builds/$(BUILD_NAME).iso: $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso $(SORTIX_RELEASE_DIR)/$(VERSION)/builds
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/builds/$(BUILD_NAME).iso: $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso $(SORTIX_RELEASE_DIR)/$(RELEASE)/builds
 	cp $< $@
 
 ifneq ($(MACHINE),)
-$(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE): $(SORTIX_RELEASE_DIR)/$(VERSION)
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE): $(SORTIX_RELEASE_DIR)/$(RELEASE)
 	mkdir -p $@
 endif
 
-$(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot: $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot: $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)
 	mkdir -p $@
 
-$(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot/sortix.bin.xz: sysroot $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/sortix.bin.xz: sysroot $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot
 	xz -c "$(SYSROOT)/boot/sortix.bin" > $@
 
-$(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot/live.initrd.xz: $(LIVE_INITRD) $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/live.initrd.xz: $(LIVE_INITRD) $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot
 	xz -c $< > $@
 
-$(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot/overlay.initrd.xz: $(OVERLAY_INITRD) $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/overlay.initrd.xz: $(OVERLAY_INITRD) $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot
 	test ! -e $< || xz -c $< > $@
 
-$(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot/src.initrd.xz: $(SRC_INITRD) $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/src.initrd.xz: $(SRC_INITRD) $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot
 	xz -c $< > $@
 
-$(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot/system.initrd.xz: $(SYSTEM_INITRD) $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/system.initrd.xz: $(SYSTEM_INITRD) $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot
 	xz -c $< > $@
 
 .PHONY: release-boot
 release-boot: \
-  $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot/sortix.bin.xz \
-  $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot/live.initrd.xz \
-  $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot/overlay.initrd.xz \
-  $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot/src.initrd.xz \
-  $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot/system.initrd.xz \
+  $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/sortix.bin.xz \
+  $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/live.initrd.xz \
+  $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/overlay.initrd.xz \
+  $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/src.initrd.xz \
+  $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/system.initrd.xz \
 
 .PHONY: release-iso
-release-iso: $(SORTIX_RELEASE_DIR)/$(VERSION)/builds/$(BUILD_NAME).iso
+release-iso: $(SORTIX_RELEASE_DIR)/$(RELEASE)/builds/$(BUILD_NAME).iso
 
 .PHONY: release-builds
 release-builds: release-boot release-iso
 
-$(SORTIX_RELEASE_DIR)/$(VERSION)/scripts: $(SORTIX_RELEASE_DIR)/$(VERSION)
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/scripts: $(SORTIX_RELEASE_DIR)/$(RELEASE)
 	mkdir -p $@
 
-$(SORTIX_RELEASE_DIR)/$(VERSION)/scripts/tix-iso-add: tix/tix-iso-add $(SORTIX_RELEASE_DIR)/$(VERSION)/scripts
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/scripts/tix-iso-add: tix/tix-iso-add $(SORTIX_RELEASE_DIR)/$(RELEASE)/scripts
 	cp $< $@
 
-$(SORTIX_RELEASE_DIR)/$(VERSION)/scripts/tix-iso-bootconfig: tix/tix-iso-bootconfig $(SORTIX_RELEASE_DIR)/$(VERSION)/scripts
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/scripts/tix-iso-bootconfig: tix/tix-iso-bootconfig $(SORTIX_RELEASE_DIR)/$(RELEASE)/scripts
 	cp $< $@
 
-$(SORTIX_RELEASE_DIR)/$(VERSION)/scripts/tix-iso-liveconfig: tix/tix-iso-liveconfig $(SORTIX_RELEASE_DIR)/$(VERSION)/scripts
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/scripts/tix-iso-liveconfig: tix/tix-iso-liveconfig $(SORTIX_RELEASE_DIR)/$(RELEASE)/scripts
 	cp $< $@
 
-$(SORTIX_RELEASE_DIR)/$(VERSION)/man:
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/man:
 	mkdir -p $@
 
-$(SORTIX_RELEASE_DIR)/$(VERSION)/man/ports.list: sysroot $(SORTIX_RELEASE_DIR)/$(VERSION)/man
-	for section in 1 2 3 4 5 6 7 8 9; do mkdir -p $(SORTIX_RELEASE_DIR)/$(VERSION)/man/man$$section; done
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/man/ports.list: sysroot $(SORTIX_RELEASE_DIR)/$(RELEASE)/man
+	for section in 1 2 3 4 5 6 7 8 9; do mkdir -p $(SORTIX_RELEASE_DIR)/$(RELEASE)/man/man$$section; done
 	for port in system `LC_ALL=C ls "$(SYSROOT)/tix/tixinfo"`; do \
 	  for manpage in `grep -E "^/share/man/man[1-9]/.*\.[1-9]$$" "$(SYSROOT)/tix/manifest/$$port" | \
 	                  LC_ALL=C sort | \
-	                  tee $(SORTIX_RELEASE_DIR)/$(VERSION)/man/$$port.list | \
+	                  tee $(SORTIX_RELEASE_DIR)/$(RELEASE)/man/$$port.list | \
 	                  grep -Eo 'man[1-9]/[^/]*\.[0-9]$$'`; do \
-	    cp -f "$(SYSROOT)/share/man/$$manpage" $(SORTIX_RELEASE_DIR)/$(VERSION)/man/$$manpage && \
-	    chmod 644 $(SORTIX_RELEASE_DIR)/$(VERSION)/man/$$manpage; \
+	    cp -f "$(SYSROOT)/share/man/$$manpage" $(SORTIX_RELEASE_DIR)/$(RELEASE)/man/$$manpage && \
+	    chmod 644 $(SORTIX_RELEASE_DIR)/$(RELEASE)/man/$$manpage; \
 	  done; \
 	done
-	LC_ALL=C ls "$(SYSROOT)/tix/tixinfo" > $(SORTIX_RELEASE_DIR)/$(VERSION)/man/ports.list
+	LC_ALL=C ls "$(SYSROOT)/tix/tixinfo" > $(SORTIX_RELEASE_DIR)/$(RELEASE)/man/ports.list
 
-$(SORTIX_RELEASE_DIR)/$(VERSION)/repository/$(HOST):
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/repository/$(HOST):
 	mkdir -p $@
 
 .PHONY: release-repository
-release-repository: sysroot $(SORTIX_RELEASE_DIR)/$(VERSION)/repository/$(HOST)
+release-repository: sysroot $(SORTIX_RELEASE_DIR)/$(RELEASE)/repository/$(HOST)
 	for port in `LC_ALL=C ls "$(SYSROOT)/tix/tixinfo"`; do \
-	  cp $(SORTIX_REPOSITORY_DIR)/$(HOST)/$$port.tix.tar.xz $(SORTIX_RELEASE_DIR)/$(VERSION)/repository/$(HOST); \
+	  cp $(SORTIX_REPOSITORY_DIR)/$(HOST)/$$port.tix.tar.xz $(SORTIX_RELEASE_DIR)/$(RELEASE)/repository/$(HOST); \
 	done
 
 .PHONY: release-scripts
 release-scripts: \
-  $(SORTIX_RELEASE_DIR)/$(VERSION)/scripts/tix-iso-add \
-  $(SORTIX_RELEASE_DIR)/$(VERSION)/scripts/tix-iso-bootconfig \
-  $(SORTIX_RELEASE_DIR)/$(VERSION)/scripts/tix-iso-liveconfig \
+  $(SORTIX_RELEASE_DIR)/$(RELEASE)/scripts/tix-iso-add \
+  $(SORTIX_RELEASE_DIR)/$(RELEASE)/scripts/tix-iso-bootconfig \
+  $(SORTIX_RELEASE_DIR)/$(RELEASE)/scripts/tix-iso-liveconfig \
 
-$(SORTIX_RELEASE_DIR)/$(VERSION)/README: README $(SORTIX_RELEASE_DIR)/$(VERSION)
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/README: README $(SORTIX_RELEASE_DIR)/$(RELEASE)
 	cp $< $@
 
 .PHONY: release-man
-release-man: $(SORTIX_RELEASE_DIR)/$(VERSION)/man/ports.list
+release-man: $(SORTIX_RELEASE_DIR)/$(RELEASE)/man/ports.list
 
 .PHONY: release-readme
-release-readme: $(SORTIX_RELEASE_DIR)/$(VERSION)/README
+release-readme: $(SORTIX_RELEASE_DIR)/$(RELEASE)/README
 
 .PHONY: release-arch
 release-arch: release-builds release-readme release-repository
@@ -516,7 +516,7 @@ release-shared: release-man release-readme release-scripts
 
 .PHONY: release
 release: release-arch release-shared
-	cd $(SORTIX_RELEASE_DIR)/$(VERSION) && \
+	cd $(SORTIX_RELEASE_DIR)/$(RELEASE) && \
 	find . -type f '!' -name sha256sum -exec sha256sum '{}' ';' | \
 	sed -E 's,^([^ ]*  )\./,\1,' | \
 	LC_ALL=C sort -k 2 > sha256sum
