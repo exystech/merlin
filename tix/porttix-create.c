@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2016, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -63,6 +63,7 @@ int main(int argc, char* argv[])
 {
 	char* input_normalized_path = NULL;
 	char* input_tarball_path = NULL;
+	char* input_tarball2_path = NULL;
 	char* output_directory = strdup(".");
 	char* output = NULL;
 	char* tmp = strdup(getenv_def("TMPDIR", "/tmp"));
@@ -95,6 +96,7 @@ int main(int argc, char* argv[])
 		else if ( GET_OPTION_VARIABLE("--output-directory", &output_directory) ) { }
 		else if ( GET_OPTION_VARIABLE("--output", &output) ) { }
 		else if ( GET_OPTION_VARIABLE("--tarball", &input_tarball_path) ) { }
+		else if ( GET_OPTION_VARIABLE("--tarball2", &input_tarball2_path) ) { }
 		else if ( GET_OPTION_VARIABLE("--tmp", &tmp) ) { }
 		else
 		{
@@ -149,7 +151,10 @@ int main(int argc, char* argv[])
 
 	initialize_tmp(tmp, "porttix");
 
-	const char* tarball_basename = non_modify_basename(input_tarball_path);
+	const char* tarball_basename =
+		input_tarball_path ? non_modify_basename(input_tarball_path) : NULL;
+	const char* tarball2_basename =
+		input_tarball2_path ? non_modify_basename(input_tarball2_path) : NULL;
 
 	char* rel_srctix_path = print_string("%s.srctix", package_name);
 	char* rel_normalized_path = print_string("%s.normalized", package_name);
@@ -253,10 +258,26 @@ int main(int argc, char* argv[])
 			execvp(cmd_argv[0], (char* const*) cmd_argv);
 			err(127, "%s", cmd_argv[0]);
 		}
+
+		if ( input_tarball2_path && fork_and_wait_or_death() )
+		{
+			const char* cmd_argv[] =
+			{
+				"tar",
+				"--extract",
+				"--directory", normalized_path,
+				"--file", input_tarball2_path,
+				"--strip-components=1",
+				NULL,
+			};
+			execvp(cmd_argv[0], (char* const*) cmd_argv);
+			err(127, "%s", cmd_argv[0]);
+		}
 	}
 
 	// Copy the tarball into the port tix.
-	char* porttix_tarball_path = print_string("%s/%s", porttix_path, tarball_basename);
+	char* porttix_tarball_path =
+		print_string("%s/%s", porttix_path, tarball_basename);
 	if ( fork_and_wait_or_death() )
 	{
 		const char* cmd_argv[] =
@@ -271,6 +292,26 @@ int main(int argc, char* argv[])
 		err(127, "%s", cmd_argv[0]);
 	}
 	fprintf(porttixinfo_fp, "tar_extract %s\n", tarball_basename);
+
+	if ( input_tarball2_path )
+	{
+		char* porttix_tarball2_path =
+			print_string("%s/%s", porttix_path, tarball2_basename);
+		if ( fork_and_wait_or_death() )
+		{
+			const char* cmd_argv[] =
+			{
+				"cp",
+				"--",
+				input_tarball2_path,
+				porttix_tarball2_path,
+				NULL,
+			};
+			execvp(cmd_argv[0], (char* const*) cmd_argv);
+			err(127, "%s", cmd_argv[0]);
+		}
+		fprintf(porttixinfo_fp, "tar_extract %s\n", tarball2_basename);
+	}
 
 	// Create the normalization patch.
 	int normalized_fd = open(normalized_path, O_RDONLY | O_DIRECTORY);
