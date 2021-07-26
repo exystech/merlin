@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -37,7 +37,11 @@ int sys_setuid(uid_t uid)
 {
 	Process* process = CurrentProcess();
 	ScopedLock lock(&process->idlock);
-	return process->uid = uid, 0;
+	// TODO: Implement security checks in many place across the operating system
+	//       and until then allow anyone to do this to not pretend to be secure.
+	process->uid = uid;
+	process->euid = uid;
+	return 0;
 }
 
 gid_t sys_getgid()
@@ -51,7 +55,11 @@ int sys_setgid(gid_t gid)
 {
 	Process* process = CurrentProcess();
 	ScopedLock lock(&process->idlock);
-	return process->gid = gid, 0;
+	// TODO: Implement security checks in many place across the operating system
+	//       and until then allow anyone to do this to not pretend to be secure.
+	process->gid = gid;
+	process->egid = gid;
+	return 0;
 }
 
 uid_t sys_geteuid()
@@ -65,7 +73,10 @@ int sys_seteuid(uid_t euid)
 {
 	Process* process = CurrentProcess();
 	ScopedLock lock(&process->idlock);
-	return process->euid = euid, 0;
+	// TODO: Implement security checks in many place across the operating system
+	//       and until then allow anyone to do this to not pretend to be secure.
+	process->euid = euid;
+	return 0;
 }
 
 gid_t sys_getegid()
@@ -79,7 +90,10 @@ int sys_setegid(gid_t egid)
 {
 	Process* process = CurrentProcess();
 	ScopedLock lock(&process->idlock);
-	return process->egid = egid, 0;
+	// TODO: Implement security checks in many place across the operating system
+	//       and until then allow anyone to do this to not pretend to be secure.
+	process->egid = egid;
+	return 0;
 }
 
 } // namespace Sortix
