@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2021 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,18 +14,22 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  * tail.c
- * Output the last part of files.
+ * Output the trailing part of files.
  */
 
 #include <sys/stat.h>
+#include <sys/types.h>
 
-#include <ctype.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
+#include <getopt.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdnoreturn.h>
 #include <string.h>
+#include <unistd.h>
 
 #ifdef HEAD
 #define TAIL false
@@ -33,208 +37,396 @@
 #define TAIL true
 #endif
 
-const char* STDINNAME = "standard input";
+static bool byte_mode = false;
+static bool beginning_relative = !TAIL;
+static off_t file_offset = 10;
+static size_t buffer_size = 10;
+static bool verbose = false;
+static bool quiet = false;
+static bool follow = false;
+static bool path_mode = false;
 
-long numlines = 10;
-bool quiet = false;
-bool verbose = false;
-
-bool processfp(const char* inputname, FILE* fp)
+static void xputchar(int c)
 {
-	struct stat st;
-	if ( fstat(fileno(fp), &st) == 0 && S_ISDIR(st.st_mode) )
+	if ( putchar(c) < 0 )
+		err(1, "stdout");
+}
+
+static void xputstr(const char* str)
+{
+	if ( fputs(str, stdout) < 0 )
+		err(1, "stdout");
+}
+
+static int from_beginning(FILE* fp, const char* filename)
+{
+	int failure = 0;
+
+	off_t offset = 0;
+	while ( true )
 	{
-		error(0, EISDIR, "%s", inputname);
-		return false;
+		offset++;
+
+		if ( !TAIL && file_offset < offset )
+			break;
+
+		char* line = NULL;
+		size_t size = 0;
+		int c = 0;
+		ssize_t length = 0;
+		if ( byte_mode )
+			c = fgetc(fp);
+		else
+			length = getline(&line, &size, fp);
+		if ( c < 0 || length < 0 )
+		{
+			if ( !feof(fp) )
+			{
+				warn("%s", filename);
+				failure = 1;
+			}
+			if ( !byte_mode )
+				free(line);
+			break;
+		}
+
+		if ( (TAIL && file_offset <= offset) ||
+		     (!TAIL && offset <= file_offset) )
+		{
+			if ( byte_mode )
+				xputchar(c);
+			else
+				xputstr(line);
+		}
+
+		if ( !byte_mode )
+			free(line);
 	}
 
-	const bool tail = TAIL;
-	const bool head = !TAIL;
-	if ( !numlines ) { return true; }
-	bool specialleading = (head && 0 < numlines) || (tail && numlines < 0);
-	bool specialtrailing = !specialleading;
-	long abslines = (numlines < 0) ? -numlines : numlines;
+	return failure;
+}
 
-	char** buffer = NULL;
-	if ( specialtrailing )
-		buffer = (char**) calloc(1, sizeof(char*) * abslines);
+static int from_end(FILE* fp, const char* filename)
+{
+	int failure = 0;
 
-	long linenum;
-	for ( linenum = 0; true; linenum++ )
+	void* buffer = calloc(buffer_size, byte_mode ? 1 : sizeof(char*));
+	if ( !buffer )
+		err(1, "calloc");
+	char** lines = !byte_mode ? buffer : NULL;
+	unsigned char* bytes = byte_mode ? buffer : NULL;
+	size_t buffer_used = 0;
+
+	size_t offset = 0;
+	while ( true )
 	{
+		offset++;
+
 		char* line = NULL;
-		size_t linesize;
-		ssize_t linelen = getline(&line, &linesize, fp);
-		if ( linelen < 0 )
+		size_t size = 0;
+		int c = 0;
+		ssize_t length = 0;
+		if ( byte_mode )
+			c = fgetc(fp);
+		else
+			length = getline(&line, &size, fp);
+		if ( c < 0 || length < 0 )
 		{
-			if ( ferror(fp) )
-				error(1, errno, "%s", inputname);
+			if ( !feof(fp) )
+			{
+				warn("%s", filename);
+				failure = 1;
+			}
 			free(line);
 			break;
 		}
-		if ( specialleading )
+
+		if ( TAIL )
 		{
-			bool doprint = false;
-			if ( head && linenum < abslines ) { doprint = true; }
-			else if ( tail && abslines <= linenum ) { doprint = true; }
-			bool done = head && abslines <= linenum+1;
-			if ( doprint ) { printf("%s", line); }
-			free(line);
-			if ( done ) { return true; }
-		}
-		if ( specialtrailing )
-		{
-			long index = linenum % abslines;
-			if ( buffer[index] )
+			if ( buffer_size == 0 )
 			{
-				char* bufline = buffer[index];
-				if ( head ) { printf("%s", bufline); }
-				free(bufline);
+				free(line);
+				break;
 			}
-			buffer[index] = line;
-		}
-	}
 
-	if ( specialtrailing && tail )
-	{
-		long numtoprint = linenum < abslines ? linenum : abslines;
-		for ( long i = 0; i < numtoprint; i++ )
+			size_t index = offset % buffer_size;
+			if ( buffer_used < buffer_size )
+				buffer_used++;
+			else if ( !byte_mode )
+				free(lines[index]);
+
+			if ( byte_mode )
+				bytes[index] = c;
+			else
+				lines[index] = line;
+		}
+		else
 		{
-			long index = (linenum - numtoprint + i) % abslines;
-			printf("%s", buffer[index]);
-			free(buffer[index]);
+			if ( buffer_size == 0 )
+			{
+				if ( byte_mode )
+					xputchar(c);
+				else
+					xputstr(line);
+				free(line);
+				continue;
+			}
+
+			size_t index = offset % buffer_size;
+			if ( buffer_used < buffer_size )
+				buffer_used++;
+			else
+			{
+				if ( byte_mode )
+					xputchar(bytes[index]);
+				else
+				{
+					xputstr(lines[index]);
+					free(lines[index]);
+				}
+			}
+
+			if ( byte_mode )
+				bytes[index] = c;
+			else
+				lines[index] = line;
 		}
 	}
 
+	if ( TAIL )
+	{
+		for ( size_t i = 0; i < buffer_used; i++ )
+		{
+			size_t index = (offset - buffer_used + i) % buffer_size;
+			if ( byte_mode )
+				xputchar(bytes[index]);
+			else
+				xputstr(lines[index]);
+		}
+	}
+
+	if ( !byte_mode )
+	{
+		for ( size_t i = 0; i < buffer_used; i++ )
+		{
+			size_t index = (offset - buffer_used + i) % buffer_size;
+			free(lines[index]);
+		}
+	}
 	free(buffer);
 
-	return true;
+	return failure;
 }
 
-static void compact_arguments(int* argc, char*** argv)
+static int process_file(FILE* fp, const char* filename)
 {
-	for ( int i = 0; i < *argc; i++ )
+	int failure = beginning_relative ? from_beginning(fp, filename) :
+	                                   from_end(fp, filename);
+
+	if ( fflush(stdout) != 0 )
+		err(1, "fflush");
+
+	return failure;
+}
+
+noreturn static void follow_file(FILE* fp, const char* filename)
+{
+	off_t previous_size = ftello(fp);
+	if ( previous_size == -1 && errno != ESPIPE )
+		warn("ftello: %s", filename);
+	int reopen_errno = 0;
+	while ( true )
 	{
-		while ( i < *argc && !(*argv)[i] )
+		// Currently we have nothing like kqueue or inotify, so keep polling.
+		// This is used also by e.g. 2.9BSD tail(1) and GNU tail(1) as fallback.
+		sleep(1);
+
+		struct stat st;
+		if ( fstat(fileno(fp), &st) < 0 )
+			err(1, "fstat");
+
+		if ( st.st_size < previous_size )
 		{
-			for ( int n = i; n < *argc; n++ )
-				(*argv)[n] = (*argv)[n+1];
-			(*argc)--;
+			warnx("File truncated: %s", filename);
+			if ( fseeko(fp, 0, SEEK_END) < 0 )
+				warn("fseeko: %s", filename);
+		}
+		previous_size = st.st_size;
+
+		bool reopen_file = false;
+		struct stat path_st;
+		if ( fp != stdin && path_mode && stat(filename, &path_st) == 0 &&
+			 (st.st_dev != path_st.st_dev || st.st_ino != path_st.st_ino) )
+		{
+			reopen_file = true;
+			previous_size = path_st.st_size;
+		}
+
+		clearerr(fp);
+		while ( true )
+		{
+			int c = fgetc(fp);
+			if ( c < 0 && feof(fp) )
+				break;
+			else if ( c < 0 )
+				err(1, "%s", filename);
+			xputchar(c);
+		}
+
+		if ( fflush(stdout) != 0 )
+			err(1, "stdout");
+
+		// Reopen file only after draining the old one, in case there was any
+		// change of contents before the file was replaced.
+		// Additionally, keep the old file open as long as we can't succesfully
+		// open the new one.
+		if ( reopen_file )
+		{
+			FILE* new_fp = fopen(filename, "r");
+			if ( new_fp )
+			{
+				fclose(fp);
+				fp = new_fp;
+				reopen_errno = 0;
+				warnx("reopened: %s", filename);
+			}
+			else if ( errno != reopen_errno )
+			{
+				warn("reopening: %s", filename);
+				reopen_errno = errno;
+			}
 		}
 	}
 }
 
-static void help(FILE* fp, const char* argv0)
+static void parse_number(const char* num_string)
 {
-	fprintf(fp, "Usage: %s [OPTION]... [FILE]...\n", argv0);
-}
+	// Handle explicit marking of whether it's relative to beginning or end.
+	const char* str = num_string;
 
-static void version(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
+	if ( *str == '+' )
+	{
+		beginning_relative = true;
+		str++;
+	}
+	else if ( *str == '-' )
+	{
+		beginning_relative = false;
+		str++;
+	}
+
+	if ( *str == '+' || *str == '-' )
+		errx(1, "Invalid number of %s: %s",
+		     byte_mode ? "bytes" : "lines", num_string);
+
+	char* end;
+	errno = 0;
+	intmax_t parsed = strtoimax(str, &end, 10);
+	if ( errno == ERANGE ||
+		 (beginning_relative && (off_t) parsed != parsed) ||
+		 (!beginning_relative && (size_t) parsed != (uintmax_t) parsed) )
+		errx(1, "Number of %s too large",
+			 byte_mode ? "bytes" : "lines");
+	if ( !*str || *end || errno )
+		errx(1, "Invalid number of %s: %s",
+			 byte_mode ? "bytes" : "lines", num_string);
+
+	if ( beginning_relative )
+		file_offset = parsed;
+	else
+		buffer_size = parsed;
 }
 
 int main(int argc, char* argv[])
 {
-	const char* nlinesstr = NULL;
-
-	const char* argv0 = argv[0];
-	for ( int i = 1; i < argc; i++ )
+	const struct option longopts[] =
 	{
-		const char* arg = argv[i];
-		if ( arg[0] != '-' || !arg[1] )
-			continue;
-		argv[i] = NULL;
-		if ( !strcmp(arg, "--") )
-			break;
-		if ( isdigit((unsigned char) arg[1]) )
-			nlinesstr = arg + 1;
-		else if ( arg[1] != '-' )
+		{"bytes", required_argument, NULL, 'c'},
+		{"lines", required_argument, NULL, 'n'},
+		{"follow", no_argument, NULL, 'f'},
+		{"quiet", no_argument, NULL, 'q'},
+		{"verbose", no_argument, NULL, 'v'},
+		{0, 0, 0, 0}
+	};
+	int opt;
+#ifndef HEAD
+	const char* opts = "c:fFn:qv";
+#else
+	const char* opts = "c:n:qv";
+#endif
+	while ( (opt = getopt_long(argc, argv, opts, longopts, NULL)) != -1 )
+	{
+		switch ( opt )
 		{
-			char c;
-			while ( (c = *++arg) ) switch ( c )
-			{
+			case 'c':
 			case 'n':
-				if ( !*(nlinesstr = arg + 1) )
-				{
-					if ( i + 1 == argc )
-					{
-						error(0, 0, "option requires an argument -- 'n'");
-						fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
-						exit(125);
-					}
-					nlinesstr = argv[i+1];
-					argv[++i] = NULL;
-				}
-				arg = "n";
+				byte_mode = opt == 'c';
+				parse_number(optarg);
 				break;
+			case 'f': follow = true; path_mode = false; break;
+			case 'F': follow = true; path_mode = true; break;
 			case 'q': quiet = true; verbose = false; break;
-			case 'v': quiet = false; verbose = true; break;
-			default:
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				help(stderr, argv0);
-				exit(1);
+			case 'v': verbose = true; quiet = false; break;
+			default: return 1;
+		}
+	}
+
+	if ( follow && 1 < argc - optind )
+		errx(1, "-%c cannot be used with multiple files",
+		     path_mode ? 'F' : 'f');
+
+	int failure = 0;
+
+	if ( argc - optind < 1 )
+	{
+		if ( verbose )
+		{
+			if ( printf("==> standard input <==\n") < 0 )
+				err(1, "stdout");
+		}
+
+		failure |= process_file(stdin, "standard input");
+
+		// -f is ignored if stdin is a fifo.
+		struct stat st;
+		if ( fstat(0, &st) < 0 )
+			err(1, "fstat");
+		if ( follow && !S_ISFIFO(st.st_mode) )
+			follow_file(stdin, "standard input");
+	}
+	else
+	{
+		for ( int i = optind; i < argc; i++ )
+		{
+			bool is_stdin = !strcmp(argv[i], "-");
+			const char* filename = is_stdin ? "standard input" : argv[i];
+			if ( verbose || (!quiet && 1 < argc - optind) )
+			{
+				if ( printf("%s==> %s <==\n", i == optind ? "" : "\n",
+				            filename) < 0 )
+					err(1, "stdout");
 			}
+
+			FILE* fp = is_stdin ? stdin : fopen(argv[i], "r");
+			if ( !fp )
+			{
+				warn("%s", argv[i]);
+				failure = 1;
+				continue;
+			}
+
+			failure |= process_file(fp, filename);
+
+			struct stat st;
+			if ( fstat(fileno(fp), &st) < 0 )
+				err(1, "fstat");
+			if ( follow && (!is_stdin || !S_ISFIFO(st.st_mode)) )
+				follow_file(fp, filename);
+
+			if ( !is_stdin )
+				fclose(fp);
 		}
-		else if ( !strcmp(arg, "--help") )
-			help(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--version") )
-			version(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--quiet") || !strcmp(arg, "--silent") )
-			quiet = true, verbose = false;
-		else if ( !strcmp(arg, "--verbose") )
-			quiet = false, verbose = true;
-		else
-		{
-			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			help(stderr, argv0);
-			exit(1);
-		}
 	}
 
-	compact_arguments(&argc, &argv);
-
-	if ( nlinesstr )
-	{
-		char* nlinesstrend;
-		long nlines = strtol(nlinesstr, &nlinesstrend, 10);
-		if ( *nlinesstrend )
-			error(1, 0, "Bad number of lines: %s", nlinesstr);
-		numlines = nlines;
-	}
-
-	if ( argc < 2 )
-	{
-		bool header = verbose;
-		if ( header )
-			printf("==> %s <==\n", STDINNAME);
-		if ( !processfp(STDINNAME, stdin) )
-			return 1;
-		return 0;
-	}
-
-	int result = 0;
-
-	const char* prefix = "";
-	for ( int i = 1; i < argc; i++ )
-	{
-		bool isstdin = strcmp(argv[i], "-") == 0;
-		FILE* fp = isstdin ? stdin : fopen(argv[i], "r");
-		if ( !fp )
-		{
-			error(0, errno, "%s", argv[i]);
-			result = 1;
-			continue;
-		}
-		bool header = !quiet && (verbose || 2 < argc);
-		if ( header )
-			printf("%s==> %s <==\n", prefix, argv[i]);
-		prefix = "\n";
-		if ( !processfp(isstdin ? STDINNAME : argv[i], fp) )
-			result = 1;
-		if ( !isstdin )
-			fclose(fp);
-	}
-
-	return result;
+	return failure;
 }
