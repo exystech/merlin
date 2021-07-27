@@ -111,6 +111,10 @@ install: all
 	mkdir -p $(DESTDIR)$(MANDIR)/man8
 	cp $(MANPAGES8) $(DESTDIR)$(MANDIR)/man8
 
+head: tail.c
+
+xinstall: cp.c
+
 %: %.c
 	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< -o $@
 
