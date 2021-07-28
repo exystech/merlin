@@ -155,7 +155,11 @@ off_t AbstractInode::lseek(ioctx_t* /*ctx*/, off_t /*offset*/, int /*whence*/)
 ssize_t AbstractInode::read(ioctx_t* ctx, uint8_t* buf, size_t count)
 {
 	if ( !supports_iovec )
+	{
+		if ( inode_type == INODE_TYPE_DIR )
+			return errno = EISDIR, -1;
 		return errno = EBADF, -1;
+	}
 	struct iovec iov;
 	memset(&iov, 0, sizeof(iov));
 	iov.iov_base = (void*) buf;
@@ -166,7 +170,11 @@ ssize_t AbstractInode::read(ioctx_t* ctx, uint8_t* buf, size_t count)
 ssize_t AbstractInode::readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt)
 {
 	if ( supports_iovec )
+	{
+		if ( inode_type == INODE_TYPE_DIR )
+			return errno = EISDIR, -1;
 		return errno = EBADF, -1;
+	}
 	ssize_t sofar = 0;
 	for ( int i = 0; i < iovcnt && sofar < SSIZE_MAX; i++ )
 	{
@@ -198,6 +206,8 @@ ssize_t AbstractInode::pread(ioctx_t* ctx, uint8_t* buf, size_t count,
 	{
 		if ( inode_type == INODE_TYPE_STREAM || inode_type == INODE_TYPE_TTY )
 			return errno = ESPIPE, -1;
+		if ( inode_type == INODE_TYPE_DIR )
+			return errno = EISDIR, -1;
 		return errno = EBADF, -1;
 	}
 	struct iovec iov;
@@ -214,6 +224,8 @@ ssize_t AbstractInode::preadv(ioctx_t* ctx, const struct iovec* iov, int iovcnt,
 	{
 		if ( inode_type == INODE_TYPE_STREAM || inode_type == INODE_TYPE_TTY )
 			return errno = ESPIPE, -1;
+		if ( inode_type == INODE_TYPE_DIR )
+			return errno = EISDIR, -1;
 		return errno = EBADF, -1;
 	}
 	ssize_t sofar = 0;
@@ -364,7 +376,7 @@ ssize_t AbstractInode::readdirents(ioctx_t* /*ctx*/,
                                    off_t /*start*/)
 {
 	if ( inode_type == INODE_TYPE_DIR )
-		return errno = EBADF, -1;
+		return errno = ENOTDIR, -1;
 	return errno = ENOTDIR, -1;
 }
 

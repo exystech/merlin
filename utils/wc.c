@@ -165,15 +165,6 @@ static void compact_arguments(int* argc, char*** argv)
 bool word_count_file(FILE* fp, const char* path, int flags,
                      struct word_count* total)
 {
-	struct stat st;
-	if ( fstat(fileno(fp), &st) == 0 && S_ISDIR(st.st_mode) )
-	{
-		struct word_count word_count;
-		memset(&word_count, 0, sizeof(word_count));
-		error(0, EISDIR, "`%s'", path);
-		print_stats(word_count, stdout, flags, path);
-		return false;
-	}
 	struct word_count word_count = count_words(fp);
 	// TODO: Possible overflow here!
 	if ( total )

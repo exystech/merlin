@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -31,13 +31,6 @@
 
 static bool cat_fd(int fd, const char* path)
 {
-	struct stat st;
-	if ( fstat(fd, &st) == 0 )
-	{
-		if ( S_ISDIR(st.st_mode) )
-			return error(0, EISDIR, "`%s'", path), false;
-	}
-
 	const size_t BUFFER_SIZE = 16 * 1024;
 	uint8_t buffer[BUFFER_SIZE];
 
