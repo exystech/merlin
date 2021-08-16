@@ -20,6 +20,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <ctype.h>
 #include <err.h>
 #include <errno.h>
 #include <getopt.h>
@@ -348,14 +349,25 @@ int main(int argc, char* argv[])
 		{"verbose", no_argument, NULL, 'v'},
 		{0, 0, 0, 0}
 	};
-	int opt;
 #ifndef HEAD
 	const char* opts = "c:fFn:qv";
 #else
 	const char* opts = "c:n:qv";
 #endif
-	while ( (opt = getopt_long(argc, argv, opts, longopts, NULL)) != -1 )
+	while ( true )
 	{
+		// Handle the historical but still widely used -num option format.
+		if ( optind < argc && argv[optind][0] == '-' &&
+		     isdigit((unsigned char) argv[optind][1]) )
+		{
+			parse_number(&argv[optind][1]);
+			optind++;
+			continue;
+		}
+
+		int opt = getopt_long(argc, argv, opts, longopts, NULL);
+		if ( opt == -1 )
+			break;
 		switch ( opt )
 		{
 			case 'c':
