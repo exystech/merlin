@@ -259,7 +259,7 @@ mkdir -p -m 700 liveconfig/home/alice
 mkdir -p -m 700 liveconfig/home/bob
 grub-mkpasswd-pbkdf2 | # enter bootloader password
 tee /dev/tty |
-tail -1 |
+tail -n 1 |
 sed 's/PBKDF2 hash of your password is //' > liveconfig/etc/grubpw
 tix-iso-bootconfig --liveconfig=liveconfig bootconfig
 (echo 'insmod password_pbkdf2'
