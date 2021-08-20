@@ -144,8 +144,8 @@ In the best case, it will simply suffice to write:
 ### config.sub ###
 
 Most packages contain a copy of the config.sub shell script that recognizes the
-platform triplets. There is a list of operating system names and the Sortix
-operating system isn't in the upstream config.sub file yet, so we will need to
+platform triplets. While Sortix has been added to the upstream config.sub, some
+packages still use an obsolete copy without it. In such cases we will need to
 add it ourselves. You can simply search the line that contains the `-aos*`
 operating system entry and append `-sortix*` to it:
 
