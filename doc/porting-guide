@@ -454,7 +454,7 @@ archived source tix:
 
     srctix-create libfoo.porttix.tar.xz
 
-This will create an suitabe `libfoo.srctix.tar.xz` in the current directory,
+This will create an suitable `libfoo.srctix.tar.xz` in the current directory,
 which is an archive containing the normalized tree with all patches applied.
 When reviewing, be sure to verify the included tarball in the archived port tix
 is entirely identical to the upstream release byte-for-byte to avoid security

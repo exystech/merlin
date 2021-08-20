@@ -83,7 +83,7 @@ standard interface is very poorly designed. In particular, if a process closes
 a file descriptor, then all locks the process has for that file is unlocked,
 even though there might not be a lock associated with that file descriptor in
 the first place. This means that if the main program locks /foo/bar and runs
-a library routine that also happen to open /foo/bar, then the advsisory lock set
+a library routine that also happen to open /foo/bar, then the advisory lock set
 up by the main program is silently gone when when the library routine closes the
 file and returns to the main program. Additionally, the locks are attached to
 processes, rather than file descriptors. This complicates using them for threads
@@ -166,7 +166,7 @@ lockf
 -----
 
 This function implements POSIX advisory locks. It suffers from the same basic
-design mistakes that the fnctl advistory lock commands (F_GETLK, F_SETLK,
+design mistakes that the fnctl advisory lock commands (F_GETLK, F_SETLK,
 F_SETLKW) do and should be avoided for the same reasons (see above).
 
 Use the flock (not to be confused with lockf) call instead as it works at a file
@@ -249,7 +249,7 @@ The fd_set system is poorly designed and the FD_SETSIZE is considerably smaller
 than INT_MIN on most systems, which violates that the value of the file
 descriptor shouldn't matter as long as it is between 0 and INT_MAX. It would be
 better to use poll instead. There is also the problem that select uses struct
-timeval instead of the superior struct timespec, though pselect solves tha
+timeval instead of the superior struct timespec, though pselect solves that
 particular problem.
 
 Sortix currently provides this function for compatibility reasons.
@@ -261,8 +261,8 @@ The sprintf function is dangerous as it can be hard to predict the length of the
 output string safely. A mistake can easily end in security vulnerabilities and
 undefined behavior. Use the snprintf function instead as it knows the size of
 the destination buffer and safely truncates in the error case. Such truncation
-can be detected by the cacller. Use the asprintf function or another approach
-if determinining the output length is hard.
+can be detected by the caller. Use the asprintf function or another approach
+if determining the output length is hard.
 
 Sortix currently provides this function for compatibility reasons.
 
@@ -288,7 +288,7 @@ sys/param.h
 -----------
 
 This is a BSD header that contains a bunch of BSD-specific stuff and other
-miscellaneous junk. The GNU libc implementation contains some uselese macros
+miscellaneous junk. The GNU libc implementation contains some useless macros
 that doesn't justify its existence. The header inclusion can often be deleted
 without any problems, but older systems may require its inclusion.
 
@@ -315,7 +315,7 @@ This function is badly designed and the whole clock_t and sysconf(_SC_CLK_TCK)
 business is insane. It doesn't help there is problem with potential overflowing
 and the accuracy of the function varies between systems. You should avoid this
 function in favor of clock_gettime and the Sortix extension clocks that provide
-the same information as struct timespecs. If you need the atomic semantics of
+the same information as struct timespec. If you need the atomic semantics of
 times, you can use the Sortix extension timens.
 
 Sortix currently provides this function for compatibility reasons.

@@ -83,7 +83,7 @@ However, such tests are usually to detect broken systems. If testing is not
 possible, then the build system should assume that the system is not broken. It
 is often just a single operating system that has such a problem and it may be
 fixed in later releases. It is acceptable to inconvenience users of broken
-operarating systems by asking them to pass an --using-broken-os configure option
+operating systems by asking them to pass an --using-broken-os configure option
 or something similar, as long as it doesn't inconvenience honest users of good
 operating systems.
 
@@ -228,7 +228,7 @@ are usually similar enough, so it is simple to adapt a build system to use the
 pkg-config variant exclusively instead.
 
 The user can build a special cross-pkg-config or wrap an existing pkg-config by
-setting special environmental variables. There are some ceveats if the program
+setting special environmental variables. There are some caveats if the program
 builds custom build tools that needs dependencies detected through pkg-config.
 In that case, the user may need to have a special pkg-config with a tool prefix
 or pass a configure option setting the name of the build machine pkg-config
