@@ -13,6 +13,7 @@ bench \
 carray \
 checksum \
 disked \
+dnsconfig \
 editor \
 ext \
 games \

@@ -1,0 +1,86 @@
+.Dd October 7, 2021
+.Dt DNSCONFIG 8
+.Os
+.Sh NAME
+.Nm dnsconfig
+.Nd configure kernel DNS resolver list
+.Sh SYNOPSIS
+.Nm
+.Nm
+.Ar resolver ...
+.Nm
+.Fl s
+.Op Ar resolver ...
+.Nm
+.Fl a
+.Op Ar resolver ...
+.Nm
+.Fl d
+.Op Ar resolver ...
+.Sh DESCRIPTION
+.Nm
+writes the current kernel DNS resolver list, or modifies it if any resolvers are
+specified.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl a
+Append resolvers to the list.
+.It Fl d
+Delete resolvers from the list.
+.It Fl s
+Set the resolver list.
+This option is the default if
+.Nm
+is invoked with any resolvers.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh EXAMPLES
+Get the resolvers:
+.Bd -literal
+$ dnsconfig
+192.0.2.1
+.Ed
+.Pp
+Set two resolvers:
+.Bd -literal
+# dnsconfig 192.0.2.15 192.0.2.100
+# dnsconfig
+192.0.2.15
+192.0.2.100
+.Ed
+.Pp
+Set the resolvers to the empty list:
+.Bd -literal
+# dnsconfig -s
+# dnsconfig
+.Ed
+.Pp
+Append a resolver:
+.Bd -literal
+# dnsconfig 192.0.2.128
+# dnsconfig -a 192.0.2.40
+# dnsconfig
+192.0.2.128
+192.0.2.40
+.Ed
+.Pp
+Delete a resolver:
+.Bd -literal
+# dnsconfig -d 192.0.2.128
+# dnsconfig
+192.0.2.40
+.Ed
+.Sh SEE ALSO
+.Xr getdnsconfig 2 ,
+.Xr setdnsconfig 2
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 1.1.
+.Sh CAVEATS
+The kernel DNS resolver list is global state.
+Changes made with
+.Nm
+may be overwritten by other programs.
