@@ -161,6 +161,10 @@ char* token_finalize(const char* token)
 		}
 		else
 		{
+			if ( escape && double_quote &&
+			     token[i] != '$' && token[i] != '`' &&
+			     token[i] != '"' && token[i] != '\\' )
+				stringbuf_append_c(&buf, '\\');
 			stringbuf_append_c(&buf, token[i]);
 			escape = false;
 		}
@@ -246,6 +250,10 @@ char* token_expand_variables(const char* token)
 		}
 		else
 		{
+			if ( escape && double_quote &&
+			     token[i] != '$' && token[i] != '`' &&
+			     token[i] != '"' && token[i] != '\\' )
+				stringbuf_append_c(&buf, '\\');
 			stringbuf_append_c(&buf, token[i]);
 			escape = false;
 		}
@@ -299,6 +307,10 @@ bool token_split(void*** out,
 			}
 			else
 			{
+				if ( escape && double_quote &&
+				     token[index] != '$' && token[index] != '`' &&
+				     token[index] != '"' && token[index] != '\\' )
+					stringbuf_append_c(&buf, '\\');
 				stringbuf_append_c(&buf, token[index]);
 				escape = false;
 			}
@@ -375,6 +387,10 @@ bool token_expand_wildcards(void*** out,
 		}
 		else
 		{
+			if ( escape && double_quote &&
+			     token[index] != '$' && token[index] != '`' &&
+			     token[index] != '"' && token[index] != '\\' )
+				stringbuf_append_c(&buf, '\\');
 			if ( token[index] == '*' )
 				num_escaped_wildcards++;
 			stringbuf_append_c(&buf, token[index]);
@@ -423,6 +439,10 @@ bool token_expand_wildcards(void*** out,
 		}
 		else
 		{
+			if ( escape && double_quote &&
+			     token[index] != '$' && token[index] != '`' &&
+			     token[index] != '"' && token[index] != '\\' )
+				stringbuf_append_c(&buf, '\\');
 			if ( token[index] == '*' )
 				num_escaped_wildcards++;
 			stringbuf_append_c(&buf, token[index]);
@@ -681,6 +701,12 @@ enum sh_tokenize_result sh_tokenize(const char* command,
 			}
 			else
 			{
+				if ( escaped && double_quote &&
+				     command[command_index] != '$' &&
+				     command[command_index] != '`' &&
+				     command[command_index] != '"' &&
+				     command[command_index] != '\\' )
+					stringbuf_append_c(&buf, '\\');
 				stringbuf_append_c(&buf, command[command_index]);
 				command_index++;
 				escaped = false;
