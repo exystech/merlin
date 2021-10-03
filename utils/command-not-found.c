@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2021 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,9 +15,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  * command-not-found.c
- * Prints a notice that the attempted command wasn't found and possibly
- * suggests how to install the command or suggests the proper spelling in case
- * of a typo.
+ * Writes a notice that the attempted command wasn't found and suggests
+ * possible altetnatives.
  */
 
 #include <fcntl.h>
@@ -25,7 +25,9 @@
 #include <string.h>
 #include <unistd.h>
 
-const char* tty_name(void)
+#define ARRAY_LENGTH(array) (sizeof(array) / sizeof((array)[0]))
+
+static const char* tty_name(void)
 {
 	int tty_fd = open("/dev/tty", O_RDONLY);
 	const char* result = NULL;
@@ -37,111 +39,145 @@ const char* tty_name(void)
 	return result ? result : "/dev/tty";
 }
 
-void suggest_editor(const char* filename)
+static void suggest_logout(void)
 {
-	fprintf(stderr, "No command '%s' found, did you mean:\n", filename);
-	if ( access("/bin/ed", X_OK) == 0 )
-		fprintf(stderr, " Command 'ed' from package 'ed'\n");
-	fprintf(stderr, " Command 'editor' from package 'editor'\n");
-	if ( access("/bin/nano", X_OK) == 0 )
-		fprintf(stderr, " Command 'nano' from package 'nano'\n");
-	if ( access("/bin/vim", X_OK) == 0 )
-		fprintf(stderr, " Command 'vim' from package 'vim'\n");
-}
-
-void suggest_pager(const char* filename)
-{
-	fprintf(stderr, "No command '%s' found, did you mean:\n", filename);
-	fprintf(stderr, " Command 'pager' from package 'utils'\n");
-}
-
-void suggest_extfs(const char* filename)
-{
-	fprintf(stderr, "No command '%s' found, did you mean:\n", filename);
-	fprintf(stderr, " Command 'extfs' from package 'ext'\n");
-}
-
-void suggest_unmount(const char* filename)
-{
-	fprintf(stderr, "No command '%s' found, did you mean:\n", filename);
-	fprintf(stderr, " Command 'unmount' from package 'utils'\n");
-}
-
-void suggest_logout(const char* filename)
-{
-	fprintf(stderr, "No command '%s' found, did you mean:\n", filename);
 	fprintf(stderr, " Exiting your shell normally to logout.\n");
 }
 
-void suggest_poweroff(const char* filename)
+static void suggest_poweroff(void)
 {
-	fprintf(stderr, "No command '%s' found, did you mean:\n", filename);
 	if ( strcmp(tty_name(), "/dev/tty1") != 0 )
-	{
 		fprintf(stderr, " Powering off on /dev/tty1.\n");
-	}
 	else if ( getenv("LOGIN_PID") )
 	{
 		fprintf(stderr, " Exiting your shell normally to logout.\n");
 		fprintf(stderr, " Login as user 'poweroff' to power off computer.\n");
 	}
 	else
-	{
 		fprintf(stderr, " Exiting your shell normally to poweroff.\n");
-	}
 }
 
-void suggest_reboot(const char* filename)
+static void suggest_reboot(void)
 {
-	fprintf(stderr, "No command '%s' found, did you mean:\n", filename);
 	if ( strcmp(tty_name(), "/dev/tty1") != 0 )
-	{
 		fprintf(stderr, " Rebooting on /dev/tty1.\n");
-	}
 	else if ( getenv("LOGIN_PID") )
 	{
 		fprintf(stderr, " Exiting your shell normally to logout.\n");
 		fprintf(stderr, " Login as user 'reboot' to reboot computer.\n");
 	}
 	else
-	{
 		fprintf(stderr, " Exiting your shell with 'exit 1' to reboot.\n");
-	}
 }
 
-void suggest_rw(const char* filename)
+enum category
 {
-	fprintf(stderr, "No command '%s' found, did you mean:\n", filename);
-	fprintf(stderr, " Command 'rw' from package 'rw'\n");
+	NONE,
+	BROWSER,
+	EDITOR,
+	LOGOUT,
+	MOUNT,
+	PAGER,
+	POWEROFF,
+	REBOOT,
+	RW,
+	SHELL,
+	UNMOUNT,
+};
+
+struct command
+{
+	enum category category;
+	const char* command;
+	const char* package;
+	void (*suggest)(void);
+};
+
+struct command commands[] =
+{
+	{BROWSER, "chromium", NULL, NULL},
+	{BROWSER, "chromium-browser", NULL, NULL},
+	{BROWSER, "elinks", NULL, NULL},
+	{BROWSER, "firefox", NULL, NULL},
+	{BROWSER, "links", "links", NULL},
+	{BROWSER, "lynx", NULL, NULL},
+	{BROWSER, "w3m", NULL, NULL},
+	{BROWSER, "www-browser", NULL, NULL},
+	{BROWSER, "x-www-browser", NULL, NULL},
+
+	{EDITOR, "ed", "ed", NULL},
+	{EDITOR, "editor", "system", NULL},
+	{EDITOR, "emacs", "emacs", NULL},
+	{EDITOR, "nano", "nano", NULL},
+	{EDITOR, "vim", "vim", NULL},
+	{EDITOR, "vi", NULL, NULL},
+
+	{LOGOUT, "logoff", NULL, NULL},
+	{LOGOUT, "logout", NULL, suggest_logout},
+
+	{MOUNT, "extfs", "system", NULL},
+	{MOUNT, "mount", NULL, NULL},
+
+	{PAGER, "less", NULL, NULL},
+	{PAGER, "more", NULL, NULL},
+	{PAGER, "pager", "system", NULL},
+
+	{POWEROFF, "halt", NULL, NULL},
+	{POWEROFF, "poweroff", NULL, suggest_poweroff},
+	{POWEROFF, "shutdown", NULL, NULL},
+
+	{REBOOT, "reboot", NULL, suggest_reboot},
+
+	{RW, "dd", NULL, NULL},
+	{RW, "rw", "system", NULL},
+
+	{SHELL, "bash", NULL, NULL},
+	{SHELL, "dash", "dash", NULL},
+	{SHELL, "ksh", NULL, NULL},
+	{SHELL, "sh", "system", NULL},
+	{SHELL, "zsh", NULL, NULL},
+
+	{UNMOUNT, "umount", NULL, NULL},
+	{UNMOUNT, "unmount", "system", NULL},
+};
+
+static enum category find_category(const char* filename)
+{
+	for ( size_t i = 0; i < ARRAY_LENGTH(commands); i++ )
+	{
+		if ( commands[i].command && !strcmp(filename, commands[i].command) )
+			return commands[i].category;
+	}
+	return NONE;
 }
 
 int main(int argc, char* argv[])
 {
 	const char* filename = 2 <= argc ? argv[1] : argv[0];
-	if ( !strcmp(filename, "ed") ||
-	     !strcmp(filename, "emacs") ||
-	     !strcmp(filename, "nano") ||
-	     !strcmp(filename, "vi") ||
-	     !strcmp(filename, "vim") )
-		suggest_editor(filename);
-	else if ( !strcmp(filename, "less") ||
-	          !strcmp(filename, "more") )
-		suggest_pager(filename);
-	else if ( !strcmp(filename, "mount") )
-		suggest_extfs(filename);
-	else if ( !strcmp(filename, "umount") )
-		suggest_unmount(filename);
-	else if ( !strcmp(filename, "logout") ||
-	          !strcmp(filename, "logoff") )
-		suggest_logout(filename);
-	else if ( !strcmp(filename, "poweroff") ||
-	          !strcmp(filename, "halt") ||
-	          !strcmp(filename, "shutdown") )
-		suggest_poweroff(filename);
-	else if ( !strcmp(filename, "reboot") )
-		suggest_reboot(filename);
-	else if ( !strcmp(filename, "dd") )
-		suggest_rw(filename);
+
+	enum category category = find_category(filename);
+	if ( category != NONE )
+	{
+		fprintf(stderr, "No command '%s' found, did you mean:\n", filename);
+
+		for ( size_t i = 0; i < ARRAY_LENGTH(commands); i++ )
+		{
+			if ( !commands[i].package && !commands[i].suggest )
+				continue;
+			else if ( commands[i].category == category )
+			{
+				if ( commands[i].suggest )
+					commands[i].suggest();
+				else if ( !strcmp(commands[i].package, "system") )
+					fprintf(stderr, " Command '%s' from the base system\n",
+					        commands[i].command);
+				else
+					fprintf(stderr, " Command '%s' from the package '%s'\n",
+					        commands[i].command, commands[i].package);
+			}
+		}
+	}
+
 	fprintf(stderr, "%s: command not found\n", filename);
 	return 127;
 }
