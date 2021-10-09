@@ -1,0 +1,127 @@
+.Dd December 13, 2021
+.Dt GETDNSCOFIG 2
+.Os
+.Sh NAME
+.Nm getdnsconfig ,
+.Nm setdnsconfig
+.Nd get and set the kernel DNS resolver list
+.Sh SYNOPSIS
+.In sys/dnsconfig.h
+.Fd #define DNSCONFIG_MAX_SERVERS 3
+.Ft int
+.Fn getdnsconfig "struct dnsconfig *cfg"
+.Ft int
+.Fn getdnsconfig "const struct dnsconfig *cfg"
+.Sh DESCRIPTION
+.Fn getdnsconfig
+gets and
+.Fn setdnsconfig
+sets the kernel DNS resolver list.
+.Pp
+.Fa cfg
+points to a
+.Vt struct dnsconfig
+structure.
+The
+.Fa servers
+array can contain up to
+.Dv DNSCONFIG_MAX_SERVERS
+DNS resolvers.
+The
+.Fa servers_count
+field marks how many of the entries in
+.Fa servers
+are populated.
+.Bd -literal
+struct dnsconfig {
+	size_t servers_count;
+	struct dnsconfig_server servers[DNSCONFIG_MAX_SERVERS];
+}
+.Ed
+.Pp
+Each DNS resolver in the
+.Fa servers
+array is described by a
+.Vt struct dnsconfig_server
+structure.
+The resolver can be defined by either an IPv4 or an IPv6 address.
+.Pp
+For an IPv4 address
+.Fa family
+is
+.Dv AF_INET ,
+.Fa addrsize
+is
+.Fn sizeof "struct in_addr" ,
+and the address is stored in the
+.Fa in
+field of the
+.Fa addr
+union.
+.Pp
+For an IPv6 address
+.Fa family
+is
+.Dv AF_INET6 ,
+.Fa addrsize
+is
+.Fn sizeof "struct in_addr6" ,
+and the address is stored in the
+.Fa in6
+field of the
+.Fa addr
+union.
+.Bd -literal
+union dnsconfig_server_union {
+	struct in_addr in;
+	struct in6_addr in6;
+}
+
+struct dnsconfig_server {
+	sa_family_t family;
+	size_t addrsize;
+	union dnsconfig_server_union addr;
+}
+.Ed
+.Sh RETURN VALUES
+On success 0 is returned.
+On error -1 is returned, and
+.Va errno
+is set appropriately.
+.Sh ERRORS
+.Fn getdnsconfig
+and
+.Fn setdnsconfig
+will fail if:
+.Bl -tag -width "12345678"
+.It Er EFAULT
+.Fa cfg
+points to an invalid address.
+.El
+.Pp
+.Fn setdnsconfig
+will additionally fail if:
+.Bl -tag -width "12345678"
+.It Er EAFNOSUPPORT
+.Fa family
+is set to an address family other than
+.Dv AF_INET
+or
+.Dv AF_INET6 .
+.It Er EINVAL
+.Fa servers_count
+is larger than
+.Dv DNSCONFIG_MAX_SERVERS .
+.It Er EINVAL
+.Fa addrsize
+does not match the size of the address corresponding to
+.Fa family .
+.El
+.Sh SEE ALSO
+.Xr dnsconfig 8
+.Sh HISTORY
+The
+.Fn getdnsconfig
+and
+.Fn setdnsconfig
+system calls originally appeared in Sortix 1.1.

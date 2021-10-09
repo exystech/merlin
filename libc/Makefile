@@ -763,7 +763,9 @@ MISCOBJ=\
 $(CRTOBJ) \
 
 MANPAGES2=\
-scram/scram.2
+scram/scram.2 \
+sys/dnsconfig/getdnsconfig.2 \
+sys/dnsconfig/setdnsconfig.2 \
 
 HEADERS:=$(shell find include -type f)
 
