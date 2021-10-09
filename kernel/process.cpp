@@ -182,8 +182,8 @@ Process::~Process() // process_family_lock taken
 	assert(!root);
 	assert(!threads_not_exiting_count);
 
-	assert(ptable);
-	ptable->Free(pid);
+	if ( ptable )
+		ptable->Free(pid);
 	ptable.Reset();
 	tty.Reset();
 }
