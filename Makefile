@@ -522,6 +522,44 @@ release: release-arch release-shared
 	sed -E 's,^([^ ]*  )\./,\1,' | \
 	LC_ALL=C sort -k 2 > sha256sum
 
+# Presubmit checks
+
+presubmit:
+	$(MAKE) verify-coding-style
+	$(MAKE) verify-manual
+	$(MAKE) verify-build-tools
+# TODO: The gcc port doesn't ship with cross-compilers out of the box.
+ifeq ($(BUILD_IS_SORTIX),1)
+	$(MAKE) verify-build
+else
+	$(MAKE) verify-build HOST=i686-sortix
+	$(MAKE) verify-build HOST=x86_64-sortix
+endif
+	$(MAKE) verify-headers
+	@echo ok
+
+verify-coding-style:
+	build-aux/verify-coding-style.sh
+
+verify-manual:
+	build-aux/verify-manual.sh
+
+verify-build-tools:
+	$(MAKE) clean-build-tools
+	$(MAKE) OPTLEVEL='-O2 -g -Werror -Werror=strict-prototypes' build-tools
+
+verify-build:
+	$(MAKE) mostlyclean
+	$(MAKE) OPTLEVEL='-O2 -g -Werror -Werror=strict-prototypes' PACKAGES=''
+
+verify-headers:
+# TODO: The gcc port doesn't ship with cross-compilers out of the box.
+ifeq ($(BUILD_IS_SORTIX),1)
+	build-aux/verify-headers.sh $(HOST) # Inherit jobserver: $(MAKE)
+else
+	build-aux/verify-headers.sh # Inherit jobserver: $(MAKE)
+endif
+
 # Virtualization
 .PHONY: run-virtualbox
 run-virtualbox: sortix.iso

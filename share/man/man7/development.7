@@ -106,6 +106,17 @@ directory after making
 .It Sy mostlyclean
 Clean everything except binary packages.
 .Sy ( clean-builds , clean-core , clean-ports , clean-release , clean-sysroot )
+.It Sy presubmit
+Verify the coding style is followed
+.Sy ( verify-coding-style ) ,
+the manual pages does not have lints
+.Sy ( verify-manual ) ,
+the build tools compile
+.Sy ( verify-build-tools ) ,
+that everything compiles without warnings on all architectures
+.Sy ( verify-build ) ,
+and the system headers works in all supported configurations
+.Sy ( verify-headers ) .
 .It Sy release
 Make
 .Sy iso
@@ -320,6 +331,11 @@ A good approach is to set up your own local development branch and work there:
     git add utils/hello.c
     git commit -m 'Add hello(1).'
 .Ed
+.Pp
+The
+.Sy presubmit
+makefile target can be used to verify your work needs some of the development
+conventions.
 .Pp
 You can then easily prepare your a set of patches for upstream submission:
 .Bd -literal
