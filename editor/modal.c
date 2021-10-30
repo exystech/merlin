@@ -18,12 +18,16 @@
  * Modal commands.
  */
 
+#include <sys/types.h>
+
 #include <ctype.h>
+#include <regex.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
 #include <wctype.h>
 
 #include "command.h"
@@ -351,6 +355,94 @@ void editor_modal_command_config(struct editor* editor, const char* cmd)
 		editor_modal_line_numbering(editor, cmd);
 }
 
+bool match_line(regex_t* regex, const wchar_t* line, size_t used,
+                bool start_of_line, size_t* start, size_t *end)
+{
+	if ( !used )
+		return false;
+
+	char* buffer = calloc(used, MB_CUR_MAX);
+	if ( !buffer )
+		return false;
+	size_t buffer_used = 0;
+	mbstate_t ps = {0};
+	for ( size_t i = 0; i < used; i++ )
+		buffer_used += wcrtomb(&buffer[buffer_used], line[i], &ps);
+
+	regmatch_t start_end[] = {{.rm_so = 0, .rm_eo = buffer_used}};
+	int flags = start_of_line ? REG_STARTEND : REG_STARTEND | REG_NOTBOL;
+	int no_match = regexec(regex, buffer, 1, start_end, flags);
+	free(buffer);
+	if ( no_match )
+		return false;
+
+	char mb[MB_CUR_MAX];
+	memset(&ps, 0, sizeof(ps));
+	size_t wc_offset = 0;
+	regoff_t mb_offset = 0;
+	for ( ; mb_offset < start_end[0].rm_so; wc_offset++ )
+		mb_offset += wcrtomb(mb, line[wc_offset], &ps);
+	*start = wc_offset;
+	for ( ; mb_offset < start_end[0].rm_eo; wc_offset++ )
+		mb_offset += wcrtomb(mb, line[wc_offset], &ps);
+	*end = wc_offset;
+	return true;
+}
+
+void editor_modal_search(struct editor* editor, const char* search)
+{
+	if ( !search[0] )
+	{
+		editor_type_edit(editor);
+		return;
+	}
+
+	regex_t regex;
+	if ( regcomp(&regex, search, REG_EXTENDED) )
+	{
+		editor->modal_error = true;
+		return;
+	}
+
+	size_t column = editor->cursor_column + 1;
+	if ( column < editor->lines[editor->cursor_row].used )
+	{
+		const wchar_t* line = &editor->lines[editor->cursor_row].data[column];
+		size_t length = editor->lines[editor->cursor_row].used - column;
+		size_t match, match_end;
+		if ( match_line(&regex, line, length, false, &match, &match_end) )
+		{
+			editor_cursor_set(editor, editor->cursor_row, match + column);
+			editor_select_set(editor, editor->cursor_row, match_end + column);
+			regfree(&regex);
+			return;
+		}
+	}
+
+	size_t line = editor->cursor_row + 1;
+	size_t remaining = editor->lines_used;
+	while ( remaining-- )
+	{
+		if ( editor->lines_used <= line )
+			line = 0;
+
+		size_t match, match_end;
+		if ( match_line(&regex, editor->lines[line].data,
+		                editor->lines[line].used, true, &match, &match_end) )
+		{
+			editor_cursor_set(editor, line, match);
+			editor_select_set(editor, line, match_end);
+			regfree(&regex);
+			return;
+		}
+		line++;
+	}
+
+	regfree(&regex);
+
+	editor->modal_error = true;
+}
+
 
 void editor_modal_character(struct editor* editor, wchar_t c)
 {
@@ -382,6 +474,7 @@ void editor_modal_character(struct editor* editor, wchar_t c)
 		case MODE_ASK_QUIT: editor_modal_ask_quit(editor, param); break;
 		case MODE_GOTO_LINE: editor_modal_goto_line(editor, param); break;
 		case MODE_COMMAND: editor_modal_command(editor, param); break;
+		case MODE_SEARCH: editor_modal_search(editor, param); break;
 		default: break;
 		}
 		free(param);

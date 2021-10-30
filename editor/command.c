@@ -649,6 +649,14 @@ void editor_type_edit(struct editor* editor)
 	editor->mode = MODE_EDIT;
 }
 
+void editor_type_search(struct editor* editor)
+{
+	editor->mode = MODE_SEARCH;
+	editor->modal_used = 0;
+	editor->modal_cursor = 0;
+	editor->modal_error = false;
+}
+
 void editor_type_goto_line(struct editor* editor)
 {
 	editor->mode = MODE_GOTO_LINE;
@@ -849,6 +857,7 @@ void editor_type_character(struct editor* editor, wchar_t c)
 		switch ( towlower(c) )
 		{
 		case L'c': editor_type_copy(editor); break;
+		case L'f': editor_type_search(editor); break;
 		case L'g': editor_type_goto_line(editor); break;
 		case L'k': editor_type_cut(editor); break;
 		case L'o': editor->shift ?

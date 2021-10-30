@@ -30,12 +30,17 @@ void editor_select_set(struct editor* editor, size_t y, size_t x)
 {
 	assert(y < editor->lines_used);
 	assert(x <= editor->lines[y].used);
-	if ( editor->viewport_height )
+	size_t viewport_height = editor->viewport_height;
+	// Account for the modal shrinking the viewport by one line.
+	if ( editor->mode != MODE_EDIT && viewport_height )
+		viewport_height--;
+
+	if ( viewport_height )
 	{
 		if ( y < editor->page_y_offset )
 			editor->page_y_offset = y;
-		if ( editor->page_y_offset + editor->viewport_height <= y )
-			editor->page_y_offset = y + 1 - editor->viewport_height;
+		if ( editor->page_y_offset + viewport_height <= y )
+			editor->page_y_offset = y + 1 - viewport_height;
 	}
 	editor->select_row = y;
 

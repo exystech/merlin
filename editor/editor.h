@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2021 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -51,6 +52,7 @@ enum editor_mode
 	MODE_ASK_QUIT,
 	MODE_GOTO_LINE,
 	MODE_COMMAND,
+	MODE_SEARCH,
 };
 
 struct editor

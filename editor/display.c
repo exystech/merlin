@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2021 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -267,6 +268,8 @@ void render_editor(struct editor* editor, struct terminal_state* state)
 		msg = "Go to line: ";
 	if ( editor->mode == MODE_COMMAND )
 		msg = "Enter miscellaneous command: ";
+	if ( editor->mode == MODE_SEARCH )
+		msg = "Search: ";
 
 	struct terminal_datum* data_line = state->data + (state->height - 1) * state->width;
 	wchar_t* wcs_msg = convert_mbs_to_wcs(msg);
