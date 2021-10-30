@@ -370,16 +370,16 @@ int main(int argc, char* argv[])
 			break;
 		switch ( opt )
 		{
-			case 'c':
-			case 'n':
-				byte_mode = opt == 'c';
-				parse_number(optarg);
-				break;
-			case 'f': follow = true; path_mode = false; break;
-			case 'F': follow = true; path_mode = true; break;
-			case 'q': quiet = true; verbose = false; break;
-			case 'v': verbose = true; quiet = false; break;
-			default: return 1;
+		case 'c':
+		case 'n':
+			byte_mode = opt == 'c';
+			parse_number(optarg);
+			break;
+		case 'f': follow = true; path_mode = false; break;
+		case 'F': follow = true; path_mode = true; break;
+		case 'q': quiet = true; verbose = false; break;
+		case 'v': verbose = true; quiet = false; break;
+		default: return 1;
 		}
 	}
 
