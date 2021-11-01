@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2021 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -252,14 +253,14 @@ static void line_push_char(struct line* line, char c)
 {
 	if ( line->content_used == line->content_length )
 	{
-		size_t new_length = 2 * line->content_length;
-		if ( new_length == 0 )
-			new_length = 128;
-		char* new_content = (char*) realloc(line->content, new_length);
-		if ( !new_content )
+		size_t length = line->content_length;
+		if ( !length )
+			length = 64;
+		char* new = reallocarray(line->content, length, 2);
+		if ( !new )
 			err(1, "malloc");
-		line->content = new_content;
-		line->content_length = new_length;
+		line->content = new;
+		line->content_length = length * 2;
 	}
 	line->content[line->content_used++] = c;
 }
@@ -276,15 +277,14 @@ static struct line* continue_line(void)
 		return incoming_line;
 	if ( lines_used == lines_length )
 	{
-		size_t new_length = 2 * lines_length;
-		if ( new_length == 0 )
-			new_length = 128;
-		struct line* new_lines = (struct line*)
-			reallocarray(lines, new_length, sizeof(struct line));
-		if ( !new_lines )
+		size_t length = lines_length;
+		if ( !length )
+			length = 64;
+		struct line* new = reallocarray(lines, length, sizeof(struct line) * 2);
+		if ( !new )
 			err(1, "malloc");
-		lines = new_lines;
-		lines_length = new_length;
+		lines = new;
+		lines_length = length * 2;
 	}
 	incoming_line = &lines[lines_used++];
 	memset(incoming_line, 0, sizeof(*incoming_line));
@@ -296,7 +296,8 @@ static void finish_line(void)
 {
 	struct line* line = incoming_line;
 	assert(line);
-	char* final_content = (char*) realloc(line->content, line->content_used);
+	size_t length = line->content_used ? line->content_used : 1;
+	char* final_content = realloc(line->content, length);
 	if ( final_content )
 		line->content = final_content;
 	incoming_line = NULL;
