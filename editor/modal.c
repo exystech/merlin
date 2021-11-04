@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2021 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -200,7 +201,7 @@ void editor_modal_goto_line(struct editor* editor, const char* linestr)
 				editor->modal_error = true;
 				return;
 			}
-			editor_cursor_row_set(editor, editor->cursor_row - line);
+			editor_cursor_set(editor, editor->cursor_row - line, 0);
 		}
 		else if ( go_forward )
 		{
@@ -209,7 +210,7 @@ void editor_modal_goto_line(struct editor* editor, const char* linestr)
 				editor->modal_error = true;
 				return;
 			}
-			editor_cursor_row_set(editor, editor->cursor_row + line);
+			editor_cursor_set(editor, editor->cursor_row + line, 0);
 		}
 		else
 		{
@@ -218,9 +219,8 @@ void editor_modal_goto_line(struct editor* editor, const char* linestr)
 				editor->modal_error = true;
 				return;
 			}
-			editor_cursor_row_set(editor, line ? line - 1 : 0);
+			editor_cursor_set(editor, line ? line - 1 : 0, 0);
 		}
-		editor_cursor_column_set(editor, 0);
 	}
 	editor_type_edit(editor);
 }

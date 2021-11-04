@@ -24,20 +24,7 @@
 
 struct editor;
 
-size_t editor_select_column_set(struct editor* editor, size_t x);
-size_t editor_select_row_set(struct editor* editor, size_t y);
 void editor_select_set(struct editor* editor, size_t y, size_t x);
-size_t editor_select_column_dec(struct editor* editor);
-size_t editor_select_column_inc(struct editor* editor);
-size_t editor_select_row_dec(struct editor* editor);
-size_t editor_select_row_inc(struct editor* editor);
-
-size_t editor_cursor_column_set(struct editor* editor, size_t x);
-size_t editor_cursor_row_set(struct editor* editor, size_t y);
 void editor_cursor_set(struct editor* editor, size_t y, size_t x);
-size_t editor_cursor_column_dec(struct editor* editor);
-size_t editor_cursor_column_inc(struct editor* editor);
-size_t editor_cursor_row_dec(struct editor* editor);
-size_t editor_cursor_row_inc(struct editor* editor);
 
 #endif
