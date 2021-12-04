@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -52,4 +52,10 @@ void __stack_chk_fail(void)
 #else
 	scram(SCRAM_STACK_SMASH, NULL);
 #endif
+}
+
+__attribute__((noreturn))
+void __stack_chk_fail_local(void)
+{
+	__stack_chk_fail();
 }
