@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2021 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,6 +22,7 @@
 #include <sys/display.h>
 #include <sys/kernelinfo.h>
 #include <sys/ioctl.h>
+#include <sys/ps2mouse.h>
 #include <sys/termmode.h>
 
 #include <assert.h>
@@ -100,7 +102,7 @@ struct glogin
 	int pointer_x;
 	int pointer_y;
 	size_t mouse_byte_count;
-	uint8_t mouse_bytes[3];
+	uint8_t mouse_bytes[MOUSE_PACKET_SIZE];
 	enum stage stage;
 	bool animating;
 	const char* warning;
@@ -670,28 +672,21 @@ static void keyboard_event(struct glogin* state, uint32_t codepoint)
 static void mouse_event(struct glogin* state, unsigned char byte)
 {
 	state->pointer_working = true;
-	if ( state->mouse_byte_count == 0 && !(byte & 1 << 3) )
+	if ( state->mouse_byte_count == 0 && !(byte & MOUSE_ALWAYS_1) )
 		return;
-	if ( state->mouse_byte_count < 3 )
+	if ( state->mouse_byte_count < MOUSE_PACKET_SIZE )
 		state->mouse_bytes[state->mouse_byte_count++] = byte;
-	if ( state->mouse_byte_count < 3 )
+	if ( state->mouse_byte_count < MOUSE_PACKET_SIZE )
 		return;
 	state->mouse_byte_count = 0;
 	unsigned char* bytes = state->mouse_bytes;
-	int xm = bytes[1];
-	int ym = bytes[2];
-	if ( xm && bytes[0] & (1 << 4) )
-		xm = xm - 256;
-	if ( ym && bytes[0] & (1 << 5) )
-		ym = ym - 256;
-	if ( (bytes[0] & (1 << 6)) || (bytes[0] & (1 << 7)) )
-	{
-		xm = 0;
-		ym = 0;
-	}
-	ym = -ym;
+
+	int xm = MOUSE_X(bytes);
+	int ym = MOUSE_Y(bytes);
+
 	int old_pointer_x = state->pointer_x;
 	int old_pointer_y = state->pointer_y;
+
 	if ( xm*xm + ym*ym >= 2*2 )
 	{
 		xm *= 2;
@@ -704,6 +699,7 @@ static void mouse_event(struct glogin* state, unsigned char byte)
 	}
 	state->pointer_x += xm;
 	state->pointer_y += ym;
+
 	if ( state->pointer_x < 0 )
 		state->pointer_x = 0;
 	if ( state->pointer_y < 0 )
@@ -714,7 +710,8 @@ static void mouse_event(struct glogin* state, unsigned char byte)
 		state->pointer_y = state->mode.view_yres;
 	xm = state->pointer_x - old_pointer_x;
 	ym = state->pointer_y - old_pointer_y;
-	if ( (bytes[0] & 1 << 0) )
+
+	if ( bytes[0] & MOUSE_BUTTON_LEFT )
 	{
 		(void) xm;
 		(void) ym;
