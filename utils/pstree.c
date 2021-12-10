@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,7 +21,7 @@
 
 #include <err.h>
 #include <errno.h>
-#include <locale.h>
+#include <getopt.h>
 #include <psctl.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -58,7 +58,11 @@ static char* get_program_path_of_pid(pid_t pid)
 	}
 }
 
-static void pstree(pid_t pid, const char* prefix, bool continuation)
+static void pstree(pid_t pid,
+                   const char* prefix,
+                   bool continuation,
+                   bool show_pgid,
+                   bool show_pid)
 {
 	while ( pid != -1 )
 	{
@@ -69,8 +73,8 @@ static void pstree(pid_t pid, const char* prefix, bool continuation)
 				warn("psctl: PSCTL_STAT: [%" PRIiPID "]", pid);
 			return;
 		}
-		char* path_string = get_program_path_of_pid(pid);
-		const char* path = last_basename(path_string ? path_string : "<unknown>");
+		char* full_path = get_program_path_of_pid(pid);
+		const char* path = last_basename(full_path ? full_path : "<unknown>");
 		if ( !continuation )
 			fputs(prefix, stdout);
 		if ( prefix[0] )
@@ -85,10 +89,21 @@ static void pstree(pid_t pid, const char* prefix, bool continuation)
 				fputs(psst.ppid_next == -1 ? "└" : "│", stdout);
 			fputs("─", stdout);
 		}
-		printf("%s", path);
+		size_t item_length = printf("%s", path);
+		if ( show_pid || show_pgid )
+		{
+			item_length += printf("(");
+			size_t begun_item_length = item_length;
+			if ( show_pid )
+				item_length += printf("%" PRIiPID, pid);
+			if ( show_pid && show_pgid )
+				item_length += printf(",");
+			if ( show_pgid )
+				item_length += printf("%" PRIiPID, psst.pgid);
+			item_length += printf(")");
+		}
 		if ( psst.ppid_first != -1 )
 		{
-			size_t path_length = strlen(path);
 			char* new_prefix;
 			if ( prefix[0] )
 			{
@@ -96,100 +111,53 @@ static void pstree(pid_t pid, const char* prefix, bool continuation)
 				size_t drawing_length = strlen(drawing);
 				size_t prefix_length = strlen(prefix);
 				size_t new_prefix_length =
-					prefix_length + drawing_length + path_length;
+					prefix_length + drawing_length + item_length;
 				if ( !(new_prefix = (char*) malloc(new_prefix_length + 1)) )
 					err(1, "malloc");
 				memcpy(new_prefix, prefix, prefix_length);
 				memcpy(new_prefix + prefix_length, drawing, drawing_length);
-				for ( size_t i = 0; i < path_length; i++ )
+				for ( size_t i = 0; i < item_length; i++ )
 					new_prefix[prefix_length + drawing_length + i] = ' ';
-				new_prefix[prefix_length + drawing_length + path_length] = '\0';
+				new_prefix[prefix_length + drawing_length + item_length] = '\0';
 			}
 			else
 			{
-				if ( !(new_prefix = (char*) malloc(path_length + 1)) )
+				if ( !(new_prefix = (char*) malloc(item_length + 1)) )
 					err(1, "malloc");
-				for ( size_t i = 0; i < path_length; i++ )
+				for ( size_t i = 0; i < item_length; i++ )
 					new_prefix[i] = ' ';
-				new_prefix[path_length] = '\0';
+				new_prefix[item_length] = '\0';
 			}
-			pstree(psst.ppid_first, new_prefix, true);
+			pstree(psst.ppid_first, new_prefix, true, show_pgid, show_pid);
 			free(new_prefix);
 		}
 		else
 			printf("\n");
-		free(path_string);
+		free(full_path);
 		continuation = false;
 		pid = psst.ppid_next;
 	}
 }
 
-static void compact_arguments(int* argc, char*** argv)
-{
-	for ( int i = 0; i < *argc; i++ )
-	{
-		while ( i < *argc && !(*argv)[i] )
-		{
-			for ( int n = i; n < *argc; n++ )
-				(*argv)[n] = (*argv)[n+1];
-			(*argc)--;
-		}
-	}
-}
-
-static void help(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "Usage: %s [OPTION]...\n", argv0);
-	fprintf(fp, "List processes.\n");
-}
-
-static void version(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
-}
-
 int main(int argc, char* argv[])
 {
-	setlocale(LC_ALL, "");
+	bool show_pgid = false;
+	bool show_pid = false;
 
-	const char* argv0 = argv[0];
-	for ( int i = 1; i < argc; i++ )
+	int opt;
+	while ( (opt = getopt(argc, argv, "gp")) != -1 )
 	{
-		const char* arg = argv[i];
-		if ( arg[0] != '-' || !arg[1] )
-			continue;
-		argv[i] = NULL;
-		if ( !strcmp(arg, "--") )
-			break;
-		if ( arg[1] != '-' )
+		switch ( opt )
 		{
-			char c;
-			while ( (c = *++arg) ) switch ( c )
-			{
-			default:
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				help(stderr, argv0);
-				exit(1);
-			}
-		}
-		else if ( !strcmp(arg, "--help") )
-			help(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--version") )
-			version(stdout, argv0), exit(0);
-		else
-		{
-			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			help(stderr, argv0);
-			exit(1);
+		case 'g': show_pgid = true; break;
+		case 'p': show_pid = true; break;
 		}
 	}
 
-	compact_arguments(&argc, &argv);
-
-	if ( 1 < argc )
+	if ( optind < argc )
 		errx(1, "extra operand: %s", argv[1]);
 
-	pstree(1, "", true);
+	pstree(1, "", true, show_pgid, show_pid);
 
 	return ferror(stdout) || fflush(stdout) == EOF ? 1 : 0;
 }
