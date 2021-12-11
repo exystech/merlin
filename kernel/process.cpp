@@ -490,11 +490,9 @@ void Process::NotifyChildExit(Process* child, bool zombify)
 	// become a zombie process. Additionally, always notify init about children
 	// when init is exiting, because OnLastThreadExit needs to be able to catch
 	// every child exiting.
+	DeliverSignal(SIGCHLD);
 	if ( zombify || (is_init_exiting && Scheduler::GetInitProcess() == this) )
-	{
-		DeliverSignal(SIGCHLD);
 		kthread_cond_broadcast(&zombiecond);
-	}
 }
 
 pid_t Process::Wait(pid_t thepid, int* status_ptr, int options)
