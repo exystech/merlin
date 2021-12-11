@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,8 +17,8 @@
  * Process control interface.
  */
 
-#ifndef INCLUDE_SYS_IOCTL_H
-#define INCLUDE_SYS_IOCTL_H
+#ifndef INCLUDE_PSCTL_H
+#define INCLUDE_PSCTL_H
 
 #include <sys/cdefs.h>
 
