@@ -93,7 +93,6 @@ static void pstree(pid_t pid,
 		if ( show_pid || show_pgid )
 		{
 			item_length += printf("(");
-			size_t begun_item_length = item_length;
 			if ( show_pid )
 				item_length += printf("%" PRIiPID, pid);
 			if ( show_pid && show_pgid )
