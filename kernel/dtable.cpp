@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -33,22 +33,33 @@
 
 namespace Sortix {
 
+struct DescriptorEntry
+{
+	Ref<Descriptor> desc;
+	int flags;
+};
+
 DescriptorTable::DescriptorTable()
 {
 	dtablelock = KTHREAD_MUTEX_INITIALIZER;
 	entries = NULL;
-	numentries = 0;
+	entries_used = 0;
+	entries_length = 0;
+	reserved_count = 0;
 	first_not_taken = 0;
 }
 
 DescriptorTable::~DescriptorTable()
 {
-	Reset();
+	for ( int i = 0; i < entries_length; i++ )
+		if ( entries[i].desc )
+			entries[i].desc.Reset();
+	delete[] entries;
 }
 
-bool DescriptorTable::IsGoodEntry(int i)
+bool DescriptorTable::IsGoodEntry(int i) // dtablelock locked
 {
-	return 0 <= i && i < numentries && entries[i].desc;
+	return 0 <= i && i < entries_length && entries[i].desc;
 }
 
 Ref<DescriptorTable> DescriptorTable::Fork()
@@ -57,12 +68,12 @@ Ref<DescriptorTable> DescriptorTable::Fork()
 	Ref<DescriptorTable> ret(new DescriptorTable);
 	if ( !ret )
 		return Ref<DescriptorTable>(NULL);
-	ret->entries = new dtableent_t[numentries];
+	ret->entries = new DescriptorEntry[entries_length];
 	if ( !ret->entries )
 		return Ref<DescriptorTable>(NULL);
-	ret->first_not_taken = 0;
-	ret->numentries = numentries;
-	for ( int i = 0; i < numentries; i++ )
+	// Copy all the file descriptors except ones closed on fork.
+	ret->entries_length = entries_length;
+	for ( int i = 0; i < entries_length; i++ )
 	{
 		if ( !entries[i].desc || entries[i].flags & FD_CLOFORK )
 		{
@@ -71,6 +82,7 @@ Ref<DescriptorTable> DescriptorTable::Fork()
 			continue;
 		}
 		ret->entries[i] = entries[i];
+		ret->entries_used++;
 		if ( ret->first_not_taken == i )
 			ret->first_not_taken = i + 1;
 	}
@@ -85,79 +97,133 @@ Ref<Descriptor> DescriptorTable::Get(int index)
 	return entries[index].desc;
 }
 
-bool DescriptorTable::Enlargen(int atleast)
+// Expands the table to have at least need_entries entries and at least
+// need_unused unused entries.
+bool DescriptorTable::Enlargen(int need_entries,
+                               int need_unused) // dtablelock taken
 {
-	if ( numentries == INT_MAX )
-		return errno = EMFILE, false; // Cannot enlargen any more.
-	int newnumentries = 8;
-	if ( numentries && __builtin_mul_overflow(2, numentries, &newnumentries) )
-		newnumentries = INT_MAX;
-	if ( newnumentries < atleast )
-		newnumentries = atleast;
-	dtableent_t* newentries = new dtableent_t[newnumentries];
-	if ( !newentries )
+	// Figure out how many entries are needed to satisfy the need for unused
+	// entries and grow the entries to that size if larger than need_entries.
+	if ( __builtin_add_overflow(need_unused, entries_used, &need_unused) ||
+	     __builtin_add_overflow(need_unused, reserved_count, &need_unused) )
+		return errno = EMFILE, false;
+	if ( need_entries < need_unused )
+		need_entries = need_unused;
+	if ( need_entries <= entries_length )
+		return true;
+	if ( entries_length == INT_MAX )
+		return errno = EMFILE, false;
+	// At least double the size of the table but maybe more entries are needed.
+	int new_entries_length = 8;
+	if ( entries_length &&
+	     __builtin_mul_overflow(2, entries_length, &new_entries_length) )
+		new_entries_length = INT_MAX;
+	if ( new_entries_length < need_entries )
+		new_entries_length = need_entries;
+	DescriptorEntry* new_entries = new DescriptorEntry[new_entries_length];
+	if ( !new_entries )
 		return false;
-	for ( int i = 0; i < numentries; i++ )
+	for ( int i = 0; i < entries_length; i++ )
 	{
-		newentries[i] = entries[i];
+		new_entries[i] = entries[i];
 		entries[i].desc.Reset();
 	}
-	for ( int i = numentries; i < newnumentries; i++ )
+	for ( int i = entries_length; i < new_entries_length; i++ )
 	{
-		//newentries[i].desc = NULL; // Constructor did this already.
-		newentries[i].flags = 0;
+		//new_entries[i].desc = NULL; // Constructor did this already.
+		new_entries[i].flags = 0;
 	}
 	delete[] entries;
-	entries = newentries;
-	numentries = newnumentries;
+	entries = new_entries;
+	entries_length = new_entries_length;
 	return true;
+}
+
+bool DescriptorTable::Reserve(int count, int* reservation)
+{
+	assert(0 <= count);
+	if ( !Enlargen(0, count) )
+		return false;
+	assert(reserved_count <= entries_length - entries_used);
+	assert(reserved_count + count <= entries_length - entries_used);
+	reserved_count += count;
+	*reservation = count;
+	return true;
+}
+
+void DescriptorTable::Unreserve(int* reservation)
+{
+	assert(0 <= *reservation);
+	assert(*reservation <= reserved_count);
+	reserved_count -= *reservation;
+	*reservation = 0;
 }
 
 int DescriptorTable::AllocateInternal(Ref<Descriptor> desc,
                                       int flags,
-                                      int min_index)
+                                      int min_index,
+                                      int* reservation) // dtablelock locked
 {
-	// dtablelock is held.
+	assert(!reservation || 1 <= *reservation);
+	assert(!reservation || !min_index);
 	if ( flags & ~__FD_ALLOWED_FLAGS )
 		return errno = EINVAL, -1;
 	if ( min_index < 0 )
 		return errno = EINVAL, -1;
 	if ( min_index < first_not_taken )
 		min_index = first_not_taken;
-	for ( int i = min_index; i < numentries; i++ )
+	int first_available = min_index;
+	for ( int i = min_index; i < entries_length; i++ )
 	{
 		if ( entries[i].desc )
+		{
+			if ( first_available == i )
+				first_available = i + 1;
+			if ( first_not_taken == i )
+				first_not_taken = i + 1;
 			continue;
+		}
+		if ( !reservation && entries_length - reserved_count <= i )
+			break;
 		entries[i].desc = desc;
 		entries[i].flags = flags;
+		entries_used++;
+		if ( reservation )
+		{
+			assert(reserved_count);
+			(*reservation)--;
+			reserved_count--;
+		}
 		if ( first_not_taken == i )
 			first_not_taken = i + 1;
 		return i;
 	}
-	first_not_taken = numentries;
-	int oldnumentries = numentries;
-	if ( !Enlargen(min_index) )
+	assert(!reservation);
+	if ( !Enlargen(first_available + 1, 1) )
 		return -1;
-	int i = oldnumentries;
-	entries[i].desc = desc;
-	entries[i].flags = flags;
-	if ( first_not_taken == i )
-		first_not_taken = i + 1;
-	return i;
+	entries[first_available].desc = desc;
+	entries[first_available].flags = flags;
+	entries_used++;
+	if ( first_not_taken == first_available )
+		first_not_taken = first_available + 1;
+	return first_available;
 }
 
-int DescriptorTable::Allocate(Ref<Descriptor> desc, int flags, int min_index)
+int DescriptorTable::Allocate(Ref<Descriptor> desc, int flags, int min_index,
+                              int* reservation)
 {
 	ScopedLock lock(&dtablelock);
-	return AllocateInternal(desc, flags, min_index);
+	return AllocateInternal(desc, flags, min_index, reservation);
 }
 
-int DescriptorTable::Allocate(int src_index, int flags, int min_index)
+int DescriptorTable::Allocate(int src_index, int flags, int min_index,
+                              int* reservation)
 {
 	ScopedLock lock(&dtablelock);
 	if ( !IsGoodEntry(src_index) )
 		return errno = EBADF, -1;
-	return AllocateInternal(entries[src_index].desc, flags, min_index);
+	return AllocateInternal(entries[src_index].desc, flags, min_index,
+	                        reservation);
 }
 
 int DescriptorTable::Copy(int from, int to, int flags)
@@ -167,25 +233,18 @@ int DescriptorTable::Copy(int from, int to, int flags)
 	ScopedLock lock(&dtablelock);
 	if ( from < 0 || to < 0 )
 		return errno = EINVAL, -1;
-	if ( !(from < numentries) )
-		return errno = EBADF, -1;
-	if ( !entries[from].desc )
+	if ( !IsGoodEntry(from) )
 		return errno = EBADF, -1;
 	if ( from == to )
 		return errno = EINVAL, -1;
-	while ( !(to < numentries) )
-	{
-		if ( to == INT_MAX )
-			return errno = EBADF, -1;
-		if ( !Enlargen(to + 1) )
-			return -1;
-	}
+	if ( to == INT_MAX )
+		return errno = EBADF, -1;
+	if ( !IsGoodEntry(to) && !Enlargen(to + 1, 1) )
+		return -1;
 	if ( entries[to].desc != entries[from].desc )
 	{
-		if ( entries[to].desc )
-		{
-			// TODO: Should this be synced or otherwise properly closed?
-		}
+		if ( !entries[to].desc )
+			entries_used++;
 		entries[to].desc = entries[from].desc;
 	}
 	entries[to].flags = flags;
@@ -195,12 +254,14 @@ int DescriptorTable::Copy(int from, int to, int flags)
 }
 
 Ref<Descriptor> DescriptorTable::FreeKeepInternal(int index)
+// dtablelock locked
 {
 	if ( !IsGoodEntry(index) )
 		return errno = EBADF, Ref<Descriptor>(NULL);
 	Ref<Descriptor> ret = entries[index].desc;
 	entries[index].desc.Reset();
 	entries[index].flags = 0;
+	entries_used--;
 	if ( index < first_not_taken )
 		first_not_taken = index;
 	return ret;
@@ -220,7 +281,7 @@ void DescriptorTable::Free(int index)
 void DescriptorTable::OnExecute()
 {
 	ScopedLock lock(&dtablelock);
-	for ( int i = 0; i < numentries; i++ )
+	for ( int i = 0; i < entries_length; i++ )
 	{
 		if ( !entries[i].desc )
 			continue;
@@ -229,19 +290,8 @@ void DescriptorTable::OnExecute()
 		entries[i].desc.Reset();
 		if ( i < first_not_taken )
 			first_not_taken = i;
+		entries_used--;
 	}
-}
-
-void DescriptorTable::Reset()
-{
-	ScopedLock lock(&dtablelock);
-	for ( int i = 0; i < numentries; i++ )
-		if ( entries[i].desc )
-			entries[i].desc.Reset();
-	numentries = 0;
-	delete[] entries;
-	entries = NULL;
-	first_not_taken = 0;
 }
 
 bool DescriptorTable::SetFlags(int index, int flags)
@@ -267,7 +317,7 @@ int DescriptorTable::Previous(int index)
 {
 	ScopedLock lock(&dtablelock);
 	if ( index < 0 )
-		index = numentries;
+		index = entries_length;
 	do index--;
 	while ( 0 <= index && !IsGoodEntry(index) );
 	if ( index < 0 )
@@ -280,11 +330,11 @@ int DescriptorTable::Next(int index)
 	ScopedLock lock(&dtablelock);
 	if ( index < 0 )
 		index = -1;
-	if ( numentries <= index )
+	if ( entries_length <= index )
 		return errno = EBADF, -1;
 	do index++;
-	while ( index < numentries && !IsGoodEntry(index) );
-	if ( numentries <= index )
+	while ( index < entries_length && !IsGoodEntry(index) );
+	if ( entries_length <= index )
 		return errno = EBADF, -1;
 	return index;
 }
@@ -295,7 +345,7 @@ int DescriptorTable::CloseFrom(int index)
 		return errno = EBADF, -1;
 	ScopedLock lock(&dtablelock);
 	bool any = false;
-	for ( ; index < numentries; index++ )
+	for ( ; index < entries_length; index++ )
 	{
 		if ( !IsGoodEntry(index) )
 			continue;

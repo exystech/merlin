@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,12 +25,7 @@
 namespace Sortix {
 
 class Descriptor;
-
-typedef struct dtableent_struct
-{
-	Ref<Descriptor> desc;
-	int flags;
-} dtableent_t;
+struct DescriptorEntry;
 
 class DescriptorTable : public Refcountable
 {
@@ -39,8 +34,12 @@ public:
 	virtual ~DescriptorTable();
 	Ref<DescriptorTable> Fork();
 	Ref<Descriptor> Get(int index);
-	int Allocate(Ref<Descriptor> desc, int flags, int min_index = 0);
-	int Allocate(int src_index, int flags, int min_index = 0);
+	bool Reserve(int count, int* reservation);
+	void Unreserve(int* reservation);
+	int Allocate(Ref<Descriptor> desc, int flags, int min_index = 0,
+	             int* reservation = NULL);
+	int Allocate(int src_index, int flags, int min_index = 0,
+	             int* reservation = NULL);
 	int Copy(int from, int to, int flags);
 	void Free(int index);
 	Ref<Descriptor> FreeKeep(int index);
@@ -52,16 +51,18 @@ public:
 	int CloseFrom(int index);
 
 private:
-	void Reset(); // Hey, reference counted. Don't call this.
 	bool IsGoodEntry(int i);
-	bool Enlargen(int atleast);
-	int AllocateInternal(Ref<Descriptor> desc, int flags, int min_index);
+	bool Enlargen(int need_index, int need_count);
+	int AllocateInternal(Ref<Descriptor> desc, int flags, int min_index,
+	                     int* reservation);
 	Ref<Descriptor> FreeKeepInternal(int index);
 
 private:
 	kthread_mutex_t dtablelock;
-	dtableent_t* entries;
-	int numentries;
+	struct DescriptorEntry* entries;
+	int entries_used;
+	int entries_length;
+	int reserved_count;
 	int first_not_taken;
 
 };

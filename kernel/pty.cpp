@@ -809,18 +809,15 @@ int sys_mkpty(int* master_fd_user, int* slave_fd_user, int flags)
 		return -1;
 
 	Ref<DescriptorTable> dtable = process->GetDTable();
-	int master_fd = dtable->Allocate(master_desc, fdflags);
-	int slave_fd = dtable->Allocate(slave_desc, fdflags);
+	int reservation = 0;
+	if ( !dtable->Reserve(2, &reservation) )
+		return -1;
+	int master_fd = dtable->Allocate(master_desc, fdflags, 0, &reservation);
+	int slave_fd = dtable->Allocate(slave_desc, fdflags, 0, &reservation);
+	assert(0 <= master_fd);
+	assert(0 <= slave_fd);
 	master_desc.Reset();
 	slave_desc.Reset();
-	if ( master_fd < 0 || slave_fd < 0 )
-	{
-		if ( 0 < master_fd )
-			dtable->Free(master_fd);
-		if ( 0 < master_fd )
-			dtable->Free(slave_fd);
-		return -1;
-	}
 	dtable.Reset();
 
 	if ( !CopyToUser(master_fd_user, &master_fd, sizeof(int)) ||

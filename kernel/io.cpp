@@ -1005,20 +1005,16 @@ int sys_fsm_mountat(int dirfd, const char* path, const struct stat* rootst, int 
 	Ref<Descriptor> from = PrepareLookup(pathcopy, dirfd);
 	if ( !from )
 		return delete[] pathcopy, -1;
+	Ref<DescriptorTable> dtable = CurrentProcess()->GetDTable();
+	int reservation;
+	if ( !dtable->Reserve(1, &reservation) )
+		return delete[] pathcopy, -1;
 	Ref<Descriptor> desc = from->fsm_mount(&ctx, pathcopy, rootst, flags);
 	delete[] pathcopy;
 	if ( !desc )
-		return -1;
-	Ref<DescriptorTable> dtable = CurrentProcess()->GetDTable();
-	int ret = dtable->Allocate(desc, fdflags);
-	if ( ret < 0 )
-	{
-		// TODO: We should use a fail-safe dtable reservation mechanism that
-		//       causes this error earlier before we have side effects.
-		int errnum = errno;
-		from->unmount(&ctx, pathcopy, 0);
-		return errno = errnum, -1;
-	}
+		return dtable->Unreserve(&reservation), -1;
+	int ret = dtable->Allocate(desc, fdflags, 0, &reservation);
+	assert(0 <= ret);
 	return ret;
 }
 

@@ -767,22 +767,18 @@ int sys_pipe2(int* pipefd, int flags)
 	if ( !recv_desc || !send_desc ) return -1;
 
 	Ref<DescriptorTable> dtable = process->GetDTable();
+	int reservation;
+	if ( !dtable->Reserve(2, &reservation) )
+		return -1;
+	int recv_index = dtable->Allocate(recv_desc, fdflags, 0, &reservation);
+	int send_index = dtable->Allocate(send_desc, fdflags, 0, &reservation);
+	assert(0 <= recv_index);
+	assert(0 <= send_index);
+	int ret[2] = { recv_index, send_index };
+	if ( !CopyToUser(pipefd, ret, sizeof(ret)) )
+		return -1;
 
-	int recv_index, send_index;
-	if ( 0 <= (recv_index = dtable->Allocate(recv_desc, fdflags)) )
-	{
-		if ( 0 <= (send_index = dtable->Allocate(send_desc, fdflags)) )
-		{
-			int ret[2] = { recv_index, send_index };
-			if ( CopyToUser(pipefd, ret, sizeof(ret)) )
-				return 0;
-
-			dtable->Free(send_index);
-		}
-		dtable->Free(recv_index);
-	}
-
-	return -1;
+	return 0;
 }
 
 } // namespace Sortix
