@@ -232,6 +232,16 @@ bool Descriptor::IsSeekable()
 	return seekable;
 }
 
+bool Descriptor::pass()
+{
+	return vnode->pass();
+}
+
+void Descriptor::unpass()
+{
+	vnode->unpass();
+}
+
 int Descriptor::sync(ioctx_t* ctx)
 {
 	// TODO: Possible denial-of-service attack if someone opens the file without

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -54,6 +54,8 @@ public: /* These must never change after construction and is read-only. */
 
 public:
 	virtual ~Inode() { }
+	virtual bool pass() = 0;
+	virtual void unpass() = 0;
 	virtual void linked() = 0;
 	virtual void unlinked() = 0;
 	virtual int sync(ioctx_t* ctx) = 0;
@@ -165,6 +167,8 @@ protected:
 public:
 	AbstractInode();
 	virtual ~AbstractInode();
+	virtual bool pass();
+	virtual void unpass();
 	virtual void linked();
 	virtual void unlinked();
 	virtual int sync(ioctx_t* ctx);

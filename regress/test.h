@@ -21,6 +21,7 @@
 #define TEST_H
 
 #include <errno.h>
+#include <error.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>

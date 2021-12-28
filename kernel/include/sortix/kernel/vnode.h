@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -55,6 +55,8 @@ public: /* These must never change after construction and is read-only. */
 public:
 	Vnode(Ref<Inode> inode, Ref<Vnode> mountedat, ino_t rootino, dev_t rootdev);
 	virtual ~Vnode();
+	bool pass();
+	void unpass();
 	int sync(ioctx_t* ctx);
 	int stat(ioctx_t* ctx, struct stat* st);
 	int statvfs(ioctx_t* ctx, struct statvfs* stvfs);

@@ -216,6 +216,16 @@ int Vnode::unmount(ioctx_t* ctx, const char* filename, int flags)
 	return 0;
 }
 
+bool Vnode::pass()
+{
+	return inode->pass();
+}
+
+void Vnode::unpass()
+{
+	inode->unpass();
+}
+
 int Vnode::sync(ioctx_t* ctx)
 {
 	return inode->sync(ctx);

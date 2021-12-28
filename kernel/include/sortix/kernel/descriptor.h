@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -58,6 +58,8 @@ public:
 	Ref<Descriptor> Fork();
 	bool SetFlags(int new_dflags);
 	int GetFlags();
+	bool pass();
+	void unpass();
 	int sync(ioctx_t* ctx);
 	int stat(ioctx_t* ctx, struct stat* st);
 	int statvfs(ioctx_t* ctx, struct statvfs* stvfs);

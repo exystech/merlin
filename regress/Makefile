@@ -25,6 +25,10 @@ test-pthread-once \
 test-pthread-self \
 test-pthread-tls \
 test-signal-raise \
+test-unix-socket-fd-cycle \
+test-unix-socket-fd-leak \
+test-unix-socket-fd-pass \
+test-unix-socket-fd-trunc \
 test-unix-socket-name \
 test-unix-socket-shutdown \
 

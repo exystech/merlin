@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2017, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -43,6 +43,8 @@ public:
 	bool SetSIGPIPEDelivery(bool deliver_sigpipe);
 	size_t Size();
 	bool Resize(size_t new_size);
+	bool pass();
+	void unpass();
 	ssize_t readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
 	ssize_t recv(ioctx_t* ctx, uint8_t* buf, size_t count, int flags);
 	ssize_t recvmsg(ioctx_t* ctx, struct msghdr* msg, int flags);

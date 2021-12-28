@@ -62,6 +62,15 @@ AbstractInode::~AbstractInode()
 {
 }
 
+bool AbstractInode::pass()
+{
+	return true;
+}
+
+void AbstractInode::unpass()
+{
+}
+
 void AbstractInode::linked()
 {
 	InterlockedIncrement(&stat_nlink);

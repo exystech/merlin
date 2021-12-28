@@ -195,6 +195,8 @@ class Unode : public Inode
 public:
 	Unode(Ref<Server> server, ino_t ino, mode_t type);
 	virtual ~Unode();
+	virtual bool pass();
+	virtual void unpass();
 	virtual void linked();
 	virtual void unlinked();
 	virtual int sync(ioctx_t* ctx);
@@ -764,6 +766,15 @@ void Unode::UnexpectedResponse(Channel* channel, struct fsm_msg_header* hdr)
 		RecvError(channel);
 	else
 		errno = EIO;
+}
+
+bool Unode::pass()
+{
+	return true;
+}
+
+void Unode::unpass()
+{
 }
 
 void Unode::linked()

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2016, 2017, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -83,6 +83,8 @@ class StreamSocket : public AbstractInode
 public:
 	StreamSocket(uid_t owner, gid_t group, mode_t mode, Ref<Manager> manager);
 	virtual ~StreamSocket();
+	virtual bool pass();
+	virtual void unpass();
 	virtual Ref<Inode> accept4(ioctx_t* ctx, uint8_t* addr, size_t* addrsize,
 	                           int flags);
 	virtual int bind(ioctx_t* ctx, const uint8_t* addr, size_t addrsize);
@@ -163,7 +165,10 @@ StreamSocket::StreamSocket(uid_t owner, gid_t group, mode_t mode,
 	inode_type = INODE_TYPE_STREAM;
 	dev = (dev_t) manager.Get();
 	ino = (ino_t) this;
-	this->type = S_IFSOCK;
+	// Never allow wrapping filesystem sockets as they need to be able to
+	// recognize themselves when passing filesystems, to prevent reference
+	// cycle loops.
+	this->type = S_IFSOCK | S_IFNEVERWRAP;
 	this->stat_uid = owner;
 	this->stat_gid = group;
 	this->stat_mode = (mode & S_SETABLE) | this->type;
@@ -189,6 +194,23 @@ StreamSocket::~StreamSocket()
 	if ( is_listening )
 		manager->Unlisten(this);
 	free(bound_address);
+}
+
+bool StreamSocket::pass()
+{
+	if ( outgoing.pass() )
+	{
+		if ( incoming.pass() )
+			return true;
+		outgoing.unpass();
+	}
+	return false;
+}
+
+void StreamSocket::unpass()
+{
+	outgoing.unpass();
+	incoming.unpass();
 }
 
 Ref<Inode> StreamSocket::accept4(ioctx_t* ctx, uint8_t* addr, size_t* addrsize,

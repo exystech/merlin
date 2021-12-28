@@ -69,6 +69,14 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Implement file descriptor passing
+The
+.Dv SCM_RIGHTS
+control message have been implemented, allowing file descriptors to be passed
+over
+.Dv AF_UNIX
+sockets.
+This is a minor compatible ABI change.
 .Ss Implement threading primitives that truly sleep
 The
 .Xr futex 2
