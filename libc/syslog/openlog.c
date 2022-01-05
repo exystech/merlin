@@ -30,8 +30,4 @@ void openlog(const char* identity, int option, int facility)
 	// Remember the option and facility parameters for later use.
 	__syslog_option = option;
 	__syslog_facility = facility;
-
-	// Connect to the system more immediately if we are asked to and need to.
-	if ( (option & LOG_NDELAY) && __syslog_fd < 0 )
-		__syslog_fd = connectlog();
 }

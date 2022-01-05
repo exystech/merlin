@@ -85,13 +85,11 @@ extern "C" {
 #if defined(__is_sortix_libc)
 extern char* __syslog_identity;
 extern int __syslog_facility;
-extern int __syslog_fd;
 extern int __syslog_mask;
 extern int __syslog_option;
 #endif
 
 void closelog(void);
-int connectlog(void);
 void openlog(const char*, int, int);
 int setlogmask(int);
 __attribute__ ((__format__ (__printf__, 2, 3)))

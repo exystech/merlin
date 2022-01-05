@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,28 +14,27 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  * syslog/vsyslog.c
- * Logs a condition to the system log.
+ * Logs an event to the system log.
  */
 
+#include <sys/types.h>
+
+#include <limits.h>
 #include <stdarg.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <syslog.h>
 #include <time.h>
 #include <unistd.h>
 
+// TODO: The Sortix <limits.h> doesn't expose this at the moment.
+#if !defined(HOST_NAME_MAX) && defined(__sortix__)
+#include <sortix/limits.h>
+#endif
+
 char* __syslog_identity = NULL;
 int __syslog_facility = LOG_USER;
-int __syslog_fd = -1;
 int __syslog_mask = LOG_UPTO(LOG_DEBUG);
 int __syslog_option = 0;
-
-// TODO: The transmitted string might be delivered in chunks using this dprintf
-//       approach (plus there are multiple dprintf calls). We should buffer the
-//       string fully before transmitting it.
-
-// TODO: The log entry format here is just whatever some other system does. We
-//       should work out the Sortix system log semantics and adapt this to that.
 
 void vsyslog(int priority, const char* format, va_list ap)
 {
@@ -43,31 +42,42 @@ void vsyslog(int priority, const char* format, va_list ap)
 	if ( !(LOG_MASK(LOG_PRI(priority)) & __syslog_mask) )
 		return;
 
-	// Connect to the system log if a connection hasn't yet been established.
-	if ( __syslog_fd < 0 && (__syslog_fd = connectlog()) < 0 )
-		return;
-
 	// If no facility is given we'll use the default facility from openlog.
 	if ( !LOG_FAC(priority) )
 		priority |= __syslog_facility;
 
-	// Prepare a timestamp for the log event.
+	// Gather the log event metadata.
+	int version = 1; // RFC 5424
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	struct tm tm;
 	gmtime_r(&now.tv_sec, &tm);
-	char timestamp[32];
-	strftime(timestamp, sizeof(timestamp), "%b %e %T", &tm);
-
-	// Include the process id of the current process if requested.
-	pid_t pid = (__syslog_option & LOG_PID) ? getpid() : 0;
+	char timeformat[64];
+	snprintf(timeformat, sizeof(timeformat),
+	         "%%FT%%T.%06liZ", now.tv_nsec / 1000);
+	char timestamp[64];
+	strftime(timestamp, sizeof(timestamp), timeformat, &tm);
+	char hostname[HOST_NAME_MAX + 1] = "-";
+	gethostname(hostname, sizeof(hostname));
+	const char* identity = __syslog_identity ? __syslog_identity : "-";
+	char pidstr[3 * sizeof(pid_t)] = "-";
+	if ( __syslog_option & LOG_PID )
+		snprintf(pidstr, sizeof(pidstr), "%"PRIdPID, getpid());
+	const char* msgid = "-";
+	const char* structured_data = "-";
 
 	// Transmit the event to the system log.
-	dprintf(__syslog_fd, "<%d>%s %s%s%.0jd%s: ",
-	                     priority,
-	                     timestamp,
-	                     __syslog_identity ? __syslog_identity : "",
-	                      "[" + !pid, (intmax_t) pid, "]" + !pid);
-	vdprintf(__syslog_fd, format, ap);
-	dprintf(__syslog_fd, "\n");
+	flockfile(stderr);
+	fprintf(stderr, "<%d>%d %s %s %s %s %s %s ",
+	                 priority,
+	                 version,
+	                 timestamp,
+	                 hostname,
+	                 identity,
+	                 pidstr,
+	                 msgid,
+	                 structured_data);
+	vfprintf(stderr, format, ap);
+	fputc('\n', stderr);
+	funlockfile(stderr);
 }

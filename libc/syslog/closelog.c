@@ -22,9 +22,4 @@
 
 void closelog(void)
 {
-	if ( 0 <= __syslog_fd )
-	{
-		close(__syslog_fd);
-		__syslog_fd = -1;
-	}
 }
