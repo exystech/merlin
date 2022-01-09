@@ -9,7 +9,9 @@
 .Op Fl \-append-title Ns = Ns Ar text
 .Op Fl \-default Ns = Ns Ar default-boot-menu-option
 .Op Fl \-disable-append-title
+.Op Fl \-disable-src
 .Op Fl \-enable-append-title
+.Op Fl \-enable-src
 .Op Fl \-liveconfig Ns = Ns Ar liveconfig-directory
 .Op Fl \-random-seed
 .Op Fl \-timeout Ns = Ns Ar boot-menu-timeout
@@ -86,6 +88,13 @@ GRUB variable.
 Don't append anything to the bootloader menu title by appending to the
 .Sy base_menu_title
 GRUB variable.
+.It Fl \-disable-src
+Disable loading the source code in
+.Pa /src
+by setting
+.Sy enable_src
+GRUB variable to
+.Sy false .
 .It Fl \-enable-append-title
 Enable appending " - " followed by the value set with
 .Fl \-append-title
@@ -94,6 +103,13 @@ to the bootloader menu title by appending to the
 GRUB variable.
 This option is on by default and can be disabled with
 .Fl \-disable-append-title .
+.It Fl \-enable-src
+Enable loading the source code in
+.Pa /src
+by setting
+.Sy enable_src
+GRUB variable to
+.Sy true .
 .It Fl \-liveconfig Ns = Ns Ar liveconfig-directory
 Overlay the
 .Ar liveconfig-directory

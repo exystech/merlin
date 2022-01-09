@@ -260,6 +260,11 @@ If the selected menu option itself is a submenu, it can be appended with a
 .Sy '>'
 and another selection to pick a default menu option in that submenu, and so on.
 (Default: 0)
+.It Sy enable_src
+Whether to load the source code initrd containing
+.Pa /src .
+(Default:
+.Sy true )
 .It Sy machine
 The machine type this release was built for.
 .It Sy menu_title
@@ -346,7 +351,9 @@ command line.
 .Pp
 Load
 .Pa /boot/system.initrd.xz ,
-.Pa /boot/src.initrd.xz ,
+.Pa /boot/src.initrd.xz
+(if
+.Sy $enable_src ) ,
 .Pa /boot/live.initrd.xz ,
 and
 .Pa /boot/overlay.initrd.xz

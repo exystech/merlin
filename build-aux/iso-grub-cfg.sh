@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2018 Jonas 'Sortie' Termansen.
+# Copyright (c) 2018, 2022 Jonas 'Sortie' Termansen.
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -182,6 +182,7 @@ if [ -e /boot/random.seed ]; then
 else
   no_random_seed=--no-random-seed
 fi
+set enable_src=true
 
 export version
 export machine
@@ -190,6 +191,7 @@ export menu_title
 export timeout
 export default
 export no_random_seed
+export enable_src
 EOF
 
 if [ -n "$ports" ]; then
@@ -285,13 +287,22 @@ cat << EOF
     echo done
   fi
 EOF
-# TODO: Make loading of the /src initrd optional.
 for initrd in $system_initrd $src_initrd $live_initrd $overlay_initrd; do
-  cat << EOF
+  if [ "$initrd" = "$src_initrd" ]; then
+    cat << EOF
+  if \$enable_src; then
+    echo -n "Loading /$initrd ($(human_size $initrd)) ... "
+    module /$initrd
+    echo done
+  fi
+EOF
+  else
+    cat << EOF
   echo -n "Loading /$initrd ($(human_size $initrd)) ... "
   module /$initrd
   echo done
 EOF
+  fi
 done
 cat << EOF
   hook_initrd_post
@@ -392,6 +403,18 @@ menuentry "Back..." {
 menu_title="\$base_menu_title - Advanced Options"
 
 hook_advanced_menu_pre
+
+if "\$enable_src"; then
+  menuentry "Disable loading source code" {
+    enable_src=false
+    configfile /boot/grub/advanced.cfg
+  }
+else
+  menuentry "Enable loading source code" {
+    enable_src=true
+    configfile /boot/grub/advanced.cfg
+  }
+fi
 
 menuentry "Select binary packages..." {
   configfile /boot/grub/tix.cfg
