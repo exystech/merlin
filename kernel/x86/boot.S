@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011, 2014, 2015, 2016, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2022 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -145,7 +146,17 @@ __start:
 	mov %ecx, %cr0
 	fninit
 
-	# Enable Streaming SIMD Extensions.
+	# Check for the presence of Streaming SIMD Extensions (SSE).
+	push %eax
+	push %ebx
+	mov $1, %eax
+	cpuid
+	pop %ebx
+	pop %eax
+	test $(1 << 25), %edx
+	jz 3f
+
+	# Enable Streaming SIMD Extensions (SSE).
 	mov %cr0, %ecx
 	and $0xFFFB, %cx
 	or $0x2, %cx
@@ -157,6 +168,7 @@ __start:
 	ldmxcsr (%esp)
 	addl $4, %esp
 
+3:
 	# Store a copy of the initialial floating point registers.
 	fxsave fpu_initialized_regs
 
