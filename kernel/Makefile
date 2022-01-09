@@ -167,8 +167,12 @@ $(OBJS) \
 $(CRTN_OBJ) \
 end.o
 
-LINK_OBJECTS=\
-$(CRTI_OBJ) $(CRTBEGIN_OBJ) $(OBJS) $(LIBS) $(CRTN_OBJ) $(CRTEND_OBJ) end.o
+# TODO: The .init section is linked at 128 MiB on i686 and at 4 MiB on x86_64
+#       which increases the memory requirement (and isn't mapped) and the _init
+#       function isn't invoked yet in the kernel anyway.
+#LINK_OBJECTS=\
+#$(CRTI_OBJ) $(CRTBEGIN_OBJ) $(OBJS) $(LIBS) $(CRTN_OBJ) $(CRTEND_OBJ) end.o
+LINK_OBJECTS=$(OBJS) $(LIBS) end.o
 
 # Rules and recipes for building the kernel.
 
