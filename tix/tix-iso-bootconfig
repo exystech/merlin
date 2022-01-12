@@ -95,6 +95,14 @@ print_enable_default() {
   fi
 }
 
+print_enable_default_bool() {
+  if [ "$1" = true ]; then
+    printf "  enable_%s=true\n" "$2"
+  elif [ "$1" = false ]; then
+    printf "  enable_%s=false\n" "$2"
+  fi
+}
+
 if $random_seed; then
   mkdir -p -- "$directory/boot"
   if which dd >/dev/null 2>/dev/null; then
