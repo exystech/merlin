@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2018, 2020, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2018, 2020, 2021, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -287,9 +287,9 @@ int main(int argc, char* argv[])
 		if ( !wait && !can_run_new_abi )
 		{
 			printf("%lu.%lu -> %lu.%lu ABI transition, "
-				   "delaying upgrade to next boot.\n",
-				   old_release.abi_major, old_release.abi_major,
-				   new_release.abi_major, new_release.abi_major);
+			       "delaying upgrade to next boot.\n",
+			       old_release.abi_major, old_release.abi_minor,
+			       new_release.abi_major, new_release.abi_minor);
 			wait = true;
 		}
 		header = true;
@@ -337,7 +337,7 @@ int main(int argc, char* argv[])
 			if ( mkdir(target, 0755) < 0 )
 				err(2, "%s", target);
 			execute((const char*[]) { "tix-collection", "/sysmerge", "create",
-				                      NULL }, "e");
+			                           NULL }, "e");
 		}
 		install_manifests_detect(source, target, true, true, full);
 	}
