@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -144,8 +144,10 @@ int AbstractInode::chmod(ioctx_t* /*ctx*/, mode_t mode)
 int AbstractInode::chown(ioctx_t* /*ctx*/, uid_t owner, gid_t group)
 {
 	ScopedLock lock(&metalock);
-	stat_uid = owner;
-	stat_gid= group;
+	if ( owner != (uid_t) -1 )
+		stat_uid = owner;
+	if ( group != (gid_t) -1 )
+		stat_gid = group;
 	return 0;
 }
 

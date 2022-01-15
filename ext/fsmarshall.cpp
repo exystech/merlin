@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -229,8 +229,10 @@ void HandleChangeOwner(int chl, struct fsm_req_chown* msg, Filesystem* fs)
 	if ( !fs->device->write ) { RespondError(chl, EROFS); return; }
 	Inode* inode = SafeGetInode(fs, msg->ino);
 	if ( !inode ) { RespondError(chl, errno); return; }
-	inode->SetUserId((uint32_t) msg->uid);
-	inode->SetGroupId((uint32_t) msg->gid);
+	if ( msg->uid != (uid_t) -1 )
+		inode->SetUserId((uint32_t) msg->uid);
+	if ( msg->gid != (gid_t) -1 )
+		inode->SetGroupId((uint32_t) msg->gid);
 	inode->Unref();
 	RespondSuccess(chl);
 }
