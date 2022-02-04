@@ -22,11 +22,10 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 
-#include <error.h>
+#include <err.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -110,8 +109,7 @@ bool dispd_session_setup_game_rgba(struct dispd_session* session)
 		       "--show-text", "false",
 		       (const char*) NULL);
 #endif
-		perror(chvideomode);
-		exit(127);
+		err(127, "%s", chvideomode);
 	}
 
 	// HACK: The console may be rendered asynchronously and it might still be
