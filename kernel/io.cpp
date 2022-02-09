@@ -154,8 +154,6 @@ int sys_dup3(int oldfd, int newfd, int flags)
 
 int sys_dup2(int oldfd, int newfd)
 {
-	if ( oldfd < 0 || newfd < 0 )
-		return errno = EINVAL, -1;
 	int ret = sys_dup3(oldfd, newfd, 0);
 	if ( ret < 0 && errno == EINVAL )
 		return errno = 0, newfd;

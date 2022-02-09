@@ -231,9 +231,7 @@ int DescriptorTable::Copy(int from, int to, int flags)
 	if ( flags & ~__FD_ALLOWED_FLAGS )
 		return errno = EINVAL, -1;
 	ScopedLock lock(&dtablelock);
-	if ( from < 0 || to < 0 )
-		return errno = EINVAL, -1;
-	if ( !IsGoodEntry(from) )
+	if ( !IsGoodEntry(from) || to < 0 )
 		return errno = EBADF, -1;
 	if ( from == to )
 		return errno = EINVAL, -1;
