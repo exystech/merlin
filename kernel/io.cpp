@@ -138,9 +138,7 @@ int sys_closefrom(int fd)
 
 int sys_dup(int fd)
 {
-	Ref<DescriptorTable> dtable = CurrentProcess()->GetDTable();
-	Ref<Descriptor> desc = dtable->Get(fd);
-	return dtable->Allocate(desc, 0);
+	return CurrentProcess()->GetDTable()->Allocate(fd, 0);
 }
 
 int sys_dup3(int oldfd, int newfd, int flags)
