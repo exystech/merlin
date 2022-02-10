@@ -48,7 +48,7 @@ Clock* GetClock(clockid_t clock)
 	switch ( clock )
 	{
 	case CLOCK_REALTIME: return realtime_clock;
-	case CLOCK_BOOT: return uptime_clock;
+	case CLOCK_BOOTTIME: return uptime_clock;
 	case CLOCK_INIT: return uptime_clock;
 	case CLOCK_MONOTONIC: return uptime_clock;
 	case CLOCK_PROCESS_CPUTIME_ID: return &CurrentProcess()->execute_clock;

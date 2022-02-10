@@ -52,7 +52,7 @@ static unsigned long AllocateDiskNumber()
 static void sleep_400_nanoseconds()
 {
 	struct timespec delay = timespec_make(0, 400);
-	Clock* clock = Time::GetClock(CLOCK_BOOT);
+	Clock* clock = Time::GetClock(CLOCK_BOOTTIME);
 	clock->SleepDelay(delay);
 }
 

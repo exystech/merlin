@@ -56,7 +56,7 @@ static inline void delay(unsigned int usecs)
 {
 	struct timespec delay =
 		timespec_make(usecs / 1000000, (usecs % 1000000) * 1000);
-	Clock* clock = Time::GetClock(CLOCK_BOOT);
+	Clock* clock = Time::GetClock(CLOCK_BOOTTIME);
 	clock->SleepDelay(delay);
 }
 
@@ -668,7 +668,7 @@ void Port::PrepareAwaitInterrupt()
 bool Port::AwaitInterrupt(unsigned int msecs)
 {
 	struct timespec timeout = timespec_make(msecs / 1000, (msecs % 1000) * 1000000L);
-	Clock* clock = Time::GetClock(CLOCK_BOOT);
+	Clock* clock = Time::GetClock(CLOCK_BOOTTIME);
 	struct timespec begun;
 	clock->Get(&begun, NULL);
 	while ( true )

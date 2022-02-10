@@ -56,8 +56,8 @@ void PrintElement(size_t num, const char* single, const char* multiple)
 int main(void)
 {
 	struct timespec uptime;
-	if ( clock_gettime(CLOCK_BOOT, &uptime) < 0 )
-		error(1, errno, "clock_gettime(CLOCK_BOOT)");
+	if ( clock_gettime(CLOCK_BOOTTIME, &uptime) < 0 )
+		error(1, errno, "clock_gettime(CLOCK_BOOTTIME)");
 
 	uintmax_t usecssinceboot = uptime.tv_sec * 1000000ULL +
 	                           uptime.tv_nsec / 1000ULL;

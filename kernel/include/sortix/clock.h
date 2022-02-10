@@ -28,7 +28,7 @@ extern "C" {
 
 #define CLOCK_REALTIME 0 /* Current real time. */
 #define CLOCK_MONOTONIC 1 /* Always increasing time. */
-#define CLOCK_BOOT 2 /* Time since system boot (uptime). */
+#define CLOCK_BOOTTIME 2 /* Time since system boot (uptime). */
 #define CLOCK_INIT 3 /* Time since 'init' process began. */
 #define CLOCK_PROCESS_CPUTIME_ID 4
 #define CLOCK_PROCESS_SYSTIME_ID 5

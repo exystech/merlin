@@ -59,7 +59,7 @@ static void copy_ata_string(char* dest, const char* src, size_t length)
 static void sleep_400_nanoseconds()
 {
 	struct timespec delay = timespec_make(0, 400);
-	Clock* clock = Time::GetClock(CLOCK_BOOT);
+	Clock* clock = Time::GetClock(CLOCK_BOOTTIME);
 	clock->SleepDelay(delay);
 }
 
@@ -860,7 +860,7 @@ void Port::PrepareAwaitInterrupt()
 bool Port::AwaitInterrupt(unsigned int msecs)
 {
 	struct timespec timeout = timespec_make(msecs / 1000, (msecs % 1000) * 1000000L);
-	Clock* clock = Time::GetClock(CLOCK_BOOT);
+	Clock* clock = Time::GetClock(CLOCK_BOOTTIME);
 	struct timespec begun;
 	clock->Get(&begun, NULL);
 	while ( true )

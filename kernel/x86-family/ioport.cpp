@@ -31,7 +31,7 @@ namespace Sortix {
 bool wait_inport8_clear(uint16_t ioport, uint8_t bits, bool any, unsigned int msecs)
 {
 	struct timespec timeout = timespec_make(msecs / 1000, (msecs % 1000) * 1000000L);
-	Clock* clock = Time::GetClock(CLOCK_BOOT);
+	Clock* clock = Time::GetClock(CLOCK_BOOTTIME);
 	struct timespec begun;
 	clock->Get(&begun, NULL);
 	while ( true )
@@ -53,7 +53,7 @@ bool wait_inport8_clear(uint16_t ioport, uint8_t bits, bool any, unsigned int ms
 bool wait_inport8_set(uint16_t ioport, uint8_t bits, bool any, unsigned int msecs)
 {
 	struct timespec timeout = timespec_make(msecs / 1000, (msecs % 1000) * 1000000L);
-	Clock* clock = Time::GetClock(CLOCK_BOOT);
+	Clock* clock = Time::GetClock(CLOCK_BOOTTIME);
 	struct timespec begun;
 	clock->Get(&begun, NULL);
 	while ( true )

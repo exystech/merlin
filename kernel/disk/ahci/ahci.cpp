@@ -43,7 +43,7 @@ bool WaitClear(volatile little_uint32_t* reg,
                unsigned int msecs)
 {
 	struct timespec timeout = timespec_make(msecs / 1000, (msecs % 1000) * 1000000L);
-	Clock* clock = Time::GetClock(CLOCK_BOOT);
+	Clock* clock = Time::GetClock(CLOCK_BOOTTIME);
 	struct timespec begun;
 	clock->Get(&begun, NULL);
 	while ( true )
@@ -68,7 +68,7 @@ bool WaitSet(volatile little_uint32_t* reg,
              unsigned int msecs)
 {
 	struct timespec timeout = timespec_make(msecs / 1000, (msecs % 1000) * 1000000L);
-	Clock* clock = Time::GetClock(CLOCK_BOOT);
+	Clock* clock = Time::GetClock(CLOCK_BOOTTIME);
 	struct timespec begun;
 	clock->Get(&begun, NULL);
 	while ( true )
