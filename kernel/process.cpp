@@ -850,6 +850,9 @@ int Process::Execute(const char* programname, const uint8_t* program,
 	assert(envc != INT_MAX);
 	assert(CurrentProcess() == this);
 
+	if ( argc == 0 )
+		return errno = EINVAL, -1;
+
 	char* programname_clone = String::Clone(programname);
 	if ( !programname_clone )
 		return -1;
