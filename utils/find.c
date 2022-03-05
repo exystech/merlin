@@ -501,7 +501,8 @@ static int evaluate(const struct expr* expr,
 				{
 					// TODO: Merge multiple paths into single invocations.
 					value = true;
-					result &= ~SUCCESS;
+					if ( !success )
+						result &= ~SUCCESS;
 				}
 				else
 					value = success;
