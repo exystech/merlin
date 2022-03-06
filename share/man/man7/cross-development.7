@@ -43,24 +43,12 @@ For instance, on an apt-based system you might install the
 .Sy grub-pc-bin
 package.
 .Pp
-You will also need the source code for:
-.Bl -bullet -compact
-.It
-Sortix
-.It
-Sortix binutils
-.It
-Sortix gcc
-.El
-.Pp
 The overall process is:
 .Bl -bullet -compact
 .It
-Retrieving all the source code.
+Retrieving the source code.
 .It
 Installing the build tools.
-.It
-Creating a system root with the system headers.
 .It
 Creating a cross-compiler.
 .It
@@ -70,15 +58,9 @@ Cross-compiling the operating system.
 You can find the latest Sortix source code at
 .Lk https://sortix.org/source/
 .Pp
-You can find the latest Sortix binutils source code at
-.Lk https://sortix.org/toolchain/sortix-binutils-latest.tar.xz
-.Pp
-You can find the latest Sortix gcc source code at
-.Lk https://sortix.org/toolchain/sortix-gcc-latest.tar.xz
-.Pp
-This is a compiler toolchain that has been modified to support Sortix.
-The toolchain is sometimes updated and you will need the latest toolchain to
-keep building the latest code.
+The source code for the ports are in the ports subdirectory as URLs to the
+upstream tarball, alongside any patches to the upstream release, which are
+downloaded when each port is built.
 .Ss Variables
 This document will use meta-syntactic shell variables to denote where you have
 choice.
@@ -98,7 +80,7 @@ This could for instance be
 .It Sy $CROSS_PREFIX
 The directory path where the cross-toolchain will be installed.
 This could for instance be
-.Pa /home/user/opt/x86_64-sortix .
+.Pa /home/user/opt/sortix-toolchain .
 .El
 .Pp
 The following sections describe these variables in detail.
@@ -111,14 +93,6 @@ This place will contain the operating system code.
 We'll refer to that location as
 .Sy $SORTIX.
 .Pp
-Don't store the source code for the cross-toolchain (binutils and gcc) here.
-Store the source code for those programs somewhere else, such as in
-.Pa ~/src .
-It doesn't make any sense to store the cross toolchain within the Sortix
-directory.
-The only toolchain that belongs here is the native toolchain that runs on Sortix
-(and not on your current operating system).
-.Pp
 Don't make a sortix directory and git clone inside it, you redundantly get a
 .Pa ~/sortix/sortix
 directory instead.
@@ -130,12 +104,12 @@ and
 .Sy x86_64-sortix .
 In this guide we will refer to that platform triplet as
 .Sy $SORTIX_PLATFORM .
-If you want to build another platform afterwards, then you will have to follow
-this guide again.
+If you want to build another platform afterwards, then repeat the steps with
+the other platform.
 .Ss Cross-Prefix
 You should install your cross-toolchain into a useful and isolated directory
 such as
-.Pa $HOME/opt/$SORTIX_PLATFORM .
+.Pa $HOME/opt/sortix-toolchain .
 This allows you to easily dispose of the directory and keeps it isolated from
 the rest of the system.
 We'll refer to that location as
@@ -160,44 +134,6 @@ You can make this permanent by adding that line to your
 or the applicable file for your shell and system.
 Consult your shell documentation.
 Otherwise type it in all Sortix-related shells before doing anything.
-.Ss Build Tools
-You need to install some additional build tools as they are needed to build the
-operating system.
-The installed build tools must be in sync with the source code as described in
-.Xr development 7 .
-You can install the build utilities by running:
-.Bd -literal
-    cd "$SORTIX" &&
-    make clean-build-tools &&
-    make PREFIX="$CROSS_PREFIX" build-tools &&
-    make PREFIX="$CROSS_PREFIX" install-build-tools
-.Ed
-.Pp
-These tools produce platform independent output so you may wish to install them
-into
-.Pa $HOME/bin
-and
-.Pa $HOME/sbin
-or
-.Pa /usr/local/bin
-and
-.Pa /usr/local/sbin
-or where it suits you in your
-.Ev PATH .
-.Ss System Root with System Headers
-Building the compiler requires the standard library headers being available.
-This can be satisfies by creating a system root with the system headers:
-.Bd -literal
-    cd "$SORTIX" &&
-    make distclean &&
-    make sysroot-base-headers HOST=$SORTIX_PLATFORM
-.Ed
-.Pp
-This will create a system root at
-.Pa $SORTIX/sysroot .
-The system root directory is always the
-.Pa sysroot
-subdirectory of the main source code directory.
 .Ss Cross-toolchain Dependencies
 You need to install these libraries (and the development packages) before
 building binutils and gcc:
@@ -215,46 +151,43 @@ libmpc
 .El
 .Pp
 Consult the official binutils and gcc documentation for the exact dependencies.
-.Ss binutils
-Assuming you extracted the binutils to
-.Pa ~/src/sortix-binutils ,
-you can build binutils out-of-directory by running:
+.Ss Cross-toolchain
+You can build the full cross-toolchain containing the build tools and the
+cross-compiler (binutils and gcc) by running:
 .Bd -literal
-    mkdir ~/src/binutils-build &&
-    cd ~/src/binutils-build &&
-    ../sortix-binutils/configure \\
-      --target=$SORTIX_PLATFORM \\
-      --with-sysroot="$SORTIX/sysroot" \\
-      --prefix="$CROSS_PREFIX" \\
-      --disable-werror &&
-    make &&
-    make install
+    cd "$SORTIX" &&
+    make clean-cross-toolchain &&
+    make PREFIX="$CROSS_PREFIX" TARGET=$SORTIX_PLATFORM install-cross-toolchain
 .Ed
 .Pp
-You can remove the temporary
-.Pa ~/src/binutils-build
-directory when finished.
-.Ss gcc
-Assuming you extracted the gcc to
-.Pa ~/src/sortix-gcc ,
-you can build gcc out-of-directory by running:
+This command builds and installs the build tools and the cross-compiler.
+The build downloads the source code for binutils and gcc modified with support
+for this operating system.
+.Pp
+If you want to build a toolchain for every architecture at once, use the
+.Sy install-cross-toolchain-all-archs
+makefile target instead and omit the
+.Sy TARGET
+variable.
+.Pp
+.Xr following-development 7
+gains a notice whenever the build tools or cross-compiler must be upgraded.
+.Ss Build Tools
+The above
+.Sy install-cross-toolchain
+command already built the build tools needed to bootstrap the operating system.
+.Pp
+However, whenever they change you can reinstall the build utilities only by
+running:
 .Bd -literal
-    mkdir ~/src/gcc-build &&
-    cd ~/src/gcc-build &&
-    ../sortix-gcc/configure \\
-      --target=$SORTIX_PLATFORM \\
-      --with-sysroot="$SORTIX/sysroot" \\
-      --prefix="$CROSS_PREFIX" \\
-      --enable-languages=c,c++ &&
-    make all-gcc all-target-libgcc &&
-    make install-gcc install-target-libgcc
+    cd "$SORTIX" &&
+    make clean-build-tools &&
+    make PREFIX="$CROSS_PREFIX" install-build-tools
 .Ed
 .Pp
-You can remove the temporary
-.Pa ~/src/gcc-build
-directory when finished.
-Notice how special make targets are used to selectively build only parts of gcc.
-It is not possible or desirable to build all of gcc here.
+.Xr following-development 7
+gains a notice whenever the build tools must be upgraded, as they must match the
+source code being built.
 .Ss Building Sortix
 With the build tools and cross-compiler in the
 .Ev PATH

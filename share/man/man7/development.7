@@ -96,9 +96,14 @@ Clean the component directories and the port source code.
 .Sy ( clean-core , clean-ports )
 .It Sy clean-build-tools
 Clean the directories of all build tools.
+.It Sy clean-cross-compiler
+Clean the directories for the cross-compiler.
+.It Sy clean-cross-toolchain
+Clean the directories for the build tools and cross-compiler.
+.Sy ( clean-build-tools , clean-cross-compiler )
 .It Sy distclean
 Run every clean target such that the source code is ready for distribution.
-.Sy ( clean-builds , clean-core , clean-mirror , clean-release , clean-repository , clean-sysroot , distclean-ports )
+.Sy ( clean-builds , clean-core , clean-mirror , clean-release , clean-repository , clean-sysroot , distclean-ports, clean-cross-compiler )
 .It Sy distclean-ports
 Remove the port source code extractions.
 .It Sy extract-ports
@@ -109,6 +114,11 @@ in
 and apply the appropriate patches.
 .It Sy install-build-tools
 Install all build tools after making them.
+.It Sy install-cross-compiler
+Install the cross-compiler after making it.
+.It Sy install-cross-toolchain
+Install the build tools and cross-compiler after making them.
+.Sy ( install-build-tools , install-cross-compiler )
 .It Sy iso
 Create a release iso in the
 .Pa /src/builds
@@ -130,7 +140,7 @@ The local mirror has the same structure as the remote mirror and can be used as
 a remote mirror.
 .It Sy mostlyclean
 Clean everything except binary packages and the mirror of upstream releases.
-.Sy ( clean-builds , clean-ports , clean-release , clean-sysroot , distclean-ports )
+.Sy ( clean-builds , clean-ports , clean-release , clean-sysroot , distclean-ports, clean-cross-compiler )
 .It Sy presubmit
 Verify the port configuration
 .Sy ( verify-ports ) ,

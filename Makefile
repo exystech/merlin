@@ -113,6 +113,49 @@ install-build-tools:
 	$(MAKE) -C sf install
 	$(MAKE) -C tix install
 
+.PHONY: clean-cross-compiler
+clean-cross-compiler:
+	rm -rf ports/binutils/binutils.build
+	rm -rf ports/gcc/gcc.build
+
+.PHONY: install-cross-compiler
+install-cross-compiler:
+	PATH="$(PREFIX)/sbin:$(PREFIX)/bin:$(PATH)" \
+	$(MAKE) extract-ports PACKAGES='binutils gcc'
+	rm -rf ports/binutils/binutils.build
+	mkdir ports/binutils/binutils.build
+	cd ports/binutils/binutils.build && \
+	../binutils/configure \
+	  --target="$(TARGET)" \
+	  --prefix="$(PREFIX)" \
+	  --with-sysroot="$(SYSROOT)" \
+	  --disable-werror
+	$(MAKE) -C ports/binutils/binutils.build
+	$(MAKE) -C ports/binutils/binutils.build install
+	rm -rf ports/gcc/gcc.build
+	mkdir ports/gcc/gcc.build
+	cd ports/gcc/gcc.build && \
+	PATH="$(PREFIX)/bin:$(PATH)" \
+	../gcc/configure \
+	  --target="$(TARGET)" \
+	  --prefix="$(PREFIX)" \
+	  --with-sysroot="$(SYSROOT)" \
+	  --enable-languages=c,c++
+	PATH="$(PREFIX)/bin:$(PATH)" \
+	$(MAKE) -C ports/gcc/gcc.build all-gcc all-target-libgcc
+	PATH="$(PREFIX)/bin:$(PATH)" \
+	$(MAKE) -C ports/gcc/gcc.build install-gcc install-target-libgcc
+	rm -rf ports/gcc/gcc.build
+
+.PHONY: clean-cross-toolchain
+clean-cross-toolchain: clean-sysroot clean-build-tools clean-cross-compiler
+
+.PHONY: install-cross-toolchain
+install-cross-toolchain: install-build-tools
+	$(MAKE) clean-sysroot
+	$(MAKE) sysroot-base-headers HOST=$(TARGET) PREFIX=
+	$(MAKE) install-cross-compiler
+
 .PHONY: sysroot-fsh
 sysroot-fsh:
 	mkdir -p "$(SYSROOT)"
@@ -331,10 +374,10 @@ distclean-ports:
 	 build-aux/clean-ports.sh distclean
 
 .PHONY: mostlyclean
-mostlyclean: clean-core distclean-ports clean-builds clean-release clean-sysroot
+mostlyclean: clean-core distclean-ports clean-builds clean-release clean-sysroot clean-cross-compiler
 
 .PHONY: distclean
-distclean: clean-core distclean-ports clean-builds clean-release clean-mirror clean-repository clean-sysroot
+distclean: clean-core distclean-ports clean-builds clean-release clean-mirror clean-repository clean-sysroot clean-cross-compiler
 
 .PHONY: most-things
 most-things: sysroot iso
@@ -350,6 +393,17 @@ sysroot-base-headers-all-archs:
 	$(MAKE) sysroot-base-headers HOST=i686-sortix
 	$(MAKE) clean clean-sysroot
 	$(MAKE) sysroot-base-headers HOST=x86_64-sortix
+
+.PHONY: install-cross-compiler-all-archs
+install-cross-compiler-all-archs:
+	$(MAKE) clean-cross-compiler
+	$(MAKE) install-cross-compiler TARGET=i686-sortix
+	$(MAKE) clean-cross-compiler
+	$(MAKE) install-cross-compiler TARGET=x86_64-sortix
+
+.PHONY: install-cross-toolchain-all-archs
+install-cross-toolchain-all-archs: install-build-tools
+	$(MAKE) install-cross-compiler-all-archs
 
 .PHONY: all-archs
 all-archs:
