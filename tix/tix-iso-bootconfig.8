@@ -11,11 +11,13 @@
 .Op Fl \-disable-append-title
 .Op Fl \-disable-dhclient
 .Op Fl \-disable-network-drivers
+.Op Fl \-disable-ntpd
 .Op Fl \-disable-src
 .Op Fl \-disable-sshd
 .Op Fl \-enable-append-title
 .Op Fl \-enable-dhclient
 .Op Fl \-enable-network-drivers
+.Op Fl \-enable-ntpd
 .Op Fl \-enable-src
 .Op Fl \-enable-sshd
 .Op Fl \-init-target Ns = Ns Ar target
@@ -111,6 +113,14 @@ GRUB variable to the
 option which will be passed on the
 .Xr kernel 7
 command line.
+.It Fl \-disable-ntpd
+Disable automatically starting the ntp client by setting the
+.Sy enable_ntpd
+GRUB variable to
+.Sy false ,
+selecting the default behavior of not starting the
+.Xr ntpd 8
+daemon.
 .It Fl \-disable-src
 Disable loading the source code in
 .Pa /src
@@ -150,6 +160,14 @@ GRUB variable to the
 option which will be passed on the
 .Xr kernel 7
 command line.
+.It Fl \-enable-ntpd
+Enable automatically starting the ntp client by setting the
+.Sy enable_ntpd
+GRUB variable to
+.Sy true ,
+causing the bootloader to load additional configuration that turns on the
+.Xr ntpd 8
+daemon on boot.
 .It Fl \-enable-src
 Enable loading the source code in
 .Pa /src

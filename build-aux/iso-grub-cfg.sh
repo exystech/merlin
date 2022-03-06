@@ -125,6 +125,7 @@ mkdir -p boot/grub/init
 echo "furthermore" > boot/grub/init/furthermore
 # TODO: Possibly use a 'try' feature to not warn in case it was already unset.
 echo "unset require dhclient" > boot/grub/init/network-no-dhclient
+echo "require ntpd optional" > boot/grub/init/local-ntpd
 echo "require sshd optional" > boot/grub/init/local-sshd
 
 exec > boot/grub/grub.cfg
@@ -194,6 +195,7 @@ fi
 set enable_src=true
 set enable_network_drivers=
 set enable_dhclient=true
+set enable_ntpd=false
 set enable_sshd=false
 
 export version
@@ -206,6 +208,7 @@ export no_random_seed
 export enable_src
 export enable_network_drivers
 export enable_dhclient
+export enable_ntpd
 export enable_sshd
 EOF
 
@@ -300,6 +303,13 @@ cat << EOF
     echo -n "Disabling dhclient ... "
     module /boot/grub/init/furthermore --create-to /etc/init/network
     module /boot/grub/init/network-no-dhclient --append-to /etc/init/network
+    echo done
+  fi
+  if \$enable_ntpd; then
+    echo -n "Enabling ntpd ... "
+    module /boot/grub/init/local-ntpd --append-to /etc/init/local
+    module /boot/grub/init/furthermore --create-to /etc/init/time
+    module /boot/grub/init/local-ntpd --append-to /etc/init/time
     echo done
   fi
   if \$enable_sshd; then
@@ -462,6 +472,18 @@ if \$enable_dhclient; then
 else
   menuentry "Enable DHCP client" {
     enable_dhclient=true
+    configfile /boot/grub/advanced.cfg
+  }
+fi
+
+if \$enable_ntpd; then
+  menuentry "Disable NTP client" {
+    enable_ntpd=false
+    configfile /boot/grub/advanced.cfg
+  }
+else
+  menuentry "Enable NTP client" {
+    enable_ntpd=true
     configfile /boot/grub/advanced.cfg
   }
 fi

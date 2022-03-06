@@ -1199,6 +1199,65 @@ int main(void)
 
 	// TODO: Ask if networking should be disabled / enabled.
 
+	if ( !access_or_die("/tix/tixinfo/ntpd", F_OK) )
+	{
+		text("A Network Time Protocol client (ntpd) has been installed that "
+		     "can automatically synchronize the current time with the internet."
+		     "\n\n");
+		text("Privacy notice: If enabled, the default configuration will "
+		     "obtain time from pool.ntp.org and time.cloudflare.com; and "
+		     "compare with HTTPS timestamps from quad9 and www.google.com. "
+		     "You are encouraged to edit /etc/ntpd.conf per the ntpd.conf(5) "
+		     "manual with your preferences.\n\n");
+		bool copied = false;
+		while ( true )
+		{
+			prompt(input, sizeof(input), "enable_ntpd",
+			       "Automatically get time from the network? (yes/no/edit/man)",
+			       copied ? "yes" : "no");
+			if ( strcasecmp(input, "no") == 0 )
+				break;
+			if ( strcasecmp(input, "man") == 0 )
+			{
+				execute((const char*[]) {"man", "5", "ntpd.conf", NULL}, "fi");
+				continue;
+			}
+			if ( strcasecmp(input, "edit") == 0 )
+			{
+				if ( !copied )
+				{
+					execute((const char*[]) {"cp", "etc/default/ntpd.conf",
+						                     "etc/ntpd.conf", NULL}, "f");
+					copied = true;
+				}
+				const char* editor =
+					getenv("EDITOR") ? getenv("EDITOR") : "editor";
+				execute((const char*[]) {editor, "etc/ntpd.conf", NULL}, "f");
+				text("Created /etc/ntpd.conf from /etc/default/ntpd.conf\n");
+				continue;
+			}
+			if ( strcasecmp(input, "yes") != 0 )
+				continue;
+			if ( !install_configurationf("etc/init/local", "a",
+			                             "require ntpd optional\n") )
+			{
+				warn("etc/init/local");
+				continue;
+			}
+			if ( !install_configurationf("etc/init/time", "a",
+			                             "furthermore\n"
+			                             "require ntpd optional\n") )
+			{
+				warn("etc/init/time");
+				continue;
+			}
+			text("Added 'require ntpd optional' to /etc/init/local\n");
+			text("Added 'require ntpd optional' to /etc/init/time\n");
+			break;
+		}
+		text("\n");
+	}
+
 	struct sshd_key_file
 	{
 		const char* pri;

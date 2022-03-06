@@ -385,6 +385,22 @@ and
 .Pp
 Please note that Sortix is not currently secure as a multi-user system and
 filesystem permissions are not enforced.
+.Ss Network Time
+You will be asked if you want to enable the Network Time Protocol client
+.Xr ntpd 8 ,
+which will automatically synchronize the current time with the internet.
+Although it's recommended to use network time to avoid clock drift, it does come
+with potential privacy implications.
+.Pp
+Privacy notice: If enabled, the default configuration will obtain time from
+various internet servers and the installer will inform you which ones they are.
+You are encouraged to answer
+.Sy man
+to read the
+.Xr ntpd.conf 5
+manual and then answer
+.Sy edit
+to edit the configuration with your preferences.
 .Ss SSH Server
 You will be asked if you want to enable a
 .Xr sshd 8

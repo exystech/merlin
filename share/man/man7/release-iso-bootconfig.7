@@ -274,6 +274,11 @@ command line parameter that controls whether network drivers are enabled.
 Either set to the empty string (network drivers are enabled) or
 .Sy --disable-network-drivers .
 (Default: The empty string).
+.It Sy enable_ntpd
+Whether to start the
+.Xr ntpd 8
+daemon.
+(Default: false)
 .It Sy enable_src
 Whether to load the source code initrd containing
 .Pa /src .
