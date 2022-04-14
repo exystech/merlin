@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021-2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,6 +22,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
+#include <signal.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -802,19 +803,25 @@ int Unode::sync(ioctx_t* ctx)
 
 int Unode::stat(ioctx_t* ctx, struct stat* st)
 {
-	Channel* channel = server->Connect(ctx);
-	if ( !channel )
-		return -1;
+	// stat(2) isn't allowed to fail with EINTR.
+	sigset_t set, oldset;
+	sigfillset(&set);
+	Signal::UpdateMask(SIG_SETMASK, &set, &oldset);
 	int ret = -1;
-	struct fsm_req_stat msg;
-	struct fsm_resp_stat resp;
-	msg.ino = ino;
-	if ( SendMessage(channel, FSM_REQ_STAT, &msg, sizeof(msg)) &&
-	     RecvMessage(channel, FSM_RESP_STAT, &resp, sizeof(resp)) &&
-	     (resp.st.st_dev = (dev_t) server.Get(), true) &&
-	     ctx->copy_to_dest(st, &resp.st, sizeof(*st)) )
-		ret = 0;
-	channel->KernelClose();
+	Channel* channel = server->Connect(ctx);
+	if ( channel )
+	{
+		struct fsm_req_stat msg;
+		struct fsm_resp_stat resp;
+		msg.ino = ino;
+		if ( SendMessage(channel, FSM_REQ_STAT, &msg, sizeof(msg)) &&
+			 RecvMessage(channel, FSM_RESP_STAT, &resp, sizeof(resp)) &&
+			 (resp.st.st_dev = (dev_t) server.Get(), true) &&
+			 ctx->copy_to_dest(st, &resp.st, sizeof(*st)) )
+			ret = 0;
+		channel->KernelClose();
+	}
+	Signal::UpdateMask(SIG_SETMASK, &oldset, NULL);
 	return ret;
 }
 
@@ -872,17 +879,24 @@ int Unode::chown(ioctx_t* ctx, uid_t owner, gid_t group)
 
 int Unode::truncate(ioctx_t* ctx, off_t length)
 {
-	Channel* channel = server->Connect(ctx);
-	if ( !channel )
-		return -1;
+	// truncate(2) is allowed to EINTR but may be used by open(2) O_TRUNC which
+	// should not fail with EINTR.
+	sigset_t set, oldset;
+	sigfillset(&set);
+	Signal::UpdateMask(SIG_SETMASK, &set, &oldset);
 	int ret = -1;
-	struct fsm_req_truncate msg;
-	msg.ino = ino;
-	msg.size = length;
-	if ( SendMessage(channel, FSM_REQ_TRUNCATE, &msg, sizeof(msg)) &&
-	     RecvMessage(channel, FSM_RESP_SUCCESS, NULL, 0) )
-		ret = 0;
-	channel->KernelClose();
+	Channel* channel = server->Connect(ctx);
+	if ( channel )
+	{
+		struct fsm_req_truncate msg;
+		msg.ino = ino;
+		msg.size = length;
+		if ( SendMessage(channel, FSM_REQ_TRUNCATE, &msg, sizeof(msg)) &&
+			 RecvMessage(channel, FSM_RESP_SUCCESS, NULL, 0) )
+			ret = 0;
+		channel->KernelClose();
+	}
+	Signal::UpdateMask(SIG_SETMASK, &oldset, NULL);
 	return ret;
 }
 
@@ -1191,22 +1205,29 @@ ssize_t Unode::readdirents(ioctx_t* ctx, struct dirent* dirent, size_t size,
 Ref<Inode> Unode::open(ioctx_t* ctx, const char* filename, int flags,
                        mode_t mode)
 {
-	Channel* channel = server->Connect(ctx);
-	if ( !channel )
-		return Ref<Inode>(NULL);
-	size_t filenamelen = strlen(filename);
+	// open(2) may EINTR on slow devices but is used by stat(2) and readlink(2)
+	// wnich aren't allowed to EINTR.
+	sigset_t set, oldset;
+	sigfillset(&set);
+	Signal::UpdateMask(SIG_SETMASK, &set, &oldset);
 	Ref<Inode> ret;
-	struct fsm_req_open msg;
-	msg.dirino = ino;
-	msg.flags = flags;
-	msg.mode = mode;
-	msg.namelen = filenamelen;
-	struct fsm_resp_open resp;
-	if ( SendMessage(channel, FSM_REQ_OPEN, &msg, sizeof(msg), filenamelen) &&
-	     channel->KernelSend(&kctx, filename, filenamelen) &&
-	     RecvMessage(channel, FSM_RESP_OPEN, &resp, sizeof(resp)) )
-		ret = server->OpenNode(resp.ino, resp.type);
-	channel->KernelClose();
+	Channel* channel = server->Connect(ctx);
+	if ( channel )
+	{
+		size_t filenamelen = strlen(filename);
+		struct fsm_req_open msg;
+		msg.dirino = ino;
+		msg.flags = flags;
+		msg.mode = mode;
+		msg.namelen = filenamelen;
+		struct fsm_resp_open resp;
+		if ( SendMessage(channel, FSM_REQ_OPEN, &msg, sizeof(msg), filenamelen) &&
+			 channel->KernelSend(&kctx, filename, filenamelen) &&
+			 RecvMessage(channel, FSM_RESP_OPEN, &resp, sizeof(resp)) )
+			ret = server->OpenNode(resp.ino, resp.type);
+		channel->KernelClose();
+	}
+	Signal::UpdateMask(SIG_SETMASK, &oldset, NULL);
 	return ret;
 }
 
@@ -1334,22 +1355,28 @@ int Unode::symlink(ioctx_t* ctx, const char* oldname, const char* filename)
 
 ssize_t Unode::readlink(ioctx_t* ctx, char* buf, size_t bufsiz)
 {
-	Channel* channel = server->Connect(ctx);
-	if ( !channel )
-		return -1;
+	// readlink(2) isn't allowed to fail with EINTR.
+	sigset_t set, oldset;
+	sigfillset(&set);
+	Signal::UpdateMask(SIG_SETMASK, &set, &oldset);
 	ssize_t ret = -1;
-	struct fsm_req_readlink msg;
-	struct fsm_resp_readlink resp;
-	msg.ino = ino;
-	if ( SendMessage(channel, FSM_REQ_READLINK, &msg, sizeof(msg)) &&
-	     RecvMessage(channel, FSM_RESP_READLINK, &resp, sizeof(resp)) )
+	Channel* channel = server->Connect(ctx);
+	if ( channel )
 	{
-		if ( resp.targetlen < bufsiz )
-			bufsiz = resp.targetlen;
-		if ( channel->KernelRecv(ctx, buf, bufsiz) )
-			ret = (ssize_t) bufsiz;
+		struct fsm_req_readlink msg;
+		struct fsm_resp_readlink resp;
+		msg.ino = ino;
+		if ( SendMessage(channel, FSM_REQ_READLINK, &msg, sizeof(msg)) &&
+			 RecvMessage(channel, FSM_RESP_READLINK, &resp, sizeof(resp)) )
+		{
+			if ( resp.targetlen < bufsiz )
+				bufsiz = resp.targetlen;
+			if ( channel->KernelRecv(ctx, buf, bufsiz) )
+				ret = (ssize_t) bufsiz;
+		}
+		channel->KernelClose();
 	}
-	channel->KernelClose();
+	Signal::UpdateMask(SIG_SETMASK, &oldset, NULL);
 	return ret;
 }
 
