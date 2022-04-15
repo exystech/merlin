@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016, 2020 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016, 2020, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -361,10 +361,8 @@ static void SetNeedVariableCrossTool(struct metainfo* minfo,
                                      const char* variable,
                                      const char* value)
 {
-	if ( strcmp(minfo->build, minfo->host) == 0 )
-	{
+	if ( !minfo->cross )
 		SetNeedVariableBuildTool(minfo, variable, value);
-	}
 	else
 	{
 		char* newvalue = print_string("%s-%s", minfo->host, value);
