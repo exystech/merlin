@@ -7,7 +7,7 @@ OPTLEVEL?=$(DEFAULT_OPTLEVEL)
 CXXFLAGS?=$(OPTLEVEL)
 
 CPPFLAGS:=$(CPPFLAGS) -DVERSIONSTR=\"$(VERSION)\"
-CXXFLAGS:=$(CXXFLAGS) -Wall -Wextra -fno-exceptions -fno-rtti
+CXXFLAGS:=$(CXXFLAGS) -Wall -Wextra -fno-exceptions -fno-rtti -fcheck-new
 
 LIBS:=$(LIBS)
 

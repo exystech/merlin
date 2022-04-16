@@ -12,7 +12,7 @@ CPPINCLUDES=-Iinclude
 CPPFLAGS=-D__is_sortix_libc $(CPPINCLUDES)
 FLAGS=-Wall -Wextra -ffreestanding $(OPTLEVEL)
 CFLAGS=-std=gnu11 -Wstrict-prototypes -Werror=implicit-function-declaration
-CXXFLAGS=-std=gnu++11 -fno-exceptions -fno-rtti
+CXXFLAGS=-std=gnu++11 -fno-exceptions -fno-rtti -fcheck-new
 ASFLAGS=
 
 FREEOBJS=\

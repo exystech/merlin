@@ -13,7 +13,7 @@ CXXFLAGS?=$(OPTLEVEL)
 
 CPPFLAGS:=$(CPPFLAGS) -I. -Iinclude -D__is_sortix_kernel
 CXXFLAGS:=$(CXXFLAGS) -Wall -Wextra -ffreestanding -fbuiltin -std=gnu++11 \
-                      -fno-exceptions -fno-rtti
+                      -fno-exceptions -fno-rtti -fcheck-new
 
 ifeq ($(PANIC_SHORT),1)
     CPPFLAGS:=$(CPPFLAGS) -DPANIC_SHORT

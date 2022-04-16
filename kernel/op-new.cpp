@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,6 +19,10 @@
 
 #include <stddef.h>
 #include <stdlib.h>
+
+#ifdef __clang__
+#warning "security: -fcheck-new might not work on clang"
+#endif
 
 void* operator new(size_t size)
 {
