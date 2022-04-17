@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2021, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -150,11 +150,12 @@ int main(int argc, char* argv[])
 		{
 		case 'g': show_pgid = true; break;
 		case 'p': show_pid = true; break;
+		default: return 1;
 		}
 	}
 
 	if ( optind < argc )
-		errx(1, "extra operand: %s", argv[1]);
+		errx(1, "extra operand: %s", argv[optind]);
 
 	pstree(1, "", true, show_pgid, show_pid);
 
