@@ -18,4 +18,4 @@
 
 set -e
 cd "$TIX_INSTALL_DIR"
-find | grep '\.la$' | while read la; do rm -f "$la"; done
+find . -name '*.la' -delete
