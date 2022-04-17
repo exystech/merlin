@@ -135,7 +135,7 @@ struct heap_state
 
 /* This structure is at the very beginning of each heap part. The size variable
    includes the size of the surrounding structures. The first chunk or the end
-   of the opart follows immediately (use the magic value to determine which). */
+   of the part follows immediately (use the magic value to determine which). */
 struct heap_part
 {
 	size_t unused[3]; /* Alignment. */
