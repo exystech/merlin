@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2018, 2021-2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -373,7 +373,7 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 	// create a kernel thread that is the current thread and isn't put into the
 	// scheduler's set of runnable threads, but rather run whenever there is
 	// _nothing_ else to run on this CPU.
-	Thread* idlethread = AllocateThread();
+	Thread* idlethread = new Thread();
 	idlethread->name = "idle";
 	idlethread->process = system;
 	idlethread->kernelstackpos = (addr_t) stack;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2021, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -224,7 +224,7 @@ static void kthread_do_kill_thread(void* user)
 	Thread* thread = (Thread*) user;
 	while ( thread->state != ThreadState::DEAD )
 		kthread_yield();
-	FreeThread(thread);
+	delete thread;
 }
 
 void kthread_exit()

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2018, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2018, 2021-2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -49,35 +49,7 @@
 #include "x86-family/float.h"
 #endif
 
-void* operator new (size_t /*size*/, void* address) throw()
-{
-	return address;
-}
-
 namespace Sortix {
-
-Thread* AllocateThread()
-{
-	uint8_t* allocation = (uint8_t*) malloc(sizeof(class Thread) + 16);
-	if ( !allocation )
-		return NULL;
-
-	uint8_t* aligned = allocation;
-	if ( ((uintptr_t) aligned & 0xFUL) )
-		aligned = (uint8_t*) (((uintptr_t) aligned + 16) & ~0xFUL);
-
-	assert(!((uintptr_t) aligned & 0xFUL));
-	Thread* thread = new (aligned) Thread;
-	assert(!((uintptr_t) thread->registers.fpuenv & 0xFUL));
-	return thread->self_allocation = allocation, thread;
-}
-
-void FreeThread(Thread* thread)
-{
-	uint8_t* allocation = thread->self_allocation;
-	thread->~Thread();
-	free(allocation);
-}
 
 Thread::Thread()
 {
@@ -152,7 +124,7 @@ Thread* CreateKernelThread(Process* process,
 	       process == CurrentProcess() ||
 	       process == Scheduler::GetKernelProcess());
 
-	Thread* thread = AllocateThread();
+	Thread* thread = new Thread();
 	if ( !thread )
 		return NULL;
 	thread->name = name;
