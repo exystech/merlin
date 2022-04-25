@@ -26,6 +26,7 @@
 #include <sortix/stat.h>
 
 #include <sortix/kernel/ioctx.h>
+#include <sortix/kernel/kernel.h>
 #include <sortix/kernel/kthread.h>
 #include <sortix/kernel/ps2.h>
 

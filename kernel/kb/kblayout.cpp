@@ -26,7 +26,7 @@
 
 #include <sortix/kblayout.h>
 
-#include <sortix/kernel/log.h>
+#include <sortix/kernel/kernel.h>
 
 #include "kblayout.h"
 

@@ -23,6 +23,7 @@
 
 #include <sortix/keycodes.h>
 
+#include <sortix/kernel/kernel.h>
 #include <sortix/kernel/keyboard.h>
 #include <sortix/kernel/ps2.h>
 #include <sortix/kernel/kthread.h>

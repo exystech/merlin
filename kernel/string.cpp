@@ -19,6 +19,8 @@
 
 #include <stdarg.h>
 #include <string.h>
+
+#include <sortix/kernel/kernel.h>
 #include <sortix/kernel/string.h>
 
 namespace Sortix {
