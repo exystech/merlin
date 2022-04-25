@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2015, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -45,15 +45,19 @@ static const char* KernelInfo(const char* req)
 	return NULL;
 }
 
-ssize_t sys_kernelinfo(const char* req, char* resp, size_t resplen)
+ssize_t sys_kernelinfo(const char* user_req, char* user_resp, size_t resplen)
 {
+	char* req = GetStringFromUser(user_req);
+	if ( !req )
+		return -1;
 	const char* str = KernelInfo(req);
+	delete[] req;
 	if ( !str )
 		return errno = EINVAL, -1;
 	size_t stringlen = strlen(str);
 	if ( resplen < stringlen + 1 )
 		return errno = ERANGE, (ssize_t) stringlen;
-	if ( !CopyToUser(resp, str, sizeof(char) * (stringlen + 1)) )
+	if ( !CopyToUser(user_resp, str, sizeof(char) * (stringlen + 1)) )
 		return -1;
 	return 0;
 }
