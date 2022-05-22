@@ -81,9 +81,11 @@ else
 fi
 
 if [ -n "$kblayout" ]; then
+  mkdir -p -- "$directory/etc"
   printf "%s\n" "$kblayout" > "$directory/etc/kblayout"
 fi
 
 if [ -n "$videomode" ]; then
+  mkdir -p -- "$directory/etc"
   printf "%s\n" "$videomode" > "$directory/etc/videomode"
 fi
