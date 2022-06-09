@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2021, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -168,7 +168,7 @@ int DescriptorTable::AllocateInternal(Ref<Descriptor> desc,
 	assert(!reservation || !min_index);
 	if ( flags & ~__FD_ALLOWED_FLAGS )
 		return errno = EINVAL, -1;
-	if ( min_index < 0 )
+	if ( min_index < 0 || min_index == INT_MAX )
 		return errno = EINVAL, -1;
 	if ( min_index < first_not_taken )
 		min_index = first_not_taken;
@@ -199,6 +199,8 @@ int DescriptorTable::AllocateInternal(Ref<Descriptor> desc,
 		return i;
 	}
 	assert(!reservation);
+	if ( first_available == INT_MAX )
+		return errno = EMFILE, -1;
 	if ( !Enlargen(first_available + 1, 1) )
 		return -1;
 	entries[first_available].desc = desc;
