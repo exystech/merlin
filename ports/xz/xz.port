@@ -1,0 +1,12 @@
+NAME=xz
+BUILD_LIBRARIES='libiconv? gettext?'
+VERSION=5.2.1
+DISTNAME=$NAME-$VERSION
+COMPRESSION=tar.xz
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=6ecdd4d80b12001497df0741d6037f918d270fa0f9a1ab4e2664bf4157ae323c
+UPSTREAM_SITE=https://tukaani.org/xz
+UPSTREAM_ARCHIVE=$ARCHIVE
+BUILD_SYSTEM=configure
+CONFIGURE_ARGS='--disable-lzmadec --disable-lzmainfo --disable-lzma-links'
+POST_INSTALL=tix-eradicate-libtool-la

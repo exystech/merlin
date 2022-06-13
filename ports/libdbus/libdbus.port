@@ -1,0 +1,14 @@
+NAME=libdbus
+BUILD_LIBRARIES=libexpat
+VERSION=1.6.8
+DISTNAME=dbus-$VERSION
+COMPRESSION=tar.gz
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=fc1370ef38abeeb13f55c905ec002e60705fb0bfde3b8d21c8d6eb8056c11bac
+UPSTREAM_SITE=https://dbus.freedesktop.org/releases/dbus
+UPSTREAM_ARCHIVE=$ARCHIVE
+BUILD_SYSTEM=configure
+# TODO: The tests depend on glib, which means we have to disable them, since glib depends on this package.
+CONFIGURE_ARGS='--disable-abstract-sockets --without-x --disable-tests'
+MAKE_VARS='V=1'
+POST_INSTALL=tix-eradicate-libtool-la

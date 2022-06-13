@@ -1,0 +1,270 @@
+diff -Paur --no-dereference -- bison.upstream/build-aux/config.sub bison/build-aux/config.sub
+--- bison.upstream/build-aux/config.sub
++++ bison/build-aux/config.sub
+@@ -1356,7 +1356,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* | -plan9* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -sortix* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -Paur --no-dereference -- bison.upstream/configure bison/configure
+--- bison.upstream/configure
++++ bison/configure
+@@ -1,4 +1,122 @@
+ #! /bin/sh
++# Make gnulib assume the best about unknown operating systems when cross-compiling.
++export ac_cv_func_calloc_0_nonnull=yes
++export ac_cv_func_chown_works=yes
++export ac_cv_func_getgroups_works=yes
++export ac_cv_func_malloc_0_nonnull=yes
++export gl_cv_func_cbrtl_ieee=yes
++export gl_cv_func_ceilf_ieee=yes
++export gl_cv_func_ceil_ieee=yes
++export gl_cv_func_ceill_ieee=yes
++export gl_cv_func_chown_ctime_works=yes
++export gl_cv_func_chown_slash_works=yes
++export gl_cv_func_exp2l_ieee=yes
++export gl_cv_func_expm1_ieee=yes
++export gl_cv_func_fcntl_f_dupfd_works=yes
++export gl_cv_func_fdopendir_works=yes
++export gl_cv_func_floorf_ieee=yes
++export gl_cv_func_fmaf_works=yes
++export gl_cv_func_fmal_works=yes
++export gl_cv_func_fma_works=yes
++export gl_cv_func_fmodf_ieee=yes
++export gl_cv_func_fmod_ieee=yes
++export gl_cv_func_fmodl_ieee=yes
++export gl_cv_func_fpurge_works=yes
++export gl_cv_func_futimens_works=yes
++export gl_cv_func_futimesat_works=yes
++export gl_cv_func_getgroups_works=yes
++export gl_cv_func_gettimeofday_clobber=no
++export gl_cv_func_hypotf_ieee=yes
++export gl_cv_func_hypot_ieee=yes
++export gl_cv_func_isfinitel_works=yes
++export gl_cv_func_isnanl_works=yes
++export gl_cv_func_linkat_slash=yes
++export gl_cv_func_link_works=yes
++export gl_cv_func_log10f_ieee=yes
++export gl_cv_func_log10_ieee=yes
++export gl_cv_func_log1pf_ieee=yes
++export gl_cv_func_log1p_ieee=yes
++export gl_cv_func_log1pl_ieee=yes
++export gl_cv_func_log2f_ieee=yes
++export gl_cv_func_log2_ieee=yes
++export gl_cv_func_logf_ieee=yes
++export gl_cv_func_log_ieee=yes
++export gl_cv_func_lstat_dereferences_slashed_symlink=yes
++export gl_cv_func_mbrlen_empty_input=yes
++export gl_cv_func_mbrtowc_empty_input=yes
++export gl_cv_func_memchr_works=yes
++export gl_cv_func_memmem_works_fast=yes
++export gl_cv_func_mkdir_trailing_dot_works=yes
++export gl_cv_func_mkdir_trailing_slash_works=yes
++export gl_cv_func_mkfifo_works=yes
++export gl_cv_func_mknod_works=yes
++export gl_cv_func_modff_ieee=yes
++export gl_cv_func_modf_ieee=yes
++export gl_cv_func_modfl_ieee=yes
++export gl_cv_func_nanosleep=yes
++export gl_cv_func_open_directory_works=yes
++export gl_cv_func_perror_works=yes
++export gl_cv_func_printf_directive_a=yes
++export gl_cv_func_printf_directive_f=yes
++export gl_cv_func_printf_directive_n=yes
++export gl_cv_func_printf_enomem=yes
++export gl_cv_func_printf_flag_zero=yes
++export gl_cv_func_printf_infinite_long_double=yes
++export gl_cv_func_printf_infinite=yes
++export gl_cv_func_printf_sizes_c99=yes
++export gl_cv_func_pselect_detects_ebadf=yes
++export gl_cv_func_ptsname_sets_errno=yes
++export gl_cv_func_readlink_works=yes
++export gl_cv_func_realpath_works=yes
++export gl_cv_func_remainderf_ieee=yes
++export gl_cv_func_remainder_ieee=yes
++export gl_cv_func_remainderl_ieee=yes
++export gl_cv_func_rename_dest_works=yes
++export gl_cv_func_rename_link_works=yes
++export gl_cv_func_rename_slash_dst_works=yes
++export gl_cv_func_rename_slash_src_works=yes
++export gl_cv_func_rmdir_works=yes
++export gl_cv_func_roundf_ieee=yes
++export gl_cv_func_round_ieee=yes
++export gl_cv_func_select_detects_ebadf=yes
++export gl_cv_func_setenv_works=yes
++export gl_cv_func_signbit_gcc=yes
++export gl_cv_func_signbit=yes
++export gl_cv_func_sleep_works=yes
++export gl_cv_func_snprintf_directive_n=yes
++export gl_cv_func_snprintf_retval_c99=yes
++export gl_cv_func_snprintf_truncation_c99=yes
++export gl_cv_func_stat_dir_slash=yes
++export gl_cv_func_stat_file_slash=yes
++export gl_cv_func_stpncpy=yes
++export gl_cv_func_strcasestr_linear=yes
++export gl_cv_func_strchrnul_works=yes
++export gl_cv_func_strerror_0_works=yes
++export gl_cv_func_strstr_linear=yes
++export gl_cv_func_strtod_works=yes
++export gl_cv_func_svid_putenv=yes
++export gl_cv_func_symlink_works=yes
++export gl_cv_func_tdelete_works=yes
++export gl_cv_func_truncf_ieee=yes
++export gl_cv_func_trunc_ieee=yes
++export gl_cv_func_truncl_ieee=yes
++export gl_cv_func_tzset_clobber=no
++export gl_cv_func_ungetc_works=yes
++export gl_cv_func_unlink_honors_slashes=yes
++export gl_cv_func_unsetenv_works=yes
++export gl_cv_func_usleep_works=yes
++export gl_cv_func_utimensat_works=yes
++export gl_cv_func_vsnprintf_posix=yes
++export gl_cv_func_vsnprintf_zerosize_c99=yes
++export gl_cv_func_vsprintf_posix=yes
++export gl_cv_func_wcwidth_works=yes
++export gl_cv_func_working_getdelim=yes
++export gl_cv_func_working_mkstemp=yes
++export gl_cv_func_working_mktime=yes
++export gl_cv_func_working_strerror=yes
++export ac_cv_func___fseterr=yes # Only if the OS actually supports this, Sortix does.
++export gl_cv_func_getcwd_null=yes # Only if the OS actually supports this, Sortix does.
++export gl_cv_struct_dirent_d_ino=yes # Only if the OS actually supports this, Sortix does.
+ # Guess values for system-dependent variables and create Makefiles.
+ # Generated by GNU Autoconf 2.69 for GNU Bison 3.0.2.
+ #
+diff -Paur --no-dereference -- bison.upstream/lib/spawn_faction_addclose.c bison/lib/spawn_faction_addclose.c
+--- bison.upstream/lib/spawn_faction_addclose.c
++++ bison/lib/spawn_faction_addclose.c
+@@ -22,10 +22,6 @@
+ #include <errno.h>
+ #include <unistd.h>
+ 
+-#if !_LIBC
+-# define __sysconf(open_max) getdtablesize ()
+-#endif
+-
+ #if !HAVE_WORKING_POSIX_SPAWN
+ # include "spawn_int.h"
+ #endif
+@@ -37,7 +33,7 @@
+                                    int fd)
+ #undef posix_spawn_file_actions_addclose
+ {
+-  int maxfd = __sysconf (_SC_OPEN_MAX);
++  int maxfd = sysconf (_SC_OPEN_MAX);
+ 
+   /* Test for the validity of the file descriptor.  */
+   if (fd < 0 || fd >= maxfd)
+diff -Paur --no-dereference -- bison.upstream/lib/spawn_faction_adddup2.c bison/lib/spawn_faction_adddup2.c
+--- bison.upstream/lib/spawn_faction_adddup2.c
++++ bison/lib/spawn_faction_adddup2.c
+@@ -22,10 +22,6 @@
+ #include <errno.h>
+ #include <unistd.h>
+ 
+-#if !_LIBC
+-# define __sysconf(open_max) getdtablesize ()
+-#endif
+-
+ #if !HAVE_WORKING_POSIX_SPAWN
+ # include "spawn_int.h"
+ #endif
+@@ -37,7 +33,7 @@
+                                   int fd, int newfd)
+ #undef posix_spawn_file_actions_adddup2
+ {
+-  int maxfd = __sysconf (_SC_OPEN_MAX);
++  int maxfd = sysconf (_SC_OPEN_MAX);
+ 
+   /* Test for the validity of the file descriptor.  */
+   if (fd < 0 || newfd < 0 || fd >= maxfd || newfd >= maxfd)
+diff -Paur --no-dereference -- bison.upstream/lib/spawn_faction_addopen.c bison/lib/spawn_faction_addopen.c
+--- bison.upstream/lib/spawn_faction_addopen.c
++++ bison/lib/spawn_faction_addopen.c
+@@ -22,10 +22,6 @@
+ #include <errno.h>
+ #include <unistd.h>
+ 
+-#if !_LIBC
+-# define __sysconf(open_max) getdtablesize ()
+-#endif
+-
+ #if !HAVE_WORKING_POSIX_SPAWN
+ # include "spawn_int.h"
+ #endif
+@@ -38,7 +34,7 @@
+                                   mode_t mode)
+ #undef posix_spawn_file_actions_addopen
+ {
+-  int maxfd = __sysconf (_SC_OPEN_MAX);
++  int maxfd = sysconf (_SC_OPEN_MAX);
+ 
+   /* Test for the validity of the file descriptor.  */
+   if (fd < 0 || fd >= maxfd)
+diff -Paur --no-dereference -- bison.upstream/Makefile.in bison/Makefile.in
+--- bison.upstream/Makefile.in
++++ bison/Makefile.in
+@@ -2297,7 +2297,7 @@
+ # Obfuscate with a variable.
+ doc_bison = doc/bison
+ TEXI2DVI = texi2dvi --build-dir=doc/bison.t2d -I doc
+-CLEANDIRS = doc/bison.t2d doc/figs doc/html
++CLEANDIRS = doc/bison.t2d doc/html
+ CROSS_OPTIONS_PL = $(top_srcdir)/build-aux/cross-options.pl
+ CROSS_OPTIONS_TEXI = $(top_srcdir)/doc/cross-options.texi
+ MAINTAINERCLEANFILES = $(CROSS_OPTIONS_TEXI) \
+@@ -4922,6 +4922,8 @@
+ distclean: distclean-recursive
+ 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
+ 	-rm -rf examples/calc++/$(DEPDIR) examples/mfcalc/$(DEPDIR) examples/rpcalc/$(DEPDIR) lib/$(DEPDIR) lib/glthread/$(DEPDIR) lib/uniwidth/$(DEPDIR) src/$(DEPDIR)
++	-rm -f $(INFO_DEPS)
++	-rm -f $(CROSS_OPTIONS_TEXI)
+ 	-rm -f Makefile
+ distclean-am: clean-am distclean-compile distclean-generic \
+ 	distclean-hdr distclean-local distclean-tags
+@@ -5145,22 +5147,28 @@
+ doc/refcard.pdf: doc/refcard.tex
+ 	$(AM_V_GEN) cd doc && pdftex $(abs_top_srcdir)/doc/refcard.tex
+ $(top_srcdir)/doc/bison.help: src/bison$(EXEEXT)
+-	$(AM_V_GEN)src/bison$(EXEEXT) --version >doc/bison.help.tmp
+-	$(AM_V_at) src/bison$(EXEEXT) --help   >>doc/bison.help.tmp
+-	$(AM_V_at)$(top_srcdir)/build-aux/move-if-change doc/bison.help.tmp $@
++	# PATCH: Nope! You can't run your programs after they have been potentially
++	#        cross-compiled so don't even try!
++	#$(AM_V_GEN)src/bison$(EXEEXT) --version >doc/bison.help.tmp
++	#$(AM_V_at) src/bison$(EXEEXT) --help   >>doc/bison.help.tmp
++	#$(AM_V_at)$(top_srcdir)/build-aux/move-if-change doc/bison.help.tmp $@
++	touch $@
+ 
+ # Depend on configure to get version number changes.
+ $(top_srcdir)/doc/bison.1: doc/bison.help doc/bison.x $(top_srcdir)/configure
+-	$(AM_V_GEN)$(HELP2MAN)			\
+-	    --include=$(top_srcdir)/doc/bison.x	\
+-	    --output=$@.t src/bison$(EXEEXT)
+-	$(AM_V_at)if $(remove_time_stamp) $@ >$@a.t 2>/dev/null &&	 \
+-	   $(remove_time_stamp) $@.t | cmp $@a.t - >/dev/null 2>&1; then \
+-	  touch $@;							 \
+-	else								 \
+-	  mv $@.t $@;							 \
+-	fi
+-	$(AM_V_at)rm -f $@*.t
++	# PATCH: Nope! You can't run your programs after they have been potentially
++	#        cross-compiled so don't even try!
++	#$(AM_V_GEN)$(HELP2MAN)			\
++	#    --include=$(top_srcdir)/doc/bison.x	\
++	#    --output=$@.t src/bison$(EXEEXT)
++	#$(AM_V_at)if $(remove_time_stamp) $@ >$@a.t 2>/dev/null &&	 \
++	#   $(remove_time_stamp) $@.t | cmp $@a.t - >/dev/null 2>&1; then \
++	#  touch $@;							 \
++	#else								 \
++	#  mv $@.t $@;							 \
++	#fi
++	#$(AM_V_at)rm -f $@*.t
++	touch $@
+ 
+ .gv.eps:
+ 	$(AM_V_GEN) $(MKDIR_P) `echo "./$@" | sed -e 's,/[^/]*$$,,'`

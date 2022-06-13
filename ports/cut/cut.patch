@@ -1,0 +1,100 @@
+diff -Paur --no-dereference -- cut.upstream/cut.c cut/cut.c
+--- cut.upstream/cut.c
++++ cut/cut.c
+@@ -34,7 +34,7 @@
+  */
+ 
+ #include <ctype.h>
+-#include <err.h>
++#include <error.h>
+ #include <errno.h>
+ #include <limits.h>
+ #include <locale.h>
+@@ -43,6 +43,13 @@
+ #include <string.h>
+ #include <unistd.h>
+ 
++#define err(eval, ...) error(eval, errno, __VA_ARGS__)
++#define errx(eval, ...) error(eval, 0, __VA_ARGS__)
++#define warn(...) error(0, errno, __VA_ARGS__)
++#define warnx(...) error(0, 0, __VA_ARGS__)
++
++#define _POSIX2_LINE_MAX 2048
++
+ int	cflag;
+ char	dchar;
+ int	dflag;
+@@ -65,7 +72,7 @@
+ 
+ 	dchar = '\t';			/* default delimiter is \t */
+ 
+-	/* Since we don't support multi-byte characters, the -c and -b 
++	/* Since we don't support multi-byte characters, the -c and -b
+ 	   options are equivalent, and the -n option is meaningless. */
+ 	while ((ch = getopt(argc, argv, "b:c:d:f:sn")) != -1)
+ 		switch(ch) {
+@@ -187,6 +194,7 @@
+ void
+ c_cut(FILE *fp, char *fname)
+ {
++	(void)fname;
+ 	int ch, col;
+ 	char *pos;
+ 
+@@ -215,13 +223,17 @@
+ void
+ f_cut(FILE *fp, char *fname)
+ {
++	(void)fname;
+ 	int ch, field, isdelim;
+ 	char *pos, *p, sep;
+ 	int output;
+ 	size_t len;
+-	char *lbuf, *tbuf;
++	ssize_t slen;
++	size_t lbuf_raw_length = 0;
++	char *lbuf = NULL, *tbuf;
+ 
+-	for (sep = dchar, tbuf = NULL; (lbuf = fgetln(fp, &len));) {
++	for (sep = dchar, tbuf = NULL; 0 <= (slen = getline(&lbuf, &lbuf_raw_length, fp));) {
++		len = slen;
+ 		output = 0;
+ 		if (lbuf[len - 1] != '\n') {
+ 			/* no newline at the end of the last line so add one */
+@@ -272,6 +284,7 @@
+ 	}
+ 	if (tbuf)
+ 		free(tbuf);
++	free(lbuf);
+ }
+ 
+ void
+diff -Paur --no-dereference -- cut.upstream/Makefile cut/Makefile
+--- cut.upstream/Makefile
++++ cut/Makefile
+@@ -0,0 +1,25 @@
++include ../../../build-aux/compiler.mak
++include ../../../build-aux/version.mak
++include ../../../build-aux/dirs.mak
++
++OPTLEVEL?=-g -O2
++CFLAGS?=$(OPTLEVEL)
++
++CFLAGS:=$(CXXFLAGS) -Wall -Wextra
++CPPFLAGS:=$(CPPFLAGS)
++
++BINARY:=cut
++
++all: $(BINARY)
++
++.PHONY: all install clean
++
++%: %.c
++	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< -o $@ $(LIBS)
++
++install: all
++	mkdir -p $(DESTDIR)$(BINDIR)
++	install $(BINARY) $(DESTDIR)$(BINDIR)
++
++clean:
++	rm -f $(BINARY)

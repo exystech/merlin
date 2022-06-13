@@ -1,0 +1,91 @@
+diff -Paur --no-dereference -- libtheora.upstream/config.sub libtheora/config.sub
+--- libtheora.upstream/config.sub
++++ libtheora/config.sub
+@@ -1093,7 +1093,7 @@
+ 	      | -*vms* | -sco* | -esix* | -isc* | -aix* | -sunos | -sunos[34]*\
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -solaris* | -sym* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* \
++	      | -aos* | -sortix* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -netbsd* | -openbsd* | -freebsd* | -riscix* \
+diff -Paur --no-dereference -- libtheora.upstream/examples/dump_psnr.c libtheora/examples/dump_psnr.c
+--- libtheora.upstream/examples/dump_psnr.c
++++ libtheora/examples/dump_psnr.c
+@@ -37,7 +37,6 @@
+ #endif
+ #include <stdlib.h>
+ #include <string.h>
+-#include <sys/timeb.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ /*Yes, yes, we're going to hell.*/
+diff -Paur --no-dereference -- libtheora.upstream/examples/dump_video.c libtheora/examples/dump_video.c
+--- libtheora.upstream/examples/dump_video.c
++++ libtheora/examples/dump_video.c
+@@ -37,9 +37,9 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+-#include <sys/timeb.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
++#include <time.h>
+ /*Yes, yes, we're going to hell.*/
+ #if defined(_WIN32)
+ #include <io.h>
+@@ -205,9 +205,9 @@
+   int long_option_index;
+   int c;
+ 
+-  struct timeb start;
+-  struct timeb after;
+-  struct timeb last;
++  struct timespec start;
++  struct timespec after;
++  struct timespec last;
+   int fps_only=0;
+   int frames = 0;
+ 
+@@ -418,8 +418,8 @@
+   }
+ 
+   if(fps_only){
+-    ftime(&start);
+-    ftime(&last);
++    clock_gettime(CLOCK_MONOTONIC, &start);
++    clock_gettime(CLOCK_MONOTONIC, &last);
+   }
+ 
+   while(!got_sigint){
+@@ -433,7 +433,7 @@
+           videobuf_ready=1;
+           frames++;
+           if(fps_only)
+-            ftime(&after);
++            clock_gettime(CLOCK_MONOTONIC, &after);
+         }
+ 
+       }else
+@@ -442,16 +442,16 @@
+ 
+     if(fps_only && (videobuf_ready || fps_only==2)){
+       long ms =
+-        after.time*1000.+after.millitm-
+-        (last.time*1000.+last.millitm);
++        after.tv_sec*1000.+after.tv_nsec/1000000-
++        (last.tv_sec*1000.+last.tv_nsec/1000000);
+ 
+       if(ms>500 || fps_only==1 ||
+          (feof(infile) && !videobuf_ready)){
+         float file_fps = (float)ti.fps_numerator/ti.fps_denominator;
+         fps_only=2;
+ 
+-        ms = after.time*1000.+after.millitm-
+-          (start.time*1000.+start.millitm);
++        ms = after.tv_sec*1000.+after.tv_nsec/1000000-
++          (start.tv_sec*1000.+start.tv_nsec/1000000);
+ 
+         fprintf(stderr,"\rframe:%d rate:%.2fx           ",
+                 frames,

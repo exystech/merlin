@@ -1,0 +1,1 @@
+rm -rf -- 'pixman/pixman-version.h'

@@ -1,0 +1,13 @@
+NAME=vim
+BUILD_LIBRARIES=libcurses
+VERSION=8.0.002
+DISTNAME=$NAME-$VERSION
+COMPRESSION=tar.bz2
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=acab24b07d9e87a1c1581cf5ecfe0439562ff7e111d0d2dbd274260490cb64e8
+UPSTREAM_SITE=http://ftp.vim.org/pub/vim/unix
+UPSTREAM_ARCHIVE=$ARCHIVE
+BUILD_SYSTEM=configure
+CONFIGURE_ARGS='--enable-multibyte --with-modified-by=sortie@maxsi.org'
+# TODO: Consider vim_cv_tty_group and vim_cv_tty_mode.
+CONFIGURE_VARS='vim_cv_tty_group=world vim_cv_tty_mode=0620'

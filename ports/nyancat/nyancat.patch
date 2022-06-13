@@ -1,0 +1,119 @@
+diff -Paur --no-dereference -- nyancat.upstream/Makefile nyancat/Makefile
+--- nyancat.upstream/Makefile
++++ nyancat/Makefile
+@@ -1,39 +1,26 @@
+-package = nyancat
+-version = 1.5.2
+-tarname = $(package)
+-distdir = $(tarname)-$(version)
+-
+-all clean check nyancat:
+-	cd src && $(MAKE) $@
+-
+-dist: $(distdir).tar.gz
+-
+-$(distdir).tar.gz: $(distdir)
+-	tar chof - $(distdir) | gzip -9 -c > $@
+-	rm -rf $(distdir)
+-
+-$(distdir): FORCE
+-	mkdir -p $(distdir)/src
+-	cp Makefile $(distdir)
+-	cp src/Makefile $(distdir)/src
+-	cp src/nyancat.c $(distdir)/src
+-	cp src/animation.h $(distdir)/src
+-	cp src/telnet.h $(distdir)/src
+-
+-FORCE:
+-	-rm $(distdir).tar.gz >/dev/null 2>&1
+-	-rm -rf $(distdir) >/dev/null 2>&1
+-
+-distcheck: $(distdir).tar.gz
+-	gzip -cd $(distdir).tar.gz | tar xvf -
+-	cd $(distdir) && $(MAKE) all
+-	cd $(distdir) && $(MAKE) check
+-	cd $(distdir) && $(MAKE) clean
+-	rm -rf $(distdir)
+-	@echo "*** Package $(distdir).tar.gz is ready for distribution."
++include ../../../build-aux/compiler.mak
++include ../../../build-aux/version.mak
++include ../../../build-aux/dirs.mak
++
++OPTLEVEL?=-g -O2
++CFLAGS?=$(OPTLEVEL)
++
++CFLAGS:=$(CXXFLAGS) -Wall -Wextra -std=c99 -pedantic -Wwrite-strings
++CPPFLAGS:=$(CPPFLAGS)
++
++all: src/nyancat
++
++.PHONY: all install clean
++
++src/nyancat: src/nyancat.o
++
++src/nyancat.o: src/animation.c src/telnet.h
+ 
+ install: all
+-	install src/nyancat /usr/bin/${package}
+-	gzip -9 -c < nyancat.1 > /usr/share/man/man1/nyancat.1.gz
++	mkdir -p $(DESTDIR)$(BINDIR)
++	install src/nyancat $(DESTDIR)$(BINDIR)
++	mkdir -p $(DESTDIR)$(MANDIR)/man1
++	install nyancat.1 $(DESTDIR)$(MANDIR)/man1
+ 
+-.PHONY: FORCE all clean check dist distcheck install
++clean:
++	rm -f src/nyancat src/nyancat.o
+diff -Paur --no-dereference -- nyancat.upstream/src/Makefile nyancat/src/Makefile
+--- nyancat.upstream/src/Makefile
++++ nyancat/src/Makefile
+@@ -1,20 +0,0 @@
+-OBJECTS = nyancat.o
+-
+-CC	?=
+-CFLAGS	 ?= -g -Wall -Wextra -std=c99 -pedantic -Wwrite-strings
+-CPPFLAGS ?=
+-LDFLAGS  ?=
+-
+-all: nyancat
+-
+-nyancat: $(OBJECTS)
+-	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(OBJECTS) -o $@
+-
+-clean:
+-	-rm -f $(OBJECTS) nyancat
+-
+-check: all
+-	# Unit tests go here. None currently.
+-	@echo "*** ALL TESTS PASSED ***"
+-
+-.PHONY: all clean check
+diff -Paur --no-dereference -- nyancat.upstream/src/nyancat.c nyancat/src/nyancat.c
+--- nyancat.upstream/src/nyancat.c
++++ nyancat/src/nyancat.c
+@@ -54,6 +54,7 @@
+ #define _BSD_SOURCE
+ #define _DEFAULT_SOURCE
+ #define __BSD_VISIBLE 1
++#define _SORTIX_SOURCE 1
+ #include <ctype.h>
+ #include <stdio.h>
+ #include <stdint.h>
+@@ -585,6 +586,8 @@
+ 			ttype = 1; /* 256-color, spaces */
+ 		} else if (strstr(term, "toaru")) {
+ 			ttype = 1; /* emulates xterm */
++		} else if (strstr(term, "sortix")) {
++			ttype = 1; /* emulates xterm */
+ 		} else if (strstr(term, "linux")) {
+ 			ttype = 3; /* Spaces and blink attribute */
+ 		} else if (strstr(term, "vtnt")) {
+@@ -892,7 +895,7 @@
+ 			 * The \033[0m prevents the Apple ][ from flipping everything, but
+ 			 * makes the whole nyancat less bright on the vt220
+ 			 */
+-			printf("\033[1;37mYou have nyaned for %0.0f seconds!\033[J\033[0m", diff);
++			printf("\033[1;37mYou have nyaned for %lli seconds!\033[J\033[0m", (long long)diff);
+ 		}
+ 		/* Reset the last color so that the escape sequences rewrite */
+ 		last = 0;

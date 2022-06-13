@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  * tix-execdiff.c
- * Reports which files have had the executable bit changed between two trees.
+ * Compare executable permissions between two trees.
  */
 
 #include <sys/stat.h>
@@ -39,7 +39,7 @@
 
 #include "util.h"
 
-DIR* fdopendupdir(int fd)
+static DIR* fdopendupdir(int fd)
 {
 	int newfd = dup(fd);
 	if ( newfd < 0 )
@@ -50,7 +50,7 @@ DIR* fdopendupdir(int fd)
 	return result;
 }
 
-int ftestexecutableat(int dirfd, const char* path)
+static int ftestexecutableat(int dirfd, const char* path)
 {
 	struct stat st;
 	if ( fstatat(dirfd, path, &st, AT_SYMLINK_NOFOLLOW) != 0 )
@@ -65,31 +65,36 @@ int ftestexecutableat(int dirfd, const char* path)
 		return -1;
 }
 
-void execdiff(int tree_a, const char* tree_a_path,
-              int tree_b, const char* tree_b_path,
-              const char* relpath)
+static void execdiff(int tree_a, const char* tree_a_path,
+                     int tree_b, const char* tree_b_path,
+                     const char* relpath)
 {
 	DIR* dir_b = fdopendupdir(tree_b);
 	if ( !dir_b )
-		err(1, "fdopendupdir(`%s`)", tree_b_path);
+		err(1, "fdopendupdir: %s", tree_b_path);
 	struct dirent* entry;
 	while ( (entry = readdir(dir_b)) )
 	{
 		if ( !strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..") )
 			continue;
 
-		char* subrelpath = join_paths(relpath, entry->d_name);
+		char* subrelpath = relpath[0] ? join_paths(relpath, entry->d_name) :
+		                   strdup(entry->d_name);
+		if ( !subrelpath )
+			err(1, "malloc");
 
 		int diropenflags = O_RDONLY | O_DIRECTORY | O_NOFOLLOW;
 		int subtree_b = openat(tree_b, entry->d_name, diropenflags);
 		if ( 0 <= subtree_b )
 		{
 			char* subtree_b_path = join_paths(tree_b_path, entry->d_name);
+			if ( !subtree_b_path )
+				err(1, "malloc");
 			int subtree_a = openat(tree_a, entry->d_name, diropenflags);
 			if ( subtree_a < 0 )
 			{
 				if ( !(errno == ENOTDIR || errno == ELOOP || errno == ENOENT) )
-					err(1, "`%s/%s`", tree_b_path, entry->d_name);
+					err(1, "%s/%s", tree_b_path, entry->d_name);
 				execdiff(-1, NULL, subtree_b, subtree_b_path, subrelpath);
 				free(subtree_b_path);
 				close(subtree_b);
@@ -97,6 +102,8 @@ void execdiff(int tree_a, const char* tree_a_path,
 				continue;
 			}
 			char* subtree_a_path = join_paths(tree_a_path, entry->d_name);
+			if ( !subtree_a_path )
+				err(1, "malloc");
 			execdiff(subtree_a, subtree_a_path, subtree_b, subtree_b_path,
 			         subrelpath);
 			free(subtree_a_path);
@@ -107,7 +114,7 @@ void execdiff(int tree_a, const char* tree_a_path,
 			continue;
 		}
 		else if ( !(errno == ENOTDIR || errno == ELOOP) )
-			err(1, "`%s/%s`", tree_b_path, entry->d_name);
+			err(1, "%s/%s", tree_b_path, entry->d_name);
 
 		int a_executableness = ftestexecutableat(tree_a, entry->d_name);
 		int b_executableness = ftestexecutableat(tree_b, entry->d_name);
@@ -135,81 +142,41 @@ void execdiff(int tree_a, const char* tree_a_path,
 		}
 
 		free(subrelpath);
-		continue;
 	}
 	closedir(dir_b);
 }
 
-static void help(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "Usage: %s [OPTION]... TREE-A TREE-B\n", argv0);
-	fprintf(fp, "Reports which files have had the executable bit changed between two trees.\n");
-}
-
-static void version(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
-}
-
 int main(int argc, char* argv[])
 {
-	const char* argv0 = argv[0];
-	for ( int i = 0; i < argc; i++ )
+	int opt;
+	while ( (opt = getopt(argc, argv, "")) != -1 )
 	{
-		const char* arg = argv[i];
-		if ( arg[0] != '-' || !arg[1] )
-			continue;
-		argv[i] = NULL;
-		if ( !strcmp(arg, "--") )
-			break;
-		if ( arg[1] != '-' )
+		switch ( opt )
 		{
-			char c;
-			while ( (c = *++arg) ) switch ( c )
-			{
-			default:
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				help(stderr, argv0);
-				exit(1);
-			}
-		}
-		else if ( !strcmp(arg, "--help") )
-			help(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--version") )
-			version(stdout, argv0), exit(0);
-		else
-		{
-			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			help(stderr, argv0);
-			exit(1);
+		default: return 1;
 		}
 	}
 
-	if ( argc == 1 )
-	{
-		help(stdout, argv0);
-		exit(0);
-	}
+	if ( argc - optind < 2 )
+		errx(1, "expected two directories");
 
-	compact_arguments(&argc, &argv);
+	if ( 2 < argc - optind )
+		errx(1, "unexpected extra operand");
 
-	if ( argc < 3 )
-		errx(1, "You need to specify two directories");
-
-	if ( 3 < argc )
-		errx(1, "extra operand");
-
-	const char* tree_a_path = argv[1];
+	const char* tree_a_path = argv[optind + 0];
 	int tree_a = open(tree_a_path, O_RDONLY | O_DIRECTORY);
 	if ( tree_a < 0 )
-		err(1, "`%s'", tree_a_path);
+		err(1, "%s", tree_a_path);
 
-	const char* tree_b_path = argv[2];
+	const char* tree_b_path = argv[optind + 1];
 	int tree_b = open(tree_b_path, O_RDONLY | O_DIRECTORY);
 	if ( tree_b < 0 )
-		err(1, "`%s'", tree_b_path);
+		err(1, "%s", tree_b_path);
 
-	execdiff(tree_a, tree_a_path, tree_b, tree_b_path, ".");
+	execdiff(tree_a, tree_a_path, tree_b, tree_b_path, "");
+
+	if ( ferror(stdout) || fflush(stdout) == EOF )
+		err(1, "stdout");
 
 	return 0;
 }

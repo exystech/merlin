@@ -1,0 +1,12 @@
+NAME=libfreetype
+BUILD_LIBRARIES='libz bzip2? libpng?'
+VERSION=2.8.1
+DISTNAME=freetype-$VERSION
+COMPRESSION=tar.bz2
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=e5435f02e02d2b87bb8e4efdcaa14b1f78c9cf3ab1ed80f94b6382fb6acc7d78
+UPSTREAM_SITE=https://download.savannah.gnu.org/releases/freetype
+UPSTREAM_ARCHIVE=$ARCHIVE
+BUILD_SYSTEM=configure
+DIRTY_FILE=config.log
+POST_INSTALL=tix-eradicate-libtool-la

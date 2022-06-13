@@ -1,0 +1,12 @@
+diff -Paur --no-dereference -- libSDL.upstream/make.sortix libSDL/make.sortix
+--- libSDL.upstream/make.sortix
++++ libSDL/make.sortix
+@@ -0,0 +1,8 @@
++#!/bin/sh
++set -e
++
++"$MAKE" "$@"
++
++if [ "$1" = "install" ]; then
++rm -fv "$DESTDIR/$EXEC_PREFIX/bin/sdl-config"
++fi

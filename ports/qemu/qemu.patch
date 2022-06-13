@@ -1,0 +1,1278 @@
+diff -Paur --no-dereference -- qemu.upstream/block/raw-posix.c qemu/block/raw-posix.c
+--- qemu.upstream/block/raw-posix.c
++++ qemu/block/raw-posix.c
+@@ -94,6 +94,8 @@
+ #include <sys/diskslice.h>
+ #endif
+ 
++#include <sys/ioctl.h>
++
+ #ifdef CONFIG_XFS
+ #include <xfs/xfs.h>
+ #endif
+diff -Paur --no-dereference -- qemu.upstream/configure qemu/configure
+--- qemu.upstream/configure
++++ qemu/configure
+@@ -246,12 +246,13 @@
+ LDFLAGS_SHARED="-shared"
+ modules="no"
+ prefix="/usr/local"
++exec_prefix="/usr/local"
+ mandir="\${prefix}/share/man"
+ datadir="\${prefix}/share"
+ qemu_docdir="\${prefix}/share/doc/qemu"
+-bindir="\${prefix}/bin"
+-libdir="\${prefix}/lib"
+-libexecdir="\${prefix}/libexec"
++bindir="\${exec_prefix}/bin"
++libdir="\${exec_prefix}/lib"
++libexecdir="\${exec_prefix}/libexec"
+ includedir="\${prefix}/include"
+ sysconfdir="\${prefix}/etc"
+ local_statedir="\${prefix}/var"
+@@ -261,6 +262,7 @@
+ bsd="no"
+ linux="no"
+ solaris="no"
++sortix="no"
+ profiler="no"
+ cocoa="no"
+ softmmu="yes"
+@@ -320,6 +322,9 @@
+ numa=""
+ tcmalloc="no"
+ jemalloc="no"
++param_build=
++param_host=
++param_target=
+ 
+ # parse CC options first
+ for opt do
+@@ -345,16 +350,29 @@
+   ;;
+   --disable-debug-info) debug_info="no"
+   ;;
++  --build=*) param_build="$optarg"
++  ;;
++  --host=*) param_host="$optarg"
++  ;;
++  --target=*) param_target="$optarg"
++  ;;
+   esac
+ done
+ # OS specific
+ # Using uname is really, really broken.  Once we have the right set of checks
+ # we can eliminate its usage altogether.
+ 
++if test -n "${CC_FOR_BUILD}"; then
++  host_cc="${CC_FOR_BUILD}"
++fi
++
+ # Preferred compiler:
+ #  ${CC} (if set)
+ #  ${cross_prefix}gcc (if cross-prefix specified)
+ #  system compiler
++if [ x"${param_build}]" != x"${param_host}" ]; then
++  cross_prefix="${param_host}-"
++fi
+ if test -z "${CC}${cross_prefix}"; then
+   cc="$host_cc"
+ else
+@@ -381,8 +399,8 @@
+     "${pkg_config_exe}" ${QEMU_PKG_CONFIG_FLAGS} "$@"
+ }
+ pkg_config=query_pkg_config
+-sdl_config="${SDL_CONFIG-${cross_prefix}sdl-config}"
+-sdl2_config="${SDL2_CONFIG-${cross_prefix}sdl2-config}"
++sdl_config="${pkg_config} sdl"
++sdl2_config="${pkg_config} sdl2"
+ 
+ # If the user hasn't specified ARFLAGS, default to 'rv', just as make does.
+ ARFLAGS="${ARFLAGS-rv}"
+@@ -443,6 +461,8 @@
+   targetos='SunOS'
+ elif check_define __HAIKU__ ; then
+   targetos='Haiku'
++elif check_define __sortix__ ; then
++  targetos='Sortix'
+ else
+   targetos=$(uname -s)
+ fi
+@@ -666,6 +686,10 @@
+   QEMU_CFLAGS="-DB_USE_POSITIVE_POSIX_ERRORS $QEMU_CFLAGS"
+   LIBS="-lposix_error_mapper -lnetwork $LIBS"
+ ;;
++Sortix*)
++  audio_possible_drivers="sdl"
++  sortix="yes"
++;;
+ *)
+   audio_drv_list="oss"
+   audio_possible_drivers="oss alsa sdl pa"
+@@ -731,6 +755,8 @@
+   ;;
+   --prefix=*) prefix="$optarg"
+   ;;
++  --exec-prefix=*) exec_prefix="$optarg"
++  ;;
+   --interp-prefix=*) interp_prefix="$optarg"
+   ;;
+   --source-path=*)
+@@ -1150,6 +1176,12 @@
+   ;;
+   --enable-jemalloc) jemalloc="yes"
+   ;;
++  --build=*)
++  ;;
++  --host=*)
++  ;;
++  --target=*)
++  ;;
+   *)
+       echo "ERROR: unknown option $opt"
+       echo "Try '$0 --help' for more information"
+@@ -1162,13 +1194,7 @@
+   error_exit "Python not found. Use --python=/path/to/python"
+ fi
+ 
+-# Note that if the Python conditional here evaluates True we will exit
+-# with status 1 which is a shell 'false' value.
+-if ! $python -c 'import sys; sys.exit(sys.version_info < (2,6) or sys.version_info >= (3,))'; then
+-  error_exit "Cannot use '$python', Python 2.6 or later is required." \
+-      "Note that Python 3 or later is not yet supported." \
+-      "Use --python=/path/to/python to specify a supported Python."
+-fi
++# PATCH: qemu has been patched to work with both Python 2 and 3.
+ 
+ # Suppress writing compiled files
+ python="$python -B"
+@@ -2288,14 +2314,15 @@
+ fi
+ 
+ has_libgcrypt_config() {
+-    if ! has "libgcrypt-config"
++    return 1
++    if ! has "false"
+     then
+ 	return 1
+     fi
+ 
+     if test -n "$cross_prefix"
+     then
+-	host=$(libgcrypt-config --host)
++	host=$(false --host)
+ 	if test "$host-" != $cross_prefix
+ 	then
+ 	    return 1
+@@ -2307,9 +2334,9 @@
+ 
+ if test "$gcrypt" != "no"; then
+     if has_libgcrypt_config; then
+-        gcrypt_cflags=$(libgcrypt-config --cflags)
+-        gcrypt_libs=$(libgcrypt-config --libs)
+-        # Debian has remove -lgpg-error from libgcrypt-config
++        gcrypt_cflags=$(false --cflags)
++        gcrypt_libs=$(false --libs)
++        # Debian has remove -lgpg-error from false
+         # as it "spreads unnecessary dependencies" which in
+         # turn breaks static builds...
+         if test "$static" = "yes"
+@@ -2438,8 +2465,7 @@
+ ##########################################
+ # SDL probe
+ 
+-# Look for sdl configuration program (pkg-config or sdl-config).  Try
+-# sdl-config even without cross prefix, and favour pkg-config over sdl-config.
++# Look for sdl configuration program (pkg-config).
+ 
+ if test "$sdlabi" = ""; then
+     if $pkg_config --exists "sdl"; then
+@@ -2478,9 +2504,6 @@
+   fi
+   sdl=no
+ fi
+-if test -n "$cross_prefix" && test "$(basename "$sdlconfig")" = sdl-config; then
+-  echo warning: using "\"$sdlconfig\"" to detect cross-compiled sdl >&2
+-fi
+ 
+ sdl_too_old=no
+ if test "$sdl" != "no" ; then
+@@ -2505,8 +2528,8 @@
+     # static link with sdl ? (note: sdl.pc's --static --libs is broken)
+     if test "$sdl" = "yes" -a "$static" = "yes" ; then
+       if test $? = 0 && echo $sdl_libs | grep -- -laa > /dev/null; then
+-         sdl_libs="$sdl_libs $(aalib-config --static-libs 2>/dev/null)"
+-         sdl_cflags="$sdl_cflags $(aalib-config --cflags 2>/dev/null)"
++         sdl_libs="$sdl_libs $(false --static-libs 2>/dev/null)"
++         sdl_cflags="$sdl_cflags $(false --cflags 2>/dev/null)"
+       fi
+       if compile_prog "$sdl_cflags" "$sdl_libs" ; then
+ 	:
+@@ -2893,9 +2916,8 @@
+   cat > $TMPC << EOF
+ #include <curses.h>
+ int main(void) {
+-  const char *s = curses_version();
+-  resize_term(0, 0);
+-  return s != 0;
++  /* PATCH: The old NetBSD libcurses on Sortix doesn't have these functions. */
++  return 0;
+ }
+ EOF
+   IFS=:
+@@ -2924,7 +2946,7 @@
+   if $pkg_config libcurl --exists; then
+     curlconfig="$pkg_config libcurl"
+   else
+-    curlconfig=curl-config
++    curlconfig=false
+   fi
+   cat > $TMPC << EOF
+ #include <curl/curl.h>
+@@ -3970,7 +3992,7 @@
+ fi
+ 
+ if test "$darwin" != "yes" -a "$mingw32" != "yes" -a "$solaris" != yes -a \
+-        "$aix" != "yes" -a "$haiku" != "yes" ; then
++        "$aix" != "yes" -a "$haiku" != "yes" -a "$sortix" != "yes" ; then
+     libs_softmmu="-lutil $libs_softmmu"
+ fi
+ 
+@@ -5006,6 +5028,9 @@
+ if test "$haiku" = "yes" ; then
+   echo "CONFIG_HAIKU=y" >> $config_host_mak
+ fi
++if test "$sortix" = "yes" ; then
++  echo "CONFIG_SORTIX=y" >> $config_host_mak
++fi
+ if test "$static" = "yes" ; then
+   echo "CONFIG_STATIC=y" >> $config_host_mak
+ fi
+diff -Paur --no-dereference -- qemu.upstream/cpus.c qemu/cpus.c
+--- qemu.upstream/cpus.c
++++ qemu/cpus.c
+@@ -1119,8 +1119,15 @@
+         current_cpu = NULL;
+         qemu_mutex_unlock_iothread();
+         do {
++/* PATCH: Sortix doesn't have sigwait() yet. */
++#ifdef __sortix__
++            sleep(1);
++            r = -1;
++            errno = EAGAIN;
++#else
+             int sig;
+             r = sigwait(&waitset, &sig);
++#endif
+         } while (r == -1 && (errno == EAGAIN || errno == EINTR));
+         if (r == -1) {
+             perror("sigwait");
+@@ -1204,7 +1211,11 @@
+         return;
+     }
+     cpu->thread_kicked = true;
++#if defined(__sortix__)
++    err = ENOSYS;
++#else
+     err = pthread_kill(cpu->thread->thread, SIG_IPI);
++#endif
+     if (err) {
+         fprintf(stderr, "qemu:%s: %s", __func__, strerror(err));
+         exit(1);
+diff -Paur --no-dereference -- qemu.upstream/hw/audio/fmopl.c qemu/hw/audio/fmopl.c
+--- qemu.upstream/hw/audio/fmopl.c
++++ qemu/hw/audio/fmopl.c
+@@ -499,7 +499,7 @@
+ static inline void OPL_CALC_RH( OPL_CH *CH )
+ {
+ 	UINT32 env_tam,env_sd,env_top,env_hh;
+-	int whitenoise = (rand()&1)*(WHITE_NOISE_db/EG_STEP);
++	int whitenoise = (arc4random()&1)*(WHITE_NOISE_db/EG_STEP);
+ 	INT32 tone8;
+ 
+ 	OPL_SLOT *SLOT;
+diff -Paur --no-dereference -- qemu.upstream/include/qemu/id.h qemu/include/qemu/id.h
+--- qemu.upstream/include/qemu/id.h
++++ qemu/include/qemu/id.h
+@@ -1,6 +1,9 @@
+ #ifndef QEMU_ID_H
+ #define QEMU_ID_H
+ 
++#ifdef ID_MAX /* Conflict with Sortix <sys/types.h> */
++#undef ID_MAX
++#endif
+ typedef enum IdSubSystems {
+     ID_QDEV,
+     ID_BLOCK,
+diff -Paur --no-dereference -- qemu.upstream/include/qemu/osdep.h qemu/include/qemu/osdep.h
+--- qemu.upstream/include/qemu/osdep.h
++++ qemu/include/qemu/osdep.h
+@@ -131,6 +131,73 @@
+ #ifndef TIME_MAX
+ #define TIME_MAX LONG_MAX
+ #endif
++#ifdef __sortix__
++#ifndef O_DSYNC
++#define O_SYNC 0
++#endif
++#ifndef O_DIRECT
++#define O_DIRECT 0
++#endif
++#ifndef PATH_MAX
++#define PATH_MAX 4096
++#define PATH_MAX_IS_FAKE
++#endif
++#ifndef FILENAME_MAX
++#define FILENAME_MAX 256
++#endif
++typedef unsigned char u_char;
++typedef unsigned short u_short;
++typedef unsigned int u_int;
++typedef unsigned long u_long;
++typedef void* caddr_t;
++/* PATCH: Sortix doesn't have file descriptor passing yet. */
++#ifndef CMSG_DATA
++#define __CMSG_LEN(cmsg) (((cmsg)->cmsg_len + sizeof(long) - 1) & ~(long)(sizeof(long) - 1))
++#define __CMSG_NEXT(cmsg) ((unsigned char *)(cmsg) + __CMSG_LEN(cmsg))
++#define __MHDR_END(mhdr) ((unsigned char *)(mhdr)->msg_control + (mhdr)->msg_controllen)
++
++#define CMSG_DATA(cmsg) ((unsigned char *) (((struct cmsghdr *)(cmsg)) + 1))
++#define CMSG_NXTHDR(mhdr, cmsg) ((cmsg)->cmsg_len < sizeof (struct cmsghdr) || \
++	__CMSG_LEN(cmsg) + sizeof(struct cmsghdr) >= __MHDR_END(mhdr) - (unsigned char *)(cmsg) \
++	? 0 : (struct cmsghdr *)__CMSG_NEXT(cmsg))
++#define CMSG_FIRSTHDR(mhdr) ((size_t) (mhdr)->msg_controllen >= sizeof (struct cmsghdr) ? (struct cmsghdr *) (mhdr)->msg_control : (struct cmsghdr *) 0)
++
++#define CMSG_ALIGN(len) (((len) + sizeof (size_t) - 1) & (size_t) ~(sizeof (size_t) - 1))
++#define CMSG_SPACE(len) (CMSG_ALIGN (len) + CMSG_ALIGN (sizeof (struct cmsghdr)))
++#define CMSG_LEN(len)   (CMSG_ALIGN (sizeof (struct cmsghdr)) + (len))
++#endif
++/* PATCH: Sortix only has the modern inet_pton and inet_ntop. */
++#define inet_aton(x, y) (inet_pton(AF_INET, (x), (y)) == 1 ? 1 : 0)
++__attribute__((unused))
++static inline char* qemu_inet_ntoa(struct in_addr in)
++{
++	static char buffer[INET_ADDRSTRLEN];
++	inet_ntop(AF_INET, &in, buffer, sizeof(buffer));
++	return buffer;
++}
++#define inet_ntoa qemu_inet_ntoa
++/* PATCH: Sortix doesn't have PATH_MAX and realpath with buffer is undefined. */
++#ifdef PATH_MAX_IS_FAKE
++__attribute__((unused))
++static inline char* realpathmax(const char* path, char* dest)
++{
++    char* result = realpath(path, NULL);
++    if (!result)
++        return NULL;
++    if (!dest)
++        return result;
++    if (PATH_MAX <= strlen(result)) {
++        errno = ENAMETOOLONG;
++        free(result);
++        return NULL;
++    }
++    strcpy(dest, result);
++    free(result);
++    return dest;
++}
++#define realpath realpathmax
++#endif
++#endif
+ 
+ /* HOST_LONG_BITS is the size of a native pointer in bits. */
+ #if UINTPTR_MAX == UINT32_MAX
+@@ -291,6 +358,12 @@
+ #define FMT_pid "%ld"
+ #elif defined(WIN64)
+ #define FMT_pid "%" PRId64
++#elif defined(__sortix__)
++#ifdef PRIdPID
++#define FMT_pid "%" PRIdPID
++#else
++#define FMT_pid "%ld"
++#endif
+ #else
+ #define FMT_pid "%d"
+ #endif
+@@ -312,9 +385,12 @@
+ ssize_t writev(int fd, const struct iovec *iov, int iov_cnt);
+ #else
+ #include <sys/uio.h>
++#ifndef IOV_MAX
++#define IOV_MAX 1024
++#endif
+ #endif
+ 
+-#ifdef _WIN32
++#if defined(_WIN32)
+ static inline void qemu_timersub(const struct timeval *val1,
+                                  const struct timeval *val2,
+                                  struct timeval *res)
+@@ -328,6 +404,18 @@
+     }
+ }
+ #else
++#if !defined(timersub) /* From musl: */
++#define timerisset(t) ((t)->tv_sec || (t)->tv_usec)
++#define timerclear(t) ((t)->tv_sec = (t)->tv_usec = 0)
++#define timercmp(s,t,op) ((s)->tv_sec == (t)->tv_sec ? \
++	(s)->tv_usec op (t)->tv_usec : (s)->tv_sec op (t)->tv_sec)
++#define timeradd(s,t,a) (void) ( (a)->tv_sec = (s)->tv_sec + (t)->tv_sec, \
++	((a)->tv_usec = (s)->tv_usec + (t)->tv_usec) >= 1000000 && \
++	((a)->tv_usec -= 1000000, (a)->tv_sec++) )
++#define timersub(s,t,a) (void) ( (a)->tv_sec = (s)->tv_sec - (t)->tv_sec, \
++	((a)->tv_usec = (s)->tv_usec - (t)->tv_usec) < 0 && \
++	((a)->tv_usec += 1000000, (a)->tv_sec--) )
++#endif
+ #define qemu_timersub timersub
+ #endif
+ 
+diff -Paur --no-dereference -- qemu.upstream/main-loop.c qemu/main-loop.c
+--- qemu.upstream/main-loop.c
++++ qemu/main-loop.c
+@@ -83,7 +83,9 @@
+      */
+     sigemptyset(&set);
+     sigaddset(&set, SIG_IPI);
++#ifdef SIGIO
+     sigaddset(&set, SIGIO);
++#endif
+     sigaddset(&set, SIGALRM);
+     sigaddset(&set, SIGBUS);
+     /* SIGINT cannot be handled via signalfd, so that ^C can be used
+diff -Paur --no-dereference -- qemu.upstream/Makefile qemu/Makefile
+--- qemu.upstream/Makefile
++++ qemu/Makefile
+@@ -396,6 +396,7 @@
+ 	rm -f config.log
+ 	rm -f linux-headers/asm
+ 	rm -f qemu-tech.info qemu-tech.aux qemu-tech.cp qemu-tech.dvi qemu-tech.fn qemu-tech.info qemu-tech.ky qemu-tech.log qemu-tech.pdf qemu-tech.pg qemu-tech.toc qemu-tech.tp qemu-tech.vr
++	rm -f trace-events-all qemu-version.h.tmp
+ 	for d in $(TARGET_DIRS); do \
+ 	rm -rf $$d || exit 1 ; \
+         done
+diff -Paur --no-dereference -- qemu.upstream/migration/savevm.c qemu/migration/savevm.c
+--- qemu.upstream/migration/savevm.c
++++ qemu/migration/savevm.c
+@@ -1278,7 +1278,7 @@
+          * a hostpage on it's own.
+          */
+         error_report("Postcopy needs matching host page sizes (s=%d d=%d)",
+-                     (int)remote_hps, getpagesize());
++                     (int)remote_hps, (int)getpagesize());
+         return -1;
+     }
+ 
+diff -Paur --no-dereference -- qemu.upstream/net/Makefile.objs qemu/net/Makefile.objs
+--- qemu.upstream/net/Makefile.objs
++++ qemu/net/Makefile.objs
+@@ -10,6 +10,7 @@
+ common-obj-$(CONFIG_SOLARIS) += tap-solaris.o
+ common-obj-$(CONFIG_AIX) += tap-aix.o
+ common-obj-$(CONFIG_HAIKU) += tap-haiku.o
++common-obj-$(CONFIG_SORTIX) += tap-haiku.o
+ common-obj-$(CONFIG_SLIRP) += slirp.o
+ common-obj-$(CONFIG_VDE) += vde.o
+ common-obj-$(CONFIG_NETMAP) += netmap.o
+diff -Paur --no-dereference -- qemu.upstream/net/net.c qemu/net/net.c
+--- qemu.upstream/net/net.c
++++ qemu/net/net.c
+@@ -102,7 +102,6 @@
+ int parse_host_port(struct sockaddr_in *saddr, const char *str)
+ {
+     char buf[512];
+-    struct hostent *he;
+     const char *p, *r;
+     int port;
+ 
+@@ -113,14 +112,12 @@
+     if (buf[0] == '\0') {
+         saddr->sin_addr.s_addr = 0;
+     } else {
+-        if (qemu_isdigit(buf[0])) {
+-            if (!inet_aton(buf, &saddr->sin_addr))
+-                return -1;
+-        } else {
+-            if ((he = gethostbyname(buf)) == NULL)
+-                return - 1;
+-            saddr->sin_addr = *(struct in_addr *)he->h_addr;
+-        }
++        struct addrinfo hint = { 0 };
++        hint.ai_family = AF_INET;
++        struct addrinfo* ai;
++        if (getaddrinfo(buf, NULL, &hint, &ai) != 0)
++            return -1;
++        saddr->sin_addr = ((struct sockaddr_in*)ai->ai_addr)->sin_addr;
+     }
+     port = strtol(p, (char **)&r, 0);
+     if (r == p)
+diff -Paur --no-dereference -- qemu.upstream/net/socket.c qemu/net/socket.c
+--- qemu.upstream/net/socket.c
++++ qemu/net/socket.c
+@@ -211,14 +211,18 @@
+ 
+ static int net_socket_mcast_create(struct sockaddr_in *mcastaddr, struct in_addr *localaddr)
+ {
++#ifdef IP_ADD_MEMBERSHIP
+     struct ip_mreq imr;
++#endif
+     int fd;
+     int val, ret;
++#ifdef IP_MULTICAST_LOOP
+ #ifdef __OpenBSD__
+     unsigned char loop;
+ #else
+     int loop;
+ #endif
++#endif
+ 
+     if (!IN_MULTICAST(ntohl(mcastaddr->sin_addr.s_addr))) {
+         fprintf(stderr, "qemu: error: specified mcastaddr \"%s\" (0x%08x) "
+@@ -252,6 +256,7 @@
+         goto fail;
+     }
+ 
++#ifdef IP_ADD_MEMBERSHIP
+     /* Add host to multicast group */
+     imr.imr_multiaddr = mcastaddr->sin_addr;
+     if (localaddr) {
+@@ -266,8 +271,10 @@
+         perror("setsockopt(IP_ADD_MEMBERSHIP)");
+         goto fail;
+     }
++#endif
+ 
+     /* Force mcast msgs to loopback (eg. several QEMUs in same host */
++#ifdef IP_MULTICAST_LOOP
+     loop = 1;
+     ret = qemu_setsockopt(fd, IPPROTO_IP, IP_MULTICAST_LOOP,
+                           &loop, sizeof(loop));
+@@ -275,7 +282,9 @@
+         perror("setsockopt(SOL_IP, IP_MULTICAST_LOOP)");
+         goto fail;
+     }
++#endif
+ 
++#ifdef IP_MULTICAST_IF
+     /* If a bind address is given, only send packets from that address */
+     if (localaddr != NULL) {
+         ret = qemu_setsockopt(fd, IPPROTO_IP, IP_MULTICAST_IF,
+@@ -285,6 +294,7 @@
+             goto fail;
+         }
+     }
++#endif
+ 
+     qemu_set_nonblock(fd);
+     return fd;
+@@ -590,7 +600,7 @@
+         return -1;
+ 
+     if (localaddr_str != NULL) {
+-        if (inet_aton(localaddr_str, &localaddr) == 0)
++        if (inet_pton(AF_INET, localaddr_str, &localaddr) < 1)
+             return -1;
+         param_localaddr = &localaddr;
+     } else {
+diff -Paur --no-dereference -- qemu.upstream/net/tap.c qemu/net/tap.c
+--- qemu.upstream/net/tap.c
++++ qemu/net/tap.c
+@@ -30,7 +30,15 @@
+ #include <sys/ioctl.h>
+ #include <sys/wait.h>
+ #include <sys/socket.h>
++#if __has_include(<net/if.h>)
+ #include <net/if.h>
++#endif
++#if defined(__sortix__) && !defined(IF_NAMESIZE)
++#define IF_NAMESIZE 32
++#endif
++#if !defined(IFNAMSIZ) && defined(IF_NAMESIZE)
++#define IFNAMSIZ IF_NAMESIZE
++#endif
+ 
+ #include "net/net.h"
+ #include "clients.h"
+diff -Paur --no-dereference -- qemu.upstream/net/tap-haiku.c qemu/net/tap-haiku.c
+--- qemu.upstream/net/tap-haiku.c
++++ qemu/net/tap-haiku.c
+@@ -29,7 +29,11 @@
+ int tap_open(char *ifname, int ifname_size, int *vnet_hdr,
+              int vnet_hdr_required, int mq_required, Error **errp)
+ {
++#ifdef __sortix__
++    error_setg(errp, "no tap on Sortix");
++#else
+     error_setg(errp, "no tap on Haiku");
++#endif
+     return -1;
+ }
+ 
+diff -Paur --no-dereference -- qemu.upstream/os-posix.c qemu/os-posix.c
+--- qemu.upstream/os-posix.c
++++ qemu/os-posix.c
+@@ -169,16 +169,18 @@
+ {
+     if (user_pwd) {
+         if (setgid(user_pwd->pw_gid) < 0) {
+-            fprintf(stderr, "Failed to setgid(%d)\n", user_pwd->pw_gid);
++            fprintf(stderr, "Failed to setgid(%jd)\n", (intmax_t)user_pwd->pw_gid);
+             exit(1);
+         }
++#if !defined(__sortix__)
+         if (initgroups(user_pwd->pw_name, user_pwd->pw_gid) < 0) {
+-            fprintf(stderr, "Failed to initgroups(\"%s\", %d)\n",
+-                    user_pwd->pw_name, user_pwd->pw_gid);
++            fprintf(stderr, "Failed to initgroups(\"%s\", %jd)\n",
++                    user_pwd->pw_name, (intmax_t)user_pwd->pw_gid);
+             exit(1);
+         }
++#endif
+         if (setuid(user_pwd->pw_uid) < 0) {
+-            fprintf(stderr, "Failed to setuid(%d)\n", user_pwd->pw_uid);
++            fprintf(stderr, "Failed to setuid(%jd)\n", (intmax_t)user_pwd->pw_uid);
+             exit(1);
+         }
+         if (setuid(0) != -1) {
+@@ -308,10 +310,12 @@
+     if (fd == -1) {
+         return -1;
+     }
++#ifdef F_TLOCK
+     if (lockf(fd, F_TLOCK, 0) == -1) {
+         close(fd);
+         return -1;
+     }
++#endif
+     len = snprintf(buffer, sizeof(buffer), FMT_pid "\n", getpid());
+     if (write(fd, buffer, len) != len) {
+         close(fd);
+@@ -331,10 +335,12 @@
+ {
+     int ret = 0;
+ 
++#if defined(MCL_CURRENT) && defined(MCL_FUTURE)
+     ret = mlockall(MCL_CURRENT | MCL_FUTURE);
+     if (ret < 0) {
+         perror("mlockall");
+     }
++#endif
+ 
+     return ret;
+ }
+diff -Paur --no-dereference -- qemu.upstream/pc-bios/optionrom/kvmvapic.S qemu/pc-bios/optionrom/kvmvapic.S
+--- qemu.upstream/pc-bios/optionrom/kvmvapic.S
++++ qemu/pc-bios/optionrom/kvmvapic.S
+@@ -104,7 +104,8 @@
+ 	reenable_vtpr
+ 	push %ecx
+ 
+-	fs/movzbl pcr_cpu, %eax
++	# PATCH: Work around Sortix as(1) considering slashes as comment starters.
++	fs movzbl pcr_cpu, %eax
+ 
+ 	mov vcpu_shift, %ecx	; fixup
+ 	shl %cl, %eax
+@@ -178,7 +179,7 @@
+ 	reenable_vtpr
+ 
+ mp_set_tpr_failed:
+-	fs/movzbl pcr_cpu, %edx
++	fs movzbl pcr_cpu, %edx
+ 
+ 	mov vcpu_shift, %ecx	; fixup
+ 	shl %cl, %edx
+diff -Paur --no-dereference -- qemu.upstream/pc-bios/optionrom/Makefile qemu/pc-bios/optionrom/Makefile
+--- qemu.upstream/pc-bios/optionrom/Makefile
++++ qemu/pc-bios/optionrom/Makefile
+@@ -5,6 +5,13 @@
+ include ../../config-host.mak
+ include $(SRC_PATH)/rules.mak
+ 
++# TODO: Use system as because the cross as is version 2.24 and appears to have
++#       problems assembling these roms correctly. linuxboot_dma.c uses the gcc
++#       driver but contains inline assembly but fails with the cross as for the
++#       same reason, so use system gcc instead as it will run the system as.
++CC = $(HOST_CC)
++AS = as
++
+ $(call set-vpath, $(SRC_PATH)/pc-bios/optionrom)
+ 
+ .PHONY : all clean build-all
+@@ -33,8 +40,11 @@
+ QEMU_INCLUDES += -I$(SRC_PATH)
+ 
+ Wa = -Wa,
+-ASFLAGS += -32
+-QEMU_CFLAGS += $(call cc-c-option, $(QEMU_CFLAGS), $(Wa)-32)
++# PATCH: Sortix as(1) currently considers slashes as a comment starter, which
++# should be fixed, but until then turn that behavior off as slashes are used for
++# division in this assembly.
++ASFLAGS += -32 --divide
++QEMU_CFLAGS += $(call cc-c-option, $(QEMU_CFLAGS), $(Wa)-32 $(Wa)--divide)
+ 
+ build-all: multiboot.bin linuxboot.bin linuxboot_dma.bin kvmvapic.bin
+ 
+diff -Paur --no-dereference -- qemu.upstream/qemu-char.c qemu/qemu-char.c
+--- qemu.upstream/qemu-char.c
++++ qemu/qemu-char.c
+@@ -50,7 +50,10 @@
+ #include <sys/resource.h>
+ #include <sys/socket.h>
+ #include <netinet/in.h>
++/* PATCH: Until Sortix networking is merged. */
++#if __has_include(<net/if.h>)
+ #include <net/if.h>
++#endif
+ #include <arpa/inet.h>
+ #include <netdb.h>
+ #include <sys/select.h>
+diff -Paur --no-dereference -- qemu.upstream/scripts/qapi.py qemu/scripts/qapi.py
+--- qemu.upstream/scripts/qapi.py
++++ qemu/scripts/qapi.py
+@@ -12,7 +12,8 @@
+ # See the COPYING file in the top-level directory.
+ 
+ import re
+-from ordereddict import OrderedDict
++# PATCH: Valid Python 2 and 3.
++from collections import OrderedDict
+ import errno
+ import getopt
+ import os
+@@ -1356,7 +1357,7 @@
+ 
+     def _make_members(self, data, info):
+         return [self._make_member(key, value, info)
+-                for (key, value) in data.iteritems()]
++                for (key, value) in data.items()]
+ 
+     def _def_struct_type(self, expr, info):
+         name = expr['struct']
+@@ -1388,11 +1389,11 @@
+                     name, info, 'base', self._make_members(base, info)))
+         if tag_name:
+             variants = [self._make_variant(key, value)
+-                        for (key, value) in data.iteritems()]
++                        for (key, value) in data.items()]
+             members = []
+         else:
+             variants = [self._make_simple_variant(key, value, info)
+-                        for (key, value) in data.iteritems()]
++                        for (key, value) in data.items()]
+             typ = self._make_implicit_enum_type(name, info,
+                                                 [v.name for v in variants])
+             tag_member = QAPISchemaObjectTypeMember('type', typ, False)
+@@ -1407,7 +1408,7 @@
+         name = expr['alternate']
+         data = expr['data']
+         variants = [self._make_variant(key, value)
+-                    for (key, value) in data.iteritems()]
++                    for (key, value) in data.items()]
+         tag_member = QAPISchemaObjectTypeMember('type', 'QType', False)
+         self._def_entity(
+             QAPISchemaAlternateType(name, info,
+@@ -1516,7 +1517,11 @@
+         type_name = prefix
+     return camel_to_upper(type_name) + '_' + c_name(const_name, False).upper()
+ 
+-c_name_trans = string.maketrans('.-', '__')
++# PATCH: Python 3 with a Python 2 fallback
++try:
++    c_name_trans = str.maketrans('.-', '__')
++except:
++    c_name_trans = string.maketrans('.-', '__')
+ 
+ 
+ # Map @name to a valid C identifier.
+@@ -1778,8 +1783,13 @@
+         if really:
+             return open(name, opt)
+         else:
+-            import StringIO
+-            return StringIO.StringIO()
++            # PATCH: Python 2 with Python 3 fallback.
++            try:
++                import StringIO
++                return StringIO.StringIO()
++            except:
++                import io
++                return io.StringIO()
+ 
+     fdef = maybe_open(do_c, c_file, 'w')
+     fdecl = maybe_open(do_h, h_file, 'w')
+diff -Paur --no-dereference -- qemu.upstream/scripts/signrom.py qemu/scripts/signrom.py
+--- qemu.upstream/scripts/signrom.py
++++ qemu/scripts/signrom.py
+@@ -18,7 +18,7 @@
+ fout = open(sys.argv[2], 'wb')
+ 
+ magic = fin.read(2)
+-if magic != '\x55\xaa':
++if magic != b'\x55\xaa':
+     sys.exit("%s: option ROM does not begin with magic 55 aa" % sys.argv[1])
+ 
+ size_byte = ord(fin.read(1))
+@@ -33,7 +33,7 @@
+     # Add padding if necessary, rounding the whole input to a multiple of
+     # 512 bytes according to the third byte of the input.
+     # size-1 because a final byte is added below to store the checksum.
+-    data = data.ljust(size-1, '\0')
++    data = data.ljust(size-1, b'\0')
+ else:
+     if ord(data[-1:]) != 0:
+         sys.stderr.write('WARNING: ROM includes nonzero checksum\n')
+diff -Paur --no-dereference -- qemu.upstream/scripts/tracetool/backend/log.py qemu/scripts/tracetool/backend/log.py
+--- qemu.upstream/scripts/tracetool/backend/log.py
++++ qemu/scripts/tracetool/backend/log.py
+@@ -39,8 +39,8 @@
+     out('        if (%(cond)s) {',
+         '            struct timeval _now;',
+         '            gettimeofday(&_now, NULL);',
+-        '            qemu_log_mask(LOG_TRACE, "%%d@%%zd.%%06zd:%(name)s " %(fmt)s "\\n",',
+-        '                          getpid(),',
++        '            qemu_log_mask(LOG_TRACE, "%%jd@%%zd.%%06zd:%(name)s " %(fmt)s "\\n",',
++        '                          (intmax_t)getpid(),',
+         '                          (size_t)_now.tv_sec, (size_t)_now.tv_usec',
+         '                          %(argnames)s);',
+         '        }',
+diff -Paur --no-dereference -- qemu.upstream/slirp/ip6_icmp.c qemu/slirp/ip6_icmp.c
+--- qemu.upstream/slirp/ip6_icmp.c
++++ qemu/slirp/ip6_icmp.c
+@@ -10,6 +10,10 @@
+ #include "qemu/error-report.h"
+ #include "qemu/log.h"
+ 
++#ifndef IPPROTO_ICMPV6
++#define IPPROTO_ICMPV6 58
++#endif
++
+ #define NDP_Interval g_rand_int_range(slirp->grand, \
+         NDP_MinRtrAdvInterval, NDP_MaxRtrAdvInterval)
+ 
+diff -Paur --no-dereference -- qemu.upstream/slirp/ip6_input.c qemu/slirp/ip6_input.c
+--- qemu.upstream/slirp/ip6_input.c
++++ qemu/slirp/ip6_input.c
+@@ -7,6 +7,10 @@
+ #include "slirp.h"
+ #include "ip6_icmp.h"
+ 
++#ifndef IPPROTO_ICMPV6
++#define IPPROTO_ICMPV6 58
++#endif
++
+ /*
+  * IP initialization: fill in IP protocol switch table.
+  * All protocols not implemented in kernel go to raw IP protocol handler.
+diff -Paur --no-dereference -- qemu.upstream/slirp/mbuf.c qemu/slirp/mbuf.c
+--- qemu.upstream/slirp/mbuf.c
++++ qemu/slirp/mbuf.c
+@@ -159,12 +159,12 @@
+         if(m->m_size>size) return;
+ 
+         if (m->m_flags & M_EXT) {
+-	  datasize = m->m_data - m->m_ext;
++	  datasize = (char*)m->m_data - m->m_ext;
+ 	  m->m_ext = (char *)realloc(m->m_ext,size);
+ 	  m->m_data = m->m_ext + datasize;
+         } else {
+ 	  char *dat;
+-	  datasize = m->m_data - m->m_dat;
++	  datasize = (char*)m->m_data - m->m_dat;
+ 	  dat = (char *)malloc(size);
+ 	  memcpy(dat, m->m_dat, m->m_size);
+ 
+diff -Paur --no-dereference -- qemu.upstream/slirp/mbuf.h qemu/slirp/mbuf.h
+--- qemu.upstream/slirp/mbuf.h
++++ qemu/slirp/mbuf.h
+@@ -53,9 +53,9 @@
+  * How much room is in the mbuf, from m_data to the end of the mbuf
+  */
+ #define M_ROOM(m) ((m->m_flags & M_EXT)? \
+-			(((m)->m_ext + (m)->m_size) - (m)->m_data) \
++			(((m)->m_ext + (m)->m_size) - (char*)((m)->m_data)) \
+ 		   : \
+-			(((m)->m_dat + (m)->m_size) - (m)->m_data))
++			(((m)->m_dat + (m)->m_size) - (char*)((m)->m_data)))
+ 
+ /*
+  * How much free room there is
+@@ -75,7 +75,7 @@
+ 	int	m_size;			/* Size of data */
+ 	struct	socket *m_so;
+ 
+-	caddr_t	m_data;			/* Location of data */
++	char*	m_data;			/* Location of data */
+ 	int	m_len;			/* Amount of data in this mbuf */
+ 
+ 	Slirp *slirp;
+diff -Paur --no-dereference -- qemu.upstream/slirp/misc.c qemu/slirp/misc.c
+--- qemu.upstream/slirp/misc.c
++++ qemu/slirp/misc.c
+@@ -144,8 +144,7 @@
+ 		dup2(s, 0);
+ 		dup2(s, 1);
+ 		dup2(s, 2);
+-		for (s = getdtablesize() - 1; s >= 3; s--)
+-		   close(s);
++		closefrom(3);
+ 
+ 		i = 0;
+ 		bptr = g_strdup(ex); /* No need to free() this */
+diff -Paur --no-dereference -- qemu.upstream/slirp/slirp.c qemu/slirp/slirp.c
+--- qemu.upstream/slirp/slirp.c
++++ qemu/slirp/slirp.c
+@@ -31,8 +31,13 @@
+ #include "qemu/cutils.h"
+ 
+ #ifndef _WIN32
++#if __has_include(<net/if.h>)
+ #include <net/if.h>
+ #endif
++#if __has_include(<sys/dnsconfig.h>)
++#include <sys/dnsconfig.h>
++#endif
++#endif
+ 
+ /* host loopback address */
+ struct in_addr loopback_addr;
+@@ -49,6 +54,7 @@
+ static QTAILQ_HEAD(slirp_instances, Slirp) slirp_instances =
+     QTAILQ_HEAD_INITIALIZER(slirp_instances);
+ 
++#if !__has_include(<sys/dnsconfig.h>)
+ static struct in_addr dns_addr;
+ #ifndef _WIN32
+ static struct in6_addr dns6_addr;
+@@ -57,6 +63,7 @@
+ #ifndef _WIN32
+ static u_int dns6_addr_time;
+ #endif
++#endif
+ 
+ #define TIMEOUT_FAST 2  /* milliseconds */
+ #define TIMEOUT_SLOW 499  /* milliseconds */
+@@ -120,6 +127,39 @@
+     WSACleanup();
+ }
+ 
++#elif __has_include(<sys/dnsconfig.h>)
++
++/* TODO: This only uses the first suitable DNS server. */
++
++int get_dns_addr(struct in_addr *pdns_addr)
++{
++    struct dnsconfig cfg;
++    if (getdnsconfig(&cfg) < 0) {
++        return -1;
++    }
++    for (size_t i = 0; i < cfg.servers_count; i++) {
++        if (cfg.servers[i].family != AF_INET) continue;
++        pdns_addr->s_addr = cfg.servers[i].addr.in.s_addr;
++        return 1;
++    }
++    return -1;
++}
++
++int get_dns6_addr(struct in6_addr *pdns6_addr, uint32_t *scope_id)
++{
++    struct dnsconfig cfg;
++    if (getdnsconfig(&cfg) < 0) {
++        return -1;
++    }
++    for (size_t i = 0; i < cfg.servers_count; i++) {
++        if (cfg.servers[i].family != AF_INET6) continue;
++        memcpy(pdns6_addr, &cfg.servers[i].addr.in6, sizeof(struct in6_addr));
++        *scope_id = 0;
++        return 1;
++    }
++    return -1;
++}
++
+ #else
+ 
+ static int get_dns_addr_cached(void *pdns_addr, void *cached_addr,
+@@ -167,7 +207,12 @@
+         if (sscanf(buff, "nameserver%*[ \t]%256s", buff2) == 1) {
+             char *c = strchr(buff2, '%');
+             if (c) {
++#if __has_include(<net/if.h>)
+                 if_index = if_nametoindex(c + 1);
++#else
++                errno = ENOSYS;
++                if_index = 0;
++#endif
+                 *c = '\0';
+             } else {
+                 if_index = 0;
+diff -Paur --no-dereference -- qemu.upstream/slirp/socket.c qemu/slirp/socket.c
+--- qemu.upstream/slirp/socket.c
++++ qemu/slirp/socket.c
+@@ -522,10 +522,14 @@
+ 	   */
+ 	  len = M_FREEROOM(m);
+ 	  /* if (so->so_fport != htons(53)) { */
++#ifdef FIONREAD
+ 	  ioctlsocket(so->s, FIONREAD, &n);
++#else
++	  n = 65527;
++#endif
+ 
+ 	  if (n > len) {
+-	    n = (m->m_data - m->m_dat) + m->m_len + n + 1;
++	    n = ((char*)m->m_data - m->m_dat) + m->m_len + n + 1;
+ 	    m_inc(m, n);
+ 	    len = M_FREEROOM(m);
+ 	  }
+diff -Paur --no-dereference -- qemu.upstream/tests/Makefile.include qemu/tests/Makefile.include
+--- qemu.upstream/tests/Makefile.include
++++ qemu/tests/Makefile.include
+@@ -645,7 +645,7 @@
+ 	rmdir $(INITRD_WORK_DIR)
+ 
+ ifeq ($(CONFIG_POSIX),y)
+-LIBS += -lutil
++#LIBS += -lutil
+ endif
+ 
+ # QTest rules
+diff -Paur --no-dereference -- qemu.upstream/ui/curses.c qemu/ui/curses.c
+--- qemu.upstream/ui/curses.c
++++ qemu/ui/curses.c
+@@ -114,12 +114,7 @@
+ static volatile sig_atomic_t got_sigwinch;
+ static void curses_winch_check(void)
+ {
+-    struct winsize {
+-        unsigned short ws_row;
+-        unsigned short ws_col;
+-        unsigned short ws_xpixel;   /* unused */
+-        unsigned short ws_ypixel;   /* unused */
+-    } ws;
++    struct winsize ws;
+ 
+     if (!got_sigwinch) {
+         return;
+@@ -130,7 +125,11 @@
+         return;
+     }
+ 
++/* PATCH: libcurses seems to be out of date, newer NetBSD libcurses seems to
++          have resize_term.  */
++#if !defined(__sortix__)
+     resize_term(ws.ws_row, ws.ws_col);
++#endif
+     invalidate = 1;
+ }
+ 
+diff -Paur --no-dereference -- qemu.upstream/ui/sdl.c qemu/ui/sdl.c
+--- qemu.upstream/ui/sdl.c
++++ qemu/ui/sdl.c
+@@ -210,7 +210,7 @@
+ 
+ /* specific keyboard conversions from scan codes */
+ 
+-#if defined(_WIN32)
++#if defined(_WIN32) || defined(__sortix__)
+ 
+ static uint8_t sdl_keyevent_to_keycode(const SDL_KeyboardEvent *ev)
+ {
+diff -Paur --no-dereference -- qemu.upstream/ui/vnc.c qemu/ui/vnc.c
+--- qemu.upstream/ui/vnc.c
++++ qemu/ui/vnc.c
+@@ -2481,10 +2481,8 @@
+ {
+     int i;
+ 
+-    srand(time(NULL)+getpid()+getpid()*987654+rand());
+-
+     for (i = 0 ; i < sizeof(vs->challenge) ; i++)
+-        vs->challenge[i] = (int) (256.0*rand()/(RAND_MAX+1.0));
++        vs->challenge[i] = (int) (256.0*arc4random()/(UINT32_MAX+1.0));
+ }
+ 
+ static int protocol_client_auth_vnc(VncState *vs, uint8_t *data, size_t len)
+diff -Paur --no-dereference -- qemu.upstream/ui/vnc-enc-tight.c qemu/ui/vnc-enc-tight.c
+--- qemu.upstream/ui/vnc-enc-tight.c
++++ qemu/ui/vnc-enc-tight.c
+@@ -40,6 +40,12 @@
+ #include <png.h>
+ #endif
+ #ifdef CONFIG_VNC_JPEG
++/* PATCH: libglib's FALSE and TRUE definitions collide with libjpeg's enum
++          boolean because everything is terrible and everyone should be ashamed
++          of themselves. The HAVE_BOOLEAN macro intended to work around this
++          situation doesn't work. */
++#undef FALSE
++#undef TRUE
+ #include <jpeglib.h>
+ #endif
+ 
+diff -Paur --no-dereference -- qemu.upstream/util/compatfd.c qemu/util/compatfd.c
+--- qemu.upstream/util/compatfd.c
++++ qemu/util/compatfd.c
+@@ -31,6 +31,11 @@
+     struct sigfd_compat_info *info = opaque;
+ 
+     while (1) {
++/* PATCH: Sortix doesn't have sigwait() yet. */
++#if defined(__sortix__)
++        (void) info;
++        sleep(1);
++#else
+         int sig;
+         int err;
+ 
+@@ -63,7 +68,9 @@
+                 offset += len;
+             }
+         }
++#endif
+     }
++    return NULL;
+ }
+ 
+ static int qemu_signalfd_compat(const sigset_t *mask)
+diff -Paur --no-dereference -- qemu.upstream/util/coroutine-sigaltstack.c qemu/util/coroutine-sigaltstack.c
+--- qemu.upstream/util/coroutine-sigaltstack.c
++++ qemu/util/coroutine-sigaltstack.c
+@@ -203,7 +203,13 @@
+      * called.
+      */
+     coTS->tr_called = 0;
++#if defined(__sortix__)
++    pthread_sigmask(SIG_UNBLOCK, &sigs, NULL);
++    raise(SIGUSR2);
++    pthread_sigmask(SIG_BLOCK, &sigs, NULL);
++#else
+     pthread_kill(pthread_self(), SIGUSR2);
++#endif
+     sigfillset(&sigs);
+     sigdelset(&sigs, SIGUSR2);
+     while (!coTS->tr_called) {
+diff -Paur --no-dereference -- qemu.upstream/util/oslib-posix.c qemu/util/oslib-posix.c
+--- qemu.upstream/util/oslib-posix.c
++++ qemu/util/oslib-posix.c
+@@ -37,7 +37,7 @@
+ #include "qapi/error.h"
+ #include "qemu/sockets.h"
+ #include <libgen.h>
+-#include <sys/signal.h>
++#include <signal.h>
+ #include "qemu/cutils.h"
+ 
+ #ifdef CONFIG_LINUX
+@@ -61,7 +61,36 @@
+ 
+ int qemu_daemon(int nochdir, int noclose)
+ {
++#if defined(__sortix__) /* From musl: */
++    if (!nochdir && chdir("/"))
++        return -1;
++    if (!noclose) {
++        int fd, failed = 0;
++        if ((fd = open("/dev/null", O_RDWR)) < 0) return -1;
++        if (dup2(fd, 0) < 0 || dup2(fd, 1) < 0 || dup2(fd, 2) < 0)
++            failed++;
++        if (fd > 2) close(fd);
++        if (failed) return -1;
++    }
++
++    switch(fork()) {
++    case 0: break;
++    case -1: return -1;
++    default: _exit(0);
++    }
++
++    if (setsid() < 0) return -1;
++
++    switch(fork()) {
++    case 0: break;
++    case -1: return -1;
++    default: _exit(0);
++    }
++
++    return 0;
++#else
+     return daemon(nochdir, noclose);
++#endif
+ }
+ 
+ void *qemu_oom_check(void *ptr)
+@@ -90,6 +119,9 @@
+     }
+ #elif defined(CONFIG_BSD)
+     ptr = valloc(size);
++#elif defined(__sortix__)
++    /* TODO: Sortix doesn't have memalign, hope 16-byte alignment is fine. */
++    ptr = malloc(size);
+ #else
+     ptr = memalign(alignment, size);
+ #endif
+@@ -189,6 +221,9 @@
+ 
+ int qemu_utimens(const char *path, const struct timespec *times)
+ {
++#if defined(__sortix__)
++    return utimens(path, times);
++#else
+     struct timeval tv[2], tv_now;
+     struct stat st;
+     int i;
+@@ -232,6 +267,7 @@
+     }
+ 
+     return utimes(path, &tv[0]);
++#endif
+ }
+ 
+ char *
+diff -Paur --no-dereference -- qemu.upstream/util/path.c qemu/util/path.c
+--- qemu.upstream/util/path.c
++++ qemu/util/path.c
+@@ -4,7 +4,6 @@
+    The assumption is that this area does not change.
+ */
+ #include "qemu/osdep.h"
+-#include <sys/param.h>
+ #include <dirent.h>
+ #include "qemu-common.h"
+ #include "qemu/cutils.h"
+diff -Paur --no-dereference -- qemu.upstream/util/qemu-openpty.c qemu/util/qemu-openpty.c
+--- qemu.upstream/util/qemu-openpty.c
++++ qemu/util/qemu-openpty.c
+@@ -47,6 +47,9 @@
+ #elif defined CONFIG_SOLARIS
+ # include <termios.h>
+ # include <stropts.h>
++#elif defined(__sortix__)
++# include <termios.h>
++# include <pty.h>
+ #else
+ # include <termios.h>
+ #endif
+@@ -93,7 +96,10 @@
+         close(mfd);
+         return -1;
+ }
++#endif
+ 
++// TODO: Sortix cfmakeraw.
++#if defined(__sun__) || defined(__sortix__)
+ static void cfmakeraw (struct termios *termios_p)
+ {
+         termios_p->c_iflag &=
+diff -Paur --no-dereference -- qemu.upstream/util/rcu.c qemu/util/rcu.c
+--- qemu.upstream/util/rcu.c
++++ qemu/util/rcu.c
+@@ -319,6 +319,10 @@
+     rcu_register_thread();
+ }
+ 
++#if defined(__sortix__)
++#undef CONFIG_POSIX
++#endif
++
+ #ifdef CONFIG_POSIX
+ static void rcu_init_lock(void)
+ {

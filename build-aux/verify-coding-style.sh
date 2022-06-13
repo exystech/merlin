@@ -93,7 +93,7 @@ verify_source() {
 # TODO: Some of these patterns should also apply to build-aux, and maybe also
 #       partially to libm. Makefile and kblayout should also not have whitespace
 #       problems.
-for MODULE in $(git ls-files | grep / | sed 's,/.*,,' | sort -u | grep -Ev '^(build-aux|doc|etc|libm|share)$'); do
+for MODULE in $(git ls-files | grep / | sed 's,/.*,,' | sort -u | grep -Ev '^(build-aux|etc|libm|ports|share)$'); do
   cd "$MODULE"
   for FILE in $(git ls-files | grep -Ev '^include/' | grep -Ev '((^|/)(Makefile|\.gitignore|tixbuildinfo)|\.([0-9]|kblayout|f16|rgb))$'); do
     verify_source "$FILE"

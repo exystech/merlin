@@ -1,0 +1,17 @@
+NAME=libjpeg
+BUILD_LIBRARIES=
+VERSION=9e
+DISTNAME=jpegsrc.v$VERSION
+COMPRESSION=tar.gz
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=4077d6a6a75aeb01884f708919d25934c93305e49f7e3f36db9129320e6f4f3d
+UPSTREAM_SITE=https://ijg.org/files
+UPSTREAM_ARCHIVE=$ARCHIVE
+BUILD_SYSTEM=configure
+# TODO: Curiously, the programs shipped with libjpeg have the target name prefixed.
+CONFIGURE_ARGS='--program-prefix='
+MAKE_VARS='V=1'
+POST_INSTALL=tix-eradicate-libtool-la
+# TODO: The last letter is optional but sort -V before the first release.
+VERSION_REGEX='([0-9]+[a-z])'
+DISTNAME_REGEX=jpegsrc\.v$VERSION_REGEX

@@ -1,4 +1,4 @@
-Copyright 2011-2016 Jonas 'Sortie' Termansen and contributors.
+Copyright 2011-2022 Jonas 'Sortie' Termansen and contributors.
 
 Permission to use, copy, modify, and distribute this software for any
 purpose with or without fee is hereby granted, provided that the above
@@ -26,7 +26,8 @@ software. There is no code under the GNU GPL or variants.
 The Sortix ports collection contains third party code which is licensed
 independently of the Sortix base systems. Such code may have licenses that
 impose restrictions, such as requiring also providing the corresponding source
-code when providing compiled program code to others.
+code when providing compiled program code to others. Patches to ports are
+licensed under the same license as the relevant port.
 
 Official Sortix releases contain the binary packages from the ports collection
 and thus may contain code whose licenses impose restrictions. Official Sortix

@@ -1,0 +1,2 @@
+rm -rf -- 'doc/texinfo/nano.html'
+rm -rf -- 'nano.spec'

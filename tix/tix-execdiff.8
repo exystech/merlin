@@ -1,0 +1,47 @@
+.Dd June 6, 2022
+.Dt TIX-EXECDIFF 8
+.Os
+.Sh NAME
+.Nm tix-execdiff
+.Nd compare executable permissions between two trees
+.Sh SYNOPSIS
+.Nm
+.Ar old
+.Ar new
+.Sh DESCRIPTION
+.Nm
+recursively finds the files with different executable permissions between the
+.Ar old
+and
+.Ar new
+directory trees.
+.Nm
+writes a shell script that transforms the permissions of old tree into that of
+the new tree, which can be applied using
+.Xr tix-execpatch 8 .
+.Pp
+Files are considered executable if the current user has executable permission
+and directories are omitted from the output.
+.Pp
+Additions of executable permissions are written shell single quoted as:
+.Bd -ragged -offset indent
+chmod +x -- 'path'
+.Ed
+.Pp
+Removals of executable permissions are written shell single quoted as:
+.Bd -ragged -offset indent
+chmod -x -- 'path'
+.Ed
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr diff 1 ,
+.Xr patch 1 ,
+.Xr port 5 ,
+.Xr tix-execpatch 8 ,
+.Xr tix-rmdiff 8 ,
+.Xr tix-rmpatch 8
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 0.8.

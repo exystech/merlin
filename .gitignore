@@ -5,10 +5,12 @@
 /*.so
 /*.a
 builds
+mirror
+ports/*/*/
+ports/*/*.version
+release
+repository
 sysroot
 sysroot.destdir
 sysroot-overlay
 sysroot-overlay-*
-release
-ports
-repository

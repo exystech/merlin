@@ -1,0 +1,24 @@
+#!/bin/sh
+# The default perl installation is quite large (62 MB) but a lot of it isn't
+# actually needed and there's a lot of value in keeping the Sortix build lean.
+# This script isn't safe to run on an actual installation so make sure it's in
+# the temporary destination directory.
+if [ -n "$TIX_INSTALL_DIR" ]; then
+  # Retain only the section 1 manuals for the actual programs. There are also
+  # other useful manuals in that section, but there's a whole lot of stuff that
+  # don't need to be installed and take up space (11 MB).
+  for manpage in "$TIX_INSTALL_DIR$PREFIX/share/man/man1"/*; do
+    program=$(basename -- "$manpage" | sed -E 's/\.1$//')
+    if [ ! -e  "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/$program" ]; then
+      rm -f -- "$manpage"
+    fi
+  done
+  # The section 3 manuals are a whole lot and don't need to be installed and
+  # take up a bunch space (6 MB).
+  rm -rf -- "$TIX_INSTALL_DIR$PREFIX/share/man/man3"
+  # The pod documentation takes up space (9 MB).
+  PERLDIR="$TIX_INSTALL_DIR$PREFIX/lib/perl5/5."*
+  find -- "$PERLDIR" -name '*.pod' -delete
+  # The per-architecture statically linked modules aren't needed (16MB).
+  rm -rf -- "$PERLDIR/$HOST"/{CORE,auto}
+fi

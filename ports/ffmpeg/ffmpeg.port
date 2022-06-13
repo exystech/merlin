@@ -1,0 +1,15 @@
+NAME=ffmpeg
+BUILD_LIBRARIES='libavcodec libGL? libSDL? libSDL2?'
+VERSION=4.3.1
+DISTNAME=$NAME-$VERSION
+COMPRESSION=tar.xz
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=ad009240d46e307b4e03a213a0f49c11b650e445b1f8be0dda2a9212b34d2ffb
+UPSTREAM_SITE=https://ffmpeg.org/releases
+UPSTREAM_ARCHIVE=$ARCHIVE
+BUILD_SYSTEM=configure
+DIRTY_FILE=ffbuild/config.mak
+CONFIGURE_ARGS='--disable-x86asm --enable-version3 --optflags=" " --disable-debug'
+MAKE_VARS='V=1'
+MAKE_TARGET=progs
+MAKE_INSTALL_TARGET='install-progs install-data'

@@ -1,0 +1,219 @@
+diff -Paur --no-dereference -- libevent.upstream/buffer.c libevent/buffer.c
+--- libevent.upstream/buffer.c
++++ libevent/buffer.c
+@@ -183,7 +183,7 @@
+ 	/* this way we can manipulate the buffer to different addresses,
+ 	 * which is required for mmap for example.
+ 	 */
+-	chain->buffer = EVBUFFER_CHAIN_EXTRA(u_char, chain);
++	chain->buffer = EVBUFFER_CHAIN_EXTRA(unsigned char, chain);
+ 
+ 	return (chain);
+ }
+@@ -2749,7 +2749,7 @@
+ 	if (!chain)
+ 		return (-1);
+ 	chain->flags |= EVBUFFER_REFERENCE | EVBUFFER_IMMUTABLE;
+-	chain->buffer = (u_char *)data;
++	chain->buffer = (unsigned char *)data;
+ 	chain->buffer_len = datlen;
+ 	chain->off = datlen;
+ 
+diff -Paur --no-dereference -- libevent.upstream/bufferevent_sock.c libevent/bufferevent_sock.c
+--- libevent.upstream/bufferevent_sock.c
++++ libevent/bufferevent_sock.c
+@@ -63,6 +63,7 @@
+ #include "event2/util.h"
+ #include "event2/bufferevent.h"
+ #include "event2/buffer.h"
++#include "event2/buffer_compat.h"
+ #include "event2/bufferevent_struct.h"
+ #include "event2/bufferevent_compat.h"
+ #include "event2/event.h"
+@@ -75,6 +76,7 @@
+ #endif
+ 
+ /* prototypes */
++void bufferevent_read_pressure_cb(struct evbuffer *, size_t, size_t, void *);
+ static int be_socket_enable(struct bufferevent *, short);
+ static int be_socket_disable(struct bufferevent *, short);
+ static void be_socket_destruct(struct bufferevent *);
+@@ -119,6 +121,40 @@
+ 	}
+ }
+ 
++static int
++bufferevent_add(struct event *ev, struct timeval timeout)
++{
++	struct timeval *ptv = NULL;
++
++	if (timeout.tv_sec || timeout.tv_usec) {
++		ptv = &timeout;
++	}
++
++	return (event_add(ev, ptv));
++}
++
++/*
++ * This callback is executed when the size of the input buffer changes.
++ * We use it to apply back pressure on the reading side.
++ */
++
++/* This API was needed to port OpenBSD's httpd to Sortix. */
++void
++bufferevent_read_pressure_cb(struct evbuffer *buf, size_t old, size_t now,
++    void *arg) {
++	struct bufferevent *bufev = arg;
++	/*
++	 * If we are below the watermark then reschedule reading if it's
++	 * still enabled.
++	 */
++	if (bufev->wm_read.high == 0 || now < bufev->wm_read.high) {
++		evbuffer_setcb(buf, NULL, NULL);
++
++		if (bufev->enabled & EV_READ)
++			bufferevent_add(&bufev->ev_read, bufev->timeout_read);
++	}
++}
++
+ static void
+ bufferevent_readcb(evutil_socket_t fd, short event, void *arg)
+ {
+diff -Paur --no-dereference -- libevent.upstream/config.sub libevent/config.sub
+--- libevent.upstream/config.sub
++++ libevent/config.sub
+@@ -1348,7 +1348,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -sortix* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -Paur --no-dereference -- libevent.upstream/configure libevent/configure
+--- libevent.upstream/configure
++++ libevent/configure
+@@ -14602,7 +14602,7 @@
+ # which indicates that we try without any flags at all, and "pthread-config"
+ # which is a program returning the flags for the Pth emulation library.
+ 
+-acx_pthread_flags="pthreads none -Kthread -kthread lthread -pthread -pthreads -mthreads pthread --thread-safe -mt pthread-config"
++acx_pthread_flags="pthreads none -Kthread -kthread lthread -pthread -pthreads -mthreads pthread --thread-safe -mt"
+ 
+ # The ordering *is* (sometimes) important.  Some notes on the
+ # individual items follow:
+@@ -14726,8 +14726,8 @@
+ main ()
+ {
+ pthread_t th; pthread_join(th, 0);
+-                     pthread_attr_init(0); pthread_cleanup_push(0, 0);
+-                     pthread_create(0,0,0,0); pthread_cleanup_pop(0);
++                     pthread_attr_init(0);
++                     pthread_create(0,0,0,0);
+   ;
+   return 0;
+ }
+diff -Paur --no-dereference -- libevent.upstream/evutil.c libevent/evutil.c
+--- libevent.upstream/evutil.c
++++ libevent/evutil.c
+@@ -2102,11 +2102,7 @@
+ long
+ _evutil_weakrand(void)
+ {
+-#ifdef WIN32
+-	return rand();
+-#else
+-	return random();
+-#endif
++	return arc4random() & 0x7FFFFFFF;
+ }
+ 
+ /**
+diff -Paur --no-dereference -- libevent.upstream/evutil_rand.c libevent/evutil_rand.c
+--- libevent.upstream/evutil_rand.c
++++ libevent/evutil_rand.c
+@@ -174,7 +174,7 @@
+ void
+ evutil_secure_rng_add_bytes(const char *buf, size_t n)
+ {
+-	arc4random_addrandom((unsigned char*)buf,
+-	    n>(size_t)INT_MAX ? INT_MAX : (int)n);
++	(void) buf;
++	(void) n;
+ }
+ 
+diff -Paur --no-dereference -- libevent.upstream/http-internal.h libevent/http-internal.h
+--- libevent.upstream/http-internal.h
++++ libevent/http-internal.h
+@@ -70,10 +70,10 @@
+ 	struct event retry_ev;		/* for retrying connects */
+ 
+ 	char *bind_address;		/* address to use for binding the src */
+-	u_short bind_port;		/* local port for binding the src */
++	unsigned short bind_port;		/* local port for binding the src */
+ 
+ 	char *address;			/* address to connect to */
+-	u_short port;
++	unsigned short port;
+ 
+ 	size_t max_headers_size;
+ 	ev_uint64_t max_body_size;
+diff -Paur --no-dereference -- libevent.upstream/Makefile.in libevent/Makefile.in
+--- libevent.upstream/Makefile.in
++++ libevent/Makefile.in
+@@ -537,7 +537,7 @@
+ @INSTALL_LIBEVENT_TRUE@lib_LTLIBRARIES = $(LIBEVENT_LIBS_LA)
+ @INSTALL_LIBEVENT_TRUE@pkgconfig_DATA = $(LIBEVENT_PKGCONFIG)
+ @INSTALL_LIBEVENT_FALSE@noinst_LTLIBRARIES = $(LIBEVENT_LIBS_LA)
+-SUBDIRS = . include sample test
++SUBDIRS = . include
+ @BUILD_WIN32_FALSE@SYS_LIBS = 
+ @BUILD_WIN32_TRUE@SYS_LIBS = -lws2_32 -lshell32 -ladvapi32
+ @BUILD_WIN32_FALSE@SYS_SRC = $(am__append_5) $(am__append_6) \
+@@ -1219,6 +1219,9 @@
+ 	clean-noinstLTLIBRARIES mostlyclean-am
+ 
+ distclean: distclean-recursive
++	rm -f sample/Makefile
++	rm -rf test/.deps
++	rm -r test/Makefile
+ 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
+ 	-rm -rf $(DEPDIR) ./$(DEPDIR)
+ 	-rm -f Makefile
+diff -Paur --no-dereference -- libevent.upstream/poll.c libevent/poll.c
+--- libevent.upstream/poll.c
++++ libevent/poll.c
+@@ -180,7 +180,7 @@
+ 	if (res == 0 || nfds == 0)
+ 		return (0);
+ 
+-	i = random() % nfds;
++	i = arc4random_uniform(nfds);
+ 	for (j = 0; j < nfds; j++) {
+ 		int what;
+ 		if (++i == nfds)
+diff -Paur --no-dereference -- libevent.upstream/select.c libevent/select.c
+--- libevent.upstream/select.c
++++ libevent/select.c
+@@ -177,7 +177,7 @@
+ 	event_debug(("%s: select reports %d", __func__, res));
+ 
+ 	check_selectop(sop);
+-	i = random() % nfds;
++	i = arc4random_uniform(nfds);
+ 	for (j = 0; j < nfds; ++j) {
+ 		if (++i >= nfds)
+ 			i = 0;
+diff -Paur --no-dereference -- libevent.upstream/util-internal.h libevent/util-internal.h
+--- libevent.upstream/util-internal.h
++++ libevent/util-internal.h
+@@ -75,7 +75,7 @@
+ 
+ /* True iff e is an error that means a read/write operation can be retried. */
+ #define EVUTIL_ERR_RW_RETRIABLE(e)				\
+-	((e) == EINTR || (e) == EAGAIN)
++	((e) == EINTR || (e) == EAGAIN || (e) == EWOULDBLOCK)
+ /* True iff e is an error that means an connect can be retried. */
+ #define EVUTIL_ERR_CONNECT_RETRIABLE(e)			\
+ 	((e) == EINTR || (e) == EINPROGRESS)

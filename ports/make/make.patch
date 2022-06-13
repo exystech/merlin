@@ -1,0 +1,169 @@
+diff -Paur --no-dereference -- make.upstream/config/config.sub make/config/config.sub
+--- make.upstream/config/config.sub
++++ make/config/config.sub
+@@ -1356,7 +1356,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* | -plan9* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -sortix* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -Paur --no-dereference -- make.upstream/dir.c make/dir.c
+--- make.upstream/dir.c
++++ make/dir.c
+@@ -19,6 +19,8 @@
+ #include "filedef.h"
+ #include "dep.h"
+ 
++#include <stddef.h>
++
+ #ifdef  HAVE_DIRENT_H
+ # include <dirent.h>
+ # define NAMLEN(dirent) strlen((dirent)->d_name)
+@@ -1142,7 +1144,7 @@
+           /* The glob interface wants a 'struct dirent', so mock one up.  */
+           struct dirent *d;
+           unsigned int len = df->length + 1;
+-          unsigned int sz = sizeof (*d) - sizeof (d->d_name) + len;
++          unsigned int sz = offsetof(struct dirent, d_name) + len;
+           if (sz > bufsz)
+             {
+               bufsz *= 2;
+diff -Paur --no-dereference -- make.upstream/function.c make/function.c
+--- make.upstream/function.c
++++ make/function.c
+@@ -2095,27 +2095,23 @@
+           char *rp;
+           struct stat st;
+           PATH_VAR (in);
+-          PATH_VAR (out);
+ 
+           strncpy (in, path, len);
+           in[len] = '\0';
+ 
+-#ifdef HAVE_REALPATH
+-          ENULLLOOP (rp, realpath (in, out));
+-#else
+-          rp = abspath (in, out);
+-#endif
++          ENULLLOOP (rp, realpath (in, NULL));
+ 
+           if (rp)
+             {
+               int r;
+-              EINTRLOOP (r, stat (out, &st));
++              EINTRLOOP (r, stat (rp, &st));
+               if (r == 0)
+                 {
+-                  o = variable_buffer_output (o, out, strlen (out));
++                  o = variable_buffer_output (o, rp, strlen (rp));
+                   o = variable_buffer_output (o, " ", 1);
+                   doneany = 1;
+                 }
++              free (rp);
+             }
+         }
+     }
+diff -Paur --no-dereference -- make.upstream/getloadavg.c make/getloadavg.c
+--- make.upstream/getloadavg.c
++++ make/getloadavg.c
+@@ -78,9 +78,11 @@
+ /* Both the Emacs and non-Emacs sections want this.  Some
+    configuration files' definitions for the LOAD_AVE_CVT macro (like
+    sparc.h's) use macros like FSCALE, defined here.  */
++#ifdef HAVE_SYS_PARAM_H
+ #if defined (unix) || defined (__unix)
+ # include <sys/param.h>
+ #endif
++#endif
+ 
+ 
+ /* Exclude all the code except the test program at the end
+diff -Paur --no-dereference -- make.upstream/job.c make/job.c
+--- make.upstream/job.c
++++ make/job.c
+@@ -67,6 +67,11 @@
+ char default_shell[] = "";
+ int batch_mode_shell = 0;
+ 
++#elif defined (__sortix__)
++
++char default_shell[] = "sh";
++int batch_mode_shell = 0;
++
+ #else
+ 
+ char default_shell[] = "/bin/sh";
+diff -Paur --no-dereference -- make.upstream/main.c make/main.c
+--- make.upstream/main.c
++++ make/main.c
+@@ -2393,9 +2393,9 @@
+           if (restarts)
+             {
+               char *b = alloca (40);
+-              sprintf (b, "MAKE_RESTARTS=%s%u",
++              sprintf (b, "%s%u",
+                        OUTPUT_IS_TRACED () ? "-" : "", restarts);
+-              putenv (b);
++              setenv ("MAKE_RESTARTS", b, 1);
+             }
+ 
+           fflush (stdout);
+diff -Paur --no-dereference -- make.upstream/misc.c make/misc.c
+--- make.upstream/misc.c
++++ make/misc.c
+@@ -710,6 +710,9 @@
+ unsigned int
+ get_path_max (void)
+ {
++#if defined(__sortix__)
++  return 32768;
++#else
+   static unsigned int value;
+ 
+   if (value == 0)
+@@ -722,5 +725,6 @@
+     }
+ 
+   return value;
++#endif
+ }
+ #endif
+diff -Paur --no-dereference -- make.upstream/output.c make/output.c
+--- make.upstream/output.c
++++ make/output.c
+@@ -278,6 +278,10 @@
+ static void *
+ acquire_semaphore (void)
+ {
++#if defined(__sortix__)
++  static int foo;
++  return &foo;
++#else
+   static struct flock fl;
+ 
+   fl.l_type = F_WRLCK;
+@@ -288,16 +292,21 @@
+     return &fl;
+   perror ("fcntl()");
+   return NULL;
++#endif
+ }
+ 
+ /* Release the lock for writing output.  */
+ static void
+ release_semaphore (void *sem)
+ {
++#if defined(__sortix__)
++  (void) sem;
++#else
+   struct flock *flp = (struct flock *)sem;
+   flp->l_type = F_UNLCK;
+   if (fcntl (sync_handle, F_SETLKW, flp) == -1)
+     perror ("fcntl()");
++#endif
+ }
+ 
+ /* Returns a file descriptor to a temporary file.  The file is automatically

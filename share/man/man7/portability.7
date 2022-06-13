@@ -1,0 +1,301 @@
+.Dd March 28, 2022
+.Dt PORTABILITY 7
+.Os
+.Sh NAME
+.Nm portability
+.Nd standard library portability information
+.Sh DESCRIPTION
+This manual documents replacements for interfaces not available in the standard
+library or with special portability notes.
+.Pp
+Software written for other operating systems can be ported by replacing uses of
+obsolete interfaces with the modern replacements and working around any missing
+functionality.
+The standard library attemps to implement the relevant parts of the C and POSIX
+standards with useful extensions and tends to omit non-standard extensions found
+on other operating systems whenever standard interfaces exists.
+.Ss alloca
+.Xr alloca 3
+and variable length arrays are implemented by the compiler, however the main
+thread stack size is fixed and does not grow unlike other operating systems, and
+large stack uses should instead use
+.Xr malloc 3
+or set the stack size explicitly for another thread using
+.Xr pthread_attr_setstacksize 2 .
+.Ss asctime, asctime_r
+.Xr strftime 3
+is the standard replacement.
+.Ss bcopy
+.Xr memcpy 3
+is the standard replacement.
+Note how the order of the source and destination parameters is swapped.
+.Ss bzero
+.Xr memset 3
+is the standard replacement.
+.Ss caddr_t
+.Vt void *
+is the standard type.
+.Ss clock
+.Xr clock 3
+is implemented but can overflow, and
+.Xr clock_gettime 2
+.Dv CLOCK_PROCESS_CPUTIME_ID
+is the modern replacement with nanosecond precision.
+.Ss ctime, ctime_r
+.Xr strftime 3
+is the standard replacement.
+.Ss daemon
+Daemons should not background by double forking but rather stay in the
+foreground and be managed by
+.Xr init 8 .
+.Ss __dead
+.Dv noreturn
+from
+.In stdnoreturn.h
+is the modern standard replacement or the
+.Sy __attribute__((noreturn))
+extension can be used.
+.Ss flock, fcntl F_UNLCK, F_WRLCK, F_GETLK, F_SETLK, F_SETLKW, lockf
+POSIX advisory locks are not implemented due to their flawed design of being
+process-wide instead of being per file description.
+The superior
+.Xr flock 2
+is not currently implemented.
+It might be safe enough to omit the file locking as a workaround.
+.Ss ftime
+.Xr clock_gettime 2
+is the standard replacement.
+.Ss getdtablesize
+The file descriptor table is unbounded and file descriptors above a certain
+value can be closed using
+.Xr closefrom 2
+and iterated using
+.Xr psctl 2 .
+.Ss getgroups, setgroups, initgroups
+Supplementary groups are not implemented yet.
+It may be possible to remove invocations as a workaround.
+.Ss gethostbyaddr
+.Xr getnameinfo 3
+is the standard modern replacement.
+.Ss gethostbyname
+.Xr getaddrinfo 3
+is the standard modern replacement.
+.Ss getitimer, setitimer
+.Xr timer_create 2
+is the modern standard replacement.
+.Ss getpgrp, setpgrp
+.Xr getpgid 3
+and
+.Xr setpgid 3
+are the standard portable replacements without disagreement on the function
+signatures.
+.Ss gettimeofday
+.Xr gettimeofday 2
+is implemented but the second parameter is defunct and is typed
+.Vt void *
+per POSIX instead of
+.Vt struct timezone * .
+.Xr clock_gettime 2
+is the modern replacement with nanosecond precision.
+.Ss gid_t
+.Vt gid_t
+is 64-bit unsigned and can be formatted portably cast to a
+.Vt uintmax_t
+using
+.Dq %ju .
+.Ss inet_addr, inet_aton
+.Xr inet_pton 3
+and
+.Xr getaddrinfo 3
+are the modern standard replacements, however they don't support the unusual
+IPv4 notations.
+.Ss inet_ntoa
+.Xr inet_ntop 3
+and
+.Xr getnameinfo 3
+are the modern standard replacements.
+.Ss <limits.h>
+.In limits.h
+is currently implemented by the compiler instead of the standard library and it
+does not define everything required by POSIX.
+.In sortix/limits.h
+can be included instead as a temporary workaround if the required definitions
+are absent.
+.Ss makedev, major, minor
+The kernel does not have a concept of major and minor device numbers.
+.Ss mkfifo
+.Xr mkfifo 2
+named pipes are not currently implemented but unnamed pipes are available using
+.Xr pipe 2 ,
+or alternatively
+.Dv AF_UNIX
+sockets can be used instead.
+.Ss mknod
+Devices in the
+.Pa /dev
+filesystem are created by the kernel and cannot be manually created.
+.Ss mmap
+.Xr mmap 2
+is implemented, but
+.Dv MAP_SHARED
+shared memory mappings are not implemented yet.
+.Ss off_t
+.Vt off_t
+is 64-bit signed and can be formatted portably cast to an
+.Vt intmax_t
+using
+.Dq %jd .
+.Ss PATH_MAX
+The
+.Dv PATH_MAX
+limit does not currently exist and may be added in the future.
+Applications should be written as if this limit does not exist, but if required,
+it can be defined to 4096 as a fallback.
+.Ss pid_t
+.Vt pid_t
+is 64-bit signed and can be formatted portably cast to an
+.Vt intmax_t
+using
+.Dq %jd .
+.Ss poll
+.Xr poll 2
+is implemented in
+.In poll.h
+per POSIX, however some operating systems have a
+.In sys/poll.h
+alias which is not implemented.
+.Ss printf
+.Xr printf 3
+is implemented, however floating point formatting is not currently implemented
+and the format specifier will instead be output verbatim.
+Position parameters are also not implemented yet.
+.Ss pthread_cancel
+Pthread cancellation is not implemented and threads instead have to
+.Xr pthread_exit 3
+voluntarily.
+.Ss pthread_kill
+Sending a signal to a particular thread is not implemented.
+.Ss putenv
+.Xr setenv 3
+is the standard replacement.
+Note how the string provided could technically be modified at a later time.
+.Ss rand, srand
+.Xr rand 3
+and
+.Xr srand 3
+are implemented, however invocations will warn that the functions are not
+random, and
+.Xr arc4random 3 ,
+.Xr arc4random_uniform 3 ,
+or
+.Xr arc4random_buf 3
+should be used instead for random numbers.
+.Ss realpath
+.Xr realpath 3
+with a non-null second parameter is undefined behavior as there is no
+.Dv PATH_MAX
+limit, and should always be invoked with a null second parameter which allocates
+a destination buffer of the appropriate size using
+.Xr malloc 3 .
+.Ss <resolv.h>
+.In resolv.h
+is currently not implemented and
+.Xr getaddrinfo 2
+can be used instead.
+.Ss sbrk
+.Xr malloc 3
+and
+.Xr mmap 2
+are the standard interfaces for memory allocation.
+.Ss select
+.Xr select 2
+is implemented, but is defined in
+.In sys/select.h
+instead of
+.In sys/time.h
+per POSIX, however the superior
+.Xr poll 2
+should be used instead as the
+.Vt fdset_t
+type overflows on file descriptors whose value is too large.
+.Ss sigaction SA_RESTART
+Restarting system calls after signal delivery is not currently implemented and
+system calls instead fail with
+.Er EINTR .
+.Ss socklen_t
+.Vt socklen_t
+is typedef to
+.Vt size_t
+instead of
+.Vt int
+or
+.Vt unsigned int
+as on other operating systems.
+.Ss sprintf
+.Xr sprintf 3
+is implemented, however invocations will warn the function is dangerous as it
+does not know the size of the destination buffer and may buffer overflow if the
+output is unexpectedly large.
+.Xr snprintf 3
+should be use instead as the destination buffer size should always be known,
+otherwise the invocation is suspicious.
+The superior alternative is to combine allocation and initialization using
+.Xr asprintf 3 .
+.Ss strptime
+.Xr strptime 3
+is not currently implemented.
+.Ss <sys/param.h>
+.In sys/param.h
+is not implemented as there is little agreement on what it's supposed to contain
+and all the contents have standard replacements or can be provided by the
+application itself.
+Inclusions are almost always unnecessary and can be removed.
+.Ss times
+.Xr times 2
+is implemented, however the
+.Vt clock_t
+type may overflow, and the
+.Xr timens 2
+non-standard extension with
+.Vt struct timespec
+precision can be used instead.
+.Ss time_t
+.Vt time_t
+is 64-bit signed and can be formatted portably cast to an
+.Vt intmax_t
+using
+.Dq %ji
+or with
+.Xr strftime 3
+and such.
+.Pp
+.Dv CLOCK_REALTIME
+counts the number of seconds since the epoch including leap seconds, unlike
+other operating systems and in violation of POSIX.
+.Ss u_char, u_short, u_int, u_long
+.Vt unsigned char ,
+.Vt unsigned short ,
+.Vt unsigned int ,
+and
+.Vt unsigned long
+are the standard types.
+Applications can supply the typedefs themselves if desired.
+.Ss uid_t
+.Vt uid_t
+is 64-bit unsigned and can be formatted portably cast to a
+.Vt uintmax_t
+using
+.Dq %ju .
+.Ss u_int8_t, u_int16_t, u_int32_t, u_int64_t
+.Vt uint8_t ,
+.Vt uint16_t ,
+.Vt uint32_t ,
+and
+.Vt uint64_t
+are the standard types.
+Applications can supply the typedefs themselves if desired.
+.Ss wait3, wait4
+.Xr waitpid 2
+is the standard replacement.
+.Sh SEE ALSO
+.Xr porting 7

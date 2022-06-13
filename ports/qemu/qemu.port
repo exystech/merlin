@@ -1,0 +1,12 @@
+NAME=qemu
+BUILD_LIBRARIES='libstdc++ libz libglib libpixman bzip2? libSDL? libcurses? libcurl? libGL? libgtk? libssh2? libgcrypt? libtasn1?'
+VERSION=2.7.0
+DISTNAME=$NAME-$VERSION
+COMPRESSION=tar.bz2
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=326e739506ba690daf69fc17bd3913a6c313d9928d743bd8eddb82f403f81e53
+UPSTREAM_SITE=https://download.qemu.org
+UPSTREAM_ARCHIVE=$ARCHIVE
+BUILD_SYSTEM=configure
+CONFIGURE_ARGS='--target-list="i386-softmmu x86_64-softmmu"'
+MAKE_VARS='V=1'

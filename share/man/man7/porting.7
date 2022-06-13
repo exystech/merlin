@@ -1,0 +1,657 @@
+.Dd March 19, 2022
+.Dt PORTING 7
+.Os
+.Sh NAME
+.Nm porting
+.Nd guide for porting software
+.Sh SYNOPSIS
+.Pa /src/ports/example/example.port
+.Sh DESCRIPTION
+This manual documents how to port software to this operating system as packaged
+ports in the
+.Xr port 5 format.
+.Ss Philosophy
+The ports collection is maintained according to a set of principles designed to
+uphold quality, keep the ports maintainable, and to enable giving back
+improvements to the upstream projects.
+.Pp
+Ports are usually named after their primary program or library if relevant.
+Libraries should always be prefixed with lib.
+The port should be ideally split if it happens to contain both a major program
+and a major library.
+.Pp
+Upstream projects should consider this operating system to be yet another
+unknown operating system implementing the standard interfaces.
+Explicit support for this operating system should generally not be upstreamed
+and should instead be maintained in the patches.
+This policy is to avoid burdening upstreams with maintaining support that is
+subject to change.
+Simply registering the operating system as existing is exempted, but preferably
+the software should be patched to compile for any unknown operating system that
+has the needed interfaces.
+.Pp
+Patches should ideally be of upstreamable quality, although it may not be
+reasonably practical to make a general solution the upstream could accept.
+Non-trivial patches should be prefaced with a comment explaining the rationale
+for the patch.
+.Pp
+Third party software should be selected into the ports collection with care,
+ideally because they're widely considered high quality and stable.
+Low quality software with poor code quality should preferably not be ported,
+instead a better replacement should be standardized on.
+.Pp
+The build system is expected to follow the relevant conventions, such as the
+GNU coding conventions for
+.Pa ./configure
+and
+.Pa Makefile
+scripts and the de-facto conventional behavior.
+Deficiencies are fixed via patches instead of being worked around.
+Ports with their own custom build system implementation should be improved if
+they don't implement the interface correctly.
+.Pp
+Generated files are preferably patched instead of their input files due to the
+difficulty regenerating them.
+For instance
+.Pa configure
+should be patched directly instead of
+.Pa configure.ac
+and likewise
+.Pa Makefile.in
+instead of
+.Pa Makefile.am .
+.Pp
+Ports must not bundle their dependencies as it's problematic to silently have
+multiple stale versions of the same library.
+If a port bundles a dependency unless it's installed, then the dependency must
+be made mandatory.
+.Pp
+Ports must both compile natively and cross-compile.
+Ports must assume the best about the host operating system when cross-compiling
+and unable to test for bugs.
+.Pp
+It must be possible to reasonably boostrap the latest ports collection from the
+latest stable release.
+.Ss Metadata
+A port named
+.Sy example
+can be built along with the operating system by creating the
+.Pa /src/ports/example/example.port
+file with the meta information documented in
+.Xr port 5 .
+.Pp
+Start the port by defining how to get the latest stable version of the upstream
+release:
+.Bd -literal -offset indent
+NAME=example
+BUILD_LIBRARIES='libfoo libbar? libqux?'
+VERSION=1.2.3
+DISTNAME=$NAME-$VERSION
+COMPRESSION=tar.gz
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=b8d67e37894726413f0d180b2c5a8369b02d4a2961bb50d2a8ab6f553f430976
+UPSTREAM_SITE=https://example.com/pub/example
+UPSTREAM_ARCHIVE=$ARCHIVE
+BUILD_SYSTEM=configure
+LICENSE=example
+DEVELOPMENT=true
+.Ed
+.Pp
+The upstream website usually contains the needed information.
+Guides such as Beyond Linux from Scratch and the packaging metadata for other
+systems may contain useful information on how to port and patch the software.
+.Pp
+.Sy UPSTREAM_SITE
+is the upstream primary download directory without a trailing slash and should
+download via a secure connection insofar possible.
+.Pp
+.Sy SHA256SUM
+is the
+.Xr sha256sum 1
+of the upstream release, which should be verified with other reputable packaging
+systems.
+It can be left as the wrong value, and the download will fail and mention which
+hash it found instead.
+.Pp
+.Sy BUILD_LIBRARIES
+is the build time library dependencies (space delimited with a
+.Sq "?"
+suffix for optional dependencies).
+It can be left empty until known.
+The dependencies can likely be found in the documentation, running
+.Sq ./configure --help ,
+or noticing what the software looks for while being built.
+The above example defines a mandatory build time dependency on
+.Sy libfoo
+and optional build time dependencies on
+.Sy libbar
+and
+.Sy libqux .
+Mandatory dependencies need to be ported first.
+.Pp
+.Sy BUILD_SYSTEM
+is set here to a standard configure script.
+.Pp
+.Sy LICENSE
+can be set to the abbreviation of the software's license.
+.Pp
+.Sy DEVELOPMENT
+is set to
+.Sy true
+to switch the port into development mode, where the port's working directory has
+writable files that can be patched during the build.
+The
+.Pa example.patch ,
+.Pa example.execpatch ,
+and
+.Pa example.rmpatch
+patch files are regenerated when the port builds successfully.
+If the upstream release works out of the box without any patches, then the port
+is already completed and the development mode can be skipped.
+The port's working directory will never be deleted automatically when it is in
+development mode.
+The
+.Sy DEVELOPMENT
+variable must be removed before submitting the finished port.
+.Ss Building
+The port can be finished by repeatedly trying to build it and iteratively fixing
+any issues that occur per
+.Xr development 7 :
+.Bd -literal -offset indent
+cd /src
+make clean-sysroot
+make PACKAGES='example!'
+.Ed
+.Pp
+The
+.Sy PACKAGES
+environment variable builds only the mentioned ports and the
+.Sq "!"
+suffix includes the port's mandatory dependencies as well.
+The top level makefile uses a sysroot when building the ports which can be used
+to determine which dependencies are mandatory.
+The mandatory ports can be found by starting with an empty list of build
+libraries and a clean sysroot, and then trying to build the port and adding the
+dependencies whose absense is causing the build to fail.
+.Pp
+The higher level
+.Xr tix-port 8
+program manages the build by downloading the source code, patching it,
+building the port, and installing the binary package.
+The lower level
+.Xr tix-build 8
+program will abort with an interactive menu if the port fails to build.
+See the section below for how to troubleshoot common situations.
+.Pp
+The binary package
+.Pa repository/$HOST/example.tix.tar.xz
+is cached when built and the
+.Pa repository/$HOST/example.version
+file is used to rebuild the binary package when the version changes.
+The files should be manually removed to force a rebuild when the port has been
+modified while in the development mode.
+.Bd -literal -offset indent
+rm -f repository/*/example.tix.tar.xz # delete stale binary package
+rm -f repository/*/example.version # optional
+make clean-repository # or: remove all binary packages
+.Ed
+.Pp
+The port's patch files are regenerated whenever the port builds successfully.
+It's recommended to add them to a work-in-progress git commit when working to
+keep track of the progress.
+.Ss Finishing
+The port can be finished by testing it thoroughly and reviewing the details.
+.Pp
+Test the port works with all the optional dependencies:
+.Bd -literal -offset indent
+make clean-sysroot
+make PACKAGES='example!!'
+.Ed
+.Pp
+The
+.Sq "!!"
+suffix includes the port's optional dependencies as well.
+.Pp
+Read all the configure and makefile output and look for anything where it looks
+like a wrong conclusion was made or an optional dependency was not used.
+.Pp
+Review the size of the binary package and whether it installs any large
+unnecessary files:
+.Bd -literal -offset indent
+du -h repository/*/example.tix.tar.xz
+tar -t -f repository/*/example.tix.tar.xz
+.Ed
+.Pp
+Review the
+.Pa .patch ,
+.Pa .execpatch
+and
+.Pa .rmpatch
+files (if any) and clean them up as needed by updating the port's source code
+and forcing a rebuild to regenerate the patches.
+.Pp
+Consider installing a cross-compiler for a second architecture and testing the
+port works everywhere per
+.Xr cross-development 7 .
+.Pp
+Comments about the port should go in comments at the end of the .port file using
+shell-style comments.
+Non-trivial patches and aspects should be documented this way.
+.Pp
+Finally remove the
+.Sy DEVELOPMENT
+variable and submit the port for review.
+.Ss Upgrading ports
+Ports can be upgraded by switching the port back in development mode with
+a updated version number and checksum.
+.Bd -literal -offset indent
+make available-ports # Search for newly available versions of ports
+make upgrade-ports PACKAGES=example # Update example port
+make PACKAGES='example!!' # Find the new sha256sum
+# Verify the new sha256sum is authentic.
+make PACKAGES='example!!' # Any old patches may fail to apply.
+find ports/example -name '*.rej' -o -name '*.orig'
+make PACKAGES='example!!' # Regenerate patches on a successful build.
+sed -E '/^DEVELOPMENT=true$/d' ports/example/example.port
+make PACKAGES='example!!' # Final build and testing.
+.Ed
+.Pp
+The
+.Sy available-ports
+top-level makefile target can be used to search for ports with newly available
+versions, while
+.Sy upgrade-ports
+updates
+.Sy VERSION
+to the latest available version and switches the port into development mode.
+The
+.Ev PACKAGES
+environment variable can be set to a subset of ports to upgrade.
+The build will fail and report the sha256sum observed upstream and the
+.Sy SHA256SUM
+variable must be manually updated once it has been verified as as authentic.
+.Pp
+The old patch will be reapplied and the build will fail if any hunks could
+not be applied.
+In that case, the
+.Pa .rej
+files contains the rejected hunks and the merge conflicts need to be resolved.
+Delete any
+.Pa .rej
+and
+.Pa .orig
+files afterwards and continue the build.
+The patch files with be regenerated on a successful build as usual.
+.Pp
+Finally perform the quality assurance and testing of new ports.
+.Sh EXAMPLES
+This section describes common situations and portability issues and how to
+resolve them.
+.Ss config.sub
+The
+.Pa config.sub
+file parses the build/host/target triplet and is duplicated into all software
+using autoconf.
+If the port ships a version older than 2015-08-20, configure will fail to parse
+the operating system:
+.Bd -literal -offset indent
+checking host system type... Invalid configuration `x86_64-sortix': system `sortix' not recognized
+.Ed
+.Pp
+Fix the situation by adding an entry for the operating system to the
+.Pa config.sub
+file which is usually in the
+.Pa build-aux
+subdirectory:
+.Bd -literal -offset indent
+             | -aos* | -aros* | -cloudabi* | -sortix* \\
+.Ed
+.Ss Configure
+If the configure script fails, then autoconf configure scripts produce a
+.Pa config.log
+file which contain useful diagnostic information, such as which programs were
+compiled to check for a particular feature and what happened when they were
+compiled, linked, and executed.
+This information can be used to locate the relevant logic in the configure
+script.
+.Ss Non-verbose make
+Some ports default to a non-verbose make mode that doesn't show the commands
+being run.
+Ports should show the commands invoked by make, which can done with an
+environment variable assignment
+.Ev V=1
+which can be made permanent using
+.Sy MAKE_VARS=V=1 .
+.Ss Patching
+The build may fail or warn for various reasons which needs to be patched, or the
+port may need extra support for the operating system.
+The sources become writable once the port is in development mode and can simply
+be edited to fix the problem.
+The patch files are regenerated whenever the port builds successfully.
+.Pp
+Non-trivial patches should contain a
+.Dq "// PATCH:"
+comment explaining why the patch had to be made and make it clear whether the
+patch fixes a problem in the upstream release or is specific to the operating
+system.
+Patches may be read by many people, including upstream developers, and the
+context helps them understand if they want the patch too.
+.Pp
+Ports should ideally continue to work on good operating systems after being
+patched.
+If the port uses an obsolete function, the port should be patched to
+unconditionally use the modern replacement instead.
+If the patch is specific to the operating system, the patch should be guarded
+with the operating system preprocessor macro.
+.Bd -literal -offset indent
+// PATCH: Use foo instead because bar doesn't work yet.
+#ifdef __sortix__
+	foo();
+#else
+	bar();
+#endif
+.Ed
+.Pp
+If the port tries to use a system header that might be added in the future and
+it doesn't have a macro for whether it exists, then
+.Sy __has_include
+extension can be used:
+.Bd -literal -offset indent
+#if __has_include(<foo.h>)
+#include <foo.h>
+#endif
+.Ed
+.Ss Configuration files
+Configuration files in
+.Pa /etc
+belongs to the system administrator and must not be installed by ports, as local
+changes will otherwise be undone whenever the port is upgraded.
+.Pp
+Ports shipping default configuration files should instead install them in
+.Pa /etc/default
+and search this directory as a fallback if the system administrator has not made
+their own file.
+Example configuration files can be installed in
+.Pa /etc/example .
+.Ss Portability issues
+The port might not be portable and requires patching.
+Often the port uses a non-standard interface when a standard interface is
+available and should be used instead.
+Other times the operating system is missing functionality which should ideally
+be implemented before proceeding with the port, or perhaps the absence can be
+worked around.
+.Pp
+Common portability problems and their resolution are documented in
+.Xr portability 7 .
+.Ss libtool .la files
+Libraries using libtool may install
+.Pa /lib/*.la
+files which are unnecessary and contain absolute paths which cause
+cross-compilation to fail.
+Ports should never install such files and instead rely on
+.Xr pkg-config 1
+for locating dependencies.
+.Pp
+The
+.Xr tix-eradicate-libtool-la 1
+program can be used to remove any installed
+.Pa .la
+files in the
+.Sy DESTDIR
+as a post-install script:
+.Bd -literal -offset indent
+POST_INSTALL=tix-eradicate-libtool-la
+.Ed
+.Ss Post-install command
+Ports may install files with an unconventional directory layout or may install
+unnecessary large files.
+Ideally the makefile should be patched to install correctly in the first place,
+but if doing so is impractical, then a post-install command can be used to fix
+up the installation in the
+.Sy DESTDIR
+before the binary package is created.
+An executable
+.Pa example.post-install
+script can be placed next to the
+.Pa example.port
+files:
+.Bd -literal -offset indent
+POST_INSTALL=../example.post-install
+.Ed
+.Pp
+The script must fail if any errors occur and protect against being accidentally
+invoked without the appropriate environment variables being set.
+E.g.:
+.Bd -literal -offset indent
+#!/bin/sh
+set -e
+[ -n "$TIX_INSTALL_DIR" ]
+mv "$TIX_INSTALL_DIR$PREFIX/share/foo" "$TIX_INSTALL_DIR$PREFIX/share/bar"
+.Ed
+.Ss Splitting into multiple ports
+Upstream releases might have multiple parts, such as a program that also comes
+with a library, which should be split into multiple ports whenever reasonable.
+.Pp
+The port whose name matches the upstream release should be the source package,
+and the other ports can use the
+.Sy SOURCE_PORT
+variable to reuse its source code.
+.Pp
+The
+.Sy SUBDIR
+variable can be used to build inside a subdirectory, if the port has already
+been logically organized.
+.Pp
+.Sy CONFIGURE_ARGS
+variable can be used to pass options to configure to request the subset of
+functionality.
+.Sy MAKE_BUILD_TARGET
+and
+.Sy MAKE_INSTALL_TARGET
+can be used to make a subset of the port.
+.Ss Gnulib
+Gnulib is a GNU portability layer that has three purposes:
+.Bl -bullet -compact
+.It
+Providing fallback implementations of missing standard library interfaces.
+.It
+Replacing buggy implementations of standard library interfaces.
+.It
+Sharing common utility functions between projects.
+.El
+.Pp
+Unfortunately the replacement of standard library functionality is problematic:
+.Bl -bullet -compact
+.It
+The replacement implementations tend to be non-portable and one is supposed to
+modify the source code to rely on private standard library details that may be
+subject to change.
+.It
+Gnulib is highly forked by design and adding support for new operating systems
+needs to be done upstream and it may take years for the support to reach new
+downstream releases.
+.It
+Gnulib has assumed the worst in the past when cross-compiling, assuming unknown
+operating systems are buggy, injecting a non-portable replacement that doesn't
+compile, even when the standard library function is correct and could just have
+been used.
+.It
+Replacing standard library functions can hide bugs that would otherwise have
+found and fixed.
+.It
+Gnulib is not organized into the three categories and it's non-trivial to find
+out whether any interface has been replaced that shouldn't have been.
+.It
+There is no way to satisfy gnulib by correctly implementing the standard library
+without contributing explicit support upstream for new systems and committing
+to private implementation details.
+.El
+.Pp
+Meanwhile the shared utility functions means gnulib is tightly integrated into
+the software and cannot be disabled.
+.Pp
+Consequently a lot of software using gnulib does not cross-compile to new
+operating systems and the compilation fails asking for standard library
+implementation details.
+.Pp
+Gnulib can be effectively disabled by copying the autoconf cache environment
+variables set at the top of the patched configure script in an existing port
+with gnulib.
+Each variable is used to say the standard library does not have a particular
+bug.
+Modern versions of gnulib has improved to assume the best when cross-compiling
+but it may still be an obstacle for some ports.
+.Ss Custom configure script
+Configure scripts generated by autoconf are useful because they have a
+consistent interface.
+Ports with a hand-written configure script can fail if they fail to implement
+the autoconf configure interface correctly.
+The best solution is modify the configure script to implement the missing parts
+of the interface.
+.Pp
+Custom configure scripts sometimes fail to implement the
+.Fl \-prefix
+and
+.Fl \-exec-prefix
+options correctly, failing to discern between an unset option and the empty
+value, which matters for the prefix where the default prefix
+.Pa ( /usr/local )
+is different from the empty prefix (the root directory).
+.Pp
+Custom configure scripts sometimes fail to implement cross-compilation using the
+.Fl \-build ,
+.Fl \-host ,
+and
+.Fl \-target
+options to locate the compiler and cross-compiler.
+.Ss Makefile
+Ports might not have a configure script and only a makefile:
+.Bd -literal -offset indent
+BUILD_SYSTEM=makefile
+.Ed
+.Pp
+The build environment is communicated to the makefile using conventional
+environment variables, however loose makefiles vary wildly and likely needs to
+be patched to support the variables used by
+.Xr tix-build 8 .
+In some cases, it may be preferable to write a new makefile from scratch.
+.Ss Running cross-compiled program
+Ports may contain logic errors and attempt to execute a cross-compiled program
+during the build, which fails because the program can't run on the current
+system.
+.Pp
+If the program is supposed to check whether a feature works at runtime, then the
+right solution is to simply assume it's correct when cross-compiling or to have
+a suitable runtime fallback.
+.Pp
+If the program is part of the compilation process, then it should be compiled
+with the build machine's compiler instead, which can be located using the
+.Ev CC_FOR_BUILD
+environment variable instead of
+.Ev CC
+before falling back to a standard program.
+Likewise each toolchain variable has a counterpart for the build machine instead
+of the host machine, such as
+.Ev CFLAGS_FOR_BUILD
+and
+.Ev CPPFLAGS_FOR_BUILD .
+.Ss pkg-config
+Ports are supposed to locate locate dependencies for the host machine using
+the
+.Ev PKG_CONFIG
+environment variable, and if unset, then using the
+.Fl \-host
+option to locate a cross-pkg-config, and finally falling back on invoking
+.Xr pkg-config 1
+directly .
+Dependencies for the build machine should likewise be located using the
+.Ev PKG_CONFIG_FOR_BUILD
+environment variable.
+.Pp
+Ports failing to use this search order may fail to cross-compile as they
+accidentally use dependencies from the build machine when cross-compiling to the
+host machine.
+The easiest fix is to use a shell parameter expansion:
+.Bd -literal -offset indent
+${PKG_CONFIG:-pkg-config}
+${PKG_CONFIG_FOR_BUILD:-${PKG_CONFIG:-pkg-config}}
+.Ed
+.Ss foo-config instead of pkg-config
+Ports are supposed to use
+.Xr pkg-config 1
+as above for dependencies as it's a general solution with cross-compilation
+support, but some ports install their own
+.Pa foo-config
+program in the
+.Ev PATH .
+These programs are inherently unable to support cross-compilation, as they
+provide answers about the build machine, and the host machine's bin directory
+cannot be executed on the current machine.
+.Pp
+Ports installing
+.Pa foo-config
+programs must be patched to not install them.
+.Xr pkg-config 1
+configuration files should be installed instead.
+.Pp
+Ports invoking
+.Pa foo-config
+programs, even as a fallback, must be patched to unconditionally use
+.Xr pkg-config 1
+instead.
+.Ss Bootstrap
+Ports may require the same version of the port to be installed on the build
+machine when cross-compiling.
+Such ports can cross-compiled with a bootstrap phase:
+.Bd -literal -offset indent
+USE_BOOTSTRAP=true
+.Ed
+.Pp
+This configuration builds the port in two phases, first building it for the
+build machine and installing it into a temporary directory, which is in the
+.Ev PATH
+while the port is cross-compiled during the second phase.
+.Ss DESTDIR
+The makefile install target must support the
+.Ev DESTDIR
+environment variable as a secondary temporary prefix during the installation.
+The makefile may need to be patched to inherit the variable from the environment
+and to use it during the installation phase.
+The build will erroneously attempt to install onto the root directory of the
+build machine if the environment variable isn't respected.
+.Ss make distclean
+The upstream release is to supposed to be distclean, i.e.  not contain any files
+that are recreated during the compilation, and the distclean makefile target
+is supposed to properly clean up.
+If it isn't, then the patch may contain spurious hunks adding, removing, or
+modifying generated files which may be large.
+.Pp
+The makefile distclean target should be patched to delete any temporary files
+produced during the build to avoid spurious files in the patch.
+.Ss Dynamic linking
+Dynamic linking is not currently implemented in the standard library and the
+compiler toolchain does not support dynamic linking.
+Ports with libraries should check whether the toolchain supports dynamic linking
+and otherwise fall back on static linking.
+.Pp
+Ports may be difficult if they use shared libraries for modules.
+It may be possible to link the modules statically instead using a supported
+mechanism or with additional patching.
+If there is no simple solution, it may be possible to statically link the
+modules and implement a fake dlopen that iterates a table of entry points for
+each module.
+.Ss Other problems
+Portability issues are very varied and ports often don't properly implement the
+conventional interface.
+.Xr portability 7
+lists common differences in the standard library.
+.Xr port 5
+documents the advanced features useful for certain situations.
+Ports may fail at runtime instead of during compilation.
+Resolving these issues can require troubleshooting, debugging, research, and
+seeking help from the operating system developers and the upstream.
+Missing operating system functionality may need to be implemented.
+.Sh SEE ALSO
+.Xr port 5 ,
+.Xr development 7 ,
+.Xr portability 7

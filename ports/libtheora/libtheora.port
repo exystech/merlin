@@ -1,0 +1,14 @@
+NAME=libtheora
+BUILD_LIBRARIES='libogg libvorbis libSDL? libcairo? libpng?'
+VERSION=1.1.1
+DISTNAME=$NAME-$VERSION
+COMPRESSION=tar.bz2
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=b6ae1ee2fa3d42ac489287d3ec34c5885730b1296f0801ae577a35193d3affbc
+UPSTREAM_SITE=https://ftp.osuosl.org/pub/xiph/releases/theora
+UPSTREAM_ARCHIVE=$ARCHIVE
+BUILD_SYSTEM=configure
+# TODO: This package runs cross-compiled programs when generating documentation:
+CONFIGURE_ARGS=--disable-spec
+MAKE_VARS='V=1'
+POST_INSTALL=tix-eradicate-libtool-la

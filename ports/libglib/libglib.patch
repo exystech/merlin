@@ -1,0 +1,407 @@
+diff -Paur --no-dereference -- libglib.upstream/config.sub libglib/config.sub
+--- libglib.upstream/config.sub
++++ libglib/config.sub
+@@ -1373,7 +1373,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* | -plan9* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -sortix* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -Paur --no-dereference -- libglib.upstream/configure libglib/configure
+--- libglib.upstream/configure
++++ libglib/configure
+@@ -22140,8 +22140,9 @@
+           fi
+ 
+ else
+-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: none" >&5
+-$as_echo "none" >&6; }
++  glib_cv_long_long_format=ll
++  { $as_echo "$as_me:${as_lineno-$LINENO}: result: ll" >&5
++$as_echo "ll" >&6; }
+ fi
+ 
+ elif  test x$ac_cv_sizeof___int64 = x8; then :
+@@ -22244,6 +22245,7 @@
+ fi
+ 
+ 
++# TODO: Remove this check and remove G_HAVE_GROWING_STACK from public API.
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking for growing stack pointer" >&5
+ $as_echo_n "checking for growing stack pointer... " >&6; }
+ if ${glib_cv_stack_grows+:} false; then :
+@@ -22251,10 +22253,7 @@
+ else
+ 
+         if test "$cross_compiling" = yes; then :
+-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+-as_fn_error $? "cannot run test program while cross compiling
+-See \`config.log' for more details" "$LINENO" 5; }
++          glib_cv_stack_grows=irrevant
+ else
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+@@ -24149,7 +24148,10 @@
+ $as_echo "yes" >&6; }
+                                           NAMESER_COMPAT_INCLUDE="#include <arpa/nameser_compat.h>"
+ else
+-  as_fn_error $? "could not compile test program either way" "$LINENO" 5
++  # PATCH: Sortix doesn't have <arpa/nameser.h> and probably won't by design, so
++  #        don't error out here but just report absence.
++  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
++$as_echo "no" >&6; }
+ fi
+ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+ fi
+@@ -24223,7 +24225,10 @@
+ $as_echo "in -lbind" >&6; }
+                                          NETWORK_LIBS="-lbind $NETWORK_LIBS"
+ else
+-  as_fn_error $? "not found" "$LINENO" 5
++  # PATCH: Sortix doesn't have <resolv.h> at this time.
++  #as_fn_error $? "not found" "$LINENO" 5
++  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
++$as_echo "no" >&6; }
+ fi
+ rm -f core conftest.err conftest.$ac_objext \
+     conftest$ac_exeext conftest.$ac_ext
+@@ -24481,7 +24486,7 @@
+   $as_echo_n "(cached) " >&6
+ else
+   if test "$cross_compiling" = yes; then :
+-  ac_cv_func_vsnprintf_c99=no
++  ac_cv_func_vsnprintf_c99=yes
+ else
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+@@ -24546,7 +24551,7 @@
+   $as_echo_n "(cached) " >&6
+ else
+   if test "$cross_compiling" = yes; then :
+-  ac_cv_func_printf_unix98=no
++  ac_cv_func_printf_unix98=yes
+ else
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+@@ -24938,7 +24943,7 @@
+   $as_echo_n "(cached) " >&6
+ else
+   if test "$cross_compiling" = yes; then :
+-  ac_cv_func_snprintf_c99=no
++  ac_cv_func_snprintf_c99=yes
+ else
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+@@ -25249,6 +25254,7 @@
+ 
+ 
+ # Check for strlcpy
++# TODO: The runtime check is to detect an ancient solaris bug so remove it.
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking for OpenBSD strlcpy/strlcat" >&5
+ $as_echo_n "checking for OpenBSD strlcpy/strlcat... " >&6; }
+ if ${glib_cv_have_strlcpy+:} false; then :
+@@ -25256,7 +25262,7 @@
+ else
+ 
+ if test "$cross_compiling" = yes; then :
+-  glib_cv_have_strlcpy=no
++  glib_cv_have_strlcpy=yes
+ else
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+@@ -25620,10 +25626,7 @@
+ else
+ 
+ 		if test "$cross_compiling" = yes; then :
+-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+-as_fn_error $? "cannot run test program while cross compiling
+-See \`config.log' for more details" "$LINENO" 5; }
++  glib_cv_uscore=no
+ else
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+@@ -26980,10 +26983,7 @@
+   $as_echo_n "(cached) " >&6
+ else
+   if test "$cross_compiling" = yes; then :
+-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+-as_fn_error $? "cannot run test program while cross compiling
+-See \`config.log' for more details" "$LINENO" 5; }
++    ac_cv_func_posix_getpwuid_r=yes
+ else
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+@@ -27071,10 +27071,7 @@
+   $as_echo_n "(cached) " >&6
+ else
+   if test "$cross_compiling" = yes; then :
+-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+-as_fn_error $? "cannot run test program while cross compiling
+-See \`config.log' for more details" "$LINENO" 5; }
++    ac_cv_func_posix_getgrgid_r=yes
+ else
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+diff -Paur --no-dereference -- libglib.upstream/gio/gdbusmessage.c libglib/gio/gdbusmessage.c
+--- libglib.upstream/gio/gdbusmessage.c
++++ libglib/gio/gdbusmessage.c
+@@ -3474,18 +3474,28 @@
+               fs = g_string_new (NULL);
+               if (fstat (fds[n], &statbuf) == 0)
+                 {
++#if defined(__sortix__)
++                  g_string_append_printf (fs, "%s" "dev=%" PRIuDEV, fs->len > 0 ? "," : "",
++                                          statbuf.st_dev);
++#else
+                   g_string_append_printf (fs, "%s" "dev=%d:%d", fs->len > 0 ? "," : "",
+                                           major (statbuf.st_dev), minor (statbuf.st_dev));
++#endif
+                   g_string_append_printf (fs, "%s" "mode=0%o", fs->len > 0 ? "," : "",
+                                           statbuf.st_mode);
+                   g_string_append_printf (fs, "%s" "ino=%" G_GUINT64_FORMAT, fs->len > 0 ? "," : "",
+                                           (guint64) statbuf.st_ino);
+-                  g_string_append_printf (fs, "%s" "uid=%u", fs->len > 0 ? "," : "",
+-                                          (guint) statbuf.st_uid);
+-                  g_string_append_printf (fs, "%s" "gid=%u", fs->len > 0 ? "," : "",
+-                                          (guint) statbuf.st_gid);
++                  g_string_append_printf (fs, "%s" "uid=%" G_GUINT64_FORMAT, fs->len > 0 ? "," : "",
++                                          (guint64) statbuf.st_uid);
++                  g_string_append_printf (fs, "%s" "gid=%" G_GUINT64_FORMAT, fs->len > 0 ? "," : "",
++                                          (guint64) statbuf.st_gid);
++#if defined(__sortix__)
++                  g_string_append_printf (fs, "%s" "rdev=%" PRIuDEV, fs->len > 0 ? "," : "",
++                                          statbuf.st_rdev);
++#else
+                   g_string_append_printf (fs, "%s" "rdev=%d:%d", fs->len > 0 ? "," : "",
+                                           major (statbuf.st_rdev), minor (statbuf.st_rdev));
++#endif
+                   g_string_append_printf (fs, "%s" "size=%" G_GUINT64_FORMAT, fs->len > 0 ? "," : "",
+                                           (guint64) statbuf.st_size);
+                   g_string_append_printf (fs, "%s" "atime=%" G_GUINT64_FORMAT, fs->len > 0 ? "," : "",
+diff -Paur --no-dereference -- libglib.upstream/gio/ginetsocketaddress.c libglib/gio/ginetsocketaddress.c
+--- libglib.upstream/gio/ginetsocketaddress.c
++++ libglib/gio/ginetsocketaddress.c
+@@ -197,10 +197,10 @@
+ 	  return FALSE;
+ 	}
+ 
++      memset (&sock, 0, sizeof(sock));
+       sock->sin_family = AF_INET;
+       sock->sin_port = g_htons (addr->priv->port);
+       memcpy (&(sock->sin_addr.s_addr), g_inet_address_to_bytes (addr->priv->address), sizeof (sock->sin_addr));
+-      memset (sock->sin_zero, 0, sizeof (sock->sin_zero));
+       return TRUE;
+     }
+   else if (family == AF_INET6)
+diff -Paur --no-dereference -- libglib.upstream/gio/gnetworking.h.in libglib/gio/gnetworking.h.in
+--- libglib.upstream/gio/gnetworking.h.in
++++ libglib/gio/gnetworking.h.in
+@@ -41,13 +41,19 @@
+ #include <netdb.h>
+ #include <netinet/in.h>
+ #include <netinet/tcp.h>
++#if __has_include(<resolv.h>)
+ #include <resolv.h>
++#endif
+ #include <sys/socket.h>
+ #include <sys/un.h>
++#if __has_include(<net/if.h>)
+ #include <net/if.h>
++#endif
+ 
+ #include <arpa/inet.h>
++#if __has_include(<arpa/nameser.h>)
+ #include <arpa/nameser.h>
++#endif
+ @NAMESER_COMPAT_INCLUDE@
+ 
+ #ifndef T_SRV
+diff -Paur --no-dereference -- libglib.upstream/gio/gresolver.c libglib/gio/gresolver.c
+--- libglib.upstream/gio/gresolver.c
++++ libglib/gio/gresolver.c
+@@ -323,8 +323,12 @@
+    * address, so if inet_aton() succeeds, then it's an address we want
+    * to reject.
+    */
++#if defined(__sortix__)
++  if ((void) addr, (void) ip4addr, 0)
++#else
+   if (inet_aton (hostname, &ip4addr))
+ #endif
++#endif
+     {
+       g_set_error (error, G_RESOLVER_ERROR, G_RESOLVER_ERROR_NOT_FOUND,
+                    _("Error resolving '%s': %s"),
+diff -Paur --no-dereference -- libglib.upstream/gio/gsocket.c libglib/gio/gsocket.c
+--- libglib.upstream/gio/gsocket.c
++++ libglib/gio/gsocket.c
+@@ -69,6 +69,39 @@
+ #include "gwin32networking.h"
+ #endif
+ 
++#if defined(__sortix__)
++#ifndef IP_TTL
++#define IP_TTL (-1)
++#endif
++#ifndef IP_MULTICAST_LOOP
++#define IP_MULTICAST_LOOP (-1)
++#endif
++#ifndef IP_MULTICAST_TTL
++#define IP_MULTICAST_TTL (-1)
++#endif
++#if !defined(IP_ADD_MEMBERSHIP) && !defined(IP_DROP_MEMBERSHIP) && !defined(HAVE_IP_MREQN)
++struct ip_mreq
++{
++	struct in_addr imr_multiaddr;
++	struct in_addr imr_interface;
++};
++#endif
++#ifndef IP_ADD_MEMBERSHIP
++#define IP_ADD_MEMBERSHIP (-1)
++#endif
++#ifndef IP_DROP_MEMBERSHIP
++#define IP_DROP_MEMBERSHIP (-1)
++#endif
++#ifndef SO_NREAD
++#define SO_NREAD (-1)
++#endif
++#ifndef CMSG_DATA
++#define CMSG_DATA(x) ((unsigned char*) x)
++#define CMSG_FIRSTHDR(x) ((struct cmsghdr *) NULL)
++#define CMSG_NXTHDR(x, y) ((struct cmsghdr *) NULL)
++#endif
++#endif
++
+ /**
+  * SECTION:gsocket
+  * @short_description: Low-level socket object
+@@ -319,7 +352,7 @@
+ {
+   struct sockaddr_storage address;
+   gint fd;
+-  guint addrlen;
++  socklen_t addrlen;
+   int value, family;
+   int errsv;
+ 
+@@ -1713,7 +1746,7 @@
+ 			    GError  **error)
+ {
+   struct sockaddr_storage buffer;
+-  guint len = sizeof (buffer);
++  socklen_t len = sizeof (buffer);
+ 
+   g_return_val_if_fail (G_IS_SOCKET (socket), NULL);
+ 
+@@ -1746,7 +1779,7 @@
+ 			     GError  **error)
+ {
+   struct sockaddr_storage buffer;
+-  guint len = sizeof (buffer);
++  socklen_t len = sizeof (buffer);
+ 
+   g_return_val_if_fail (G_IS_SOCKET (socket), NULL);
+ 
+@@ -4866,7 +4899,7 @@
+ 		     gint     *value,
+ 		     GError  **error)
+ {
+-  guint size;
++  socklen_t size;
+ 
+   g_return_val_if_fail (G_IS_SOCKET (socket), FALSE);
+ 
+@@ -4891,7 +4924,7 @@
+   /* If the returned value is smaller than an int then we need to
+    * slide it over into the low-order bytes of *value.
+    */
+-  if (size != sizeof (gint))
++  if (size < sizeof (gint))
+     *value = *value >> (8 * (sizeof (gint) - size));
+ #endif
+ 
+diff -Paur --no-dereference -- libglib.upstream/gio/gthreadedresolver.c libglib/gio/gthreadedresolver.c
+--- libglib.upstream/gio/gthreadedresolver.c
++++ libglib/gio/gthreadedresolver.c
+@@ -22,6 +22,7 @@
+ #include <glib.h>
+ #include "glibintl.h"
+ 
++#include <endian.h>
+ #include <stdio.h>
+ #include <string.h>
+ 
+@@ -263,7 +264,15 @@
+ 
+ #if defined(G_OS_UNIX)
+ 
+-#ifdef __BIONIC__
++#if defined(__BIONIC__) || defined(__sortix__)
++#if defined(__sortix__)
++static int h_errno;
++typedef unsigned char u_char;
++#define HOST_NOT_FOUND 1
++#define NO_DATA 2
++#define TRY_AGAIN 3
++#define res_query(a, b, c, d, e) ((void) (a), (void) (b), (void) (c), (void) (d), (void) (e), -1)
++#endif
+ /* Copy from bionic/libc/private/arpa_nameser_compat.h
+  * and bionic/libc/private/arpa_nameser.h */
+ typedef struct {
+diff -Paur --no-dereference -- libglib.upstream/gio/gunixmounts.c libglib/gio/gunixmounts.c
+--- libglib.upstream/gio/gunixmounts.c
++++ libglib/gio/gunixmounts.c
+@@ -713,6 +713,20 @@
+   return return_list;
+ }
+ 
++#elif defined(__sortix__)
++
++static char *
++get_mtab_monitor_file (void)
++{
++  return NULL;
++}
++
++static GList *
++_g_get_unix_mounts (void)
++{
++  return NULL;
++}
++
+ /* Common code {{{2 */
+ #else
+ #error No _g_get_unix_mounts() implementation for system
+@@ -1118,6 +1132,14 @@
+   return _g_get_unix_mounts ();
+ }
+ 
++#elif defined(__sortix__)
++
++static GList *
++_g_get_unix_mount_points (void)
++{
++  return NULL;
++}
++
+ /* Common code {{{2 */
+ #else
+ #error No g_get_mount_table() implementation for system
+diff -Paur --no-dereference -- libglib.upstream/Makefile.in libglib/Makefile.in
+--- libglib.upstream/Makefile.in
++++ libglib/Makefile.in
+@@ -1726,6 +1726,7 @@
+ distclean: distclean-recursive
+ 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
+ 	-rm -f Makefile
++	-find . -name '*.pyc' -delete
+ distclean-am: clean-am distclean-generic distclean-hdr \
+ 	distclean-libtool distclean-local distclean-tags
+ 

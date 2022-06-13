@@ -1,0 +1,13 @@
+NAME=libglib
+BUILD_LIBRARIES='libiconv gettext libz libffi xz? libdbus?'
+VERSION=2.45.6
+DISTNAME=glib-$VERSION
+COMPRESSION=tar.xz
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=a5710fcf8a073201ceca188c285af14d8da4bb2bbec22bdf6b5e0593d5bc6b77
+UPSTREAM_SITE=https://download.gnome.org/sources/glib/2.45
+UPSTREAM_ARCHIVE=$ARCHIVE
+BUILD_SYSTEM=configure
+CONFIGURE_ARGS=--disable-gtk-doc
+MAKE_VARS='V=1'
+POST_INSTALL=tix-eradicate-libtool-la

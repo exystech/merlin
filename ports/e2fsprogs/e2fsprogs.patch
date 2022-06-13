@@ -1,0 +1,1272 @@
+diff -Paur --no-dereference -- e2fsprogs.upstream/config/config.sub e2fsprogs/config/config.sub
+--- e2fsprogs.upstream/config/config.sub
++++ e2fsprogs/config/config.sub
+@@ -1360,7 +1360,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* | -plan9* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -sortix* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -Paur --no-dereference -- e2fsprogs.upstream/config/parse-types.sh e2fsprogs/config/parse-types.sh
+--- e2fsprogs.upstream/config/parse-types.sh
++++ e2fsprogs/config/parse-types.sh
+@@ -1,5 +1,9 @@
+ #!/bin/sh
+ 
++# PATCH: Disable insanity in favor of <stdint.h>.
++printf '' > asm_types.h
++exit 0
++
+ cat > sed.script << "EOF"
+ /^#/d
+ /^$/d
+@@ -19,7 +23,7 @@
+ /bin/echo -n "checking for __uNN types... "
+ # can't check [ -f /usr/include/asm/types.h ] directly, since
+ # the include path might be different if cross-compiling
+-if echo '#include <asm/types.h>' | $CPP - 2> parse-types.log | \
++if echo '#include <asm/types.h>' | ${BUILD_CC-${CC-gcc}} -E - 2> parse-types.log | \
+ 	sed -f sed.script | grep '^#' > asm_types.h; then
+ 	echo "using <asm/types.h>"
+ else
+diff -Paur --no-dereference -- e2fsprogs.upstream/e2fsck/journal.c e2fsprogs/e2fsck/journal.c
+--- e2fsprogs.upstream/e2fsck/journal.c
++++ e2fsprogs/e2fsck/journal.c
+@@ -14,7 +14,6 @@
+ 
+ #include "config.h"
+ #ifdef HAVE_SYS_MOUNT_H
+-#include <sys/param.h>
+ #include <sys/mount.h>
+ #define MNT_FL (MS_MGC_VAL | MS_RDONLY)
+ #endif
+diff -Paur --no-dereference -- e2fsprogs.upstream/e2fsck/logfile.c e2fsprogs/e2fsck/logfile.c
+--- e2fsprogs.upstream/e2fsck/logfile.c
++++ e2fsprogs/e2fsck/logfile.c
+@@ -22,6 +22,36 @@
+ 
+ extern e2fsck_t e2fsck_global_ctx;   /* Try your very best not to use this! */
+ 
++#if defined(__sortix__)
++int daemon(int nochdir, int noclose)
++{
++	if (!nochdir && chdir("/"))
++		return -1;
++	if (!noclose) {
++		int fd, failed = 0;
++		if ((fd = open("/dev/null", O_RDWR)) < 0) return -1;
++		if (dup2(fd, 0) < 0 || dup2(fd, 1) < 0 || dup2(fd, 2) < 0)
++			failed++;
++		if (fd > 2) close(fd);
++		if (failed) return -1;
++	}
++
++	switch(fork()) {
++	case 0: break;
++	case -1: return -1;
++	default: _exit(0);
++	}
++
++	switch(fork()) {
++	case 0: break;
++	case -1: return -1;
++	default: _exit(0);
++	}
++
++	return 0;
++}
++#endif
++
+ struct string {
+ 	char	*s;
+ 	int	len;
+diff -Paur --no-dereference -- e2fsprogs.upstream/e2fsck/quota.c e2fsprogs/e2fsck/quota.c
+--- e2fsprogs.upstream/e2fsck/quota.c
++++ e2fsprogs/e2fsck/quota.c
+@@ -5,7 +5,6 @@
+ 
+ #include "config.h"
+ #ifdef HAVE_SYS_MOUNT_H
+-#include <sys/param.h>
+ #include <sys/mount.h>
+ #define MNT_FL (MS_MGC_VAL | MS_RDONLY)
+ #endif
+diff -Paur --no-dereference -- e2fsprogs.upstream/e2fsck/scantest.c e2fsprogs/e2fsck/scantest.c
+--- e2fsprogs.upstream/e2fsck/scantest.c
++++ e2fsprogs/e2fsck/scantest.c
+@@ -54,7 +54,7 @@
+ {
+ 	struct rusage r;
+ 
+-	track->brk_start = sbrk(0);
++	track->brk_start = 0;
+ 	gettimeofday(&track->time_start, 0);
+ 	getrusage(RUSAGE_SELF, &r);
+ 	track->user_start = r.ru_utime;
+@@ -77,7 +77,7 @@
+ 	getrusage(RUSAGE_SELF, &r);
+ 
+ 	printf(_("Memory used: %d, elapsed time: %6.3f/%6.3f/%6.3f\n"),
+-	       (int) (((char *) sbrk(0)) - ((char *) track->brk_start)),
++	       (int) (((char *) 0) - ((char *) track->brk_start)),
+ 	       timeval_subtract(&time_end, &track->time_start),
+ 	       timeval_subtract(&r.ru_utime, &track->user_start),
+ 	       timeval_subtract(&r.ru_stime, &track->system_start));
+diff -Paur --no-dereference -- e2fsprogs.upstream/e2fsck/sigcatcher.c e2fsprogs/e2fsck/sigcatcher.c
+--- e2fsprogs.upstream/e2fsck/sigcatcher.c
++++ e2fsprogs/e2fsck/sigcatcher.c
+@@ -10,6 +10,7 @@
+  */
+ 
+ #include "config.h"
++#include <stdint.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <signal.h>
+@@ -341,7 +342,7 @@
+        fprintf(stderr, "Signal (%d) %s ", signum,
+ 	       lookup_table_fallback(signum, sig_table));
+        if (siginfo->si_code == SI_USER)
+-	       fprintf(stderr, "(sent from pid %u) ", siginfo->si_pid);
++	       fprintf(stderr, "(sent from pid %ji) ", (intmax_t) siginfo->si_pid);
+        cp = lookup_table(siginfo->si_code, generic_code_table);
+        if (cp)
+ 	       fprintf(stderr, "si_code=%s ", cp);
+diff -Paur --no-dereference -- e2fsprogs.upstream/e2fsck/unix.c e2fsprogs/e2fsck/unix.c
+--- e2fsprogs.upstream/e2fsck/unix.c
++++ e2fsprogs/e2fsck/unix.c
+@@ -590,8 +590,6 @@
+ 	return 0;
+ }
+ 
+-#define PATH_SET "PATH=/sbin"
+-
+ /*
+  * Make sure 0,1,2 file descriptors are open, so that we don't open
+  * the filesystem using the same file descriptor as stdout or stderr.
+@@ -1007,21 +1005,21 @@
+ 	if (cflag) {
+ 		char *oldpath = getenv("PATH");
+ 		char *newpath;
+-		int len = sizeof(PATH_SET) + 1;
++		size_t len = strlen("/sbin");
+ 
+ 		if (oldpath)
+-			len += strlen(oldpath);
++			len += 1 + strlen(oldpath);
+ 
+-		newpath = malloc(len);
++		newpath = malloc(len + 1);
+ 		if (!newpath)
+ 			fatal_error(ctx, "Couldn't malloc() newpath");
+-		strcpy(newpath, PATH_SET);
++		strcpy(newpath, "/sbin");
+ 
+ 		if (oldpath) {
+ 			strcat(newpath, ":");
+ 			strcat(newpath, oldpath);
+ 		}
+-		putenv(newpath);
++		setenv("PATH", newpath, 1);
+ 	}
+ #ifdef CONFIG_JBD_DEBUG
+ 	jbd_debug = getenv("E2FSCK_JBD_DEBUG");
+diff -Paur --no-dereference -- e2fsprogs.upstream/e2fsck/util.c e2fsprogs/e2fsck/util.c
+--- e2fsprogs.upstream/e2fsck/util.c
++++ e2fsprogs/e2fsck/util.c
+@@ -332,7 +332,7 @@
+ #endif
+ 	io_stats io_start = 0;
+ 
+-	track->brk_start = sbrk(0);
++	track->brk_start = 0;
+ 	gettimeofday(&track->time_start, 0);
+ #ifdef HAVE_GETRUSAGE
+ #ifdef sun
+@@ -398,7 +398,7 @@
+ 		kbytes(malloc_info.uordblks), kbytes(malloc_info.fordblks));
+ #else
+ 	log_out(ctx, _("Memory used: %lu, "),
+-		(unsigned long) (((char *) sbrk(0)) -
++		(unsigned long) (((char *) 0) -
+ 				 ((char *) track->brk_start)));
+ #endif
+ #ifdef HAVE_GETRUSAGE
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/blkid/blkid_types.h.in e2fsprogs/lib/blkid/blkid_types.h.in
+--- e2fsprogs.upstream/lib/blkid/blkid_types.h.in
++++ e2fsprogs/lib/blkid/blkid_types.h.in
+@@ -7,161 +7,46 @@
+ 	!defined(_EXT2_TYPES_H))
+ #define _BLKID_TYPES_H
+ 
+-@ASM_TYPES_HEADER@
++#include <stdint.h>
+ 
+ #ifndef HAVE___U8
+ #define HAVE___U8
+-#ifdef __U8_TYPEDEF
+-typedef __U8_TYPEDEF __u8;
+-#else
+-typedef unsigned char __u8;
+-#endif
++typedef uint8_t __u8;
+ #endif /* HAVE___U8 */
+ 
+ #ifndef HAVE___S8
+ #define HAVE___S8
+-#ifdef __S8_TYPEDEF
+-typedef __S8_TYPEDEF __s8;
+-#else
+-typedef signed char __s8;
+-#endif
++typedef int8_t __s8;
+ #endif /* HAVE___S8 */
+ 
+ #ifndef HAVE___U16
+ #define HAVE___U16
+-#ifdef __U16_TYPEDEF
+-typedef __U16_TYPEDEF __u16;
+-#else
+-#if (@SIZEOF_INT@ == 2)
+-typedef	unsigned int	__u16;
+-#else
+-#if (@SIZEOF_SHORT@ == 2)
+-typedef	unsigned short	__u16;
+-#else
+-#undef HAVE___U16
+-  ?==error: undefined 16 bit type
+-#endif /* SIZEOF_SHORT == 2 */
+-#endif /* SIZEOF_INT == 2 */
+-#endif /* __U16_TYPEDEF */
++typedef uint16_t __u16;
+ #endif /* HAVE___U16 */
+ 
+ #ifndef HAVE___S16
+ #define HAVE___S16
+-#ifdef __S16_TYPEDEF
+-typedef __S16_TYPEDEF __s16;
+-#else
+-#if (@SIZEOF_INT@ == 2)
+-typedef	int		__s16;
+-#else
+-#if (@SIZEOF_SHORT@ == 2)
+-typedef	short		__s16;
+-#else
+-#undef HAVE___S16
+-  ?==error: undefined 16 bit type
+-#endif /* SIZEOF_SHORT == 2 */
+-#endif /* SIZEOF_INT == 2 */
+-#endif /* __S16_TYPEDEF */
++typedef int16_t __s16;
+ #endif /* HAVE___S16 */
+ 
+ #ifndef HAVE___U32
+ #define HAVE___U32
+-#ifdef __U32_TYPEDEF
+-typedef __U32_TYPEDEF __u32;
+-#else
+-#if (@SIZEOF_INT@ == 4)
+-typedef	unsigned int	__u32;
+-#else
+-#if (@SIZEOF_LONG@ == 4)
+-typedef	unsigned long	__u32;
+-#else
+-#if (@SIZEOF_SHORT@ == 4)
+-typedef	unsigned short	__u32;
+-#else
+-#undef HAVE___U32
+- ?== error: undefined 32 bit type
+-#endif /* SIZEOF_SHORT == 4 */
+-#endif /* SIZEOF_LONG == 4 */
+-#endif /* SIZEOF_INT == 4 */
+-#endif /* __U32_TYPEDEF */
++typedef uint32_t __u32;
+ #endif /* HAVE___U32 */
+ 
+ #ifndef HAVE___S32
+ #define HAVE___S32
+-#ifdef __S32_TYPEDEF
+-typedef __S32_TYPEDEF __s32;
+-#else
+-#if (@SIZEOF_INT@ == 4)
+-typedef	int		__s32;
+-#else
+-#if (@SIZEOF_LONG@ == 4)
+-typedef	long		__s32;
+-#else
+-#if (@SIZEOF_SHORT@ == 4)
+-typedef	short		__s32;
+-#else
+-#undef HAVE___S32
+- ?== error: undefined 32 bit type
+-#endif /* SIZEOF_SHORT == 4 */
+-#endif /* SIZEOF_LONG == 4 */
+-#endif /* SIZEOF_INT == 4 */
+-#endif /* __S32_TYPEDEF */
++typedef int32_t __s32;
+ #endif /* HAVE___S32 */
+ 
+ #ifndef HAVE___U64
+ #define HAVE___U64
+-#ifdef __U64_TYPEDEF
+-typedef __U64_TYPEDEF __u64;
+-#else
+-#if (@SIZEOF_INT@ == 8)
+-typedef unsigned int	__u64;
+-#else
+-#if (@SIZEOF_LONG_LONG@ == 8)
+-typedef unsigned long long	__u64;
+-#else
+-#if (@SIZEOF_LONG@ == 8)
+-typedef unsigned long	__u64;
+-#else
+-#undef HAVE___U64
+- ?== error: undefined 64 bit type
+-#endif /* SIZEOF_LONG == 8 */
+-#endif /* SIZEOF_LONG_LONG == 8 */
+-#endif /* SIZEOF_INT == 8 */
+-#endif /* __U64_TYPEDEF */
++typedef unsigned long long __u64; /* Uses %llu instead of PRIu64... */
+ #endif /* HAVE___U64 */
+ 
+ #ifndef HAVE___S64
+ #define HAVE___S64
+-#ifdef __S64_TYPEDEF
+-typedef __S64_TYPEDEF __s64;
+-#else
+-#if (@SIZEOF_INT@ == 8)
+-typedef int		__s64;
+-#else
+-#if (@SIZEOF_LONG_LONG@ == 8)
+-#if defined(__GNUC__)
+-typedef __signed__ long long	__s64;
+-#else
+-typedef signed long long	__s64;
+-#endif /* __GNUC__ */
+-#else
+-#if (@SIZEOF_LONG@ == 8)
+-typedef long		__s64;
+-#else
+-#undef HAVE___S64
+- ?== error: undefined 64 bit type
+-#endif /* SIZEOF_LONG == 8 */
+-#endif /* SIZEOF_LONG_LONG == 8 */
+-#endif /* SIZEOF_INT == 8 */
+-#endif /* __S64_TYPEDEF */
++typedef long long __s64; /* Uses %lld instead of PRId64... */
+ #endif /* HAVE___S64 */
+ 
+-#undef __S8_TYPEDEF
+-#undef __U8_TYPEDEF
+-#undef __S16_TYPEDEF
+-#undef __U16_TYPEDEF
+-#undef __S32_TYPEDEF
+-#undef __U32_TYPEDEF
+-#undef __S64_TYPEDEF
+-#undef __U64_TYPEDEF
+-
+ #endif /* _*_TYPES_H */
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/blkid/devname.c e2fsprogs/lib/blkid/devname.c
+--- e2fsprogs.upstream/lib/blkid/devname.c
++++ e2fsprogs/lib/blkid/devname.c
+@@ -40,6 +40,10 @@
+ 
+ #include "blkidP.h"
+ 
++#if defined(__sortix__)
++#define makedev(a, b) 0
++#endif
++
+ /*
+  * Find a dev struct in the cache by device name, if available.
+  *
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/e2p/fgetversion.c e2fsprogs/lib/e2p/fgetversion.c
+--- e2fsprogs.upstream/lib/e2p/fgetversion.c
++++ e2fsprogs/lib/e2p/fgetversion.c
+@@ -61,7 +61,6 @@
+    return(err);
+ #endif
+ #else /* ! HAVE_EXT2_IOCTLS */
+-	extern int errno;
+ 	errno = EOPNOTSUPP;
+ 	return -1;
+ #endif /* ! HAVE_EXT2_IOCTLS */
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/e2p/fsetversion.c e2fsprogs/lib/e2p/fsetversion.c
+--- e2fsprogs.upstream/lib/e2p/fsetversion.c
++++ e2fsprogs/lib/e2p/fsetversion.c
+@@ -59,7 +59,6 @@
+    return syscall(SYS_fsctl, name, EXT2_IOC_SETVERSION, &ver, 0);
+ #endif
+ #else /* ! HAVE_EXT2_IOCTLS */
+-	extern int errno;
+ 	errno = EOPNOTSUPP;
+ 	return -1;
+ #endif /* ! HAVE_EXT2_IOCTLS */
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/e2p/getversion.c e2fsprogs/lib/e2p/getversion.c
+--- e2fsprogs.upstream/lib/e2p/getversion.c
++++ e2fsprogs/lib/e2p/getversion.c
+@@ -33,7 +33,6 @@
+ 	*version = ver;
+ 	return r;
+ #else /* ! HAVE_EXT2_IOCTLS */
+-	extern int errno;
+ 	errno = EOPNOTSUPP;
+ 	return -1;
+ #endif /* ! HAVE_EXT2_IOCTLS */
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/e2p/setversion.c e2fsprogs/lib/e2p/setversion.c
+--- e2fsprogs.upstream/lib/e2p/setversion.c
++++ e2fsprogs/lib/e2p/setversion.c
+@@ -32,7 +32,6 @@
+ 	ver = (int) version;
+ 	return ioctl (fd, EXT2_IOC_SETVERSION, &ver);
+ #else /* ! HAVE_EXT2_IOCTLS */
+-	extern int errno;
+ 	errno = EOPNOTSUPP;
+ 	return -1;
+ #endif /* ! HAVE_EXT2_IOCTLS */
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/et/com_err.c e2fsprogs/lib/et/com_err.c
+--- e2fsprogs.upstream/lib/et/com_err.c
++++ e2fsprogs/lib/et/com_err.c
+@@ -23,6 +23,10 @@
+ #include "error_table.h"
+ #include "internal.h"
+ 
++#if !defined(ONLCR)
++#define ONLCR 0
++#endif
++
+ static void
+ default_com_err_proc (const char *whoami, errcode_t code, const
+ 		      char *fmt, va_list args)
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/ext2fs/bitmaps.c e2fsprogs/lib/ext2fs/bitmaps.c
+--- e2fsprogs.upstream/lib/ext2fs/bitmaps.c
++++ e2fsprogs/lib/ext2fs/bitmaps.c
+@@ -21,6 +21,7 @@
+ #if HAVE_SYS_STAT_H
+ #include <sys/stat.h>
+ #endif
++#include <sys/time.h>
+ #if HAVE_SYS_TYPES_H
+ #include <sys/types.h>
+ #endif
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/ext2fs/blkmap64_ba.c e2fsprogs/lib/ext2fs/blkmap64_ba.c
+--- e2fsprogs.upstream/lib/ext2fs/blkmap64_ba.c
++++ e2fsprogs/lib/ext2fs/blkmap64_ba.c
+@@ -20,6 +20,7 @@
+ #if HAVE_SYS_STAT_H
+ #include <sys/stat.h>
+ #endif
++#include <sys/time.h>
+ #if HAVE_SYS_TYPES_H
+ #include <sys/types.h>
+ #endif
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/ext2fs/blkmap64_rb.c e2fsprogs/lib/ext2fs/blkmap64_rb.c
+--- e2fsprogs.upstream/lib/ext2fs/blkmap64_rb.c
++++ e2fsprogs/lib/ext2fs/blkmap64_rb.c
+@@ -19,6 +19,7 @@
+ #if HAVE_SYS_STAT_H
+ #include <sys/stat.h>
+ #endif
++#include <sys/time.h>
+ #if HAVE_SYS_TYPES_H
+ #include <sys/types.h>
+ #endif
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/ext2fs/ext2_types.h.in e2fsprogs/lib/ext2fs/ext2_types.h.in
+--- e2fsprogs.upstream/lib/ext2fs/ext2_types.h.in
++++ e2fsprogs/lib/ext2fs/ext2_types.h.in
+@@ -7,163 +7,48 @@
+ 	!defined(_EXT2_TYPES_H))
+ #define _EXT2_TYPES_H
+ 
+-@ASM_TYPES_HEADER@
++#include <stdint.h>
+ 
+ #ifndef HAVE___U8
+ #define HAVE___U8
+-#ifdef __U8_TYPEDEF
+-typedef __U8_TYPEDEF __u8;
+-#else
+-typedef unsigned char __u8;
+-#endif
++typedef uint8_t __u8;
+ #endif /* HAVE___U8 */
+ 
+ #ifndef HAVE___S8
+ #define HAVE___S8
+-#ifdef __S8_TYPEDEF
+-typedef __S8_TYPEDEF __s8;
+-#else
+-typedef signed char __s8;
+-#endif
++typedef int8_t __s8;
+ #endif /* HAVE___S8 */
+ 
+ #ifndef HAVE___U16
+ #define HAVE___U16
+-#ifdef __U16_TYPEDEF
+-typedef __U16_TYPEDEF __u16;
+-#else
+-#if (@SIZEOF_INT@ == 2)
+-typedef	unsigned int	__u16;
+-#else
+-#if (@SIZEOF_SHORT@ == 2)
+-typedef	unsigned short	__u16;
+-#else
+-#undef HAVE___U16
+-  ?==error: undefined 16 bit type
+-#endif /* SIZEOF_SHORT == 2 */
+-#endif /* SIZEOF_INT == 2 */
+-#endif /* __U16_TYPEDEF */
++typedef uint16_t __u16;
+ #endif /* HAVE___U16 */
+ 
+ #ifndef HAVE___S16
+ #define HAVE___S16
+-#ifdef __S16_TYPEDEF
+-typedef __S16_TYPEDEF __s16;
+-#else
+-#if (@SIZEOF_INT@ == 2)
+-typedef	int		__s16;
+-#else
+-#if (@SIZEOF_SHORT@ == 2)
+-typedef	short		__s16;
+-#else
+-#undef HAVE___S16
+-  ?==error: undefined 16 bit type
+-#endif /* SIZEOF_SHORT == 2 */
+-#endif /* SIZEOF_INT == 2 */
+-#endif /* __S16_TYPEDEF */
++typedef int16_t __s16;
+ #endif /* HAVE___S16 */
+ 
+ #ifndef HAVE___U32
+ #define HAVE___U32
+-#ifdef __U32_TYPEDEF
+-typedef __U32_TYPEDEF __u32;
+-#else
+-#if (@SIZEOF_INT@ == 4)
+-typedef	unsigned int	__u32;
+-#else
+-#if (@SIZEOF_LONG@ == 4)
+-typedef	unsigned long	__u32;
+-#else
+-#if (@SIZEOF_SHORT@ == 4)
+-typedef	unsigned short	__u32;
+-#else
+-#undef HAVE___U32
+- ?== error: undefined 32 bit type
+-#endif /* SIZEOF_SHORT == 4 */
+-#endif /* SIZEOF_LONG == 4 */
+-#endif /* SIZEOF_INT == 4 */
+-#endif /* __U32_TYPEDEF */
++typedef uint32_t __u32;
+ #endif /* HAVE___U32 */
+ 
+ #ifndef HAVE___S32
+ #define HAVE___S32
+-#ifdef __S32_TYPEDEF
+-typedef __S32_TYPEDEF __s32;
+-#else
+-#if (@SIZEOF_INT@ == 4)
+-typedef	int		__s32;
+-#else
+-#if (@SIZEOF_LONG@ == 4)
+-typedef	long		__s32;
+-#else
+-#if (@SIZEOF_SHORT@ == 4)
+-typedef	short		__s32;
+-#else
+-#undef HAVE___S32
+- ?== error: undefined 32 bit type
+-#endif /* SIZEOF_SHORT == 4 */
+-#endif /* SIZEOF_LONG == 4 */
+-#endif /* SIZEOF_INT == 4 */
+-#endif /* __S32_TYPEDEF */
++typedef int32_t __s32;
+ #endif /* HAVE___S32 */
+ 
+ #ifndef HAVE___U64
+ #define HAVE___U64
+-#ifdef __U64_TYPEDEF
+-typedef __U64_TYPEDEF __u64;
+-#else
+-#if (@SIZEOF_INT@ == 8)
+-typedef unsigned int	__u64;
+-#else
+-#if (@SIZEOF_LONG_LONG@ == 8)
+-typedef unsigned long long	__u64;
+-#else
+-#if (@SIZEOF_LONG@ == 8)
+-typedef unsigned long	__u64;
+-#else
+-#undef HAVE___U64
+- ?== error: undefined 64 bit type
+-#endif /* SIZEOF_LONG_LONG == 8 */
+-#endif /* SIZEOF_LONG == 8 */
+-#endif /* SIZEOF_INT == 8 */
+-#endif /* __U64_TYPEDEF */
++typedef unsigned long long __u64; /* Uses %llu instead of PRIu64... */
+ #endif /* HAVE___U64 */
+ 
+ #ifndef HAVE___S64
+ #define HAVE___S64
+-#ifdef __S64_TYPEDEF
+-typedef __S64_TYPEDEF __s64;
+-#else
+-#if (@SIZEOF_INT@ == 8)
+-typedef int		__s64;
+-#else
+-#if (@SIZEOF_LONG_LONG@ == 8)
+-#if defined(__GNUC__)
+-typedef __signed__ long long	__s64;
+-#else
+-typedef signed long long	__s64;
+-#endif /* __GNUC__ */
+-#else
+-#if (@SIZEOF_LONG@ == 8)
+-typedef long		__s64;
+-#else
+-#undef HAVE___S64
+- ?== error: undefined 64 bit type
+-#endif /* SIZEOF_LONG_LONG == 8 */
+-#endif /* SIZEOF_LONG == 8 */
+-#endif /* SIZEOF_INT == 8 */
+-#endif /* __S64_TYPEDEF */
++typedef long long __s64; /* Uses %lld instead of PRId64... */
+ #endif /* HAVE___S64 */
+ 
+-#undef __S8_TYPEDEF
+-#undef __U8_TYPEDEF
+-#undef __S16_TYPEDEF
+-#undef __U16_TYPEDEF
+-#undef __S32_TYPEDEF
+-#undef __U32_TYPEDEF
+-#undef __S64_TYPEDEF
+-#undef __U64_TYPEDEF
+-
+ #endif /* _*_TYPES_H */
+ 
+ @PUBLIC_CONFIG_HEADER@
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/ext2fs/flushb.c e2fsprogs/lib/ext2fs/flushb.c
+--- e2fsprogs.upstream/lib/ext2fs/flushb.c
++++ e2fsprogs/lib/ext2fs/flushb.c
+@@ -22,7 +22,6 @@
+ #include <sys/ioctl.h>
+ #endif
+ #if HAVE_SYS_MOUNT_H
+-#include <sys/param.h>
+ #include <sys/mount.h>		/* This may define BLKFLSBUF */
+ #endif
+ 
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/ext2fs/getsize.c e2fsprogs/lib/ext2fs/getsize.c
+--- e2fsprogs.upstream/lib/ext2fs/getsize.c
++++ e2fsprogs/lib/ext2fs/getsize.c
+@@ -237,13 +237,22 @@
+ 	{
+ 		ext2fs_struct_stat st;
+ 
+-		if (ext2fs_fstat(fd, &st) == 0)
++		if (ext2fs_fstat(fd, &st) == 0) {
++#if !defined(__sortix__)
+ 			if (S_ISREG(st.st_mode)) {
++#endif
+ 				*retblocks = st.st_size / blocksize;
+ 				goto out;
++#if !defined(__sortix__)
+ 			}
++#endif
++		}
+ 	}
+ 
++#if defined(__sortix__)
++	/* This fallback seems to get one block too few on Sortix. fstat reports
++	   correctly on block devices on Sortix. That's why we always use fstat. */
++#endif
+ 	/*
+ 	 * OK, we couldn't figure it out by using a specialized ioctl,
+ 	 * which is generally the best way.  So do binary search to
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/ext2fs/mmp.c e2fsprogs/lib/ext2fs/mmp.c
+--- e2fsprogs.upstream/lib/ext2fs/mmp.c
++++ e2fsprogs/lib/ext2fs/mmp.c
+@@ -122,29 +122,9 @@
+ 	return retval;
+ }
+ 
+-#ifdef HAVE_SRANDOM
+-#define srand(x)	srandom(x)
+-#define rand()		random()
+-#endif
+-
+ unsigned ext2fs_mmp_new_seq(void)
+ {
+-	unsigned new_seq;
+-	struct timeval tv;
+-
+-	gettimeofday(&tv, 0);
+-	srand((getpid() << 16) ^ getuid() ^ tv.tv_sec ^ tv.tv_usec);
+-
+-	gettimeofday(&tv, 0);
+-	/* Crank the random number generator a few times */
+-	for (new_seq = (tv.tv_sec ^ tv.tv_usec) & 0x1F; new_seq > 0; new_seq--)
+-		rand();
+-
+-	do {
+-		new_seq = rand();
+-	} while (new_seq > EXT4_MMP_SEQ_MAX);
+-
+-	return new_seq;
++	return arc4random_uniform(EXT4_MMP_SEQ_MAX);
+ }
+ 
+ static errcode_t ext2fs_mmp_reset(ext2_filsys fs)
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/ext2fs/tdb.c e2fsprogs/lib/ext2fs/tdb.c
+--- e2fsprogs.upstream/lib/ext2fs/tdb.c
++++ e2fsprogs/lib/ext2fs/tdb.c
+@@ -56,13 +56,30 @@
+ #include <utime.h>
+ #endif
+ #include <sys/stat.h>
+-#include <sys/file.h>
+ #include <fcntl.h>
+ 
+ #ifdef HAVE_SYS_MMAN_H
+ #include <sys/mman.h>
+ #endif
+ 
++#if defined(__sortix__)
++#define F_UNLCK 0
++#define F_RDLCK 1
++#define F_WRLCK 2
++#define F_GETLK 1000
++#define F_SETLK 1001
++#define F_SETLKW 1002
++struct flock
++{
++	short  l_type;
++	short  l_whence;
++	off_t  l_start;
++	off_t  l_len;
++	pid_t  l_pid;
++};
++#define fcntl(...) 0
++#endif
++
+ #ifndef MAP_FILE
+ #define MAP_FILE 0
+ #endif
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/quota/quotaio.c e2fsprogs/lib/quota/quotaio.c
+--- e2fsprogs.upstream/lib/quota/quotaio.c
++++ e2fsprogs/lib/quota/quotaio.c
+@@ -14,7 +14,6 @@
+ #include <time.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+-#include <sys/file.h>
+ 
+ #include "common.h"
+ #include "quotaio.h"
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/ss/help.c e2fsprogs/lib/ss/help.c
+--- e2fsprogs.upstream/lib/ss/help.c
++++ e2fsprogs/lib/ss/help.c
+@@ -24,9 +24,7 @@
+ extern int errno;
+ #endif
+ #include <fcntl.h>
+-#include <sys/param.h>
+ #include <sys/types.h>
+-#include <sys/file.h>
+ #ifdef NEED_SYS_FCNTL_H
+ /* just for O_* */
+ #include <sys/fcntl.h>
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/ss/listen.c e2fsprogs/lib/ss/listen.c
+--- e2fsprogs.upstream/lib/ss/listen.c
++++ e2fsprogs/lib/ss/listen.c
+@@ -21,7 +21,6 @@
+ #include <stdio.h>
+ #include <setjmp.h>
+ #include <signal.h>
+-#include <sys/param.h>
+ 
+ typedef void sigret_t;
+ 
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/ss/pager.c e2fsprogs/lib/ss/pager.c
+--- e2fsprogs.upstream/lib/ss/pager.c
++++ e2fsprogs/lib/ss/pager.c
+@@ -27,7 +27,6 @@
+ #include "ss_internal.h"
+ #include <stdio.h>
+ #include <sys/types.h>
+-#include <sys/file.h>
+ #include <signal.h>
+ #ifdef HAVE_SYS_PRCTL_H
+ #include <sys/prctl.h>
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/uuid/gen_uuid.c e2fsprogs/lib/uuid/gen_uuid.c
+--- e2fsprogs.upstream/lib/uuid/gen_uuid.c
++++ e2fsprogs/lib/uuid/gen_uuid.c
+@@ -95,9 +95,22 @@
+ #include "uuidP.h"
+ #include "uuidd.h"
+ 
+-#ifdef HAVE_SRANDOM
+-#define srand(x) 	srandom(x)
+-#define rand() 		random()
++#if defined(__sortix__)
++#define F_UNLCK 0
++#define F_RDLCK 1
++#define F_WRLCK 2
++#define F_GETLK 1000
++#define F_SETLK 1001
++#define F_SETLKW 1002
++struct flock
++{
++	short  l_type;
++	short  l_whence;
++	off_t  l_start;
++	off_t  l_len;
++	pid_t  l_pid;
++};
++#define fcntl(...) 0
+ #endif
+ 
+ #ifdef TLS
+@@ -135,82 +148,12 @@
+ }
+ #endif
+ 
+-static int get_random_fd(void)
+-{
+-	struct timeval	tv;
+-	static int	fd = -2;
+-	int		i;
+-
+-	if (fd == -2) {
+-		gettimeofday(&tv, 0);
+-#ifndef _WIN32
+-		fd = open("/dev/urandom", O_RDONLY);
+-		if (fd == -1)
+-			fd = open("/dev/random", O_RDONLY | O_NONBLOCK);
+-		if (fd >= 0) {
+-			i = fcntl(fd, F_GETFD);
+-			if (i >= 0)
+-				fcntl(fd, F_SETFD, i | FD_CLOEXEC);
+-		}
+-#endif
+-		srand((getpid() << 16) ^ getuid() ^ tv.tv_sec ^ tv.tv_usec);
+-#ifdef DO_JRAND_MIX
+-		jrand_seed[0] = getpid() ^ (tv.tv_sec & 0xFFFF);
+-		jrand_seed[1] = getppid() ^ (tv.tv_usec & 0xFFFF);
+-		jrand_seed[2] = (tv.tv_sec ^ tv.tv_usec) >> 16;
+-#endif
+-	}
+-	/* Crank the random number generator a few times */
+-	gettimeofday(&tv, 0);
+-	for (i = (tv.tv_sec ^ tv.tv_usec) & 0x1F; i > 0; i--)
+-		rand();
+-	return fd;
+-}
+-
+-
+ /*
+- * Generate a series of random bytes.  Use /dev/urandom if possible,
+- * and if not, use srandom/random.
++ * Generate a series of random bytes.
+  */
+-static void get_random_bytes(void *buf, int nbytes)
++static void get_random_bytes(void *buf, size_t nbytes)
+ {
+-	int i, n = nbytes, fd = get_random_fd();
+-	int lose_counter = 0;
+-	unsigned char *cp = buf;
+-
+-	if (fd >= 0) {
+-		while (n > 0) {
+-			i = read(fd, cp, n);
+-			if (i <= 0) {
+-				if (lose_counter++ > 16)
+-					break;
+-				continue;
+-			}
+-			n -= i;
+-			cp += i;
+-			lose_counter = 0;
+-		}
+-	}
+-
+-	/*
+-	 * We do this all the time, but this is the only source of
+-	 * randomness if /dev/random/urandom is out to lunch.
+-	 */
+-	for (cp = buf, i = 0; i < nbytes; i++)
+-		*cp++ ^= (rand() >> 7) & 0xFF;
+-#ifdef DO_JRAND_MIX
+-	{
+-		unsigned short tmp_seed[3];
+-
+-		memcpy(tmp_seed, jrand_seed, sizeof(tmp_seed));
+-		jrand_seed[2] = jrand_seed[2] ^ syscall(__NR_gettid);
+-		for (cp = buf, i = 0; i < nbytes; i++)
+-			*cp++ ^= (jrand48(tmp_seed) >> 7) & 0xFF;
+-		memcpy(jrand_seed, tmp_seed,
+-		       sizeof(jrand_seed) - sizeof(unsigned short));
+-	}
+-#endif
+-
++	arc4random_buf(buf, nbytes);
+ 	return;
+ }
+ 
+@@ -224,7 +167,9 @@
+  */
+ static int get_node_id(unsigned char *node_id)
+ {
+-#ifdef HAVE_NET_IF_H
++#if defined(HAVE_NET_IF_H) && (defined(SIOCGIFHWADDR) || \
++                               defined(SIOCGENADDR) || \
++                               defined(HAVE_NET_IF_DL_H))
+ 	int 		sd;
+ 	struct ifreq 	ifr, *ifrp;
+ 	struct ifconf 	ifc;
+@@ -403,8 +348,8 @@
+ 	if (state_fd > 0) {
+ 		rewind(state_f);
+ 		len = fprintf(state_f,
+-			      "clock: %04x tv: %016lu %08lu adj: %08d\n",
+-			      clock_seq, last.tv_sec, (long)last.tv_usec,
++			      "clock: %04x tv: %016lld %08lu adj: %08d\n",
++			      clock_seq, (long long) last.tv_sec, (long)last.tv_usec,
+ 			      adjustment);
+ 		fflush(state_f);
+ 		if (ftruncate(state_fd, len) < 0) {
+@@ -665,14 +610,10 @@
+ 
+ /*
+  * This is the generic front-end to uuid_generate_random and
+- * uuid_generate_time.  It uses uuid_generate_random only if
+- * /dev/urandom is available, since otherwise we won't have
+- * high-quality randomness.
++ * uuid_generate_time.  It uses uuid_generate_random only,
++ * because good randomness is always available.
+  */
+ void uuid_generate(uuid_t out)
+ {
+-	if (get_random_fd() >= 0)
+-		uuid_generate_random(out);
+-	else
+-		uuid_generate_time(out);
++	uuid_generate_random(out);
+ }
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/uuid/tst_uuid.c e2fsprogs/lib/uuid/tst_uuid.c
+--- e2fsprogs.upstream/lib/uuid/tst_uuid.c
++++ e2fsprogs/lib/uuid/tst_uuid.c
+@@ -143,8 +143,8 @@
+ 	tv.tv_sec = 0;
+ 	tv.tv_usec = 0;
+ 	time_reg = uuid_time(buf, &tv);
+-	printf("UUID generated at %lu reports %lu (%ld.%ld)\n",
+-	       time_gen, time_reg, tv.tv_sec, (long)tv.tv_usec);
++	printf("UUID generated at %llu reports %llu (%lld.%ld)\n",
++	       (long long) time_gen, (long long) time_reg, (long long) tv.tv_sec, (long)tv.tv_usec);
+ 	/* allow 1s margin in case of rollover between sampling
+ 	 * the current time and when the UUID is generated. */
+ 	if (time_reg > time_gen + 1) {
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/uuid/uuid_time.c e2fsprogs/lib/uuid/uuid_time.c
+--- e2fsprogs.upstream/lib/uuid/uuid_time.c
++++ e2fsprogs/lib/uuid/uuid_time.c
+@@ -165,7 +165,7 @@
+ 		printf("Warning: not a time-based UUID, so UUID time "
+ 		       "decoding will likely not work!\n");
+ 	}
+-	printf("UUID time is: (%ld, %ld): %s\n", tv.tv_sec, (long)tv.tv_usec,
++	printf("UUID time is: (%lld, %ld): %s\n", (long long) tv.tv_sec, (long)tv.tv_usec,
+ 	       ctime(&time_reg));
+ 
+ 	return 0;
+diff -Paur --no-dereference -- e2fsprogs.upstream/Makefile.in e2fsprogs/Makefile.in
+--- e2fsprogs.upstream/Makefile.in
++++ e2fsprogs/Makefile.in
+@@ -117,6 +117,10 @@
+ distclean: distclean-doc distclean-recursive
+ 	$(RM) -rf autom4te.cache e2fsprogs.spec ext2ed/Makefile po/stamp-po
+ 	$(MAKE) distclean-local 
++	$(RM) -f parse-types.log
++	$(RM) -f public_config.h
++	$(RM) -f util/install-symlink
++	$(RM) -f asm_types.h
+ 
+ realclean: realclean-recursive realclean-local
+ 
+diff -Paur --no-dereference -- e2fsprogs.upstream/misc/badblocks.c e2fsprogs/misc/badblocks.c
+--- e2fsprogs.upstream/misc/badblocks.c
++++ e2fsprogs/misc/badblocks.c
+@@ -322,7 +322,7 @@
+ 
+ 	if (pattern == (unsigned int) ~0) {
+ 		for (ptr = buffer; ptr < buffer + n; ptr++) {
+-			(*ptr) = random() % (1 << (8 * sizeof(char)));
++			(*ptr) = arc4random_uniform(1 << (8 * sizeof(char)));
+ 		}
+ 		if (s_flag | v_flag)
+ 			fputs(_("Testing with random pattern: "), stderr);
+@@ -1068,7 +1068,6 @@
+ 	textdomain(NLS_CAT_NAME);
+ 	set_com_err_gettext(gettext);
+ #endif
+-	srandom((unsigned int)time(NULL));  /* simple randomness is enough */
+ 	test_func = test_ro;
+ 
+ 	/* Determine the system page size if possible */
+diff -Paur --no-dereference -- e2fsprogs.upstream/misc/chattr.c e2fsprogs/misc/chattr.c
+--- e2fsprogs.upstream/misc/chattr.c
++++ e2fsprogs/misc/chattr.c
+@@ -31,7 +31,6 @@
+ #ifdef HAVE_ERRNO_H
+ #include <errno.h>
+ #endif
+-#include <sys/param.h>
+ #include <sys/stat.h>
+ #include "ext2fs/ext2_fs.h"
+ 
+diff -Paur --no-dereference -- e2fsprogs.upstream/misc/logsave.c e2fsprogs/misc/logsave.c
+--- e2fsprogs.upstream/misc/logsave.c
++++ e2fsprogs/misc/logsave.c
+@@ -319,7 +319,9 @@
+ 				       outfn);
+ 			exit(rc);
+ 		}
++#if !defined(__sortix__)
+ 		setsid();	/* To avoid getting killed by init */
++#endif
+ 		while (outfd < 0) {
+ 			outfd = open(outfn, openflags, 0644);
+ 			sleep(1);
+diff -Paur --no-dereference -- e2fsprogs.upstream/misc/lsattr.c e2fsprogs/misc/lsattr.c
+--- e2fsprogs.upstream/misc/lsattr.c
++++ e2fsprogs/misc/lsattr.c
+@@ -36,7 +36,6 @@
+ #include <unistd.h>
+ #include <stdlib.h>
+ #include <string.h>
+-#include <sys/param.h>
+ #include <sys/stat.h>
+ 
+ #include "ext2fs/ext2_fs.h"
+diff -Paur --no-dereference -- e2fsprogs.upstream/misc/mke2fs.c e2fsprogs/misc/mke2fs.c
+--- e2fsprogs.upstream/misc/mke2fs.c
++++ e2fsprogs/misc/mke2fs.c
+@@ -19,6 +19,7 @@
+ #define _XOPEN_SOURCE 600 /* for inclusion of PATH_MAX in Solaris */
+ 
+ #include "config.h"
++#include <stdint.h>
+ #include <stdio.h>
+ #include <string.h>
+ #include <strings.h>
+@@ -49,6 +50,9 @@
+ #include <sys/stat.h>
+ #include <libgen.h>
+ #include <limits.h>
++#if defined(__sortix__)
++#define sync() 0
++#endif
+ #include <blkid/blkid.h>
+ 
+ #include "ext2fs/ext2_fs.h"
+@@ -660,7 +664,7 @@
+ 	       100.0 *  ext2fs_r_blocks_count(s) / ext2fs_blocks_count(s));
+ 	printf(_("First data block=%u\n"), s->s_first_data_block);
+ 	if (root_uid != 0 || root_gid != 0)
+-		printf(_("Root directory owner=%u:%u\n"), root_uid, root_gid);
++		printf(_("Root directory owner=%ju:%ju\n"), (uintmax_t) root_uid, (uintmax_t) root_gid);
+ 	if (s->s_reserved_gdt_blocks)
+ 		printf(_("Maximum filesystem blocks=%lu\n"),
+ 		       (s->s_reserved_gdt_blocks + fs->desc_blocks) *
+@@ -727,8 +731,6 @@
+ 	return 1;
+ }
+ 
+-#define PATH_SET "PATH=/sbin"
+-
+ static void parse_extended_opts(struct ext2_super_block *param,
+ 				const char *opts)
+ {
+@@ -1439,24 +1441,24 @@
+ 	char		*fs_features = 0;
+ 	int		use_bsize;
+ 	char		*newpath;
+-	int		pathlen = sizeof(PATH_SET) + 1;
++	size_t		pathlen = strlen("/sbin");
+ 
+ 	if (oldpath)
+-		pathlen += strlen(oldpath);
+-	newpath = malloc(pathlen);
++		pathlen += 1 + strlen(oldpath);
++	newpath = malloc(pathlen + 1);
+ 	if (!newpath) {
+ 		fprintf(stderr, "%s",
+ 			_("Couldn't allocate memory for new PATH.\n"));
+ 		exit(1);
+ 	}
+-	strcpy(newpath, PATH_SET);
++	strcpy(newpath, "/sbin");
+ 
+ 	/* Update our PATH to include /sbin  */
+ 	if (oldpath) {
+ 		strcat (newpath, ":");
+ 		strcat (newpath, oldpath);
+ 	}
+-	putenv (newpath);
++	setenv("PATH", newpath, 1);
+ 
+ 	tmp = getenv("MKE2FS_SYNC");
+ 	if (tmp)
+diff -Paur --no-dereference -- e2fsprogs.upstream/misc/mke2fs.conf.in e2fsprogs/misc/mke2fs.conf.in
+--- e2fsprogs.upstream/misc/mke2fs.conf.in
++++ e2fsprogs/misc/mke2fs.conf.in
+@@ -1,5 +1,6 @@
+ [defaults]
+-	base_features = sparse_super,large_file,filetype,resize_inode,dir_index,ext_attr
++	#base_features = sparse_super,large_file,filetype,resize_inode,dir_index,ext_attr
++	base_features = large_file,filetype
+ 	default_mntopts = acl,user_xattr
+ 	enable_periodic_fsck = 0
+ 	blocksize = 4096
+diff -Paur --no-dereference -- e2fsprogs.upstream/misc/mklost+found.c e2fsprogs/misc/mklost+found.c
+--- e2fsprogs.upstream/misc/mklost+found.c
++++ e2fsprogs/misc/mklost+found.c
+@@ -20,7 +20,6 @@
+ #include <string.h>
+ #include <unistd.h>
+ #include <stdlib.h>
+-#include <sys/param.h>
+ #include <sys/stat.h>
+ 
+ #include "ext2fs/ext2_fs.h"
+diff -Paur --no-dereference -- e2fsprogs.upstream/misc/uuidd.c e2fsprogs/misc/uuidd.c
+--- e2fsprogs.upstream/misc/uuidd.c
++++ e2fsprogs/misc/uuidd.c
+@@ -12,6 +12,7 @@
+ #define _GNU_SOURCE /* for setres[ug]id() */
+ 
+ #include "config.h"
++#include <stdint.h>
+ #include <stdio.h>
+ #ifdef HAVE_STDLIB_H
+ #include <stdlib.h>
+@@ -33,6 +34,23 @@
+ extern char *optarg;
+ extern int optind;
+ #endif
++#if defined(__sortix__)
++#define F_UNLCK 0
++#define F_RDLCK 1
++#define F_WRLCK 2
++#define F_GETLK 1000
++#define F_SETLK 1001
++#define F_SETLKW 1002
++struct flock
++{
++	short  l_type;
++	short  l_whence;
++	off_t  l_start;
++	off_t  l_len;
++	pid_t  l_pid;
++};
++#define fcntl(...) 0
++#endif
+ #include "uuid/uuid.h"
+ #include "uuid/uuidd.h"
+ #include "nls-enable.h"
+@@ -81,10 +99,12 @@
+ 	open("/dev/null", O_RDWR);
+ 
+ 	if (chdir("/")) {}	/* Silence warn_unused_result warning */
++#if !defined(__sortix__)
+ 	(void) setsid();
+ 	euid = geteuid();
+ 	if (setreuid(euid, euid) < 0)
+ 		die("setreuid");
++#endif
+ }
+ 
+ static ssize_t read_all(int fd, char *buf, size_t count)
+@@ -328,7 +348,7 @@
+ 	signal(SIGALRM, terminate_intr);
+ 	signal(SIGPIPE, SIG_IGN);
+ 
+-	sprintf(reply_buf, "%8d\n", getpid());
++	sprintf(reply_buf, "%8jd\n", (intmax_t) getpid());
+ 	if (ftruncate(fd_pidfile, 0)) {} /* Silence warn_unused_result */
+ 	write_all(fd_pidfile, reply_buf, strlen(reply_buf));
+ 	if (fd_pidfile > 1)
+@@ -366,7 +386,7 @@
+ 
+ 		switch(op) {
+ 		case UUIDD_OP_GETPID:
+-			sprintf(reply_buf, "%d", getpid());
++			sprintf(reply_buf, "%jd", (intmax_t) getpid());
+ 			reply_len = strlen(reply_buf)+1;
+ 			break;
+ 		case UUIDD_OP_GET_MAXOP:
+@@ -515,17 +535,21 @@
+ 		if (setresgid(gid, gid, gid) < 0)
+ 			die("setresgid");
+ #else
++#if !defined(__sortix__)
+ 		if (setregid(gid, gid) < 0)
+ 			die("setregid");
+ #endif
++#endif
+ 
+ #ifdef HAVE_SETRESUID
+ 		if (setresuid(uid, uid, uid) < 0)
+ 			die("setresuid");
+ #else
++#if !defined(__sortix__)
+ 		if (setreuid(uid, uid) < 0)
+ 			die("setreuid");
+ #endif
++#endif
+ 	}
+ 	if (num && do_type) {
+ 		ret = call_daemon(socket_path, do_type+2, buf,
+diff -Paur --no-dereference -- e2fsprogs.upstream/resize/resource_track.c e2fsprogs/resize/resource_track.c
+--- e2fsprogs.upstream/resize/resource_track.c
++++ e2fsprogs/resize/resource_track.c
+@@ -27,7 +27,7 @@
+ 	io_stats io_start = 0;
+ 
+ 	track->desc = desc;
+-	track->brk_start = sbrk(0);
++	track->brk_start = 0;
+ 	gettimeofday(&track->time_start, 0);
+ #ifdef HAVE_GETRUSAGE
+ #ifdef sun
+@@ -85,7 +85,7 @@
+ 		kbytes(malloc_info.uordblks), kbytes(malloc_info.fordblks));
+ #else
+ 	printf("Memory used: %lu, ",
+-		(unsigned long) (((char *) sbrk(0)) -
++		(unsigned long) (((char *) 0) -
+ 				 ((char *) track->brk_start)));
+ #endif
+ #ifdef HAVE_GETRUSAGE
+diff -Paur --no-dereference -- e2fsprogs.upstream/util/subst.c e2fsprogs/util/subst.c
+--- e2fsprogs.upstream/util/subst.c
++++ e2fsprogs/util/subst.c
+@@ -382,13 +382,8 @@
+ 		if (fd > 0) {
+ 			/* save the original atime, if possible */
+ 			if (fstat(fd, &stbuf) == 0) {
+-#if HAVE_STRUCT_STAT_ST_ATIM
+ 				tv[0].tv_sec = stbuf.st_atim.tv_sec;
+ 				tv[0].tv_usec = stbuf.st_atim.tv_nsec / 1000;
+-#else
+-				tv[0].tv_sec = stbuf.st_atime;
+-				tv[0].tv_usec = 0;
+-#endif
+ 				got_atime = 1;
+ 			}
+ 			old = fdopen(fd, "r");

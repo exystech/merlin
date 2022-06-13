@@ -1,0 +1,11 @@
+NAME=libcurses
+BUILD_LIBRARIES=
+VERSION=0.1.0
+DISTNAME=netbsd-curses-$VERSION
+COMPRESSION=tar.xz
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=bea4a945c8d0ec6e923bb43882b1d261c544601c3510b73818a6c431dec7756a
+UPSTREAM_SITE=https://github.com/sabotage-linux/netbsd-curses/releases/download/v$VERSION
+UPSTREAM_ARCHIVE=$ARCHIVE
+BUILD_SYSTEM=makefile
+UPSTREAM_SITE=https://ftp.barfooze.de/pub/sabotage/tarballs

@@ -1,0 +1,13 @@
+#!/bin/sh -e
+cd "$TIX_INSTALL_DIR/$PREFIX"
+cd lib/python*
+find . -type d -name __pycache__ -prune -exec rm -rf {} \;
+find . -name '*.exe' -delete
+rm -rf test
+rm -rf ensurepip/_bundled
+rm -f config*/*.a
+cd "$TIX_INSTALL_DIR/$EXEC_PREFIX"
+cd lib
+rm -f libpython*.a
+rm -f pkgconfig/python*.pc
+rmdir pkgconfig || true

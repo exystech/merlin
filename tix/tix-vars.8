@@ -1,0 +1,52 @@
+.Dd June 5, 2022
+.Dt TIX-VARS 8
+.Os
+.Sh NAME
+.Nm tix-vars
+.Nd evaluate variables in port files
+.Sh SYNOPSIS
+.Nm
+.Op Fl t
+.Op Fl d Ar default
+.Ar file
+.Op Ar variable ...
+.Sh DESCRIPTION
+.Nm
+evaluates the variables in the
+.Xr port 5
+named by
+.Ar file
+or the standard input if
+.Ar file
+is
+.Sq - .
+If any
+.Ar variables
+are requested then their raw values are written as lines.
+Otherwise all the variables are written in a normalized form as lines with an
+equals sign
+.Sq =
+separating the variable name and the raw value.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl d Ar default
+Use the
+.Ar default
+value instead if the variable is unset.
+.It Fl t
+Test quietly whether the file is syntactically correct and whether the variables
+are set without writing their contents.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success,
+exit 1 on a syntax error or if the requested variable is unset,
+and exit 2 otherwise.
+.Sh SEE ALSO
+.Xr port 5 ,
+.Xr tix-build 8 ,
+.Xr tix-port 8
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 1.1.

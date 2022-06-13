@@ -1,0 +1,869 @@
+diff -Paur --no-dereference -- grub.upstream/10_sortix grub/10_sortix
+--- grub.upstream/10_sortix
++++ grub/10_sortix
+@@ -0,0 +1,70 @@
++#!/bin/sh -e
++! [ -e /etc/sortix-release ] && exit 0
++. /etc/sortix-release
++find_mountpoint() {(
++  FILE="$1"
++  DEVICE=$(grub-probe -t device -- "$FILE")
++  while [ "$FILE" != "/" ]; do
++    PARENT="$(dirname -- "$FILE")"
++    if [ x"$(grub-probe -t device -- "$PARENT")" != x"$DEVICE" ]; then
++      echo "$FILE"
++      exit 0
++    fi
++    FILE="$PARENT"
++  done
++  echo "$FILE"
++  exit 0
++)}
++mountpoint_relative() {(
++  REL=""
++  FILE="$1"
++  DEVICE=$(grub-probe -t device -- "$FILE")
++  while [ "$FILE" != "/" ]; do
++    PARENT="$(dirname -- "$FILE")"
++    if [ x"$(grub-probe -t device -- "$PARENT")" != x"$DEVICE" ]; then
++      echo "$REL"
++      exit 0
++    fi
++    REL="/$(basename -- "$FILE")$REL"
++    FILE="$PARENT"
++  done
++  echo "$REL"
++  exit 0
++)}
++BOOT_MNT=$(find_mountpoint /boot)
++BOOT_REL=$(mountpoint_relative /boot)
++DEVICE=$(grub-probe -t device -- "$BOOT_MNT")
++FS_UUID=$(grub-probe -t fs_uuid -- "$BOOT_MNT")
++HINTS_STRING=$(grub-probe -t hints_string -- "$BOOT_MNT")
++PARTMAP=$(grub-probe -t partmap -- "$BOOT_MNT")
++FS=$(grub-probe -t fs -- "$BOOT_MNT")
++echo "Found $PRETTY_NAME on $DEVICE" >&2
++cat > "$0.cache" << EOF
++menuentry "$PRETTY_NAME (on $DEVICE)" --unrestricted {
++  insmod part_$PARTMAP
++  insmod $FS
++  search --no-floppy --fs-uuid --set=root $HINTS_STRING $FS_UUID
++  if [ -e $BOOT_REL/sortix.bin.xz ]; then
++    insmod xzio
++    multiboot $BOOT_REL/sortix.bin.xz
++  elif [ -e $BOOT_REL/sortix.bin.gz ]; then
++    insmod gzio
++    multiboot $BOOT_REL/sortix.bin.gz
++  else
++    multiboot $BOOT_REL/sortix.bin
++  fi
++  if [ -e $BOOT_REL/random.seed ]; then
++    module $BOOT_REL/random.seed --random-seed
++  fi
++  if [ -e $BOOT_REL/sortix.initrd.xz ]; then
++    insmod xzio
++    module $BOOT_REL/sortix.initrd.xz
++  elif [ -e $BOOT_REL/sortix.initrd.gz ]; then
++    insmod gzio
++    module $BOOT_REL/sortix.initrd.gz
++  else
++    module $BOOT_REL/sortix.initrd
++  fi
++}
++EOF
++cat "$0.cache"
+diff -Paur --no-dereference -- grub.upstream/build-aux/config.sub grub/build-aux/config.sub
+--- grub.upstream/build-aux/config.sub
++++ grub/build-aux/config.sub
+@@ -1354,7 +1354,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* | -plan9* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -sortix* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -Paur --no-dereference -- grub.upstream/configure grub/configure
+--- grub.upstream/configure
++++ grub/configure
+@@ -1,4 +1,126 @@
+ #! /bin/sh
++# CFLAGS containing -s produces a broken GRUB on boot.
++if [ -n "$CFLAGS" ]; then
++  CFLAGS=$(printf '%s\n' "$CFLAGS" | sed 's/\(^\|[[:space:]]\+\)-s\([[:space:]]\+\|$\)/ /g')
++fi
++# Make gnulib assume the best about unknown operating systems when cross-compiling.
++export ac_cv_func_calloc_0_nonnull=yes
++export ac_cv_func_chown_works=yes
++export ac_cv_func_getgroups_works=yes
++export ac_cv_func_malloc_0_nonnull=yes
++export gl_cv_func_cbrtl_ieee=yes
++export gl_cv_func_ceilf_ieee=yes
++export gl_cv_func_ceil_ieee=yes
++export gl_cv_func_ceill_ieee=yes
++export gl_cv_func_chown_ctime_works=yes
++export gl_cv_func_chown_slash_works=yes
++export gl_cv_func_exp2l_ieee=yes
++export gl_cv_func_expm1_ieee=yes
++export gl_cv_func_fcntl_f_dupfd_works=yes
++export gl_cv_func_fdopendir_works=yes
++export gl_cv_func_floorf_ieee=yes
++export gl_cv_func_fmaf_works=yes
++export gl_cv_func_fmal_works=yes
++export gl_cv_func_fma_works=yes
++export gl_cv_func_fmodf_ieee=yes
++export gl_cv_func_fmod_ieee=yes
++export gl_cv_func_fmodl_ieee=yes
++export gl_cv_func_fpurge_works=yes
++export gl_cv_func_futimens_works=yes
++export gl_cv_func_futimesat_works=yes
++export gl_cv_func_getgroups_works=yes
++export gl_cv_func_gettimeofday_clobber=no
++export gl_cv_func_hypotf_ieee=yes
++export gl_cv_func_hypot_ieee=yes
++export gl_cv_func_isfinitel_works=yes
++export gl_cv_func_isnanl_works=yes
++export gl_cv_func_linkat_slash=yes
++export gl_cv_func_link_works=yes
++export gl_cv_func_log10f_ieee=yes
++export gl_cv_func_log10_ieee=yes
++export gl_cv_func_log1pf_ieee=yes
++export gl_cv_func_log1p_ieee=yes
++export gl_cv_func_log1pl_ieee=yes
++export gl_cv_func_log2f_ieee=yes
++export gl_cv_func_log2_ieee=yes
++export gl_cv_func_logf_ieee=yes
++export gl_cv_func_log_ieee=yes
++export gl_cv_func_lstat_dereferences_slashed_symlink=yes
++export gl_cv_func_mbrlen_empty_input=yes
++export gl_cv_func_mbrtowc_empty_input=yes
++export gl_cv_func_memchr_works=yes
++export gl_cv_func_memmem_works_fast=yes
++export gl_cv_func_mkdir_trailing_dot_works=yes
++export gl_cv_func_mkdir_trailing_slash_works=yes
++export gl_cv_func_mkfifo_works=yes
++export gl_cv_func_mknod_works=yes
++export gl_cv_func_modff_ieee=yes
++export gl_cv_func_modf_ieee=yes
++export gl_cv_func_modfl_ieee=yes
++export gl_cv_func_nanosleep=yes
++export gl_cv_func_open_directory_works=yes
++export gl_cv_func_perror_works=yes
++export gl_cv_func_printf_directive_a=yes
++export gl_cv_func_printf_directive_f=yes
++export gl_cv_func_printf_directive_n=yes
++export gl_cv_func_printf_enomem=yes
++export gl_cv_func_printf_flag_zero=yes
++export gl_cv_func_printf_infinite_long_double=yes
++export gl_cv_func_printf_infinite=yes
++export gl_cv_func_printf_sizes_c99=yes
++export gl_cv_func_pselect_detects_ebadf=yes
++export gl_cv_func_ptsname_sets_errno=yes
++export gl_cv_func_readlink_works=yes
++export gl_cv_func_realpath_works=yes
++export gl_cv_func_remainderf_ieee=yes
++export gl_cv_func_remainder_ieee=yes
++export gl_cv_func_remainderl_ieee=yes
++export gl_cv_func_rename_dest_works=yes
++export gl_cv_func_rename_link_works=yes
++export gl_cv_func_rename_slash_dst_works=yes
++export gl_cv_func_rename_slash_src_works=yes
++export gl_cv_func_rmdir_works=yes
++export gl_cv_func_roundf_ieee=yes
++export gl_cv_func_round_ieee=yes
++export gl_cv_func_select_detects_ebadf=yes
++export gl_cv_func_setenv_works=yes
++export gl_cv_func_signbit_gcc=yes
++export gl_cv_func_signbit=yes
++export gl_cv_func_sleep_works=yes
++export gl_cv_func_snprintf_directive_n=yes
++export gl_cv_func_snprintf_retval_c99=yes
++export gl_cv_func_snprintf_truncation_c99=yes
++export gl_cv_func_stat_dir_slash=yes
++export gl_cv_func_stat_file_slash=yes
++export gl_cv_func_stpncpy=yes
++export gl_cv_func_strcasestr_linear=yes
++export gl_cv_func_strchrnul_works=yes
++export gl_cv_func_strerror_0_works=yes
++export gl_cv_func_strstr_linear=yes
++export gl_cv_func_strtod_works=yes
++export gl_cv_func_svid_putenv=yes
++export gl_cv_func_symlink_works=yes
++export gl_cv_func_tdelete_works=yes
++export gl_cv_func_truncf_ieee=yes
++export gl_cv_func_trunc_ieee=yes
++export gl_cv_func_truncl_ieee=yes
++export gl_cv_func_tzset_clobber=no
++export gl_cv_func_ungetc_works=yes
++export gl_cv_func_unlink_honors_slashes=yes
++export gl_cv_func_unsetenv_works=yes
++export gl_cv_func_usleep_works=yes
++export gl_cv_func_utimensat_works=yes
++export gl_cv_func_vsnprintf_posix=yes
++export gl_cv_func_vsnprintf_zerosize_c99=yes
++export gl_cv_func_vsprintf_posix=yes
++export gl_cv_func_wcwidth_works=yes
++export gl_cv_func_working_getdelim=yes
++export gl_cv_func_working_mkstemp=yes
++export gl_cv_func_working_mktime=yes
++export gl_cv_func_working_strerror=yes
++export ac_cv_func___fseterr=yes # Only if the OS actually supports this, Sortix does.
++export gl_cv_func_getcwd_null=yes # Only if the OS actually supports this, Sortix does.
++export gl_cv_struct_dirent_d_ino=yes # Only if the OS actually supports this, Sortix does.
+ # Guess values for system-dependent variables and create Makefiles.
+ # Generated by GNU Autoconf 2.69 for GRUB 2.02~beta2.
+ #
+@@ -26950,6 +27072,11 @@
+ 
+ fi
+ fi
++if ${PKG_CONFIG:-pkg-config} --exists freetype2; then
++  ac_cv_prog_FREETYPE="${PKG_CONFIG:-pkg-config} freetype2"
++else
++  ac_cv_prog_FREETYPE=
++fi
+ FREETYPE=$ac_cv_prog_FREETYPE
+ if test -n "$FREETYPE"; then
+   { $as_echo "$as_me:${as_lineno-$LINENO}: result: $FREETYPE" >&5
+diff -Paur --no-dereference -- grub.upstream/grub-core/lib/libgcrypt-grub/cipher/rijndael.c grub/grub-core/lib/libgcrypt-grub/cipher/rijndael.c
+--- grub.upstream/grub-core/lib/libgcrypt-grub/cipher/rijndael.c
++++ grub/grub-core/lib/libgcrypt-grub/cipher/rijndael.c
+@@ -180,8 +180,9 @@
+   static int initialized = 0;
+   static const char *selftest_failed=0;
+   int rounds;
+-  int i,j, r, t, rconpointer = 0;
++  int j, r, t, rconpointer = 0;
+   int KC;
++  unsigned i;
+   union
+   {
+     PROPERLY_ALIGNED_TYPE dummy;
+@@ -226,7 +227,9 @@
+       KC = 4;
+ 
+       if (0)
+-        ;
++        {
++          ; /* [-Wempty-body] */
++        }
+ #ifdef USE_PADLOCK
+       else if ((_gcry_get_hw_features () & HWF_PADLOCK_AES))
+         {
+@@ -349,7 +352,7 @@
+   else
+     {
+ #define W (ctx->keyschenc)
+-      for (i = 0; i < keylen; i++)
++      for (i = 0; i < keylen; i++) /* [-Wsign-compare] */
+         {
+           k[i >> 2][i & 3] = key[i];
+         }
+diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/getroot.c grub/grub-core/osdep/getroot.c
+--- grub.upstream/grub-core/osdep/getroot.c
++++ grub/grub-core/osdep/getroot.c
+@@ -16,6 +16,8 @@
+ #include "aros/getroot.c"
+ #elif defined (__HAIKU__)
+ #include "haiku/getroot.c"
++#elif defined(__sortix__)
++#include "sortix/getroot.c"
+ #else
+ # warning "No getroot OS-specific functions is available for your system. Device detection may not work properly."
+ #include "basic/getroot.c"
+diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/hostdisk.c grub/grub-core/osdep/hostdisk.c
+--- grub.upstream/grub-core/osdep/hostdisk.c
++++ grub/grub-core/osdep/hostdisk.c
+@@ -16,6 +16,8 @@
+ #include "aros/hostdisk.c"
+ #elif defined (__HAIKU__)
+ #include "haiku/hostdisk.c"
++#elif defined(__sortix__)
++#include "sortix/hostdisk.c"
+ #else
+ # warning "No hostdisk OS-specific functions is available for your system. Device detection may not work properly."
+ #include "basic/hostdisk.c"
+diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/random.c grub/grub-core/osdep/random.c
+--- grub.upstream/grub-core/osdep/random.c
++++ grub/grub-core/osdep/random.c
+@@ -5,6 +5,8 @@
+   || defined (__GNU__) || defined (__NetBSD__) \
+   || defined (__APPLE__) || defined(__sun__) || defined (__HAIKU__)
+ #include "unix/random.c"
++#elif defined(__sortix__)
++#include "sortix/random.c"
+ #else
+ #include "basic/random.c"
+ #endif
+diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/sortix/getroot.c grub/grub-core/osdep/sortix/getroot.c
+--- grub.upstream/grub-core/osdep/sortix/getroot.c
++++ grub/grub-core/osdep/sortix/getroot.c
+@@ -0,0 +1,162 @@
++/*
++ *  GRUB  --  GRand Unified Bootloader
++ *  Copyright (C) 1999,2000,2001,2002,2003,2006,2007,2008,2009,2010,2011,2012,2013  Free Software Foundation, Inc.
++ *
++ *  GRUB is free software: you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation, either version 3 of the License, or
++ *  (at your option) any later version.
++ *
++ *  GRUB is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with GRUB.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <config-util.h>
++#include <config.h>
++
++#include <sys/stat.h>
++#include <sys/types.h>
++#include <assert.h>
++#include <dirent.h>
++#include <errno.h>
++#include <error.h>
++#include <fcntl.h>
++#include <limits.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <termios.h>
++#include <unistd.h>
++
++#include <grub/types.h>
++
++#include <grub/util/misc.h>
++
++#include <grub/mm.h>
++#include <grub/misc.h>
++#include <grub/emu/misc.h>
++#include <grub/emu/hostdisk.h>
++#include <grub/emu/getroot.h>
++
++int
++is_sortix_partition_path (const char *path)
++{
++  const char *dev = "/dev/";
++  size_t devlen = strlen (dev);
++  if (memcmp (path, dev, devlen) != 0)
++    return 0;
++  path += devlen;
++  if (!*path || isdigit ((unsigned char)*path))
++    return 0;
++  while (*path && !isdigit ((unsigned char)*path))
++    path++;
++  if (!*path || !isdigit ((unsigned char)*path))
++    return 0;
++  while (*path && isdigit ((unsigned char)*path))
++    path++;
++  if (*path++ != 'p')
++    return 0;
++  if (!*path || !isdigit ((unsigned char)*path))
++    return 0;
++  while (*path && isdigit ((unsigned char)*path))
++    path++;
++  if (*path)
++    return 0;
++  return 1;
++}
++
++char *
++grub_util_part_to_disk (const char *os_dev,
++			struct stat *st,
++			int *is_part)
++{
++  if (! S_ISBLK (st->st_mode))
++    {
++      *is_part = 0;
++      return xstrdup (os_dev);
++    }
++
++  char *path = realpath (os_dev, NULL);
++
++  if (is_sortix_partition_path (path))
++    {
++      *strrchr (path, 'p') = '\0';
++      *is_part = 1;
++      return path;
++    }
++
++  return path;
++}
++
++enum grub_dev_abstraction_types
++grub_util_get_dev_abstraction_os (const char *os_dev __attribute__((unused)))
++{
++  return GRUB_DEV_ABSTRACTION_NONE;
++}
++
++int
++grub_util_pull_device_os (const char *os_dev __attribute__ ((unused)),
++			  enum grub_dev_abstraction_types ab __attribute__ ((unused)))
++{
++  return 0;
++}
++
++char *
++grub_util_get_grub_dev_os (const char *os_dev __attribute__ ((unused)))
++{
++  return NULL;
++}
++
++
++grub_disk_addr_t
++grub_util_find_partition_start_os (const char *dev __attribute__ ((unused)))
++{
++  /* TODO: We need new system support for this in Sortix. */
++  return 0;
++}
++
++static char *
++find_sortix_root_device (const char *path)
++{
++   int fd = open (path, O_RDONLY);
++   if (fd < 0)
++     return 0;
++   ssize_t blob_size = tcgetblob (fd, "device-path", NULL, 0);
++   if (blob_size < 0)
++     return close (fd), (char *)0;
++   char *blob = malloc (blob_size + 1);
++   if (!blob)
++     return close (fd), (char *)0;
++   if (tcgetblob(fd, "device-path", blob, blob_size) != blob_size)
++     return free (blob), close (fd), (char *)0;
++   close (fd);
++   blob[blob_size] = '\0';
++   return blob;
++}
++
++char **
++grub_guess_root_devices (const char *dir)
++{
++  char **os_dev = NULL;
++
++  os_dev = xmalloc (2 * sizeof (os_dev[0]));
++
++  /* Sortix specific function.  */
++  os_dev[0] = find_sortix_root_device (dir);
++
++  if (!os_dev[0])
++    {
++      free (os_dev);
++      return 0;
++    }
++
++  os_dev[1] = 0;
++
++  return os_dev;
++}
+diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/sortix/hostdisk.c grub/grub-core/osdep/sortix/hostdisk.c
+--- grub.upstream/grub-core/osdep/sortix/hostdisk.c
++++ grub/grub-core/osdep/sortix/hostdisk.c
+@@ -0,0 +1,66 @@
++/*
++ *  GRUB  --  GRand Unified Bootloader
++ *  Copyright (C) 1999,2000,2001,2002,2003,2004,2006,2007,2008,2009,2010,2011,2012,2013  Free Software Foundation, Inc.
++ *
++ *  GRUB is free software: you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation, either version 3 of the License, or
++ *  (at your option) any later version.
++ *
++ *  GRUB is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with GRUB.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <config-util.h>
++
++#include <grub/disk.h>
++#include <grub/partition.h>
++#include <grub/msdos_partition.h>
++#include <grub/types.h>
++#include <grub/err.h>
++#include <grub/emu/misc.h>
++#include <grub/emu/hostdisk.h>
++#include <grub/emu/getroot.h>
++#include <grub/misc.h>
++#include <grub/i18n.h>
++#include <grub/list.h>
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <ctype.h>
++#include <assert.h>
++#include <unistd.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <fcntl.h>
++#include <errno.h>
++#include <limits.h>
++
++grub_int64_t
++grub_util_get_fd_size_os (grub_util_fd_t fd,
++		       const char *name,
++		       unsigned *log_secsize)
++{
++  struct stat st;
++  if (fstat (fd, &st))
++    return -1;
++  unsigned int sector_size = st.st_blksize;
++  unsigned int log_sector_size;
++  for (log_sector_size = 0;
++       (1 << log_sector_size) < sector_size;
++       log_sector_size++);
++  if (log_secsize)
++   *log_secsize = log_sector_size;
++  return st.st_size;
++}
++
++void
++grub_hostdisk_flush_initial_buffer (const char *os_dev __attribute__ ((unused)))
++{
++}
+diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/sortix/random.c grub/grub-core/osdep/sortix/random.c
+--- grub.upstream/grub-core/osdep/sortix/random.c
++++ grub/grub-core/osdep/sortix/random.c
+@@ -0,0 +1,35 @@
++/*
++ *  GRUB  --  GRand Unified Bootloader
++ *  Copyright (C) 1992-1999,2001,2003,2004,2005,2009,2010,2011,2012,2013 Free Software Foundation, Inc.
++ *
++ *  GRUB is free software: you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation, either version 3 of the License, or
++ *  (at your option) any later version.
++ *
++ *  GRUB is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with GRUB.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <config.h>
++
++#include <grub/types.h>
++#include <grub/crypto.h>
++#include <grub/auth.h>
++#include <grub/emu/misc.h>
++#include <grub/util/misc.h>
++#include <grub/i18n.h>
++
++#include <stdlib.h>
++
++int
++grub_get_random (void *out, grub_size_t len)
++{
++  arc4random_buf(out, len);
++  return 0;
++}
+diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/unix/getroot.c grub/grub-core/osdep/unix/getroot.c
+--- grub.upstream/grub-core/osdep/unix/getroot.c
++++ grub/grub-core/osdep/unix/getroot.c
+@@ -111,7 +111,8 @@
+ #include <sys/mount.h>
+ #endif
+ 
+-#if !defined (__GNU__)
++/* Sortix implements these in grub-core/osdep/sortix/getroot.c instead. */
++#if !defined (__GNU__) && !defined(__sortix__)
+ static void
+ strip_extra_slashes (char *dir)
+ {
+@@ -441,7 +442,7 @@
+ 
+ 	  cwd = xgetcwd ();
+ 	  res = xmalloc (strlen (cwd) + strlen (ent->d_name) + 3);
+-	  sprintf (res, 
++	  snprintf (res, strlen (cwd) + strlen (ent->d_name) + 3,
+ #if defined(__NetBSD__) || defined(__OpenBSD__)
+ 		   /* Convert this block device to its character (raw) device.  */
+ 		   "%s/r%s",
+diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/unix/hostdisk.c grub/grub-core/osdep/unix/hostdisk.c
+--- grub.upstream/grub-core/osdep/unix/hostdisk.c
++++ grub/grub-core/osdep/unix/hostdisk.c
+@@ -200,16 +200,7 @@
+ char *
+ grub_canonicalize_file_name (const char *path)
+ {
+-#if defined (PATH_MAX)
+-  char *ret;
+-
+-  ret = xmalloc (PATH_MAX);
+-  if (!realpath (path, ret))
+-    return NULL;
+-  return ret;
+-#else
+-  return realpath (path, NULL);
+-#endif
++  return canonicalize_file_name (path);
+ }
+ 
+ FILE *
+diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/unix/password.c grub/grub-core/osdep/unix/password.c
+--- grub.upstream/grub-core/osdep/unix/password.c
++++ grub/grub-core/osdep/unix/password.c
+@@ -37,9 +37,9 @@
+   grub_refresh ();
+ 
+   /* Disable echoing. Based on glibc.  */
+-  in = fopen ("/dev/tty", "w+c");
++  in = fopen ("/dev/tty", "w+"); /* 'c' on glibc means no thread cancellation */
+   if (in == NULL)
+-    in = stdin;
++    return 0;
+ 
+   if (tcgetattr (fileno (in), &t) == 0)
+     {
+diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/unix/platform.c grub/grub-core/osdep/unix/platform.c
+--- grub.upstream/grub-core/osdep/unix/platform.c
++++ grub/grub-core/osdep/unix/platform.c
+@@ -114,8 +114,14 @@
+ 	  || line[sizeof ("Boot") - 1] < '0'
+ 	  || line[sizeof ("Boot") - 1] > '9')
+ 	continue;
++#if defined(__sortix__)
++/* PATCH: Sortix doesn't have strcasestr yet. */
++      if (!strstr (line, efi_distributor))
++	continue;
++#else
+       if (!strcasestr (line, efi_distributor))
+ 	continue;
++#endif
+       bootnum = line + sizeof ("Boot") - 1;
+       bootnum[4] = '\0';
+       if (!verbosity)
+diff -Paur --no-dereference -- grub.upstream/include/grub/emu/getroot.h grub/include/grub/emu/getroot.h
+--- grub.upstream/include/grub/emu/getroot.h
++++ grub/include/grub/emu/getroot.h
+@@ -101,4 +101,8 @@
+ grub_util_fprint_full_disk_name (FILE *f,
+ 				 const char *drive, grub_device_t dev);
+ 
++#if defined(__sortix__)
++int is_sortix_partition_path (const char *path);
++#endif
++
+ #endif /* ! GRUB_UTIL_GETROOT_HEADER */
+diff -Paur --no-dereference -- grub.upstream/update-grub grub/update-grub
+--- grub.upstream/update-grub
++++ grub/update-grub
+@@ -0,0 +1,2 @@
++#!/bin/sh -e
++exec grub-mkconfig -o /boot/grub/grub.cfg "$@"
+diff -Paur --no-dereference -- grub.upstream/util/getroot.c grub/util/getroot.c
+--- grub.upstream/util/getroot.c
++++ grub/util/getroot.c
+@@ -223,7 +223,7 @@
+   return convert_system_partition_to_system_disk (os_dev, &is_part);
+ }
+ 
+-#if !defined(__APPLE__)
++#if !defined(__APPLE__) && !defined(__sortix__)
+ /* Context for grub_util_biosdisk_get_grub_dev.  */
+ struct grub_util_biosdisk_get_grub_dev_ctx
+ {
+@@ -314,6 +314,29 @@
+     return ret;
+   }
+ 
++#elif defined(__sortix__)
++
++  /* Sortix uses "/dev/[a-z]+[0-9]+(p[0-9]+)?".  */
++  /*
++   * Note: we do not use the new partition naming scheme as dos_part does not
++   * necessarily correspond to an msdos partition.
++   */
++  {
++    char *dri;
++
++    dri = make_device_name (drive);
++
++    if (is_sortix_partition_path (os_dev))
++      {
++	long part = strtol (strrchr (os_dev, 'p') + 1, NULL, 10);
++	char *ret = xasprintf ("%s,%ld", dri, part);
++	free (dri);
++	return ret;
++      }
++ 
++    return dri;
++  }
++
+ #else
+ 
+   /* Linux counts partitions uniformly, whether a BSD partition or a DOS
+diff -Paur --no-dereference -- grub.upstream/util/grub.d/00_header.in grub/util/grub.d/00_header.in
+--- grub.upstream/util/grub.d/00_header.in
++++ grub/util/grub.d/00_header.in
+@@ -27,6 +27,13 @@
+ 
+ . "$pkgdatadir/grub-mkconfig_lib"
+ 
++if [ -f "/etc/grubpw" ]; then
++  echo 'insmod password_pbkdf2'
++  echo 'set superusers="root"'
++  echo "password_pbkdf2 root $(cat /etc/grubpw)"
++  echo
++fi
++
+ # Do this as early as possible, since other commands might depend on it.
+ # (e.g. the `loadfont' command might need lvm or raid modules)
+ for i in ${GRUB_PRELOAD_MODULES} ; do
+diff -Paur --no-dereference -- grub.upstream/util/grub-fstest.c grub/util/grub-fstest.c
+--- grub.upstream/util/grub-fstest.c
++++ grub/util/grub-fstest.c
+@@ -753,7 +753,7 @@
+         {
+           alloc_root = xmalloc (strlen (default_root) + strlen (root) + 2);
+ 
+-          sprintf (alloc_root, "%s,%s", default_root, root);
++          snprintf (alloc_root, strlen (default_root) + strlen (root) + 2, "%s,%s", default_root, root);
+           root = alloc_root;
+         }
+     }
+diff -Paur --no-dereference -- grub.upstream/util/grub-mkconfig.in grub/util/grub-mkconfig.in
+--- grub.upstream/util/grub-mkconfig.in
++++ grub/util/grub-mkconfig.in
+@@ -102,27 +102,6 @@
+     esac
+ done
+ 
+-if [ "x$EUID" = "x" ] ; then
+-  EUID=`id -u`
+-fi
+-
+-if [ "$EUID" != 0 ] ; then
+-  root=f
+-  case "`uname 2>/dev/null`" in
+-    CYGWIN*)
+-      # Cygwin: Assume root if member of admin group
+-      for g in `id -G 2>/dev/null` ; do
+-	case $g in
+-	  0|544) root=t ;;
+-	esac
+-      done ;;
+-  esac
+-  if [ $root != t ] ; then
+-    gettext_printf "%s: You must run this as root\n" "$self" >&2
+-    exit 1
+-  fi
+-fi
+-
+ set $grub_probe dummy
+ if test -f "$1"; then
+     :
+diff -Paur --no-dereference -- grub.upstream/util/misc.c grub/util/misc.c
+--- grub.upstream/util/misc.c
++++ grub/util/misc.c
+@@ -68,9 +68,10 @@
+ grub_util_get_path (const char *dir, const char *file)
+ {
+   char *path;
++  size_t path_size = strlen (dir) + 1 + strlen (file) + 1;
+ 
+-  path = (char *) xmalloc (strlen (dir) + 1 + strlen (file) + 1);
+-  sprintf (path, "%s/%s", dir, file);
++  path = (char *) xmalloc (path_size);
++  snprintf (path, path_size, "%s/%s", dir, file);
+   return path;
+ }
+ 
+diff -Paur --no-dereference -- grub.upstream/util/probe.c grub/util/probe.c
+--- grub.upstream/util/probe.c
++++ grub/util/probe.c
+@@ -81,6 +81,22 @@
+     ptr++;
+   else
+     ptr = canon;
++#if defined(__sortix__)
++  if (! strncmp(ptr, "ata", strlen ("ata")) &&
++      isdigit((unsigned char)*(ptr + strlen ("ata"))))
++   {
++     int num = strtol(ptr + strlen("ata"), NULL, 10);
++     free (canon);
++     return xasprintf ("hd%d", num);
++   }
++  if (! strncmp(ptr, "ahci", strlen ("ahci")) &&
++      isdigit((unsigned char)*(ptr + strlen ("ahci"))))
++    {
++      int num = strtol(ptr + strlen("ahci"), NULL, 10);
++      free (canon);
++      return xasprintf ("hd%d", num);
++    }
++#endif
+   if ((ptr[0] == 's' || ptr[0] == 'h') && ptr[1] == 'd')
+     {
+       int num = ptr[2] - 'a';
+@@ -110,6 +126,22 @@
+     ptr++;
+   else
+     ptr = canon;
++#if defined(__sortix__)
++  if (! strncmp(ptr, "ata", strlen ("ata")) &&
++      isdigit((unsigned char)*(ptr + strlen ("ata"))))
++   {
++     int num = strtol(ptr + strlen("ata"), NULL, 10);
++     free (canon);
++     return xasprintf ("hd%d", num);
++   }
++  if (! strncmp(ptr, "ahci", strlen ("ahci")) &&
++      isdigit((unsigned char)*(ptr + strlen ("ahci"))))
++    {
++      int num = strtol(ptr + strlen("ahci"), NULL, 10);
++      free (canon);
++      return xasprintf ("hd%d", num);
++    }
++#endif
+   if ((ptr[0] == 's' || ptr[0] == 'h') && ptr[1] == 'd')
+     {
+       int num = ptr[2] - 'a';
+@@ -139,6 +171,22 @@
+     ptr++;
+   else
+     ptr = canon;
++#if defined(__sortix__)
++  if (! strncmp(ptr, "ata", strlen ("ata")) &&
++      isdigit((unsigned char)*(ptr + strlen ("ata"))))
++   {
++     int num = strtol(ptr + strlen("ata"), NULL, 10);
++     free (canon);
++     return xasprintf ("ata%d", num);
++   }
++  if (! strncmp(ptr, "ahci", strlen ("ahci")) &&
++      isdigit((unsigned char)*(ptr + strlen ("ahci"))))
++    {
++      int num = strtol(ptr + strlen("ahci"), NULL, 10);
++      free (canon);
++      return xasprintf ("ahci%d", num);
++    }
++#endif
+   if (ptr[0] == 'h' && ptr[1] == 'd')
+     {
+       int num = ptr[2] - 'a';
+diff -Paur --no-dereference -- grub.upstream/util/resolve.c grub/util/resolve.c
+--- grub.upstream/util/resolve.c
++++ grub/util/resolve.c
+@@ -172,7 +172,7 @@
+   else
+     {
+       base = xmalloc (strlen (str) + 4 + 1);
+-      sprintf (base, "%s.mod", str);
++      snprintf (base, strlen (str) + 4 + 1, "%s.mod", str);
+     }
+ 
+   dir = strchr (str, '/');

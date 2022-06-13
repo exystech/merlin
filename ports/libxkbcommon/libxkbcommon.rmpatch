@@ -1,0 +1,2 @@
+rm -rf -- 'src/xkbcomp/parser.c'
+rm -rf -- 'src/xkbcomp/parser.h'

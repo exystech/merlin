@@ -1,0 +1,13 @@
+NAME=bochs
+BUILD_LIBRARIES='libstdc++ libiconv libSDL'
+VERSION=2.6
+DISTNAME=$NAME-$VERSION
+COMPRESSION=tar.gz
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=65123e44a6d2c1148d741da025d16311b9ccd600ef268b911aba73c67eaf86e1
+UPSTREAM_SITE=https://sourceforge.net/projects/bochs/files/bochs/$VERSION
+UPSTREAM_ARCHIVE=$ARCHIVE
+BUILD_SYSTEM=configure
+CONFIGURE_ARGS='--with-sdl --enable-x86-64'
+RELEASE_SEARCH_PAGE=https://sourceforge.net/projects/bochs/files/bochs/
+RELEASE_SEARCH_REGEX='([0-9]+\.[0-9]+(\.[0-9]+)*)/'

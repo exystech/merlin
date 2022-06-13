@@ -1,0 +1,176 @@
+diff -Paur --no-dereference -- libdbus.upstream/bus/activation-helper.c libdbus/bus/activation-helper.c
+--- libdbus.upstream/bus/activation-helper.c
++++ libdbus/bus/activation-helper.c
+@@ -43,6 +43,10 @@
+ #include <dbus/dbus-shell.h>
+ #include <dbus/dbus-marshal-validate.h>
+ 
++#if defined(__sortix__)
++#define initgroups(a, b) 0
++#endif
++
+ static BusDesktopFile *
+ desktop_file_for_name (BusConfigParser *parser,
+                        const char *name,
+diff -Paur --no-dereference -- libdbus.upstream/bus/Makefile.in libdbus/bus/Makefile.in
+--- libdbus.upstream/bus/Makefile.in
++++ libdbus/bus/Makefile.in
+@@ -1510,7 +1510,6 @@
+ 	/bin/rm *.bb *.bbg *.da *.gcov || true
+ 
+ install-data-hook:
+-	$(mkinstalldirs) $(DESTDIR)$(localstatedir)/run/dbus
+ 	$(mkinstalldirs) $(DESTDIR)$(configdir)/system.d
+ 	$(mkinstalldirs) $(DESTDIR)$(configdir)/session.d
+ 	$(mkinstalldirs) $(DESTDIR)$(datadir)/dbus-1/services
+diff -Paur --no-dereference -- libdbus.upstream/config.sub libdbus/config.sub
+--- libdbus.upstream/config.sub
++++ libdbus/config.sub
+@@ -1342,7 +1342,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -sortix* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -Paur --no-dereference -- libdbus.upstream/dbus/dbus-sysdeps.h libdbus/dbus/dbus-sysdeps.h
+--- libdbus.upstream/dbus/dbus-sysdeps.h
++++ libdbus/dbus/dbus-sysdeps.h
+@@ -50,7 +50,7 @@
+  * DBusPollFD
+  */ 
+ #ifdef HAVE_POLL
+-#include <sys/poll.h>
++#include <poll.h>
+ #endif
+ 
+ #ifdef DBUS_WINCE
+diff -Paur --no-dereference -- libdbus.upstream/dbus/dbus-sysdeps-unix.c libdbus/dbus/dbus-sysdeps-unix.c
+--- libdbus.upstream/dbus/dbus-sysdeps-unix.c
++++ libdbus/dbus/dbus-sysdeps-unix.c
+@@ -63,7 +63,7 @@
+ #include <sys/uio.h>
+ #endif
+ #ifdef HAVE_POLL
+-#include <sys/poll.h>
++#include <poll.h>
+ #endif
+ #ifdef HAVE_BACKTRACE
+ #include <execinfo.h>
+@@ -76,6 +76,8 @@
+ #include <bsm/adt.h>
+ #endif
+ 
++#include <alloca.h>
++
+ #include "sd-daemon.h"
+ 
+ #ifndef O_BINARY
+@@ -276,6 +278,11 @@
+   *n_fds = 0;
+   return r;
+ 
++#elif defined(__sortix__)
++
++  fprintf(stderr, "%s:%u Warning: Sortix cannot pass fds between processes yet\n", __FILE__, __LINE__);
++  return errno = ENOTSUP, -1;
++
+ #else
+   int bytes_read;
+   int start;
+@@ -426,6 +433,12 @@
+   return _dbus_write_socket_two(fd,
+                                 buffer1, start1, len1,
+                                 buffer2, start2, len2);
++
++#elif defined(__sortix__)
++
++  fprintf(stderr, "%s:%u Warning: Sortix cannot pass fds between processes yet\n", __FILE__, __LINE__);
++  return errno = ENOTSUP, -1;
++
+ #else
+ 
+   struct msghdr m;
+@@ -734,6 +747,7 @@
+ #else /* HAVE_WRITEV */
+   {
+     int ret1;
++    int ret2;
+ 
+     ret1 = _dbus_write (fd, buffer1, start1, len1);
+     if (ret1 == len1 && buffer2 != NULL)
+diff -Paur --no-dereference -- libdbus.upstream/dbus/dbus-sysdeps-util-unix.c libdbus/dbus/dbus-sysdeps-util-unix.c
+--- libdbus.upstream/dbus/dbus-sysdeps-util-unix.c
++++ libdbus/dbus/dbus-sysdeps-util-unix.c
+@@ -59,6 +59,11 @@
+ #define O_BINARY 0
+ #endif
+ 
++#if defined(__sortix__)
++#define setsid() getpid()
++#define setgroups(a, b) 0
++#endif
++
+ /**
+  * @addtogroup DBusInternalsUtils
+  * @{
+diff -Paur --no-dereference -- libdbus.upstream/dbus/sd-daemon.c libdbus/dbus/sd-daemon.c
+--- libdbus.upstream/dbus/sd-daemon.c
++++ libdbus/dbus/sd-daemon.c
+@@ -32,7 +32,7 @@
+ #include <sys/stat.h>
+ #include <sys/socket.h>
+ #include <sys/un.h>
+-#include <sys/fcntl.h>
++#include <fcntl.h>
+ #include <netinet/in.h>
+ #include <stdlib.h>
+ #include <errno.h>
+diff -Paur --no-dereference -- libdbus.upstream/tools/dbus-launch.c libdbus/tools/dbus-launch.c
+--- libdbus.upstream/tools/dbus-launch.c
++++ libdbus/tools/dbus-launch.c
+@@ -769,7 +769,7 @@
+ 
+      strcpy (envvar, "DBUS_SESSION_BUS_ADDRESS=");
+      strcat (envvar, bus_address);
+-     putenv (envvar);
++     setenv ("DBUS_SESSION_BUS_ADDRESS", bus_address, 1);
+ 
+      execvp (runprog, args);
+      fprintf (stderr, "Couldn't exec %s: %s\n", runprog, strerror (errno));
+diff -Paur --no-dereference -- libdbus.upstream/tools/dbus-monitor.c libdbus/tools/dbus-monitor.c
+--- libdbus.upstream/tools/dbus-monitor.c
++++ libdbus/tools/dbus-monitor.c
+@@ -104,11 +104,7 @@
+   return DBUS_HANDLER_RESULT_HANDLED;
+ }
+ 
+-#ifdef __APPLE__
+-#define PROFILE_TIMED_FORMAT "%s\t%lu\t%d"
+-#else
+-#define PROFILE_TIMED_FORMAT "%s\t%lu\t%lu"
+-#endif
++#define PROFILE_TIMED_FORMAT "%s\t%lld\t%lu"
+ #define TRAP_NULL_STRING(str) ((str) ? (str) : "<none>")
+ 
+ typedef enum
+@@ -127,7 +123,7 @@
+ profile_print_with_attrs (const char *type, DBusMessage *message,
+   struct timeval *t, ProfileAttributeFlags attrs)
+ {
+-  printf (PROFILE_TIMED_FORMAT, type, t->tv_sec, t->tv_usec);
++  printf (PROFILE_TIMED_FORMAT, type, (long long)t->tv_sec, t->tv_usec);
+ 
+   if (attrs & PROFILE_ATTRIBUTE_FLAG_SERIAL)
+     printf ("\t%u", dbus_message_get_serial (message));
+@@ -197,7 +193,7 @@
+ 	  PROFILE_ATTRIBUTE_FLAG_MEMBER);
+ 	break;
+       default:
+-	printf (PROFILE_TIMED_FORMAT "\n", "tun", t.tv_sec, t.tv_usec);
++	printf (PROFILE_TIMED_FORMAT "\n", "tun", (long long)t.tv_sec, t.tv_usec);
+ 	break;
+     }
+ }

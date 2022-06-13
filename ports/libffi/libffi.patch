@@ -1,0 +1,68 @@
+diff -Paur --no-dereference -- libffi.upstream/config.sub libffi/config.sub
+--- libffi.upstream/config.sub
++++ libffi/config.sub
+@@ -1354,7 +1354,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* | -plan9* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -sortix* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -Paur --no-dereference -- libffi.upstream/configure libffi/configure
+--- libffi.upstream/configure
++++ libffi/configure
+@@ -20709,7 +20709,7 @@
+       eval "${MAKE-make} -f $tmp/conftemp.mk 2>/dev/null >/dev/null"
+       if grep '^REMOVED,,,' "$ac_top_srcdir/Makefile" >/dev/null
+       then rm $ac_top_srcdir/Makefile ; fi
+-      cp $tmp/conftemp.mk $ac_top_srcdir/makefiles.mk~      ## DEBUGGING
++      #cp $tmp/conftemp.mk $ac_top_srcdir/makefiles.mk~      ## DEBUGGING
+     fi
+     if test ! -f "$ac_top_srcdir/Makefile" ; then
+       { $as_echo "$as_me:${as_lineno-$LINENO}: create top_srcdir/Makefile guessed from local Makefile" >&5
+@@ -20794,7 +20794,7 @@
+ 	; echo "\$\$i" | grep "^../" > /dev/null && continue \\\\\\
+ 	; echo "rm -r \$\$i"; (rm -r "\$\$i") ; done ; rm Makefile
+ _EOF
+-      cp "$tmp/conftemp.sed" "$ac_top_srcdir/makefile.sed~"            ## DEBUGGING
++      #cp "$tmp/conftemp.sed" "$ac_top_srcdir/makefile.sed~"            ## DEBUGGING
+       $ax_enable_builddir_sed -f $tmp/conftemp.sed Makefile >$ac_top_srcdir/Makefile
+       if test -f "$ac_top_srcdir/Makefile.mk" ; then
+         { $as_echo "$as_me:${as_lineno-$LINENO}: extend top_srcdir/Makefile with top_srcdir/Makefile.mk" >&5
+@@ -20815,8 +20815,8 @@
+       # echo "/^$xxxx *$ax_enable_builddir_host /d" >$tmp/conftemp.sed
+       echo "s!^$xxxx [^|]* | *$ax_enable_builddir *\$!$xxxx ...... $ax_enable_builddir!" >$tmp/conftemp.sed
+       $ax_enable_builddir_sed -f "$tmp/conftemp.sed" "$ac_top_srcdir/Makefile" >$tmp/mkfile.tmp
+-        cp "$tmp/conftemp.sed" "$ac_top_srcdir/makefiles.sed~"         ## DEBUGGING
+-        cp "$tmp/mkfile.tmp"   "$ac_top_srcdir/makefiles.out~"         ## DEBUGGING
++        #cp "$tmp/conftemp.sed" "$ac_top_srcdir/makefiles.sed~"         ## DEBUGGING
++        #cp "$tmp/mkfile.tmp"   "$ac_top_srcdir/makefiles.out~"         ## DEBUGGING
+       if cmp -s "$ac_top_srcdir/Makefile" "$tmp/mkfile.tmp" 2>/dev/null ; then
+         { $as_echo "$as_me:${as_lineno-$LINENO}: keeping top_srcdir/Makefile from earlier configure" >&5
+ $as_echo "$as_me: keeping top_srcdir/Makefile from earlier configure" >&6;}
+diff -Paur --no-dereference -- libffi.upstream/include/Makefile.in libffi/include/Makefile.in
+--- libffi.upstream/include/Makefile.in
++++ libffi/include/Makefile.in
+@@ -314,7 +314,7 @@
+ AUTOMAKE_OPTIONS = foreign
+ DISTCLEANFILES = ffitarget.h
+ EXTRA_DIST = ffi.h.in ffi_common.h
+-includesdir = $(libdir)/@PACKAGE_NAME@-@PACKAGE_VERSION@/include
++includesdir = $(includedir)
+ nodist_includes_HEADERS = ffi.h ffitarget.h
+ all: all-am
+ 
+diff -Paur --no-dereference -- libffi.upstream/libffi.pc.in libffi/libffi.pc.in
+--- libffi.upstream/libffi.pc.in
++++ libffi/libffi.pc.in
+@@ -2,7 +2,7 @@
+ exec_prefix=@exec_prefix@
+ libdir=@libdir@
+ toolexeclibdir=@toolexeclibdir@
+-includedir=${libdir}/@PACKAGE_NAME@-@PACKAGE_VERSION@/include
++includedir=@includedir@
+ 
+ Name: @PACKAGE_NAME@
+ Description: Library supporting Foreign Function Interfaces

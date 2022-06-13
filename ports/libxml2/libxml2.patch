@@ -1,0 +1,356 @@
+diff -Paur --no-dereference -- libxml2.upstream/config.sub libxml2/config.sub
+--- libxml2.upstream/config.sub
++++ libxml2/config.sub
+@@ -1342,7 +1342,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -sortix* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -Paur --no-dereference -- libxml2.upstream/dict.c libxml2/dict.c
+--- libxml2.upstream/dict.c
++++ libxml2/dict.c
+@@ -138,15 +138,6 @@
+  */
+ static int xmlDictInitialized = 0;
+ 
+-#ifdef DICT_RANDOMIZATION
+-#ifdef HAVE_RAND_R
+-/*
+- * Internal data for random function, protected by xmlDictMutex
+- */
+-static unsigned int rand_seed = 0;
+-#endif
+-#endif
+-
+ /**
+  * xmlInitializeDict:
+  *
+@@ -180,14 +171,6 @@
+         return(0);
+     xmlRMutexLock(xmlDictMutex);
+ 
+-#ifdef DICT_RANDOMIZATION
+-#ifdef HAVE_RAND_R
+-    rand_seed = time(NULL);
+-    rand_r(& rand_seed);
+-#else
+-    srand(time(NULL));
+-#endif
+-#endif
+     xmlDictInitialized = 1;
+     xmlRMutexUnlock(xmlDictMutex);
+     return(1);
+@@ -195,19 +178,7 @@
+ 
+ #ifdef DICT_RANDOMIZATION
+ int __xmlRandom(void) {
+-    int ret;
+-
+-    if (xmlDictInitialized == 0)
+-        __xmlInitializeDict();
+-
+-    xmlRMutexLock(xmlDictMutex);
+-#ifdef HAVE_RAND_R
+-    ret = rand_r(& rand_seed);
+-#else
+-    ret = rand();
+-#endif
+-    xmlRMutexUnlock(xmlDictMutex);
+-    return(ret);
++    return(arc4random_uniform(INT_MAX));
+ }
+ #endif
+ 
+diff -Paur --no-dereference -- libxml2.upstream/Makefile.am libxml2/Makefile.am
+--- libxml2.upstream/Makefile.am
++++ libxml2/Makefile.am
+@@ -17,7 +17,7 @@
+ 
+ bin_PROGRAMS = xmllint xmlcatalog
+ 
+-bin_SCRIPTS=xml2-config
++bin_SCRIPTS=
+ 
+ lib_LTLIBRARIES = libxml2.la
+ libxml2_la_LIBADD = $(ICU_LIBS) $(THREAD_LIBS) $(Z_LIBS) $(LZMA_LIBS) $(ICONV_LIBS) $(M_LIBS) $(WIN32_EXTRA_LIBADD)
+@@ -61,7 +61,7 @@
+ LDADDS = $(STATIC_BINARIES) $(top_builddir)/libxml2.la $(THREAD_LIBS) $(Z_LIBS) $(LZMA_LIBS) $(ICONV_LIBS) $(M_LIBS) $(WIN32_EXTRA_LIBADD)
+ 
+ 
+-man_MANS = xml2-config.1 libxml.3
++man_MANS = libxml.3
+ 
+ m4datadir = $(datadir)/aclocal
+ m4data_DATA = libxml.m4
+@@ -1176,32 +1176,18 @@
+ 	@(rm -rf $(distdir)/xstc/Test)
+ 
+ cleantar:
+-	@(rm -f libxml*.tar.gz COPYING.LIB)
++	@(rm -f libxml*.tar.gz)
+ 
+ rpm: cleanup cleantar
+ 	@(unset CDPATH ; $(MAKE) dist-source dist && rpmbuild -ta $(distdir).tar.gz)
+ 
+-## We create xml2Conf.sh here and not from configure because we want
+-## to get the paths expanded correctly.  Macros like srcdir are given
+-## the value NONE in configure if the user doesn't specify them (this
+-## is an autoconf feature, not a bug).
+-
+-xml2Conf.sh: xml2Conf.sh.in Makefile
+-## Use sed and then mv to avoid problems if the user interrupts.
+-	sed -e 's?\@XML_LIBDIR\@?$(XML_LIBDIR)?g' \
+-	    -e 's?\@XML_INCLUDEDIR\@?$(XML_INCLUDEDIR)?g' \
+-	    -e 's?\@VERSION\@?$(VERSION)?g' \
+-	    -e 's?\@XML_LIBS\@?$(XML_LIBS)?g' \
+-	       < $(srcdir)/xml2Conf.sh.in > xml2Conf.tmp \
+-	&& mv xml2Conf.tmp xml2Conf.sh
+-
+ CLEANFILES = runxmlconf.log test.out xml2Conf.sh *.gcda *.gcno *.res
+-DISTCLEANFILES = COPYING missing.lst
++DISTCLEANFILES = missing.lst
+ 
+ confexecdir=$(libdir)
+-confexec_DATA = xml2Conf.sh
++confexec_DATA =
+ CVS_EXTRA_DIST=
+-EXTRA_DIST = xml2-config.in xml2Conf.sh.in libxml.spec.in libxml2.spec \
++EXTRA_DIST = libxml.spec.in libxml2.spec \
+              libxml.m4 Copyright check-xml-test-suite.py gentest.py \
+ 	     check-relaxng-test-suite.py check-relaxng-test-suite2.py \
+ 	     check-xsddata-test-suite.py check-xinclude-test-suite.py \
+diff -Paur --no-dereference -- libxml2.upstream/Makefile.in libxml2/Makefile.in
+--- libxml2.upstream/Makefile.in
++++ libxml2/Makefile.in
+@@ -67,7 +67,7 @@
+ 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
+ 	$(srcdir)/libxml-2.0-uninstalled.pc.in \
+ 	$(srcdir)/libxml-2.0.pc.in $(srcdir)/libxml.spec.in \
+-	$(srcdir)/xml2-config.in $(top_srcdir)/configure AUTHORS \
++	$(top_srcdir)/configure AUTHORS \
+ 	COPYING ChangeLog INSTALL NEWS TODO config.guess config.sub \
+ 	depcomp install-sh ltmain.sh missing
+ ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
+@@ -615,7 +615,7 @@
+ DIST_SUBDIRS = include . doc example python xstc
+ AM_CPPFLAGS = -I$(top_builddir)/include -I$(srcdir)/include
+ AM_CFLAGS = $(THREAD_CFLAGS) $(Z_CFLAGS) $(LZMA_CFLAGS)
+-bin_SCRIPTS = xml2-config
++bin_SCRIPTS =
+ lib_LTLIBRARIES = libxml2.la
+ libxml2_la_LIBADD = $(ICU_LIBS) $(THREAD_LIBS) $(Z_LIBS) $(LZMA_LIBS) $(ICONV_LIBS) $(M_LIBS) $(WIN32_EXTRA_LIBADD)
+ @USE_VERSION_SCRIPT_FALSE@LIBXML2_VERSION_SCRIPT = 
+@@ -643,7 +643,7 @@
+ 
+ DEPS = $(top_builddir)/libxml2.la
+ LDADDS = $(STATIC_BINARIES) $(top_builddir)/libxml2.la $(THREAD_LIBS) $(Z_LIBS) $(LZMA_LIBS) $(ICONV_LIBS) $(M_LIBS) $(WIN32_EXTRA_LIBADD)
+-man_MANS = xml2-config.1 libxml.3
++man_MANS = libxml.3
+ m4datadir = $(datadir)/aclocal
+ m4data_DATA = libxml.m4
+ runtest_SOURCES = runtest.c
+@@ -740,11 +740,11 @@
+ runxmlconf_DEPENDENCIES = $(DEPS)
+ runxmlconf_LDADD = $(LDADDS)
+ CLEANFILES = runxmlconf.log test.out xml2Conf.sh *.gcda *.gcno *.res
+-DISTCLEANFILES = COPYING missing.lst
++DISTCLEANFILES = missing.lst
+ confexecdir = $(libdir)
+-confexec_DATA = xml2Conf.sh
++confexec_DATA =
+ CVS_EXTRA_DIST = 
+-EXTRA_DIST = xml2-config.in xml2Conf.sh.in libxml.spec.in libxml2.spec \
++EXTRA_DIST = libxml.spec.in libxml2.spec \
+              libxml.m4 Copyright check-xml-test-suite.py gentest.py \
+ 	     check-relaxng-test-suite.py check-relaxng-test-suite2.py \
+ 	     check-xsddata-test-suite.py check-xinclude-test-suite.py \
+@@ -829,8 +829,6 @@
+ 	-rm -f config.h stamp-h1
+ libxml2.spec: $(top_builddir)/config.status $(srcdir)/libxml.spec.in
+ 	cd $(top_builddir) && $(SHELL) ./config.status $@
+-xml2-config: $(top_builddir)/config.status $(srcdir)/xml2-config.in
+-	cd $(top_builddir) && $(SHELL) ./config.status $@
+ libxml-2.0.pc: $(top_builddir)/config.status $(srcdir)/libxml-2.0.pc.in
+ 	cd $(top_builddir) && $(SHELL) ./config.status $@
+ libxml-2.0-uninstalled.pc: $(top_builddir)/config.status $(srcdir)/libxml-2.0-uninstalled.pc.in
+@@ -2781,19 +2779,11 @@
+ 	@(rm -rf $(distdir)/xstc/Test)
+ 
+ cleantar:
+-	@(rm -f libxml*.tar.gz COPYING.LIB)
++	@(rm -f libxml*.tar.gz)
+ 
+ rpm: cleanup cleantar
+ 	@(unset CDPATH ; $(MAKE) dist-source dist && rpmbuild -ta $(distdir).tar.gz)
+ 
+-xml2Conf.sh: xml2Conf.sh.in Makefile
+-	sed -e 's?\@XML_LIBDIR\@?$(XML_LIBDIR)?g' \
+-	    -e 's?\@XML_INCLUDEDIR\@?$(XML_INCLUDEDIR)?g' \
+-	    -e 's?\@VERSION\@?$(VERSION)?g' \
+-	    -e 's?\@XML_LIBS\@?$(XML_LIBS)?g' \
+-	       < $(srcdir)/xml2Conf.sh.in > xml2Conf.tmp \
+-	&& mv xml2Conf.tmp xml2Conf.sh
+-
+ install-data-local: 
+ 	$(MKDIR_P) $(DESTDIR)$(BASE_DIR)/$(DOC_MODULE)
+ 	-$(INSTALL) -m 0644 $(srcdir)/Copyright $(DESTDIR)$(BASE_DIR)/$(DOC_MODULE)
+diff -Paur --no-dereference -- libxml2.upstream/nanoftp.c libxml2/nanoftp.c
+--- libxml2.upstream/nanoftp.c
++++ libxml2/nanoftp.c
+@@ -62,6 +62,18 @@
+ #include <strings.h>
+ #endif
+ 
++#if defined(__sortix__)
++struct hostent
++{
++char* h_name;
++char** h_aliases;
++int h_addrtype;
++int h_length;
++char** h_addr_list;
++};
++#define gethostbyname(x) ((struct hostent*) NULL)
++#endif
++
+ #include <libxml/xmlmemory.h>
+ #include <libxml/parser.h>
+ #include <libxml/xmlerror.h>
+diff -Paur --no-dereference -- libxml2.upstream/nanohttp.c libxml2/nanohttp.c
+--- libxml2.upstream/nanohttp.c
++++ libxml2/nanohttp.c
+@@ -1119,7 +1119,7 @@
+ #if defined(HAVE_GETADDRINFO) && defined(SUPPORT_IP6) && !defined(_WIN32)
+     else
+ #endif
+-#if !defined(HAVE_GETADDRINFO) || !defined(_WIN32)
++#if !defined(HAVE_GETADDRINFO) || (!defined(_WIN32) && !defined(__sortix__))
+     {
+ 	h = gethostbyname (host);
+ 	if (h == NULL) {
+diff -Paur --no-dereference -- libxml2.upstream/runtest.c libxml2/runtest.c
+--- libxml2.upstream/runtest.c
++++ libxml2/runtest.c
+@@ -192,6 +192,33 @@
+     }
+ }
+ 
++#elif defined(__sortix__)
++
++typedef struct
++{
++      size_t gl_pathc;    /* Count of paths matched so far  */
++      char **gl_pathv;    /* List of matched pathnames.  */
++      size_t gl_offs;     /* Slots to reserve in 'gl_pathv'.  */
++} glob_t;
++
++#define GLOB_DOOFFS 0
++static int glob(const char *pattern, int flags,
++                int errfunc(const char *epath, int eerrno),
++                glob_t *pglob) {
++	(void) pattern;
++	(void) flags;
++	(void) errfunc;
++	(void) pglob;
++	pglob->gl_pathc = 0;
++	pglob->gl_pathv = NULL;
++	pglob->gl_offs = 0;
++	return -1;
++}
++
++static void globfree(glob_t *pglob) {
++	(void) pglob;
++}
++
+ #else
+ #include <glob.h>
+ #endif
+diff -Paur --no-dereference -- libxml2.upstream/testlimits.c libxml2/testlimits.c
+--- libxml2.upstream/testlimits.c
++++ libxml2/testlimits.c
+@@ -1287,12 +1287,12 @@
+         if (fail)
+             res = 0;
+         else {
+-            fprintf(stderr, "Failed to parse '%s' %lu\n", filename, limit);
++            fprintf(stderr, "Failed to parse '%s' %zu\n", filename, limit);
+             res = 1;
+         }
+     } else {
+         if (fail) {
+-            fprintf(stderr, "Failed to get failure for '%s' %lu\n",
++            fprintf(stderr, "Failed to get failure for '%s' %zu\n",
+                     filename, limit);
+             res = 1;
+         } else
+@@ -1341,7 +1341,7 @@
+                 fprintf(stderr, "Failed to parse '%s' %u\n",
+                         filename, crazy_indx);
+             else
+-                fprintf(stderr, "Failed to parse '%s' %lu\n",
++                fprintf(stderr, "Failed to parse '%s' %zu\n",
+                         filename, limit);
+             res = 1;
+         }
+@@ -1351,7 +1351,7 @@
+                 fprintf(stderr, "Failed to get failure for '%s' %u\n",
+                         filename, crazy_indx);
+             else
+-                fprintf(stderr, "Failed to get failure for '%s' %lu\n",
++                fprintf(stderr, "Failed to get failure for '%s' %zu\n",
+                         filename, limit);
+             res = 1;
+         } else
+diff -Paur --no-dereference -- libxml2.upstream/testrecurse.c libxml2/testrecurse.c
+--- libxml2.upstream/testrecurse.c
++++ libxml2/testrecurse.c
+@@ -146,6 +146,33 @@
+     }
+ }
+ 
++#elif defined(__sortix__)
++
++typedef struct
++{
++      size_t gl_pathc;    /* Count of paths matched so far  */
++      char **gl_pathv;    /* List of matched pathnames.  */
++      size_t gl_offs;     /* Slots to reserve in 'gl_pathv'.  */
++} glob_t;
++
++#define GLOB_DOOFFS 0
++static int glob(const char *pattern, int flags,
++                int errfunc(const char *epath, int eerrno),
++                glob_t *pglob) {
++	(void) pattern;
++	(void) flags;
++	(void) errfunc;
++	(void) pglob;
++	pglob->gl_pathc = 0;
++	pglob->gl_pathv = NULL;
++	pglob->gl_offs = 0;
++	return -1;
++}
++
++static void globfree(glob_t *pglob) {
++	(void) pglob;
++}
++
+ #else
+ #include <glob.h>
+ #endif
+diff -Paur --no-dereference -- libxml2.upstream/timsort.h libxml2/timsort.h
+--- libxml2.upstream/timsort.h
++++ libxml2/timsort.h
+@@ -323,7 +323,7 @@
+     SORT_TYPE *tempstore = (SORT_TYPE *)realloc(store->storage, new_size * sizeof(SORT_TYPE));
+     if (tempstore == NULL)
+     {
+-      fprintf(stderr, "Error allocating temporary storage for tim sort: need %lu bytes", sizeof(SORT_TYPE) * new_size);
++      fprintf(stderr, "Error allocating temporary storage for tim sort: need %zu bytes", sizeof(SORT_TYPE) * new_size);
+       exit(1);
+     }
+     store->storage = tempstore;

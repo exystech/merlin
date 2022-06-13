@@ -1,0 +1,4 @@
+#!/bin/sh
+set -e
+cd "$TIX_INSTALL_DIR/$PREFIX"
+find -type f -name '*.el.gz' -delete

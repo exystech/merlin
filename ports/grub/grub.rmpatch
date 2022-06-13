@@ -1,0 +1,2 @@
+rm -rf -- 'docs/stamp-1'
+rm -rf -- 'docs/stamp-vti'

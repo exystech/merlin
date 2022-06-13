@@ -1,0 +1,3 @@
+NAME=video-player
+BUILD_LIBRARIES=libavcodec
+BUILD_SYSTEM=sortix-usual-makefile

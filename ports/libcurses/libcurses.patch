@@ -1,0 +1,905 @@
+diff -Paur --no-dereference -- libcurses.upstream/GNUmakefile libcurses/GNUmakefile
+--- libcurses.upstream/GNUmakefile
++++ libcurses/GNUmakefile
+@@ -1,4 +1,5 @@
+-HOSTCC ?= $(CC)
++CC_FOR_BUILD ?= $(CC)
++HOSTCC ?= $(CC_FOR_BUILD)
+ AWK ?= awk
+ AR ?= ar
+ RANLIB ?= ranlib
+@@ -11,13 +12,15 @@
+ 
+ PIC = -fPIC
+ 
+-PREFIX=/usr/local
+-BINDIR=$(PREFIX)/bin
+-LIBDIR=$(PREFIX)/lib
+-INCDIR=$(PREFIX)/include
+-MANDIR=$(PREFIX)/share/man
+-MAN1DIR=$(MANDIR)/man1
+-MAN3DIR=$(MANDIR)/man3
++PREFIX?=/usr/local
++EXEC_PREFIX?=$(PREFIX)
++BINDIR?=$(EXEC_PREFIX)/bin
++LIBDIR?=$(EXEC_PREFIX)/lib
++INCLUDEDIR?=$(PREFIX)/include
++INCDIR?=$(INCLUDEDIR)
++MANDIR?=$(PREFIX)/share/man
++MAN1DIR?=$(MANDIR)/man1
++MAN3DIR?=$(MANDIR)/man3
+ 
+ -include config.mak
+ 
+@@ -40,6 +43,7 @@
+ else
+ STATIC_BINS=0
+ endif
++STATIC_BINS=1
+ 
+ CFLAGS+=-Werror-implicit-function-declaration
+ CPPFLAGS+= -I. -I./libterminfo
+@@ -166,7 +170,8 @@
+ TI_LINKLIB=$(TI_LIBA)
+ endif
+ 
+-all: $(STALIBS) $(DYNLIBS) $(PROGS)
++#all: $(STALIBS) $(DYNLIBS) $(PROGS)
++all: all-static
+ 
+ all-static: $(STALIBS) $(PROGS)
+ 
+@@ -181,7 +186,7 @@
+ 
+ install-tput: tput/tput tput/clear.sh
+ 	$(INSTALL) -Dm 755 tput/tput $(DESTDIR)$(BINDIR)/tput
+-	$(INSTALL) -Dm 755 tput/clear.sh $(DESTDIR)$(BINDIR)/clear
++	#$(INSTALL) -Dm 755 tput/clear.sh $(DESTDIR)$(BINDIR)/clear
+ 
+ install-infocmp: infocmp/infocmp
+ 	$(INSTALL) -Dm 755 infocmp/infocmp $(DESTDIR)$(BINDIR)/infocmp
+@@ -257,7 +262,8 @@
+ 	$(LN) -sf $(notdir $<) $(DESTDIR)$(LIBDIR)/$(basename $(notdir $<))w$(SO_SUFFIX)
+ 
+ install-dynlibs: install-dynlib-terminfo install-dynlib-curses install-dynlib-panel install-dynlib-menu install-dynlib-form
+-install-libs: install-stalibs install-dynlibs
++#install-libs: install-stalibs install-dynlibs
++install-libs: install-stalibs
+ 
+ install-pc-dir:
+ 	$(MKDIR) -p $(DESTDIR)$(LIBDIR)/pkgconfig
+@@ -329,7 +335,15 @@
+ 
+ install-manpages: install-prog-manpages install-lib-manpages
+ 
+-install: install-headers install-libs install-progs install-pcs install-manpages
++install-terminfo: $(TOOL_HOSTTIC)
++	cat terminfo/terminfo terminfo/sortix.terminfo > $(DESTDIR)$(PREFIX)/share/terminfo.tmp
++	$(TOOL_HOSTTIC) -x -o $(DESTDIR)$(PREFIX)/share/terminfo.cdb $(DESTDIR)$(PREFIX)/share/terminfo.tmp
++	rm -f $(DESTDIR)$(PREFIX)/share/terminfo.tmp
++	mkdir -p $(DESTDIR)$(PREFIX)/share/terminfo
++	mkdir -p $(DESTDIR)$(PREFIX)/share/terminfo/s
++	cp terminfo/sortix.terminfo $(DESTDIR)$(PREFIX)/share/terminfo/s/sortix.terminfo
++
++install: install-headers install-libs install-progs install-pcs install-manpages install-terminfo
+ 
+ install-static: install-headers install-progs install-pcs install-stalibs
+ install-dynamic: TI_LINKLIB=$(TI_LIBSO)
+@@ -549,4 +563,4 @@
+ 	install-man-infocmp install-man-tabs install-prog-manpages \
+ 	install-man-terminfo install-man-curses install-man-panel \
+ 	install-man-menu install-man-form install-lib-manpages \
+-	install-manpages
++	install-manpages install-terminfo
+diff -Paur --no-dereference -- libcurses.upstream/libcurses/acs.c libcurses/libcurses/acs.c
+--- libcurses.upstream/libcurses/acs.c
++++ libcurses/libcurses/acs.c
+@@ -38,7 +38,9 @@
+ #ifdef HAVE_WCHAR
+ #include <assert.h>
+ #include <locale.h>
++#if !defined(__sortix__) || (defined(__has_include) && __has_include(<langinfo.h>))
+ #include <langinfo.h>
++#endif
+ #include <strings.h>
+ 
+ cchar_t _wacs_char[ NUM_ACS ];
+@@ -156,7 +158,11 @@
+ 	/* Add the SUSv2 defaults (those that are not '+') */
+ 	if (!strcmp(setlocale(LC_CTYPE, NULL), "C"))
+ 		setlocale(LC_CTYPE, "");
++#if !defined(__sortix__) || (defined(__has_include) && __has_include(<langinfo.h>))
+ 	lstr = nl_langinfo(CODESET);
++#else
++	lstr = "UTF-8";
++#endif
+ 	_DIAGASSERT(lstr);
+ 	if (strcasecmp(lstr, "UTF-8")) {
+ #ifdef DEBUG
+diff -Paur --no-dereference -- libcurses.upstream/libcurses/color.c libcurses/libcurses/color.c
+--- libcurses.upstream/libcurses/color.c
++++ libcurses/libcurses/color.c
+@@ -35,6 +35,8 @@
+ #include "curses.h"
+ #include "curses_private.h"
+ 
++typedef uint32_t u_int32_t;
++
+ /* Have we initialised colours? */
+ int	__using_color = 0;
+ 
+diff -Paur --no-dereference -- libcurses.upstream/libcurses/cur_hash.c libcurses/libcurses/cur_hash.c
+--- libcurses.upstream/libcurses/cur_hash.c
++++ libcurses/libcurses/cur_hash.c
+@@ -36,6 +36,8 @@
+ #include "curses.h"
+ #include "curses_private.h"
+ 
++typedef unsigned int u_int;
++
+ /*
+  * __hash_more() is "hashpjw" from the Dragon Book, Aho, Sethi & Ullman, p.436.
+  */
+diff -Paur --no-dereference -- libcurses.upstream/libcurses/get_wch.c libcurses/libcurses/get_wch.c
+--- libcurses.upstream/libcurses/get_wch.c
++++ libcurses/libcurses/get_wch.c
+@@ -44,6 +44,35 @@
+ #include "curses_private.h"
+ #include "keymap.h"
+ 
++#ifdef __sortix__
++#include <errno.h>
++#include <stdio_ext.h>
++static wint_t getwchar(void)
++{
++	mbstate_t ps = { 0 };
++	wchar_t wc;
++	while (1) {
++		int ic = getchar();
++		if (ic == EOF) {
++			if (!mbsinit(&ps)) {
++				errno = EILSEQ;
++				__fseterr(stdin);
++			}
++			return WEOF;
++		}
++		char c = ic;
++		size_t bytes = mbrtowc(&wc, &c, 1, &ps);
++		if (bytes == (size_t) -1) {
++			__fseterr(stdin);
++			return WEOF;
++		}
++		if (bytes == (size_t) -2)
++			continue;
++		return wc;
++	}
++}
++#endif
++
+ #ifdef HAVE_WCHAR
+ static short   wstate;		  /* state of the wcinkey function */
+ #endif /* HAVE_WCHAR */
+diff -Paur --no-dereference -- libcurses.upstream/libcurses/putchar.c libcurses/libcurses/putchar.c
+--- libcurses.upstream/libcurses/putchar.c
++++ libcurses/libcurses/putchar.c
+@@ -31,6 +31,8 @@
+ 
+ #include <netbsd_sys/cdefs.h>
+ 
++#include <stdlib.h>
++
+ #include "curses.h"
+ #include "curses_private.h"
+ 
+@@ -68,7 +70,18 @@
+ #ifdef DEBUG
+ 	__CTRACE(__CTRACE_OUTPUT, "__cputwchar: 0x%x\n", wch);
+ #endif
++#ifdef __sortix__
++	mbstate_t ps = { 0 };
++	char mb[MB_CUR_MAX];
++	size_t bytes = wcrtomb(mb, wch, &ps);
++	if (bytes == (size_t) -1)
++		return WEOF;
++	if (fwrite(mb, bytes, 1, _cursesi_screen->outfd) != 1)
++		return WEOF;
++	return wch;
++#else
+ 	return (putwc(wch, _cursesi_screen->outfd));
++#endif
+ }
+ 
+ /*
+@@ -85,6 +98,17 @@
+ 	__CTRACE(__CTRACE_OUTPUT, "__cputwchar_args: 0x%x on fd %d\n",
+ 	    wch, outfd->_file);
+ #endif
++#ifdef __sortix__
++	mbstate_t ps = { 0 };
++	char mb[MB_CUR_MAX];
++	size_t bytes = wcrtomb(mb, wch, &ps);
++	if (bytes == (size_t) -1)
++		return WEOF;
++	if (fwrite(mb, bytes, 1, outfd) != 1)
++		return WEOF;
++	return wch;
++#else
+ 	return putwc(wch, outfd);
++#endif
+ }
+ #endif /* HAVE_WCHAR */
+diff -Paur --no-dereference -- libcurses.upstream/libcurses/refresh.c libcurses/libcurses/refresh.c
+--- libcurses.upstream/libcurses/refresh.c
++++ libcurses/libcurses/refresh.c
+@@ -37,6 +37,8 @@
+ #include "curses.h"
+ #include "curses_private.h"
+ 
++typedef unsigned int u_int;
++
+ static void	domvcur(int, int, int, int);
+ static int	makech(int);
+ static void	quickch(void);
+diff -Paur --no-dereference -- libcurses.upstream/libcurses/tty.c libcurses/libcurses/tty.c
+--- libcurses.upstream/libcurses/tty.c
++++ libcurses/libcurses/tty.c
+@@ -63,6 +63,10 @@
+ #endif
+ #endif
+ 
++#ifndef ONLCR
++#define ONLCR 0
++#endif
++
+ /*
+  * baudrate --
+  *	Return the current baudrate
+diff -Paur --no-dereference -- libcurses.upstream/libform/field.c libcurses/libform/field.c
+--- libcurses.upstream/libform/field.c
++++ libcurses/libform/field.c
+@@ -31,7 +31,6 @@
+ #include <string.h>
+ #include <stdlib.h>
+ #include <netbsd_sys/cdefs.h>
+-#include <sys/param.h>
+ #include <stdlib.h>
+ #include <strings.h>
+ #include <stdarg.h>
+diff -Paur --no-dereference -- libcurses.upstream/libform/type_ipv4.c libcurses/libform/type_ipv4.c
+--- libcurses.upstream/libform/type_ipv4.c
++++ libcurses/libform/type_ipv4.c
+@@ -79,7 +79,7 @@
+ 	hex_val = 0;
+ 	mask = 0;
+ 	
+-	if ((slash = index(buf, '/')) != NULL)
++	if ((slash = strchr(buf, '/')) != NULL)
+ 		style = FORMI_CLASSLESS;
+ 	else {
+ 		start = _formi_skip_blanks(buf, 0);
+diff -Paur --no-dereference -- libcurses.upstream/libterminfo/cdbr.c libcurses/libterminfo/cdbr.c
+--- libcurses.upstream/libterminfo/cdbr.c
++++ libcurses/libterminfo/cdbr.c
+@@ -59,6 +59,8 @@
+ #define malloc(size) kmem_alloc(size, KM_SLEEP)
+ #define free(ptr) kmem_free(ptr, sizeof(struct cdbr))
+ #else
++/* TODO: Sortix <limits.h> doesn't define everything it should. */
++#include <sys/types.h>
+ #include <sys/mman.h>
+ #include <netbsd_sys/cdbr.h>
+ #include <errno.h>
+@@ -142,7 +144,7 @@
+ 
+ 
+ 	size = (size_t)sb.st_size;
+-	base = mmap(NULL, size, PROT_READ, MAP_FILE|MAP_SHARED, fd, 0);
++	base = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+ 	close(fd);
+ 
+ 	if (base == MAP_FAILED)
+diff -Paur --no-dereference -- libcurses.upstream/libterminfo/term.c libcurses/libterminfo/term.c
+--- libcurses.upstream/libterminfo/term.c
++++ libcurses/libterminfo/term.c
+@@ -52,6 +52,11 @@
+ #endif
+ #endif
+ 
++/* TODO: Hack. */
++#ifndef PATH_MAX
++#define PATH_MAX 4096
++#endif
++
+ static char database[PATH_MAX];
+ static char pathbuf[PATH_MAX];
+ const char *_ti_database;
+diff -Paur --no-dereference -- libcurses.upstream/libterminfo/tparm.c libcurses/libterminfo/tparm.c
+--- libcurses.upstream/libterminfo/tparm.c
++++ libcurses/libterminfo/tparm.c
+@@ -28,11 +28,11 @@
+  */
+ 
+ #include <netbsd_sys/cdefs.h>
+-#include <sys/param.h>
+ 
+ #include <assert.h>
+ #include <ctype.h>
+ #include <errno.h>
++#include <limits.h>
+ #include <stdarg.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+diff -Paur --no-dereference -- libcurses.upstream/netbsd_sys/cdefs.h libcurses/netbsd_sys/cdefs.h
+--- libcurses.upstream/netbsd_sys/cdefs.h
++++ libcurses/netbsd_sys/cdefs.h
+@@ -60,5 +60,10 @@
+ #define __predict_false(exp)    (exp)
+ #endif
+ 
++#if defined(__sortix__)
++#define bcopy(src, dest, size) memcpy(dest, src, size)
++#endif
++#define MAX(a,b) (((a)>(b))?(a):(b))
++
+ #endif
+ 
+diff -Paur --no-dereference -- libcurses.upstream/terminfo/sortix.terminfo libcurses/terminfo/sortix.terminfo
+--- libcurses.upstream/terminfo/sortix.terminfo
++++ libcurses/terminfo/sortix.terminfo
+@@ -0,0 +1,230 @@
++# TODO: Decode setab and setaf and see if they are what I want.
++# TODO: Implement BEL \a and add bel=^G,
++# TODO: Add blink support and add blink=\E[5m,
++# TODO: Add backtab support and add cbt=\E[Z, and kcbt=\E[Z,
++# TODO: Support csr=\E[%i%p1%d;%p2%dr,
++# TODO: Support dch=\E[%p1%dP,
++# TODO: dch1=\E[P,
++# TODO: Add faint support and add dim=\E[2m,
++# TODO: dl1=\E[M,
++# TODO: ech=\E[%p1%dX,
++# TODO: hts=\EH,
++# TODO: ich=\E[%p1%d@,
++# TODO: il=\E[%p1%dL,
++# TODO: il1=\E[L,
++# TODO: invis=\E[8m,
++# TODO: Some modifiers for the function keys are missing, like control + alt +
++#       shift + f12, kfxx should probably go up to 96. On the other hand,
++#       control-alt-fxx switches virtual terminals.
++# TODO: Sequences for key pad presses (with numlock off) such as kb2
++# TODO: Sequences for backspace with modifiers (kbs)?
++# TODO: Support mouse event kmous=\E[M,
++# TODO: Add italicized support sitm=\E[3m, ritm=\E[23m,
++# TODO: rmkx=\E[?1l\E>,
++# TODO: smkx=\E[?1h\E=,
++
++sortix-16color|Sortix with 16 colors,
++	am,
++	bce,
++	km,
++	mc5i,
++	msgr,
++	npc,
++	xenl,
++	colors#16,
++	cols#80,
++	it#8,
++	lines#25,
++	pairs#256,
++	bold=\E[1m,
++	civis=\E[?25l,
++	clear=\E[H\E[2J,
++	cnorm=\E[?25h,
++	cr=^M,
++	cub1=\E[D,
++	cub=\E[%p1%dD,
++	cud1=^J,
++	cud=\E[%p1%dB,
++	cuf1=\E[C,
++	cuf=\E[%p1%dC,
++	cup=\E[%i%p1%d;%p2%dH,
++	cuu1=\E[A,
++	cuu=\E[%p1%dA,
++	ed=\E[J,
++	el1=\E[1K,
++	el=\E[K,
++	home=\E[H,
++	hpa=\E[%i%p1%dG,
++	ht=^I,
++	ind=^J,
++	indn=\E[%p1%dS,
++	nel=^J,
++	op=\E[39;49m,
++	rc=\E[u,
++	rev=\E[7m,
++	ri=\E[T,
++	rin=\E[%p1%dT,
++	rmcup=\E[?1049l,
++	rmso=\E[27m,
++	sc=\E[s,
++	setab=\E[%?%p1%{8}%<%t4%p1%d%e%p1%{16}%<%t10%p1%{8}%-%d%e48;5;%p1%d%;m,
++	setaf=\E[%?%p1%{8}%<%t3%p1%d%e%p1%{16}%<%t9%p1%{8}%-%d%e38;5;%p1%d%;m,
++	sgr0=\E[m,
++	sgr=\E[0;10%?%p1%t;7%;%?%p2%t;4%;%?%p3%t;7%;%?%p4%t;5%;%?%p5%t;2%;%?%p6%t;1%;%?%p7%t;8%;%?%p9%t;11%;m,
++	smcup=\E[?1049h,
++	smso=\E[7m,
++	vpa=\E[%i%p1%dd,
++	kbs=\177,
++	kcub1=\E[D,
++	kLFT=\E[1;2D,
++	kLFT3=\E[1;3D,
++	kLFT4=\E[1;4D,
++	kLFT5=\E[1;5D,
++	kLFT6=\E[1;6D,
++	kLFT7=\E[1;7D,
++	kLFT8=\E[1;8D,
++	kcud1=\E[B,
++	kDN=\E[1;2B,
++	kDN3=\E[1;3B,
++	kDN4=\E[1;4B,
++	kDN5=\E[1;5B,
++	kDN6=\E[1;6B,
++	kDN7=\E[1;7B,
++	kDN8=\E[1;8B,
++	kcuf1=\E[C,
++	kRIT=\E[1;2C,
++	kRIT3=\E[1;3C,
++	kRIT4=\E[1;4C,
++	kRIT5=\E[1;5C,
++	kRIT6=\E[1;6C,
++	kRIT7=\E[1;7C,
++	kRIT8=\E[1;8C,
++	kcuu1=\E[A,
++	kUP=\E[1;2A,
++	kUP3=\E[1;3A,
++	kUP4=\E[1;4A,
++	kUP5=\E[1;5A,
++	kUP6=\E[1;6A,
++	kUP7=\E[1;7A,
++	kUP8=\E[1;8A,
++	kdch1=\E[3~,
++	kDC=\E[3;2~,
++	kDC3=\E[3;3~,
++	kDC4=\E[3;4~,
++	kDC5=\E[3;5~,
++	kDC6=\E[3;6~,
++	kDC7=\E[3;7~,
++	kDC8=\E[3;8~,
++	kend=\E[F,
++	kEND=\E[1;2F,
++	kEND3=\E[1;3F,
++	kEND4=\E[1;4F,
++	kEND5=\E[1;5F,
++	kEND6=\E[1;6F,
++	kEND7=\E[1;7F,
++	kEND8=\E[1;8F,
++	kent=\E0M,
++	kf1=\EOP,
++	kf2=\EOQ,
++	kf3=\EOR,
++	kf4=\EOS,
++	kf5=\E[15~,
++	kf6=\E[17~,
++	kf7=\E[18~,
++	kf8=\E[19~,
++	kf9=\E[20~,
++	kf10=\E[21~,
++	kf11=\E[23~,
++	kf12=\E[24~,
++	kf13=\E[1;2P,
++	kf14=\E[1;2Q,
++	kf15=\E[1;2R,
++	kf16=\E[1;2S,
++	kf17=\E[15;2~,
++	kf18=\E[17;2~,
++	kf19=\E[18;2~,
++	kf20=\E[19;2~,
++	kf21=\E[20;2~,
++	kf22=\E[21;2~,
++	kf23=\E[23;2~,
++	kf24=\E[24;2~,
++	kf25=\E[1;5P,
++	kf26=\E[1;5Q,
++	kf27=\E[1;5R,
++	kf28=\E[1;5S,
++	kf29=\E[15;5~,
++	kf30=\E[17;5~,
++	kf31=\E[18;5~,
++	kf32=\E[19;5~,
++	kf33=\E[20;5~,
++	kf34=\E[21;5~,
++	kf35=\E[23;5~,
++	kf36=\E[24;5~,
++	kf37=\E[1;6P,
++	kf38=\E[1;6Q,
++	kf39=\E[1;6R,
++	kf40=\E[1;6S,
++	kf41=\E[15;6~,
++	kf42=\E[17;6~,
++	kf43=\E[18;6~,
++	kf44=\E[19;6~,
++	kf45=\E[20;6~,
++	kf46=\E[21;6~,
++	kf47=\E[23;6~,
++	kf48=\E[24;6~,
++	kf49=\E[1;3P,
++	kf50=\E[1;3Q,
++	kf51=\E[1;3R,
++	kf52=\E[1;3S,
++	kf53=\E[15;3~,
++	kf54=\E[17;3~,
++	kf55=\E[18;3~,
++	kf56=\E[19;3~,
++	kf57=\E[20;3~,
++	kf58=\E[21;3~,
++	kf59=\E[23;3~,
++	kf60=\E[24;3~,
++	kf61=\E[1;4P,
++	kf62=\E[1;4Q,
++	kf63=\E[1;4R,
++	khome=\E[H,
++	kHOM=\E[1;2H,
++	kHOM3=\E[1;3H,
++	kHOM4=\E[1;4H,
++	kHOM5=\E[1;5H,
++	kHOM6=\E[1;6H,
++	kHOM7=\E[1;7H,
++	kHOM8=\E[1;8H,
++	kich1=\E[2~,
++	kIC=\E[2;2~,
++	kIC3=\E[2;3~,
++	kIC4=\E[2;4~,
++	kIC5=\E[2;5~,
++	kIC6=\E[2;6~,
++	kIC7=\E[2;7~,
++	kIC8=\E[2;8~,
++	kind=\E[1;2B,
++	knp=\E[6~,
++	kNXT=\E[6;2~,
++	kNXT3=\E[6;3~,
++	kNXT4=\E[6;4~,
++	kNXT5=\E[6;5~,
++	kNXT6=\E[6;6~,
++	kNXT7=\E[6;7~,
++	kNXT8=\E[6;8~,
++	kpp=\E[5~,
++	kPRV=\E[5;2~,
++	kPRV3=\E[5;3~,
++	kPRV4=\E[5;4~,
++	kPRV5=\E[5;5~,
++	kPRV6=\E[5;6~,
++	kPRV7=\E[5;7~,
++	kPRV8=\E[5;8~,
++	kri=\E[1;2A,
++
++sortix|Sortix,
++	use=sortix-16color,
++	colors#256,
++	pairs#32767,
++	smul=\E[4m,
++	rmul=\E[24m,
+diff -Paur --no-dereference -- libcurses.upstream/tic/musl-hsearch.c libcurses/tic/musl-hsearch.c
+--- libcurses.upstream/tic/musl-hsearch.c
++++ libcurses/tic/musl-hsearch.c
+@@ -0,0 +1,149 @@
++#define _GNU_SOURCE
++#include <stdlib.h>
++#include <string.h>
++
++/*
++open addressing hash table with 2^n table size
++quadratic probing is used in case of hash collision
++tab indices and hash are size_t
++after resize fails with ENOMEM the state of tab is still usable
++
++with the posix api items cannot be iterated and length cannot be queried
++*/
++
++#define MINSIZE 8
++#define MAXSIZE ((size_t)-1/2 + 1)
++
++struct __tab {
++	ENTRY *entries;
++	size_t mask;
++	size_t used;
++};
++
++static struct hsearch_data htab;
++
++int __hcreate_r(size_t, struct hsearch_data *);
++void __hdestroy_r(struct hsearch_data *);
++int __hsearch_r(ENTRY, ACTION, ENTRY **, struct hsearch_data *);
++
++static size_t keyhash(char *k)
++{
++	unsigned char *p = (void *)k;
++	size_t h = 0;
++
++	while (*p)
++		h = 31*h + *p++;
++	return h;
++}
++
++static int resize(size_t nel, struct hsearch_data *htab)
++{
++	size_t newsize;
++	size_t i, j;
++	ENTRY *e, *newe;
++	ENTRY *oldtab = htab->__tab->entries;
++	ENTRY *oldend = htab->__tab->entries + htab->__tab->mask + 1;
++
++	if (nel > MAXSIZE)
++		nel = MAXSIZE;
++	for (newsize = MINSIZE; newsize < nel; newsize *= 2);
++	htab->__tab->entries = calloc(newsize, sizeof *htab->__tab->entries);
++	if (!htab->__tab->entries) {
++		htab->__tab->entries = oldtab;
++		return 0;
++	}
++	htab->__tab->mask = newsize - 1;
++	if (!oldtab)
++		return 1;
++	for (e = oldtab; e < oldend; e++)
++		if (e->key) {
++			for (i=keyhash(e->key),j=1; ; i+=j++) {
++				newe = htab->__tab->entries + (i & htab->__tab->mask);
++				if (!newe->key)
++					break;
++			}
++			*newe = *e;
++		}
++	free(oldtab);
++	return 1;
++}
++
++int hcreate(size_t nel)
++{
++	return __hcreate_r(nel, &htab);
++}
++
++void hdestroy(void)
++{
++	__hdestroy_r(&htab);
++}
++
++static ENTRY *lookup(char *key, size_t hash, struct hsearch_data *htab)
++{
++	size_t i, j;
++	ENTRY *e;
++
++	for (i=hash,j=1; ; i+=j++) {
++		e = htab->__tab->entries + (i & htab->__tab->mask);
++		if (!e->key || strcmp(e->key, key) == 0)
++			break;
++	}
++	return e;
++}
++
++ENTRY *hsearch(ENTRY item, ACTION action)
++{
++	ENTRY *e;
++
++	__hsearch_r(item, action, &e, &htab);
++	return e;
++}
++
++int __hcreate_r(size_t nel, struct hsearch_data *htab)
++{
++	int r;
++
++	htab->__tab = calloc(1, sizeof *htab->__tab);
++	if (!htab->__tab)
++		return 0;
++	r = resize(nel, htab);
++	if (r == 0) {
++		free(htab->__tab);
++		htab->__tab = 0;
++	}
++	return r;
++}
++
++void __hdestroy_r(struct hsearch_data *htab)
++{
++	if (htab->__tab) free(htab->__tab->entries);
++	free(htab->__tab);
++	htab->__tab = 0;
++}
++
++int __hsearch_r(ENTRY item, ACTION action, ENTRY **retval, struct hsearch_data *htab)
++{
++	size_t hash = keyhash(item.key);
++	ENTRY *e = lookup(item.key, hash, htab);
++
++	if (e->key) {
++		*retval = e;
++		return 1;
++	}
++	if (action == FIND) {
++		*retval = 0;
++		return 0;
++	}
++	*e = item;
++	if (++htab->__tab->used > htab->__tab->mask - htab->__tab->mask/4) {
++		if (!resize(2*htab->__tab->used, htab)) {
++			htab->__tab->used--;
++			e->key = 0;
++			*retval = 0;
++			return 0;
++		}
++		e = lookup(item.key, hash, htab);
++	}
++	*retval = e;
++	return 1;
++}
+diff -Paur --no-dereference -- libcurses.upstream/tic/musl-search.h libcurses/tic/musl-search.h
+--- libcurses.upstream/tic/musl-search.h
++++ libcurses/tic/musl-search.h
+@@ -0,0 +1,60 @@
++#ifndef _SEARCH_H
++#define _SEARCH_H
++
++#include <stddef.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++typedef enum { FIND, ENTER } ACTION;
++typedef enum { preorder, postorder, endorder, leaf } VISIT;
++
++typedef struct entry {
++	char *key;
++	void *data;
++} ENTRY;
++
++int hcreate(size_t);
++void hdestroy(void);
++ENTRY *hsearch(ENTRY, ACTION);
++
++#ifdef _GNU_SOURCE
++struct hsearch_data {
++	struct __tab *__tab;
++	unsigned int __unused1;
++	unsigned int __unused2;
++};
++
++int hcreate_r(size_t, struct hsearch_data *);
++void hdestroy_r(struct hsearch_data *);
++int hsearch_r(ENTRY, ACTION, ENTRY **, struct hsearch_data *);
++#endif
++
++void insque(void *, void *);
++void remque(void *);
++
++void *lsearch(const void *, void *, size_t *, size_t,
++	int (*)(const void *, const void *));
++void *lfind(const void *, const void *, size_t *, size_t,
++	int (*)(const void *, const void *));
++
++void *tdelete(const void *__restrict, void **__restrict, int(*)(const void *, const void *));
++void *tfind(const void *, void *const *, int(*)(const void *, const void *));
++void *tsearch(const void *, void **, int (*)(const void *, const void *));
++void twalk(const void *, void (*)(const void *, VISIT, int));
++
++#ifdef _GNU_SOURCE
++struct qelem {
++	struct qelem *q_forw, *q_back;
++	char q_data[1];
++};
++
++void tdestroy(void *, void (*)(void *));
++#endif
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif
+diff -Paur --no-dereference -- libcurses.upstream/tic/tic.c libcurses/tic/tic.c
+--- libcurses.upstream/tic/tic.c
++++ libcurses/tic/tic.c
+@@ -49,7 +49,12 @@
+ #include <getopt.h>
+ #include <limits.h>
+ #include <fcntl.h>
++#if !defined(__sortix__) || (defined(__has_include) && __has_include(<search.h>))
+ #include <search.h>
++#else
++#include "musl-search.h"
++#include "musl-hsearch.c"
++#endif
+ #include <stdarg.h>
+ #include <stdlib.h>
+ #include <stdio.h>
+diff -Paur --no-dereference -- libcurses.upstream/tset/map.c libcurses/tset/map.c
+--- libcurses.upstream/tset/map.c
++++ libcurses/tset/map.c
+@@ -73,7 +73,7 @@
+ 	char *copy, *p, *termp;
+ 
+ 	copy = strdup(arg);
+-	mapp = malloc((u_int)sizeof(MAP));
++	mapp = malloc(sizeof(MAP));
+ 	if (copy == NULL || mapp == NULL)
+ 		err(1, "malloc");
+ 	mapp->next = NULL;
+diff -Paur --no-dereference -- libcurses.upstream/tset/set.c libcurses/tset/set.c
+--- libcurses.upstream/tset/set.c
++++ libcurses/tset/set.c
+@@ -36,7 +36,39 @@
+ #include <term.h>
+ #include <termios.h>
+ #include <unistd.h>
++#if !defined(__sortix__) || (defined(__has_include) && __has_include(<sys/ttydefaults.h>))
+ #include <sys/ttydefaults.h>
++#else
++#define CTRL(x) (x&037)
++#define CEOF CTRL('d')
++
++#ifdef _POSIX_VDISABLE
++#define CEOL _POSIX_VDISABLE
++#define CSTATUS _POSIX_VDISABLE
++#else
++#define CEOL '\0'
++#define CSTATUS '\0'
++#endif
++
++#define CERASE 0177
++#define CINTR CTRL('c')
++#define CKILL CTRL('u')
++#define CMIN 1
++#define CQUIT 034
++#define CSUSP CTRL('z')
++#define CTIME 0
++#define CDSUSP CTRL('y')
++#define CSTART CTRL('q')
++#define CSTOP CTRL('s')
++#define CLNEXT CTRL('v')
++#define CDISCARD CTRL('o')
++#define CWERASE CTRL('w')
++#define CREPRINT CTRL('r')
++#define CEOT CEOF
++#define CBRK CEOL
++#define CRPRNT CREPRINT
++#define CFLUSH CDISCARD
++#endif
+ #include "extern.h"
+ #ifndef OXTABS
+ #define OXTABS 0
+diff -Paur --no-dereference -- libcurses.upstream/tset/tset.c libcurses/tset/tset.c
+--- libcurses.upstream/tset/tset.c
++++ libcurses/tset/tset.c
+@@ -35,7 +35,14 @@
+ 
+ #include <sys/types.h>
+ #include <sys/ioctl.h>
++#if !defined(__sortix__) || (defined(__has_include) && __has_include(<sys/ttydefaults.h>))
+ #include <sys/ttydefaults.h>
++#else
++#define CTRL(x) (x&037)
++#define CERASE 0177
++#define CKILL CTRL('u')
++#define CINTR CTRL('c')
++#endif
+ #include <ctype.h>
+ #include <err.h>
+ #include <errno.h>
+@@ -47,6 +54,8 @@
+ #include <unistd.h>
+ #include "extern.h"
+ 
++typedef unsigned int u_int;
++
+ static void	obsolete(char *[]);
+ static void	report(const char *, int, u_int);
+ __dead static void	usage(char*);
+@@ -167,7 +176,10 @@
+ 		    nlines > 0 && columns > 0) {
+ 			win.ws_row = nlines;
+ 			win.ws_col = ncolumns;
++/* TODO: Remove after TIOCSWINSZ has been merged to Sortix master. */
++#ifdef TIOCSWINSZ
+ 			(void)ioctl(STDERR_FILENO, TIOCSWINSZ, &win);
++#endif
+ 		}
+ #endif
+ 		set_control_chars(erasechar, intrchar, killchar);

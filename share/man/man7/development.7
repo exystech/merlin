@@ -47,10 +47,11 @@ The build system creates a minimal root filesystem structure in the
 .Pa /src/sysroot
 and builds each operating system component in turn, installing them into the
 sysroot.
-If the source code for ports are placed in
+The ports in the
 .Pa /src/ports
-then they are automatically built as well.
-The result is a minimal system that can be turned into working system by adding
+are built automatically by downloading the upstream releases and applying the
+appropriate patches.
+The result is a system image that can be turned into working system by adding
 important configuration such as
 .Xr passwd 5 .
 .Pp
@@ -86,6 +87,8 @@ The important targets are:
 .Bl -tag -width "12345678"
 .It Sy all
 (default) Build each component in turn and install them into the sysroot.
+.It Sy available-ports
+Search for newer available versions of ports.
 .It Sy build-tools
 Make all build tools.
 .It Sy clean
@@ -95,7 +98,15 @@ Clean the component directories and the port source code.
 Clean the directories of all build tools.
 .It Sy distclean
 Run every clean target such that the source code is ready for distribution.
-.Sy ( clean-builds , clean-core , clean-ports , clean-release , clean-repository , clean-sysroot )
+.Sy ( clean-builds , clean-core , clean-mirror , clean-release , clean-repository , clean-sysroot , distclean-ports )
+.It Sy distclean-ports
+Remove the port source code extractions.
+.It Sy extract-ports
+Extract the upstream release for each
+.Xr port 5
+in
+.Pa /src/ports
+and apply the appropriate patches.
 .It Sy install-build-tools
 Install all build tools after making them.
 .It Sy iso
@@ -103,9 +114,23 @@ Create a release iso in the
 .Pa /src/builds
 directory after making
 .Sy all .
+.It Sy mirror
+Download the upstream release for each
+.Xr port 5
+in
+.Pa /src/ports
+from
+.Ev SORTIX_PORTS_MIRROR
+into the
+.Pa /src/mirror
+directory.
+The operating system can be built without network connectivity once the mirror
+is populated.
+The local mirror has the same structure as the remote mirror and can be used as
+a remote mirror.
 .It Sy mostlyclean
-Clean everything except binary packages.
-.Sy ( clean-builds , clean-core , clean-ports , clean-release , clean-sysroot )
+Clean everything except binary packages and the mirror of upstream releases.
+.Sy ( clean-builds , clean-ports , clean-release , clean-sysroot , distclean-ports )
 .It Sy presubmit
 Verify the coding style is followed
 .Sy ( verify-coding-style ) ,
@@ -153,6 +178,12 @@ Create the sysroot and install only the headers of the standard library and
 kernel into it.
 This is useful when bootstrapping the runtime libraries of the compiler that
 need to know about libc prior to building libc.
+.It Sy upgrade-ports
+Search for newer available versions of ports and update the
+.Sy VERSION
+variable in the
+.Xr port 5
+and switch it into development mode.
 .El
 .Pp
 The important environment variables influencing the Makefile are:
@@ -177,6 +208,19 @@ Specifies compiler optimization options that gets added to
 .Ev CFLAGS
 and
 .Ev CXXFLAGS .
+.It Ev PACKAGES
+Specifies which ports to build, or all ports if unset.
+Suffixing a port with a
+.Sq "!"
+includes its mandatory dependencies, and suffixing it with
+.Sq !!
+includes the optional dependencies as well.
+The sets of ports defined in
+.Pa /src/build-aux/ports.conf
+can be specified as well.
+For instance
+.Sy PACKAGES=minimal!
+builds all the minimal ports with no optional dependencies.
 .It Ev SORTIX_INCLUDE_SOURCE
 Specifies whether the source code is included in the sysroot.
 This must be one of
@@ -198,6 +242,10 @@ or
 .Sy xz
 and defaults to
 .Sy xz .
+.It Ev SORTIX_PORTS_MIRROR
+Upstream releases of ports are downloaded from this mirror, defaulting to the
+official mirror, and falling back to the upstream release site if the mirror
+failed.
 .El
 .Ss Components
 The operating systems components, such as libc and the kernel, each have their
@@ -241,17 +289,24 @@ to make it install files there.
 In addition to the directories for each operating system component, there are
 these special directories:
 .Bl -tag -width "12345678"
+.It Pa /src/builds
+The build artifacts produced when building the operating system.
+.It Pa /src/mirror
+The upstream releases of ports are downloaded on the first use and cached inside
+this mirror directory.
 .It Pa /src/ports
-If this directory exists, each subdirectory can contain the source code for a
-port that gets built along with the rest of the system.
+Each subdirectory contains a
+.Xr port 5
+which is automatically built along with the operating system per the
+.Ev PACKAGES
+environment variable.
 .It Pa /src/release
 The
 .Sy release
 root makefile target creates this directory and populates it with a directory
 structure suitable for online publishing of a release.
 .It Pa /src/repository
-If ports are present, this directory is made when binary packages are built and
-they are stored here.
+This directory stores the binary packages and is created when they are built.
 This works as a cache so ports don't have to be rebuilt every time the operating
 system is.
 Packages are also copied from here rather than the sysroot when making releases.
@@ -298,29 +353,23 @@ compiled tools are intended to run on the current system, and have not been
 built properly using
 .Pa /src/sysroot .
 .Ss Ports
-You can place the source code for ports in
-.Xr srctix 7
-format (has a
-.Xr tixbuildinfo 7
-file) in the
+Each
+.Xr port 5
+in the
 .Pa /src/ports
-directory and they will get built automatically when and installed into the
-sysroot when building the whole operating system.
+directory will get built automatically when and installed into the sysroot when
+building the whole operating system.
 Installable binary packages are created in the
 .Pa /src/repository/$HOST
 directory using
-.Xr tix-build 8
-directory and can be installed with
+.Xr tix-port 8
+and can be installed with
 .Xr tix-install 8 .
-If an existing binary package exists in the repository, it is used instead of
-the building the port again.
+If an existing binary package with the right version exists in the repository,
+it is used instead of the building the port again.
 .Pp
-Ports are currently made using
-.Xr cross-development 7
-as not all ports can be built natively yet.
-.Pp
-The ports system is described in detail in
-.Xr porting-guide 7 .
+The ports system workflow is described in
+.Xr porting 7 .
 .Ss Patches
 The source code is managed as a
 .Xr git 1
@@ -383,10 +432,11 @@ source code.
 .Sh SEE ALSO
 .Xr git 1 ,
 .Xr make 1 ,
+.Xr port 5 ,
 .Xr cross-development 7 ,
 .Xr following-development 7 ,
 .Xr installation 7 ,
-.Xr porting-guide 7 ,
+.Xr porting 7 ,
 .Xr serial-transfer 7 ,
 .Xr upgrade 7 ,
 .Xr sysinstall 8 ,

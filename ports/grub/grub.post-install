@@ -1,0 +1,10 @@
+#!/bin/sh -e
+cp update-grub "$TIX_INSTALL_DIR$EXEC_PREFIX/sbin/update-grub"
+cp 10_sortix "$TIX_INSTALL_DIR$PREFIX/etc/grub.d/10_sortix"
+if [ ! -e "$TIX_INSTALL_DIR$PREFIX/share/grub/unicode.pf2" ]; then
+  # Cheat as I'm not sure how to get this when cross-building.
+  [ -e /share/grub/unicode.pf2 ] &&
+  cp /share/grub/unicode.pf2 "$TIX_INSTALL_DIR$PREFIX/share/grub/unicode.pf2"
+  [ -e /usr/share/grub/unicode.pf2 ] &&
+  cp /usr/share/grub/unicode.pf2 "$TIX_INSTALL_DIR$PREFIX/share/grub/unicode.pf2"
+fi

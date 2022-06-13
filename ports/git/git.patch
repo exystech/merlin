@@ -1,0 +1,429 @@
+diff -Paur --no-dereference -- git.upstream/builtin/log.c git/builtin/log.c
+--- git.upstream/builtin/log.c
++++ git/builtin/log.c
+@@ -249,7 +249,12 @@
+ 	fprintf(rev->diffopt.file, _("Final output: %d %s\n"), nr, stage);
+ }
+ 
++/* PATCH: Sortix does not have obsolescent XSI itimers. */
++#if defined(__sortix__)
++static timer_t early_output_timer;
++#else
+ static struct itimerval early_output_timer;
++#endif
+ 
+ static void log_show_early(struct rev_info *revs, struct commit_list *list)
+ {
+@@ -297,9 +302,18 @@
+ 	 * trigger every second even if we're blocked on a
+ 	 * reader!
+ 	 */
++#if defined(__sortix__)
++	struct itimerspec its;
++	its.it_value.tv_sec = 0;
++	its.it_value.tv_nsec = 500000000;
++	its.it_interval.tv_sec = 0;
++	its.it_interval.tv_nsec = 0;
++	timer_settime(early_output_timer, 0, &its, NULL);
++#else
+ 	early_output_timer.it_value.tv_sec = 0;
+ 	early_output_timer.it_value.tv_usec = 500000;
+ 	setitimer(ITIMER_REAL, &early_output_timer, NULL);
++#endif
+ }
+ 
+ static void early_output(int signal)
+@@ -309,6 +323,13 @@
+ 
+ static void setup_early_output(struct rev_info *rev)
+ {
++#if defined(__sortix__) && !defined(__SORTIX_HAS_RESTARTABLE_SYSCALLS__)
++	/* TODO: Sortix doesn't have restartable system calls at the moment and this
++	         feature creates spurious failures, so this feature is disabled for
++	         now. */
++	return;
++#endif
++
+ 	struct sigaction sa;
+ 
+ 	/*
+@@ -331,13 +352,37 @@
+ 	 *
+ 	 * This is a one-time-only trigger.
+ 	 */
++#if defined(__sortix__)
++	struct sigevent sev;
++	memset(&sev, 0, sizeof(sev));
++	sev.sigev_notify = SIGEV_SIGNAL;
++	sev.sigev_signo = SIGALRM;
++	timer_create(CLOCK_MONOTONIC, &sev, &early_output_timer);
++	struct itimerspec its;
++	its.it_value.tv_sec = 0;
++	its.it_value.tv_nsec = 100000000;
++	its.it_interval.tv_sec = 0;
++	its.it_interval.tv_nsec = 0;
++	timer_settime(early_output_timer, 0, &its, NULL);
++#else
+ 	early_output_timer.it_value.tv_sec = 0;
+ 	early_output_timer.it_value.tv_usec = 100000;
+ 	setitimer(ITIMER_REAL, &early_output_timer, NULL);
++#endif
+ }
+ 
+ static void finish_early_output(struct rev_info *rev)
+ {
++#if defined(__sortix__) && !defined(__SORTIX_HAS_RESTARTABLE_SYSCALLS__)
++	/* TODO: Sortix doesn't have restartable system calls at the moment and this
++	         feature creates spurious failures, so this feature is disabled for
++	         now. */
++	return;
++#endif
++
++#if defined(__sortix__)
++	timer_delete(early_output_timer);
++#endif
+ 	int n = estimate_commit_count(rev, rev->commits);
+ 	signal(SIGALRM, SIG_IGN);
+ 	show_early_header(rev, "done", n);
+diff -Paur --no-dereference -- git.upstream/compat/hstrerror.c git/compat/hstrerror.c
+--- git.upstream/compat/hstrerror.c
++++ git/compat/hstrerror.c
+@@ -2,6 +2,10 @@
+ #include <stdio.h>
+ #include <netdb.h>
+ 
++/* PATCH: hstrerror(3) is not used by git when getaddrinfo(3) is available.
++          Sortix has the modern getaddrinfo(3), but does not have the obsolete
++          gethostbyname(3). */
++#ifdef NO_IPV6
+ const char *githstrerror(int err)
+ {
+ 	static char buffer[48];
+@@ -19,3 +23,4 @@
+ 	snprintf(buffer, sizeof(buffer), "Name resolution error %d", err);
+ 	return buffer;
+ }
++#endif
+diff -Paur --no-dereference -- git.upstream/config.mak.uname git/config.mak.uname
+--- git.upstream/config.mak.uname
++++ git/config.mak.uname
+@@ -17,6 +17,8 @@
+ # because maintaining the nesting to match is a pain.  If
+ # we had "elif" things would have been much nicer...
+ 
++# PATCH: Assume unknown operating systems have /dev/tty as required by POSIX.
++HAVE_DEV_TTY = YesPlease
+ ifeq ($(uname_S),OSF1)
+ 	# Need this for u_short definitions et al
+ 	BASIC_CFLAGS += -D_OSF_SOURCE
+diff -Paur --no-dereference -- git.upstream/configure git/configure
+--- git.upstream/configure
++++ git/configure
+@@ -5315,7 +5315,7 @@
+   $as_echo_n "(cached) " >&6
+ else
+   ac_check_lib_save_LIBS=$LIBS
+-LIBS="-lcurl  $LIBS"
++LIBS="-lcurl -lssl -lcrypto -lz $LIBS"
+ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+ 
+@@ -5364,52 +5364,13 @@
+ 
+ if test -z "$NO_CURL"; then
+ 
+-# Extract the first word of "curl-config", so it can be a program name with args.
+-set dummy curl-config; ac_word=$2
+-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+-$as_echo_n "checking for $ac_word... " >&6; }
+-if ${ac_cv_prog_CURL_CONFIG+:} false; then :
+-  $as_echo_n "(cached) " >&6
+-else
+-  if test -n "$CURL_CONFIG"; then
+-  ac_cv_prog_CURL_CONFIG="$CURL_CONFIG" # Let the user override the test.
+-else
+-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+-for as_dir in $PATH
+-do
+-  IFS=$as_save_IFS
+-  test -z "$as_dir" && as_dir=.
+-    for ac_exec_ext in '' $ac_executable_extensions; do
+-  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+-    ac_cv_prog_CURL_CONFIG="curl-config"
+-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+-    break 2
+-  fi
+-done
+-  done
+-IFS=$as_save_IFS
+-
+-  test -z "$ac_cv_prog_CURL_CONFIG" && ac_cv_prog_CURL_CONFIG="no"
+-fi
+-fi
+-CURL_CONFIG=$ac_cv_prog_CURL_CONFIG
+-if test -n "$CURL_CONFIG"; then
+-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $CURL_CONFIG" >&5
+-$as_echo "$CURL_CONFIG" >&6; }
+-else
+-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+-$as_echo "no" >&6; }
+-fi
+-
+-
+-
+-if test $CURL_CONFIG != no; then
++# PATCH: pkg-config must be used instead of the bad curl-config.
+ 
+ config_appended_defs="$config_appended_defs${newline}CURL_CONFIG=${CURL_CONFIG}"
+     if test -z "${NO_OPENSSL}"; then
+       { $as_echo "$as_me:${as_lineno-$LINENO}: checking if Curl supports SSL" >&5
+ $as_echo_n "checking if Curl supports SSL... " >&6; }
+-      if test $(curl-config --features|grep SSL) = SSL; then
++      if test -n "$(${PKG_CONFIG:-pkg-config} libcurl --variable=supported_features|grep SSL)"; then
+          NEEDS_SSL_WITH_CURL=YesPlease
+          { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+ $as_echo "yes" >&6; }
+@@ -5423,8 +5384,6 @@
+     fi
+ fi
+ 
+-fi
+-
+ 
+ #
+ # Define NO_EXPAT if you do not have expat installed.  git-http-push is
+diff -Paur --no-dereference -- git.upstream/git-compat-util.h git/git-compat-util.h
+--- git.upstream/git-compat-util.h
++++ git/git-compat-util.h
+@@ -325,6 +325,10 @@
+ typedef uintmax_t timestamp_t;
+ #define PRItime PRIuMAX
+ #define parse_timestamp strtoumax
++/* PATCH: Avoid conflicting Sortix macro. */
++#ifdef TIME_MAX
++#undef TIME_MAX
++#endif
+ #define TIME_MAX UINTMAX_MAX
+ 
+ #ifndef PATH_SEP
+diff -Paur --no-dereference -- git.upstream/lockfile.c git/lockfile.c
+--- git.upstream/lockfile.c
++++ git/lockfile.c
+@@ -105,16 +105,10 @@
+ 	int n = 1;
+ 	int multiplier = 1;
+ 	long remaining_ms = 0;
+-	static int random_initialized = 0;
+ 
+ 	if (timeout_ms == 0)
+ 		return lock_file(lk, path, flags);
+ 
+-	if (!random_initialized) {
+-		srand((unsigned int)getpid());
+-		random_initialized = 1;
+-	}
+-
+ 	if (timeout_ms > 0)
+ 		remaining_ms = timeout_ms;
+ 
+@@ -133,7 +127,8 @@
+ 
+ 		backoff_ms = multiplier * INITIAL_BACKOFF_MS;
+ 		/* back off for between 0.75*backoff_ms and 1.25*backoff_ms */
+-		wait_ms = (750 + rand() % 500) * backoff_ms / 1000;
++		/* PATCH: Avoid rand(3) warning and modulo bias. */
++		wait_ms = (750 + arc4random_uniform(500)) * backoff_ms / 1000;
+ 		sleep_millisec(wait_ms);
+ 		remaining_ms -= wait_ms;
+ 
+diff -Paur --no-dereference -- git.upstream/Makefile git/Makefile
+--- git.upstream/Makefile
++++ git/Makefile
+@@ -1176,9 +1176,7 @@
+ 	endif
+ 	ifdef NEEDS_SSL_WITH_CURL
+ 		CURL_LIBCURL += -lssl
+-		ifdef NEEDS_CRYPTO_WITH_SSL
+-			CURL_LIBCURL += -lcrypto
+-		endif
++		CURL_LIBCURL += -lcrypto
+ 	endif
+ 	ifdef NEEDS_IDN_WITH_CURL
+ 		CURL_LIBCURL += -lidn
+@@ -1252,6 +1250,12 @@
+ 	LIB_4_CRYPTO += -framework Security -framework CoreFoundation
+ endif
+ endif
++# PATCH: Link with libintl first so it can statically link with libiconv.
++ifndef NO_GETTEXT
++ifndef LIBC_CONTAINS_LIBINTL
++	EXTLIBS += -lintl
++endif
++endif
+ ifdef NEEDS_LIBICONV
+ 	ifdef ICONVDIR
+ 		BASIC_CFLAGS += -I$(ICONVDIR)/include
+@@ -1259,19 +1263,11 @@
+ 	else
+ 		ICONV_LINK =
+ 	endif
+-	ifdef NEEDS_LIBINTL_BEFORE_LIBICONV
+-		ICONV_LINK += -lintl
+-	endif
+ 	EXTLIBS += $(ICONV_LINK) -liconv
+ endif
+ ifdef NEEDS_LIBGEN
+ 	EXTLIBS += -lgen
+ endif
+-ifndef NO_GETTEXT
+-ifndef LIBC_CONTAINS_LIBINTL
+-	EXTLIBS += -lintl
+-endif
+-endif
+ ifdef NEEDS_SOCKET
+ 	EXTLIBS += -lsocket
+ endif
+@@ -2184,8 +2180,10 @@
+ doc:
+ 	$(MAKE) -C Documentation all
+ 
++# PATCH: Build manual pages if asciidoc and xmlto are installed.
++all:: man
+ man:
+-	$(MAKE) -C Documentation man
++	if which asciidoc 1>/dev/null 2>/dev/null && which xmlto 1>/dev/null 2>/dev/null; then $(MAKE) -C Documentation man; fi
+ 
+ html:
+ 	$(MAKE) -C Documentation html
+@@ -2502,7 +2500,7 @@
+ profile-fast-install: profile-fast
+ 	$(MAKE) install
+ 
+-install: all
++install: all install-man
+ 	$(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(bindir_SQ)'
+ 	$(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(gitexec_instdir_SQ)'
+ 	$(INSTALL) $(ALL_PROGRAMS) '$(DESTDIR_SQ)$(gitexec_instdir_SQ)'
+@@ -2570,8 +2568,9 @@
+ install-doc:
+ 	$(MAKE) -C Documentation install
+ 
++# PATCH: Install manual pages if asciidoc and xmlto are installed.
+ install-man:
+-	$(MAKE) -C Documentation install-man
++	if which asciidoc 1>/dev/null 2>/dev/null && which xmlto 1>/dev/null 2>/dev/null; then $(MAKE) -C Documentation install-man; fi
+ 
+ install-html:
+ 	$(MAKE) -C Documentation install-html
+@@ -2638,8 +2637,8 @@
+ 
+ ### Cleaning rules
+ 
++# PATCH: Don't delete configure when making distclean because it is in the dist.
+ distclean: clean
+-	$(RM) configure
+ 	$(RM) config.log config.status config.cache
+ 	$(RM) config.mak.autogen config.mak.append
+ 	$(RM) -r autom4te.cache
+diff -Paur --no-dereference -- git.upstream/progress.c git/progress.c
+--- git.upstream/progress.c
++++ git/progress.c
+@@ -39,6 +39,10 @@
+ 	uint64_t start_ns;
+ };
+ 
++/* PATCH: Sortix does not have obsolescent XSI itimers. */
++#if defined(__sortix__)
++static timer_t progress_timer;
++#endif
+ static volatile sig_atomic_t progress_update;
+ 
+ static void progress_interval(int signum)
+@@ -48,8 +52,19 @@
+ 
+ static void set_progress_signal(void)
+ {
++#if defined(__sortix__) && !defined(__SORTIX_HAS_RESTARTABLE_SYSCALLS__)
++	/* TODO: Sortix doesn't have restartable system calls at the moment and this
++	         feature creates spurious failures, so this feature is disabled for
++	         now. */
++	return;
++#endif
++
+ 	struct sigaction sa;
++#if defined(__sortix__)
++	struct itimerspec v;
++#else
+ 	struct itimerval v;
++#endif
+ 
+ 	progress_update = 0;
+ 
+@@ -59,16 +74,39 @@
+ 	sa.sa_flags = SA_RESTART;
+ 	sigaction(SIGALRM, &sa, NULL);
+ 
++#if defined(__sortix__)
++	struct sigevent sev;
++	memset(&sev, 0, sizeof(sev));
++	sev.sigev_notify = SIGEV_SIGNAL;
++	sev.sigev_signo = SIGALRM;
++	timer_create(CLOCK_MONOTONIC, &sev, &progress_timer);
++	v.it_interval.tv_sec = 1;
++	v.it_interval.tv_nsec = 0;
++	v.it_value = v.it_interval;
++	timer_settime(progress_timer, 0, &v, NULL);
++#else
+ 	v.it_interval.tv_sec = 1;
+ 	v.it_interval.tv_usec = 0;
+ 	v.it_value = v.it_interval;
+ 	setitimer(ITIMER_REAL, &v, NULL);
++#endif
+ }
+ 
+ static void clear_progress_signal(void)
+ {
++#if defined(__sortix__) && !defined(__SORTIX_HAS_RESTARTABLE_SYSCALLS__)
++	/* TODO: Sortix doesn't have restartable system calls at the moment and this
++	         feature creates spurious failures, so this feature is disabled for
++	         now. */
++	return;
++#endif
++
++#if defined(__sortix__)
++	timer_delete(progress_timer);
++#else
+ 	struct itimerval v = {{0,},};
+ 	setitimer(ITIMER_REAL, &v, NULL);
++#endif
+ 	signal(SIGALRM, SIG_IGN);
+ 	progress_update = 0;
+ }
+diff -Paur --no-dereference -- git.upstream/run-command.c git/run-command.c
+--- git.upstream/run-command.c
++++ git/run-command.c
+@@ -491,9 +491,12 @@
+ #else
+ 	bug_die(pthread_sigmask(SIG_SETMASK, &all, &as->old),
+ 		"blocking all signals");
++/* PATCH: Sortix doesn't have pthread cancelation. */
++#ifdef PTHREAD_CANCEL_DISABLE
+ 	bug_die(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &as->cs),
+ 		"disabling cancellation");
+ #endif
++#endif
+ }
+ 
+ static void atfork_parent(struct atfork_state *as)
+@@ -502,8 +505,11 @@
+ 	if (sigprocmask(SIG_SETMASK, &as->old, NULL))
+ 		die_errno("sigprocmask");
+ #else
++/* PATCH: Sortix doesn't have pthread cancelation. */
++#ifdef PTHREAD_CANCEL_DISABLE
+ 	bug_die(pthread_setcancelstate(as->cs, NULL),
+ 		"re-enabling cancellation");
++#endif
+ 	bug_die(pthread_sigmask(SIG_SETMASK, &as->old, NULL),
+ 		"restoring signal mask");
+ #endif

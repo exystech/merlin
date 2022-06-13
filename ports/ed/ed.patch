@@ -1,0 +1,64 @@
+diff -Paur --no-dereference -- ed.upstream/main.c ed/main.c
+--- ed.upstream/main.c
++++ ed/main.c
+@@ -60,6 +60,10 @@
+ 
+ #include "ed.h"
+ 
++#if defined(__sortix__) && !defined(PATH_MAX)
++#define PATH_MAX 4096
++#endif
++
+ void signal_hup(int);
+ void signal_int(int);
+ void handle_winch(int);
+@@ -129,8 +133,10 @@
+ 	int c, n;
+ 	int status = 0;
+ 
++#if 0
+ 	if (pledge("stdio rpath wpath cpath proc exec tty", NULL) == -1)
+ 		err(1, "pledge");
++#endif
+ 
+ 	home = getenv("HOME");
+ 
+diff -Paur --no-dereference -- ed.upstream/Makefile ed/Makefile
+--- ed.upstream/Makefile
++++ ed/Makefile
+@@ -0,0 +1,35 @@
++include ../../../build-aux/platform.mak
++include ../../../build-aux/compiler.mak
++include ../../../build-aux/version.mak
++include ../../../build-aux/dirs.mak
++
++OPTLEVEL?=$(DEFAULT_OPTLEVEL)
++CFLAGS?=$(OPTLEVEL)
++
++CFLAGS:=$(CXXFLAGS) -Wall -Wextra -Wno-logical-not-parentheses -Wno-unused-parameter
++CPPFLAGS:=$(CPPFLAGS) -DBACKWARDS
++
++PROGRAM=ed
++MANPAGE=ed.1
++
++OBJS=buf.o glbl.o io.o main.o re.o sub.o undo.o
++
++.PHONY: all
++all: $(PROGRAM)
++
++$(PROGRAM): $(OBJS)
++	$(CC) $(CFLAGS) -o $(PROGRAM) $(OBJS)
++
++%: %.c
++	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< -o $@ $(LIBS)
++
++.PHONY: clean
++clean:
++	rm -f $(PROGRAM) $(OBJS)
++
++.PHONY: install
++install: all
++	mkdir -p $(DESTDIR)$(BINDIR)
++	install $(PROGRAM) $(DESTDIR)$(BINDIR)
++	mkdir -p $(DESTDIR)$(MANDIR)/man1
++	install $(MANPAGE) $(DESTDIR)$(MANDIR)/man1

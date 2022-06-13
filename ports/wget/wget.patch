@@ -1,0 +1,320 @@
+diff -Paur --no-dereference -- wget.upstream/configure wget/configure
+--- wget.upstream/configure
++++ wget/configure
+@@ -1,4 +1,124 @@
+ #! /bin/sh
++# Make gnulib assume the best about unknown operating systems when cross-compiling.
++export ac_cv_func_calloc_0_nonnull=yes
++export ac_cv_func_chown_works=yes
++export ac_cv_func_getgroups_works=yes
++export ac_cv_func_malloc_0_nonnull=yes
++export gl_cv_func_cbrtl_ieee=yes
++export gl_cv_func_ceilf_ieee=yes
++export gl_cv_func_ceil_ieee=yes
++export gl_cv_func_ceill_ieee=yes
++export gl_cv_func_chown_ctime_works=yes
++export gl_cv_func_chown_slash_works=yes
++export gl_cv_func_exp2l_ieee=yes
++export gl_cv_func_expm1_ieee=yes
++export gl_cv_func_fcntl_f_dupfd_works=yes # Not needed since February 2015
++export gl_cv_func_fdopendir_works=yes
++export gl_cv_func_floorf_ieee=yes
++export gl_cv_func_fmaf_works=yes
++export gl_cv_func_fmal_works=yes
++export gl_cv_func_fma_works=yes
++export gl_cv_func_fmodf_ieee=yes
++export gl_cv_func_fmod_ieee=yes
++export gl_cv_func_fmodl_ieee=yes
++export gl_cv_func_fpurge_works=yes
++export gl_cv_func_futimens_works=yes
++export gl_cv_func_futimesat_works=yes
++export gl_cv_func_getgroups_works=yes
++export gl_cv_func_gettimeofday_clobber=no
++export gl_cv_func_hypotf_ieee=yes
++export gl_cv_func_hypotl_ieee=yes
++export gl_cv_func_hypot_ieee=yes
++export gl_cv_func_isfinitel_works=yes
++export gl_cv_func_isnanl_works=yes
++export gl_cv_func_linkat_slash=yes
++export gl_cv_func_link_works=yes
++export gl_cv_func_log10f_ieee=yes
++export gl_cv_func_log10_ieee=yes
++export gl_cv_func_log1pf_ieee=yes
++export gl_cv_func_log1p_ieee=yes
++export gl_cv_func_log1pl_ieee=yes
++export gl_cv_func_log2f_ieee=yes
++export gl_cv_func_log2_ieee=yes
++export gl_cv_func_logf_ieee=yes
++export gl_cv_func_log_ieee=yes
++export gl_cv_func_lstat_dereferences_slashed_symlink=yes
++export gl_cv_func_mbrlen_empty_input=yes
++export gl_cv_func_mbrtowc_empty_input=yes
++export gl_cv_func_memchr_works=yes
++export gl_cv_func_memmem_works_fast=yes
++export gl_cv_func_mkdir_trailing_dot_works=yes
++export gl_cv_func_mkdir_trailing_slash_works=yes
++export gl_cv_func_mkfifo_works=yes
++export gl_cv_func_mknod_works=yes
++export gl_cv_func_modff_ieee=yes
++export gl_cv_func_modf_ieee=yes
++export gl_cv_func_modfl_ieee=yes
++export gl_cv_func_nanosleep=yes
++export gl_cv_func_open_directory_works=yes
++export gl_cv_func_perror_works=yes
++export gl_cv_func_printf_directive_a=yes
++export gl_cv_func_printf_directive_f=yes
++export gl_cv_func_printf_directive_n=yes
++export gl_cv_func_printf_enomem=yes
++export gl_cv_func_printf_flag_zero=yes
++export gl_cv_func_printf_infinite_long_double=yes
++export gl_cv_func_printf_infinite=yes
++export gl_cv_func_printf_sizes_c99=yes
++export gl_cv_func_pselect_detects_ebadf=yes
++export gl_cv_func_ptsname_sets_errno=yes
++export gl_cv_func_readlink_works=yes
++export gl_cv_func_realpath_works=yes
++export gl_cv_func_remainderf_ieee=yes
++export gl_cv_func_remainder_ieee=yes
++export gl_cv_func_remainderl_ieee=yes
++export gl_cv_func_rename_dest_works=yes
++export gl_cv_func_rename_link_works=yes
++export gl_cv_func_rename_slash_dst_works=yes
++export gl_cv_func_rename_slash_src_works=yes
++export gl_cv_func_rmdir_works=yes
++export gl_cv_func_roundf_ieee=yes
++export gl_cv_func_round_ieee=yes
++export gl_cv_func_select_detects_ebadf=yes
++export gl_cv_func_setenv_works=yes
++export gl_cv_func_signbit_gcc=yes
++export gl_cv_func_signbit=yes
++export gl_cv_func_sleep_works=yes
++export gl_cv_func_snprintf_directive_n=yes
++export gl_cv_func_snprintf_retval_c99=yes
++export gl_cv_func_snprintf_truncation_c99=yes
++export gl_cv_func_stat_dir_slash=yes
++export gl_cv_func_stat_file_slash=yes
++export gl_cv_func_stpncpy=yes
++export gl_cv_func_strcasestr_linear=yes
++export gl_cv_func_strchrnul_works=yes
++export gl_cv_func_strerror_0_works=yes
++export gl_cv_func_strstr_linear=yes
++export gl_cv_func_strtod_works=yes
++export gl_cv_func_svid_putenv=yes
++export gl_cv_func_symlink_works=yes
++export gl_cv_func_tdelete_works=yes
++export gl_cv_func_truncf_ieee=yes
++export gl_cv_func_trunc_ieee=yes
++export gl_cv_func_truncl_ieee=yes
++export gl_cv_func_tzset_clobber=no
++export gl_cv_func_ungetc_works=yes
++export gl_cv_func_unlink_honors_slashes=yes
++export gl_cv_func_unsetenv_works=yes
++export gl_cv_func_usleep_works=yes
++export gl_cv_func_utimensat_works=yes
++export gl_cv_func_vsnprintf_posix=yes
++export gl_cv_func_vsnprintf_zerosize_c99=yes
++export gl_cv_func_vsprintf_posix=yes
++export gl_cv_func_wcwidth_works=yes
++export gl_cv_func_working_getdelim=yes
++export gl_cv_func_working_mkstemp=yes
++export gl_cv_func_working_mktime=yes
++export gl_cv_func_working_strerror=yes
++export ac_cv_func___fseterr=yes # Only if the OS actually supports this, Sortix does.
++export gl_cv_func_getcwd_null=yes # Only if the OS actually supports this, Sortix does.
++export gl_cv_struct_dirent_d_ino=yes # Only if the OS actually supports this, Sortix does.
++export ac_cv_func_realloc_0_nonnull=yes # TODO: Investigate this, found in flex.
+ # Guess values for system-dependent variables and create Makefiles.
+ # Generated by GNU Autoconf 2.69 for wget 1.18.
+ #
+@@ -39179,6 +39299,8 @@
+ esac
+ fi
+ GPGME_CONFIG=$ac_cv_path_GPGME_CONFIG
++# PATCH: Not cross-compile safe.
++GPGME_CONFIG=no
+ if test -n "$GPGME_CONFIG"; then
+   { $as_echo "$as_me:${as_lineno-$LINENO}: result: $GPGME_CONFIG" >&5
+ $as_echo "$GPGME_CONFIG" >&6; }
+@@ -39841,7 +39963,7 @@
+ { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_idn_stringprep_check_version" >&5
+ $as_echo "$ac_cv_lib_idn_stringprep_check_version" >&6; }
+ if test "x$ac_cv_lib_idn_stringprep_check_version" = xyes; then :
+-  iri=yes LIBS="${LIBS} -lidn"
++  iri=yes LIBS="${LIBS} -lidn $LIBINTL"
+ else
+   iri=no
+ fi
+diff -Paur --no-dereference -- wget.upstream/lib/flock.c wget/lib/flock.c
+--- wget.upstream/lib/flock.c
++++ wget/lib/flock.c
+@@ -211,6 +211,16 @@
+   return r;
+ }
+ 
++# elif defined (__sortix__)
++
++int
++flock (int fd, int operation)
++{
++  (void) fd;
++  (void) operation;
++  return 0;
++}
++
+ # else /* !HAVE_STRUCT_FLOCK_L_TYPE */
+ 
+ #  error "This platform lacks flock function, and Gnulib doesn't provide a replacement. This is a bug in Gnulib."
+diff -Paur --no-dereference -- wget.upstream/src/hsts.c wget/src/hsts.c
+--- wget.upstream/src/hsts.c
++++ wget/src/hsts.c
+@@ -325,9 +325,9 @@
+       struct hsts_kh *kh = (struct hsts_kh *) it.key;
+       struct hsts_kh_info *khi = (struct hsts_kh_info *) it.value;
+ 
+-      if (fprintf (fp, "%s\t%d\t%d\t%lu\t%lu\n",
++      if (fprintf (fp, "%s\t%d\t%d\t%lli\t%lli\n",
+                    kh->host, kh->explicit_port, khi->include_subdomains,
+-                   khi->created, khi->max_age) < 0)
++                   (long long)khi->created, (long long)khi->max_age) < 0)
+         {
+           logprintf (LOG_ALWAYS, "Could not write the HSTS database correctly.\n");
+           break;
+diff -Paur --no-dereference -- wget.upstream/src/init.c wget/src/init.c
+--- wget.upstream/src/init.c
++++ wget/src/init.c
+@@ -39,13 +39,6 @@
+ #include <string.h>
+ #include <errno.h>
+ #include <limits.h>
+-/* not all systems provide PATH_MAX in limits.h */
+-#ifndef PATH_MAX
+-# include <sys/param.h>
+-# ifndef PATH_MAX
+-#  define PATH_MAX MAXPATHLEN
+-# endif
+-#endif
+ 
+ #include <regex.h>
+ #ifdef HAVE_LIBPCRE
+diff -Paur --no-dereference -- wget.upstream/src/progress.c wget/src/progress.c
+--- wget.upstream/src/progress.c
++++ wget/src/progress.c
+@@ -311,9 +311,15 @@
+     if (dp->rows == dp->initial_length / ROW_BYTES)
+       bytes_this_row -= dp->initial_length % ROW_BYTES;
+     rate = calc_rate (bytes_this_row, dltime - dp->last_timer_value, &units);
++#if defined(__sortix__)
++    /* PATCH: HACK: Sortix doesn't support floating point printf right now. */
++    logprintf (LOG_PROGRESS, " %4lli%c",
++               (long long)rate, names[units]);
++#else
+     logprintf (LOG_PROGRESS, " %4.*f%c",
+                rate >= 99.95 ? 0 : rate >= 9.995 ? 1 : 2,
+                rate, names[units]);
++#endif
+     dp->last_timer_value = dltime;
+   }
+ 
+@@ -1093,8 +1099,14 @@
+       wgint dlquant = hist->total_bytes + bp->recent_bytes;
+       double dltime = hist->total_time + (dl_total_time - bp->recent_start);
+       double dlspeed = calc_rate (dlquant, dltime, &units);
++#if defined(__sortix__)
++      /* PATCH: HACK: Sortix doesn't support floating point printf right now. */
++      p += sprintf (p, "  %4lli%s",
++               (long long)dlspeed,  !opt.report_bps ? short_units[units] : short_units_bits[units]);
++#else
+       p += sprintf (p, "  %4.*f%s", dlspeed >= 99.95 ? 0 : dlspeed >= 9.995 ? 1 : 2,
+                dlspeed,  !opt.report_bps ? short_units[units] : short_units_bits[units]);
++#endif
+     }
+   else
+     APPEND_LITERAL ("  --.-KB/s");
+diff -Paur --no-dereference -- wget.upstream/src/retr.c wget/src/retr.c
+--- wget.upstream/src/retr.c
++++ wget/src/retr.c
+@@ -634,9 +634,15 @@
+   double dlrate = calc_rate (bytes, secs, &units);
+   /* Use more digits for smaller numbers (regardless of unit used),
+      e.g. "1022", "247", "12.5", "2.38".  */
++#if defined(__sortix__)
++  /* PATCH: HACK: Sortix doesn't support floating point printf right now. */
++  sprintf (res, "%lli %s", (long long)dlrate,
++           !opt.report_bps ? rate_names[units]: rate_names_bits[units]);
++#else
+   sprintf (res, "%.*f %s",
+            dlrate >= 99.95 ? 0 : dlrate >= 9.995 ? 1 : 2,
+            dlrate, !opt.report_bps ? rate_names[units]: rate_names_bits[units]);
++#endif
+ 
+   return res;
+ }
+diff -Paur --no-dereference -- wget.upstream/src/utils.c wget/src/utils.c
+--- wget.upstream/src/utils.c
++++ wget/src/utils.c
+@@ -505,7 +505,9 @@
+     }
+ 
+   /* child: give up the privileges and keep running. */
++#if !defined(__sortix__)
+   setsid ();
++#endif
+   if (freopen ("/dev/null", "r", stdin) == NULL)
+     DEBUGP (("Failed to redirect stdin to /dev/null.\n"));
+   if (freopen ("/dev/null", "w", stdout) == NULL)
+@@ -1583,8 +1585,13 @@
+           double val = n / 1024.0;
+           /* Print values smaller than the accuracy level (acc) with (decimal)
+            * decimal digits, and others without any decimals.  */
++#if defined(__sortix__)
++          /* PATCH: HACK: Sortix doesn't support floating point printf right now. */
++          snprintf (buf, sizeof (buf), "%lli%c", (long long)val, powers[i]); 
++#else
+           snprintf (buf, sizeof (buf), "%.*f%c",
+                     val < acc ? decimals : 0, val, powers[i]);
++#endif
+           return buf;
+         }
+       n /= 1024;
+@@ -1843,9 +1850,11 @@
+ #endif /* neither TIOCGWINSZ nor WINDOWS */
+ }
+ 
++#if !defined(__sortix__)
+ /* Whether the rnd system (either rand or [dl]rand48) has been
+    seeded.  */
+ static int rnd_seeded;
++#endif
+ 
+ /* Return a random number between 0 and MAX-1, inclusive.
+ 
+@@ -1862,7 +1871,9 @@
+ int
+ random_number (int max)
+ {
+-#ifdef HAVE_RANDOM
++#if defined(__sortix__)
++  return arc4random_uniform(max);
++#elif defined HAVE_RANDOM
+   if (!rnd_seeded)
+     {
+       srandom ((long) time (NULL) ^ (long) getpid ());
+@@ -2444,6 +2455,10 @@
+   static char buf[32];
+   double n = number >= 0 ? number : -number;
+ 
++#if defined(__sortix__)
++  /* PATCH: HACK: Sortix doesn't support floating point printf right now. */
++  snprintf (buf, sizeof buf, "%lld", (long long) number);
++#else
+   if (n >= 9.95)
+     /* Cut off at 9.95 because the below %.1f would round 9.96 to
+        "10.0" instead of "10".  OTOH 9.94 will print as "9.9".  */
+@@ -2458,6 +2473,7 @@
+   else
+     /* print numbers close to 0 as 0, not 0.000 */
+     strcpy (buf, "0");
++#endif
+ 
+   return buf;
+ }

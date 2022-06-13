@@ -1,0 +1,42 @@
+.Dd June 6, 2022
+.Dt TIX-RMPATCH 8
+.Os
+.Sh NAME
+.Nm tix-rmpatch
+.Nd remove files and directories per the rmpatch
+.Sh SYNOPSIS
+.Nm
+.Op Fl \-check
+.Op Fl \-directory Ns = Ns Ar directory
+.Ar rmpatch
+.Sh DESCRIPTION
+.Nm
+recursively removes the files and directories per an rmpatch
+produced by
+.Xr tix-rmdiff 8 .
+The rmpatch is checked for validity and absolute paths and paths containing
+.Sq ..
+components are rejected.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl \-check
+Check only the rmpatch is valid and don't remove any files or directories.
+.It Fl \-directory Ns = Ns Ar directory
+Remove inside
+.Ar directory
+instead of the working directory.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr diff 1 ,
+.Xr patch 1 ,
+.Xr port 5 ,
+.Xr tix-execdiff 8 ,
+.Xr tix-execpatch 8 ,
+.Xr tix-rmdiff 8
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 0.8.

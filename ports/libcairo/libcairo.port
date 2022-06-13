@@ -1,0 +1,13 @@
+NAME=libcairo
+BUILD_LIBRARIES='libz bzip2 libpng libfreetype libfontconfig? librsvg? libexpat? libpixman libglib?'
+VERSION=1.12.14
+DISTNAME=cairo-$VERSION
+COMPRESSION=tar.xz
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=96d0d1e3f9b74d2ca3469ff187c5e5f25649b1ad35cf06f4f3a83847dff4ac13
+UPSTREAM_SITE=https://www.cairographics.org/releases
+UPSTREAM_ARCHIVE=$ARCHIVE
+BUILD_SYSTEM=configure
+CONFIGURE_ARGS='--without-x --disable-valgrind --disable-xlib --enable-xlib=no --enable-xcb=no --enable-xlib-xcb=no --enable-xcb-shm=no --enable-glx=no'
+MAKE_VARS='V=1'
+POST_INSTALL=tix-eradicate-libtool-la

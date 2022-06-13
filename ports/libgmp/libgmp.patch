@@ -1,0 +1,60 @@
+diff -Paur --no-dereference -- libgmp.upstream/configfsf.sub libgmp/configfsf.sub
+--- libgmp.upstream/configfsf.sub
++++ libgmp/configfsf.sub
+@@ -1356,7 +1356,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* | -plan9* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -sortix* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -Paur --no-dereference -- libgmp.upstream/configure libgmp/configure
+--- libgmp.upstream/configure
++++ libgmp/configure
+@@ -6224,6 +6224,8 @@
+    1666 to segfault with e.g., -O2 -mpowerpc64.  */
+ 
+ #if defined (__GNUC__) && ! defined (__cplusplus)
++h();
++g();
+ typedef unsigned long long t1;typedef t1*t2;
+ static __inline__ t1 e(t2 rp,t2 up,int n,t1 v0)
+ {t1 c,x,r;int i;if(v0){c=1;for(i=1;i<n;i++){x=up[i];r=x+1;rp[i]=r;}}return c;}
+@@ -6288,6 +6290,7 @@
+    1666 to get an ICE with -O1 -mpowerpc64.  */
+ 
+ #if defined (__GNUC__) && ! defined (__cplusplus)
++g();
+ f(int u){int i;long long x;x=u?~0:0;if(x)for(i=0;i<9;i++);x&=g();if(x)g();}
+ g(){}
+ #else
+@@ -7777,6 +7780,8 @@
+    1666 to segfault with e.g., -O2 -mpowerpc64.  */
+ 
+ #if defined (__GNUC__) && ! defined (__cplusplus)
++h();
++g();
+ typedef unsigned long long t1;typedef t1*t2;
+ static __inline__ t1 e(t2 rp,t2 up,int n,t1 v0)
+ {t1 c,x,r;int i;if(v0){c=1;for(i=1;i<n;i++){x=up[i];r=x+1;rp[i]=r;}}return c;}
+@@ -7841,6 +7846,7 @@
+    1666 to get an ICE with -O1 -mpowerpc64.  */
+ 
+ #if defined (__GNUC__) && ! defined (__cplusplus)
++g();
+ f(int u){int i;long long x;x=u?~0:0;if(x)for(i=0;i<9;i++);x&=g();if(x)g();}
+ g(){}
+ #else
+diff -Paur --no-dereference -- libgmp.upstream/gmp-h.in libgmp/gmp-h.in
+--- libgmp.upstream/gmp-h.in
++++ libgmp/gmp-h.in
+@@ -254,6 +254,7 @@
+ /* For reference, "defined(EOF)" cannot be used here.  In g++ 2.95.4,
+    <iostream> defines EOF but not FILE.  */
+ #if defined (FILE)                                              \
++  || defined (stdout)                                           \
+   || defined (H_STDIO)                                          \
+   || defined (_H_STDIO)               /* AIX */                 \
+   || defined (_STDIO_H)               /* glibc, Sun, SCO */     \

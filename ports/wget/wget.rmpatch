@@ -1,0 +1,4 @@
+rm -rf -- 'doc/stamp-vti'
+rm -rf -- 'src/build_info.c'
+rm -rf -- 'src/css.c'
+rm -rf -- 'src/css_.c'

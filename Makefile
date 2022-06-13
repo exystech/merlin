@@ -4,7 +4,6 @@ include build-aux/compiler.mak
 include build-aux/version.mak
 
 MODULES=\
-doc \
 libc \
 libm \
 dispd \
@@ -43,10 +42,13 @@ ifndef SYSROOT_OVERLAY
 endif
 
 SORTIX_BUILDS_DIR?=builds
+SORTIX_MIRROR_DIR?=mirror
 SORTIX_PORTS_DIR?=ports
 SORTIX_RELEASE_DIR?=release
 SORTIX_REPOSITORY_DIR?=repository
 SORTIX_ISO_COMPRESSION?=xz
+
+SORTIX_PORTS_MIRROR?=https://pub.sortix.org/mirror
 
 SORTIX_INCLUDE_SOURCE_GIT_REPO?=$(shell test -d .git && echo "file://`pwd`")
 SORTIX_INCLUDE_SOURCE_GIT_REPO:=$(SORTIX_INCLUDE_SOURCE_GIT_REPO)
@@ -225,15 +227,56 @@ endif
 	grep -E '^/src(/.*)?$$' | \
 	LC_ALL=C sort > "$(SYSROOT)/tix/manifest/src"
 
-.PHONY: sysroot-ports
-sysroot-ports: sysroot-fsh sysroot-base-headers sysroot-system sysroot-source
-	@SORTIX_PORTS_DIR="$(SORTIX_PORTS_DIR)" \
+.PHONY: available-ports
+available-ports:
+	@for port in $$(build-aux/list-packages.sh PACKAGES); do \
+	  build-aux/upgrade-port.sh ports/$$port/$$port.port available; \
+	done
+
+.PHONY: upgrade-ports
+upgrade-ports:
+	@for port in $$(build-aux/list-packages.sh PACKAGES); do \
+	  build-aux/upgrade-port.sh ports/$$port/$$port.port upgrade; \
+	done
+
+.PHONY: mirror
+mirror:
+	@SORTIX_MIRROR_DIR="$(SORTIX_MIRROR_DIR)" \
+	 SORTIX_PORTS_DIR="$(SORTIX_PORTS_DIR)" \
 	 SORTIX_REPOSITORY_DIR="$(SORTIX_REPOSITORY_DIR)" \
+	 SORTIX_PORTS_MIRROR="$(SORTIX_PORTS_MIRROR)" \
 	 SYSROOT="$(SYSROOT)" \
+	 BUILD="$(BUILD)" \
 	 HOST="$(HOST)" \
 	 MAKE="$(MAKE)" \
 	 MAKEFLAGS="$(MAKEFLAGS)" \
-	 build-aux/build-ports.sh
+	 build-aux/build-ports.sh download
+
+.PHONY: extract-ports
+extract-ports:
+	@SORTIX_MIRROR_DIR="$(SORTIX_MIRROR_DIR)" \
+	 SORTIX_PORTS_DIR="$(SORTIX_PORTS_DIR)" \
+	 SORTIX_REPOSITORY_DIR="$(SORTIX_REPOSITORY_DIR)" \
+	 SORTIX_PORTS_MIRROR="$(SORTIX_PORTS_MIRROR)" \
+	 SYSROOT="$(SYSROOT)" \
+	 BUILD="$(BUILD)" \
+	 HOST="$(HOST)" \
+	 MAKE="$(MAKE)" \
+	 MAKEFLAGS="$(MAKEFLAGS)" \
+	 build-aux/build-ports.sh extract
+
+.PHONY: sysroot-ports
+sysroot-ports: sysroot-fsh sysroot-base-headers sysroot-system sysroot-source
+	@SORTIX_MIRROR_DIR="$(SORTIX_MIRROR_DIR)" \
+	 SORTIX_PORTS_DIR="$(SORTIX_PORTS_DIR)" \
+	 SORTIX_REPOSITORY_DIR="$(SORTIX_REPOSITORY_DIR)" \
+	 SORTIX_PORTS_MIRROR="$(SORTIX_PORTS_MIRROR)" \
+	 SYSROOT="$(SYSROOT)" \
+	 BUILD="$(BUILD)" \
+	 HOST="$(HOST)" \
+	 MAKE="$(MAKE)" \
+	 MAKEFLAGS="$(MAKEFLAGS)" \
+	 build-aux/build-ports.sh build
 
 .PHONY: sysroot
 sysroot: sysroot-system sysroot-source sysroot-ports
@@ -248,10 +291,13 @@ $(SORTIX_REPOSITORY_DIR)/$(HOST): $(SORTIX_REPOSITORY_DIR)
 clean-core:
 	(for D in $(MODULES); do $(MAKE) clean -C $$D || exit $$?; done)
 
+.PHONY: clean-mirror
+clean-mirror:
+	rm -rf "$(SORTIX_MIRROR_DIR)"
+
 .PHONY: clean-ports
 clean-ports:
 	@SORTIX_PORTS_DIR="$(SORTIX_PORTS_DIR)" \
-	 HOST="$(HOST)" \
 	 MAKE="$(MAKE)" \
 	 MAKEFLAGS="$(MAKEFLAGS)" \
 	 build-aux/clean-ports.sh
@@ -277,11 +323,18 @@ clean-sysroot:
 .PHONY: clean
 clean: clean-core clean-ports
 
+.PHONY: distclean-ports
+distclean-ports:
+	@SORTIX_PORTS_DIR="$(SORTIX_PORTS_DIR)" \
+	 MAKE="$(MAKE)" \
+	 MAKEFLAGS="$(MAKEFLAGS)" \
+	 build-aux/clean-ports.sh distclean
+
 .PHONY: mostlyclean
-mostlyclean: clean-core clean-ports clean-builds clean-release clean-sysroot
+mostlyclean: clean-core distclean-ports clean-builds clean-release clean-sysroot
 
 .PHONY: distclean
-distclean: clean-core clean-ports clean-builds clean-release clean-repository clean-sysroot
+distclean: clean-core distclean-ports clean-builds clean-release clean-mirror clean-repository clean-sysroot
 
 .PHONY: most-things
 most-things: sysroot iso
@@ -340,7 +393,13 @@ $(LIVE_INITRD): sysroot
 	mkdir -p $(LIVE_INITRD).d/home
 	mkdir -p $(LIVE_INITRD).d/root -m 700
 	cp -RT "$(SYSROOT)/etc/skel" $(LIVE_INITRD).d/root
-	cp doc/welcome $(LIVE_INITRD).d/root
+	(echo "You can view the documentation for new users by typing:" && \
+	 echo && \
+	 echo "  man user-guide" && \
+	 echo && \
+	 echo "You can view the installation instructions by typing:" && \
+	 echo && \
+	 echo "  man installation") > $(LIVE_INITRD).d/root/welcome
 	tix-collection $(LIVE_INITRD).d create --platform=$(HOST) --prefix= --generation=2
 	mkinitrd --format=sortix-initrd-2 $(LIVE_INITRD).d -o $(LIVE_INITRD)
 	rm -rf $(LIVE_INITRD).d
@@ -491,7 +550,8 @@ $(SORTIX_RELEASE_DIR)/$(RELEASE)/repository/$(HOST):
 .PHONY: release-repository
 release-repository: sysroot $(SORTIX_RELEASE_DIR)/$(RELEASE)/repository/$(HOST)
 	for port in `LC_ALL=C ls "$(SYSROOT)/tix/tixinfo"`; do \
-	  cp $(SORTIX_REPOSITORY_DIR)/$(HOST)/$$port.tix.tar.xz $(SORTIX_RELEASE_DIR)/$(RELEASE)/repository/$(HOST); \
+	  cp $(SORTIX_REPOSITORY_DIR)/$(HOST)/$$port.tix.tar.xz $(SORTIX_RELEASE_DIR)/$(RELEASE)/repository/$(HOST) && \
+	  cp $(SORTIX_REPOSITORY_DIR)/$(HOST)/$$port.version $(SORTIX_RELEASE_DIR)/$(RELEASE)/repository/$(HOST); \
 	done
 
 .PHONY: release-scripts

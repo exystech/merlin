@@ -1,0 +1,25 @@
+.Dd June 6, 2022
+.Dt TIX-ERADICATE-LIBTOOL-LA 8
+.Os
+.Sh NAME
+.Nm tix-eradicate-libtool-la
+.Nd remove unnecessary .la files from the staging directory
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+is a
+.Xr port 5
+.Sy POST_INSTALL
+command that recursively removes all .la files from the installation staging
+directory named by the
+.Ev TIX_INSTALL_DIR
+environment variable.
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr port 5
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 0.8.

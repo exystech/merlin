@@ -1,0 +1,9 @@
+NAME=libintl
+SOURCE_PORT=gettext
+SUBDIR=gettext-runtime
+BUILD_SYSTEM=configure
+# libstdc++ is a dependency if libasprintf is enabled. Right now, I suspect it
+# is more trouble than it is worth, so it's disabled. Does anything of value
+# actually use it?
+CONFIGURE_ARGS=--disable-libasprintf
+POST_INSTALL=tix-eradicate-libtool-la

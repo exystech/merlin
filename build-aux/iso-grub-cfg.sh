@@ -115,7 +115,9 @@ live_initrd=$(maybe_compressed boot/live.initrd)
 overlay_initrd=$(maybe_compressed boot/overlay.initrd)
 src_initrd=$(maybe_compressed boot/src.initrd)
 system_initrd=$(maybe_compressed boot/system.initrd)
-ports=$(ls repository | sed 's/\.tix\.tar\.xz//')
+ports=$(ls repository |
+       grep -E '\.tix\.tar\.xz$' |
+       sed -E 's/\.tix\.tar\.xz$//')
 
 mkdir -p boot/grub
 exec > boot/grub/grub.cfg

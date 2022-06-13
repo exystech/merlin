@@ -15,7 +15,7 @@ if [ -z "$SORTIX_PORTS_DIR" ]; then
 elif ! [ -d "$SORTIX_PORTS_DIR" ] ||
      [ "$(ls "$SORTIX_PORTS_DIR") | wc -l" = 0 ]; then
   exit 0
-elif ! has_command tix-build; then
+elif ! has_command tix-vars; then
   echo "$0: warning: Can't clean ports directory without Tix locally installed." >&2
   exit 0
 fi
@@ -23,23 +23,41 @@ fi
 # Make paths absolute for later use.
 SORTIX_PORTS_DIR=$(make_dir_path_absolute "$SORTIX_PORTS_DIR")
 
-# Detect all packages.
-get_all_packages() {
-  for PACKAGE in $(ls "$SORTIX_PORTS_DIR"); do
-    ! [ -f "$SORTIX_PORTS_DIR/$PACKAGE/tixbuildinfo" ] ||
-    echo $PACKAGE
-  done
-}
-
 # Clean all the packages.
-for PACKAGE in $(get_all_packages); do
-  [ -f "$SORTIX_REPOSITORY_DIR/$PACKAGE.tix.tar.xz" ] ||
-  tix-build \
-    --sysroot="/" \
-    --host=$HOST \
-    --prefix= \
-    --destination="/" \
-    --start=clean \
-    --end=clean \
-    "$SORTIX_PORTS_DIR/$PACKAGE"
+for PACKAGE in $("$(dirname -- "$0")"/list-packages.sh 'all!'); do
+  if [ "$1" = distclean ]; then
+    DEVELOPMENT=$(tix-vars -d false $SORTIX_PORTS_DIR/$PACKAGE/$PACKAGE.port \
+                           DEVELOPMENT)
+    if [ "$DEVELOPMENT" = true ]; then
+      case "$SORTIX_PORTS_DIR/$PACKAGE/$PACKAGE.version" in
+      *.development)
+        echo "Port is in development: '$SORTIX_PORTS_DIR/$PACKAGE/$PACKAGE'"
+        continue
+        ;;
+      esac
+    fi
+    if [ -e "$SORTIX_PORTS_DIR/$PACKAGE/$PACKAGE" ]; then
+      echo "Removing '$SORTIX_PORTS_DIR/$PACKAGE/$PACKAGE'"
+    fi
+    rm -rf "$SORTIX_PORTS_DIR/$PACKAGE/$PACKAGE"
+    rm -rf "$SORTIX_PORTS_DIR/$PACKAGE/$PACKAGE.upstream"
+    rm -f "$SORTIX_PORTS_DIR/$PACKAGE/$PACKAGE.version"
+    rm -f "$SORTIX_PORTS_DIR/$PACKAGE/$PACKAGE.version.new"
+  fi
+  if [ -e "$SORTIX_PORTS_DIR/$PACKAGE/$PACKAGE.version" -o \
+       -e "$SORTIX_PORTS_DIR/$PACKAGE/$PACKAGE.version.new" ]; then
+    SOURCE_PORT=$(tix-vars -d '' $SORTIX_PORTS_DIR/$PACKAGE/$PACKAGE.port \
+                           SOURCE_PORT)
+    if [ -z "$SOURCE_PORT" ] ||
+       [ -e "$SORTIX_PORTS_DIR/$SOURCE_PORT/$SOURCE_PORT" ]; then
+      tix-build \
+        --sysroot="/" \
+        --prefix= \
+        --destination="/" \
+        --start=clean \
+        --end=clean \
+        ${SOURCE_PORT:+--source-port "$SORTIX_PORTS_DIR/$SOURCE_PORT/$SOURCE_PORT"} \
+        "$SORTIX_PORTS_DIR/$PACKAGE/$PACKAGE"
+    fi
+  fi
 done

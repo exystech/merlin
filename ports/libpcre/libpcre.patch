@@ -1,0 +1,130 @@
+diff -Paur --no-dereference -- libpcre.upstream/config.sub libpcre/config.sub
+--- libpcre.upstream/config.sub
++++ libpcre/config.sub
+@@ -1373,7 +1373,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* | -plan9* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -sortix* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -Paur --no-dereference -- libpcre.upstream/Makefile.in libpcre/Makefile.in
+--- libpcre.upstream/Makefile.in
++++ libpcre/Makefile.in
+@@ -130,7 +130,7 @@
+ @WITH_JIT_TRUE@@WITH_PCRE32_TRUE@am__append_17 = libpcre32.la
+ @WITH_GCOV_TRUE@@WITH_JIT_TRUE@am__append_18 = $(GCOV_CFLAGS)
+ @WITH_GCOV_TRUE@@WITH_JIT_TRUE@am__append_19 = $(GCOV_LIBS)
+-@WITH_PCRE8_TRUE@am__append_20 = libpcreposix.la
++@WITH_PCRE8_TRUE@am__append_20 =
+ @WITH_GCOV_TRUE@@WITH_PCRE8_TRUE@am__append_21 = $(GCOV_CFLAGS)
+ @WITH_PCRE_CPP_TRUE@am__append_22 = libpcrecpp.la
+ @WITH_PCRE_CPP_TRUE@am__append_23 = pcrecpp_unittest \
+@@ -144,7 +144,7 @@
+ @WITH_GCOV_TRUE@@WITH_PCRE_CPP_TRUE@am__append_27 = $(GCOV_LIBS)
+ @WITH_GCOV_TRUE@@WITH_PCRE_CPP_TRUE@am__append_28 = $(GCOV_LIBS)
+ @WITH_PCRE8_TRUE@am__append_29 = pcre_printint.c
+-@WITH_PCRE8_TRUE@am__append_30 = libpcre.la libpcreposix.la
++@WITH_PCRE8_TRUE@am__append_30 = libpcre.la
+ @WITH_PCRE16_TRUE@am__append_31 = pcre16_printint.c
+ @WITH_PCRE16_TRUE@am__append_32 = libpcre16.la
+ @WITH_PCRE32_TRUE@am__append_33 = pcre32_printint.c
+@@ -422,7 +422,7 @@
+ @WITH_GCOV_TRUE@@WITH_PCRE8_TRUE@	$(am__DEPENDENCIES_1)
+ @WITH_PCRE8_TRUE@pcregrep_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+ @WITH_PCRE8_TRUE@	$(am__DEPENDENCIES_1) libpcre.la \
+-@WITH_PCRE8_TRUE@	libpcreposix.la $(am__DEPENDENCIES_4)
++@WITH_PCRE8_TRUE@	$(am__DEPENDENCIES_4)
+ pcregrep_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+ 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(pcregrep_CFLAGS) \
+ 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+@@ -524,7 +524,7 @@
+ MANS = $(dist_man_MANS) $(man_MANS)
+ DATA = $(dist_doc_DATA) $(dist_html_DATA) $(dist_noinst_DATA) \
+ 	$(html_DATA) $(pkgconfig_DATA)
+-am__include_HEADERS_DIST = pcreposix.h pcrecpp.h pcre_scanner.h
++am__include_HEADERS_DIST = pcrecpp.h pcre_scanner.h
+ HEADERS = $(include_HEADERS) $(nodist_include_HEADERS)
+ am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) \
+ 	$(LISP)config.h.in
+@@ -914,7 +914,6 @@
+ ACLOCAL_AMFLAGS = -I m4
+ dist_doc_DATA = \
+   doc/pcre.txt \
+-  doc/pcre-config.txt \
+   doc/pcregrep.txt \
+   doc/pcretest.txt \
+   AUTHORS \
+@@ -930,7 +929,6 @@
+   doc/html/NON-AUTOTOOLS-BUILD.txt \
+   doc/html/README.txt \
+   doc/html/index.html \
+-  doc/html/pcre-config.html \
+   doc/html/pcre.html \
+   doc/html/pcre16.html \
+   doc/html/pcre32.html \
+@@ -973,7 +971,6 @@
+   doc/html/pcrepartial.html \
+   doc/html/pcrepattern.html \
+   doc/html/pcreperform.html \
+-  doc/html/pcreposix.html \
+   doc/html/pcreprecompile.html \
+   doc/html/pcresample.html \
+   doc/html/pcrestack.html \
+@@ -1080,8 +1077,8 @@
+ # These are the header files we'll install. We do not distribute pcre.h because
+ # it is generated from pcre.h.in.
+ nodist_include_HEADERS = pcre.h $(am__append_1)
+-include_HEADERS = pcreposix.h $(am__append_2)
+-bin_SCRIPTS = pcre-config
++include_HEADERS = $(am__append_2)
++bin_SCRIPTS = 
+ @WITH_REBUILD_CHARTABLES_TRUE@dftables_SOURCES = dftables.c
+ BUILT_SOURCES = pcre_chartables.c
+ @WITH_PCRE8_TRUE@libpcre_la_SOURCES = \
+@@ -1220,7 +1217,7 @@
+ @WITH_PCRE8_TRUE@pcregrep_SOURCES = pcregrep.c
+ @WITH_PCRE8_TRUE@pcregrep_CFLAGS = $(AM_CFLAGS) $(am__append_41)
+ @WITH_PCRE8_TRUE@pcregrep_LDADD = $(LIBZ) $(LIBBZ2) libpcre.la \
+-@WITH_PCRE8_TRUE@	libpcreposix.la $(am__append_42)
++@WITH_PCRE8_TRUE@	$(am__append_42)
+ 
+ # A PCRE user submitted the following addition, saying that it "will allow
+ # anyone using the 'mingw32' compiler to simply type 'make pcre.dll' and get a
+@@ -1236,12 +1233,11 @@
+ 
+ # We have .pc files for pkg-config users.
+ pkgconfigdir = $(libdir)/pkgconfig
+-pkgconfig_DATA = libpcre.pc libpcreposix.pc $(am__append_43) \
++pkgconfig_DATA = libpcre.pc $(am__append_43) \
+ 	$(am__append_44) $(am__append_45)
+ 
+ # Note that pcrecpp.3 is not in this list, but is included separately below.
+ dist_man_MANS = \
+-  doc/pcre-config.1 \
+   doc/pcre.3 \
+   doc/pcre16.3 \
+   doc/pcre32.3 \
+@@ -1284,7 +1280,6 @@
+   doc/pcrepartial.3 \
+   doc/pcrepattern.3 \
+   doc/pcreperform.3 \
+-  doc/pcreposix.3 \
+   doc/pcreprecompile.3 \
+   doc/pcresample.3 \
+   doc/pcrestack.3 \
+diff -Paur --no-dereference -- libpcre.upstream/pcretest.c libpcre/pcretest.c
+--- libpcre.upstream/pcretest.c
++++ libpcre/pcretest.c
+@@ -180,9 +180,7 @@
+ #define PRINTOK(c) (locale_set? isprint(c) : PRINTABLE(c))
+ 
+ /* Posix support is disabled in 16 or 32 bit only mode. */
+-#if !defined SUPPORT_PCRE8 && !defined NOPOSIX
+ #define NOPOSIX
+-#endif
+ 
+ /* It is possible to compile this test program without including support for
+ testing the POSIX interface, though this is not available via the standard

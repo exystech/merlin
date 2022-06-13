@@ -1,0 +1,198 @@
+diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
+--- ffmpeg.upstream/configure
++++ ffmpeg/configure
+@@ -81,10 +81,12 @@
+   --disable-logging        do not log configure debug information
+   --fatal-warnings         fail if any configure warning is generated
+   --prefix=PREFIX          install in PREFIX [$prefix_default]
+-  --bindir=DIR             install binaries in DIR [PREFIX/bin]
++  --exec-prefix=EPREFIX    install architecture-dependent files in EPREFIX
++                           [PREFIX]
++  --bindir=DIR             install binaries in DIR [EPREFIX/bin]
+   --datadir=DIR            install data files in DIR [PREFIX/share/ffmpeg]
+   --docdir=DIR             install documentation in DIR [PREFIX/share/doc/ffmpeg]
+-  --libdir=DIR             install libs in DIR [PREFIX/lib]
++  --libdir=DIR             install libs in DIR [EPREFIX/lib]
+   --shlibdir=DIR           install shared libs in DIR [LIBDIR]
+   --incdir=DIR             install includes in DIR [PREFIX/include]
+   --mandir=DIR             install man page in DIR [PREFIX/share/man]
+@@ -770,7 +772,9 @@
+ 
+ set_default(){
+     for opt; do
+-        eval : \${$opt:=\$${opt}_default}
++        if [ -z "$(eval "echo \${${opt}_set}")" ]; then
++            eval : \${$opt:=\$${opt}_default}
++        fi
+     done
+ }
+ 
+@@ -2444,6 +2448,8 @@
+ "
+ 
+ PATHS_LIST="
++    prefix
++    exec_prefix
+     bindir
+     datadir
+     docdir
+@@ -2462,6 +2468,7 @@
+     arch
+     as
+     assert_level
++    build
+     build_suffix
+     cc
+     objcc
+@@ -2474,6 +2481,7 @@
+     env
+     extra_version
+     gas
++    host
+     host_cc
+     host_cflags
+     host_extralibs
+@@ -2500,6 +2508,7 @@
+     sws_max_filter_size
+     sysinclude
+     sysroot
++    target
+     target_exec
+     target_os
+     target_path
+@@ -3714,11 +3723,12 @@
+ 
+ # installation paths
+ prefix_default="/usr/local"
+-bindir_default='${prefix}/bin'
++exec_prefix_default='${prefix}'
++bindir_default='${exec_prefix}/bin'
+ datadir_default='${prefix}/share/ffmpeg'
+ docdir_default='${prefix}/share/doc/ffmpeg'
+ incdir_default='${prefix}/include'
+-libdir_default='${prefix}/lib'
++libdir_default='${exec_prefix}/lib'
+ mandir_default='${prefix}/share/man'
+ 
+ # toolchain
+@@ -4075,8 +4085,10 @@
+             optname="${opt%%=*}"
+             optname="${optname#--}"
+             optname=$(echo "$optname" | sed 's/-/_/g')
++            optname_set="${optname}_set"
+             if is_in $optname $CMDLINE_SET; then
+                 eval $optname='$optval'
++                eval $optname_set=true
+             elif is_in $optname $CMDLINE_APPEND; then
+                 append $optname "$optval"
+             else
+@@ -4279,6 +4291,16 @@
+     ;;
+ esac
+ 
++# TODO: This is pretty spotty and should be combined with config.sub and
++#       possibly also config.guess.
++if [ -n "$build" -a -n "$host" -a "$build" != "$host" ]; then
++  cross_prefix=${host}-
++  arch=$(echo "$host" | grep -o '^[^-]*')
++  if echo "$host" | grep -- "-sortix$" > /dev/null; then
++    target_os="sortix"
++  fi
++fi
++
+ if test -n "$cross_prefix"; then
+     test -n "$arch" && test -n "$target_os" ||
+         die "Must specify target arch (--arch) and OS (--target-os) when cross-compiling"
+@@ -5541,6 +5563,9 @@
+         ;;
+     minix)
+         ;;
++    sortix)
++        add_cppflags -D_SORTIX_SOURCE -D_POSIX_SOURCE=200809L
++        ;;
+     none)
+         ;;
+     *)
+@@ -7214,6 +7239,7 @@
+ if test "$quiet" != "yes"; then
+ 
+ echo "install prefix            $prefix"
++echo "install exec-prefix       $exec_prefix"
+ echo "source path               $source_path"
+ echo "C compiler                $cc"
+ echo "C library                 $libc_type"
+@@ -7367,6 +7393,7 @@
+ FFMPEG_CONFIG_MAK=1
+ FFMPEG_CONFIGURATION=$FFMPEG_CONFIGURATION
+ prefix=$prefix
++exec_prefix=$exec_prefix
+ LIBDIR=\$(DESTDIR)$libdir
+ SHLIBDIR=\$(DESTDIR)$shlibdir
+ INCDIR=\$(DESTDIR)$incdir
+@@ -7628,6 +7655,7 @@
+ shared=$shared
+ build_suffix=$build_suffix
+ prefix=$prefix
++exec_prefix=$exec_prefix
+ libdir=$libdir
+ incdir=$incdir
+ rpath=$(enabled rpath && echo "-Wl,-rpath,\${libdir}")
+diff -Paur --no-dereference -- ffmpeg.upstream/ffbuild/pkgconfig_generate.sh ffmpeg/ffbuild/pkgconfig_generate.sh
+--- ffmpeg.upstream/ffbuild/pkgconfig_generate.sh
++++ ffmpeg/ffbuild/pkgconfig_generate.sh
+@@ -28,7 +28,7 @@
+ 
+ cat <<EOF > $name/$fullname.pc
+ prefix=$prefix
+-exec_prefix=\${prefix}
++exec_prefix=$exec_prefix
+ libdir=$libdir
+ includedir=$incdir
+ 
+diff -Paur --no-dereference -- ffmpeg.upstream/fftools/Makefile ffmpeg/fftools/Makefile
+--- ffmpeg.upstream/fftools/Makefile
++++ ffmpeg/fftools/Makefile
+@@ -30,6 +30,8 @@
+ 
+ all: $(AVPROGS)
+ 
++progs: $(AVPROGS)
++
+ fftools/ffprobe.o fftools/cmdutils.o: libavutil/ffversion.h | fftools
+ OUTDIRS += fftools
+ 
+diff -Paur --no-dereference -- ffmpeg.upstream/libavformat/codec2.c ffmpeg/libavformat/codec2.c
+--- ffmpeg.upstream/libavformat/codec2.c
++++ ffmpeg/libavformat/codec2.c
+@@ -19,7 +19,6 @@
+  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+  */
+ 
+-#include <memory.h>
+ #include "libavcodec/codec2utils.h"
+ #include "libavutil/intreadwrite.h"
+ #include "avio_internal.h"
+diff -Paur --no-dereference -- ffmpeg.upstream/libavformat/udp.c ffmpeg/libavformat/udp.c
+--- ffmpeg.upstream/libavformat/udp.c
++++ ffmpeg/libavformat/udp.c
+@@ -252,7 +252,9 @@
+                                      struct sockaddr_storage *sources,
+                                      int nb_sources, int include)
+ {
++#if HAVE_STRUCT_IP_MREQ_SOURCE && defined(IP_BLOCK_SOURCE)
+     int i;
++#endif
+     if (addr->sa_family != AF_INET) {
+ #if HAVE_STRUCT_GROUP_SOURCE_REQ && defined(MCAST_BLOCK_SOURCE)
+         /* For IPv4 prefer the old approach, as that alone works reliably on
+@@ -791,8 +793,10 @@
+ 
+     if (dscp >= 0) {
+         dscp <<= 2;
++#ifdef IP_TOS
+         if (setsockopt (udp_fd, IPPROTO_IP, IP_TOS, &dscp, sizeof(dscp)) != 0)
+             goto fail;
++#endif
+     }
+ 
+     /* If multicast, try binding the multicast address first, to avoid

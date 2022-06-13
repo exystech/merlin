@@ -1,0 +1,261 @@
+diff -Paur --no-dereference -- libfontconfig.upstream/fc-blanks/Makefile.in libfontconfig/fc-blanks/Makefile.in
+--- libfontconfig.upstream/fc-blanks/Makefile.in
++++ libfontconfig/fc-blanks/Makefile.in
+@@ -350,7 +350,8 @@
+ 	$(TMPL)		\
+ 	$(NULL)
+ 
+-DISTCLEANFILES = $(BLANKS_H)
++# PATCH: fc-blanks.py doesn't work on Sortix (python2 urllib issues).
++DISTCLEANFILES =
+ all: all-am
+ 
+ .SUFFIXES:
+diff -Paur --no-dereference -- libfontconfig.upstream/fontconfig.pc.in libfontconfig/fontconfig.pc.in
+--- libfontconfig.upstream/fontconfig.pc.in
++++ libfontconfig/fontconfig.pc.in
+@@ -14,5 +14,6 @@
+ Requires: @PKGCONFIG_REQUIRES@
+ Requires.private: @PKGCONFIG_REQUIRES_PRIVATELY@
+ Libs: -L${libdir} -lfontconfig
+-Libs.private: @EXPAT_LIBS@ @FREETYPE_LIBS@ @ICONV_LIBS@ @LIBXML2_LIBS@
+-Cflags: -I${includedir} @EXPAT_CFLAGS@ @FREETYPE_CFLAGS@ @ICONV_CFLAGS@ @LIBXML2_CFLAGS@
++Libs.private: @ICONV_LIBS@
++# PATCH: These were provided by the above Requires and were not cross safe.
++Cflags: -I${includedir} @ICONV_CFLAGS@
+diff -Paur --no-dereference -- libfontconfig.upstream/Makefile.in libfontconfig/Makefile.in
+--- libfontconfig.upstream/Makefile.in
++++ libfontconfig/Makefile.in
+@@ -434,7 +434,8 @@
+ top_build_prefix = @top_build_prefix@
+ top_builddir = @top_builddir@
+ top_srcdir = @top_srcdir@
+-SUBDIRS = fontconfig fc-blanks fc-case fc-lang fc-glyphname src \
++# PATCH: fc-blanks is a python script that doesn't run on Sortix right now.
++SUBDIRS = fontconfig fc-case fc-lang fc-glyphname src \
+ 	fc-cache fc-cat fc-list fc-match fc-pattern fc-query fc-scan \
+ 	fc-validate conf.d test $(am__append_1)
+ ACLOCAL_AMFLAGS = -I m4
+diff -Paur --no-dereference -- libfontconfig.upstream/src/fccache.c libfontconfig/src/fccache.c
+--- libfontconfig.upstream/src/fccache.c
++++ libfontconfig/src/fccache.c
+@@ -38,6 +38,9 @@
+ #if defined(_WIN32)
+ #include <sys/locking.h>
+ #endif
++#if defined(__has_include) && __has_include(<sys/file.h>)
++#include <sys/file.h>
++#endif
+ 
+ #ifndef O_BINARY
+ #define O_BINARY 0
+@@ -1266,7 +1269,11 @@
+ #if defined(_WIN32)
+ 	    if (_locking (fd, _LK_LOCK, 1) == -1)
+ 		goto bail;
+-#else
++/* PATCH: Sortix refuses to implement crap file locking. */
++#elif defined(LOCK_EX)
++	    if (flock(fd, LOCK_EX) == -1)
++		goto bail;
++#elif !defined(__sortix__)
+ 	    struct flock fl;
+ 
+ 	    fl.l_type = F_WRLCK;
+@@ -1276,17 +1283,21 @@
+ 	    fl.l_pid = getpid ();
+ 	    if (fcntl (fd, F_SETLKW, &fl) == -1)
+ 		goto bail;
++#else
++#define FcDirCacheLock_NOBAIL
+ #endif
+ 	    break;
+ 	}
+     }
+     FcStrListDone (list);
+     return fd;
++#ifndef FcDirCacheLock_NOBAIL
+ bail:
+     FcStrListDone (list);
+     if (fd != -1)
+ 	close (fd);
+     return -1;
++#endif
+ }
+ 
+ void
+@@ -1296,7 +1307,10 @@
+     {
+ #if defined(_WIN32)
+ 	_locking (fd, _LK_UNLCK, 1);
+-#else
++/* PATCH: Sortix refuses to implement crap file locking. */
++#elif defined(LOCK_EX)
++	flock(fd, LOCK_UN);
++#elif !defined(__sortix__)
+ 	struct flock fl;
+ 
+ 	fl.l_type = F_UNLCK;
+diff -Paur --no-dereference -- libfontconfig.upstream/src/fccompat.c libfontconfig/src/fccompat.c
+--- libfontconfig.upstream/src/fccompat.c
++++ libfontconfig/src/fccompat.c
+@@ -164,69 +164,8 @@
+ int32_t
+ FcRandom(void)
+ {
+-    int32_t result;
+-
+-#if HAVE_RANDOM_R
+-    static struct random_data fcrandbuf;
+-    static char statebuf[256];
+-    static FcBool initialized = FcFalse;
+-#ifdef _AIX
+-    static char *retval;
+-    long res;
+-#endif
+-
+-    if (initialized != FcTrue)
+-    {
+-#ifdef _AIX
+-	initstate_r (time (NULL), statebuf, 256, &retval, &fcrandbuf);
+-#else
+-	initstate_r (time (NULL), statebuf, 256, &fcrandbuf);
+-#endif
+-	initialized = FcTrue;
+-    }
+-
+-#ifdef _AIX
+-    random_r (&res, &fcrandbuf);
+-    result = (int32_t)res;
+-#else
+-    random_r (&fcrandbuf, &result);
+-#endif
+-#elif HAVE_RANDOM
+-    static char statebuf[256];
+-    char *state;
+-    static FcBool initialized = FcFalse;
+-
+-    if (initialized != FcTrue)
+-    {
+-	state = initstate (time (NULL), statebuf, 256);
+-	initialized = FcTrue;
+-    }
+-    else
+-	state = setstate (statebuf);
+-
+-    result = random ();
+-
+-    setstate (state);
+-#elif HAVE_LRAND48
+-    result = lrand48 ();
+-#elif HAVE_RAND_R
+-    static unsigned int seed = time (NULL);
+-
+-    result = rand_r (&seed);
+-#elif HAVE_RAND
+-    static FcBool initialized = FcFalse;
+-
+-    if (initialized != FcTrue)
+-    {
+-	srand (time (NULL));
+-	initialized = FcTrue;
+-    }
+-    result = rand ();
+-#else
+-# error no random number generator function available.
+-#endif
+-
+-    return result;
++    /* PATCH: Use good random. */
++    return arc4random_uniform (INT32_MAX);
+ }
+ 
+ #ifdef _WIN32
+diff -Paur --no-dereference -- libfontconfig.upstream/src/fcname.c libfontconfig/src/fcname.c
+--- libfontconfig.upstream/src/fcname.c
++++ libfontconfig/src/fcname.c
+@@ -506,17 +506,17 @@
+     case FcTypeVoid:
+ 	return FcTrue;
+     case FcTypeInteger:
+-	sprintf ((char *) temp, "%d", v.u.i);
++	snprintf ((char *) temp, sizeof (temp), "%d", v.u.i);
+ 	return FcNameUnparseString (buf, temp, 0);
+     case FcTypeDouble:
+-	sprintf ((char *) temp, "%g", v.u.d);
++	snprintf ((char *) temp, sizeof (temp), "%g", v.u.d);
+ 	return FcNameUnparseString (buf, temp, 0);
+     case FcTypeString:
+ 	return FcNameUnparseString (buf, v.u.s, escape);
+     case FcTypeBool:
+ 	return FcNameUnparseString (buf, v.u.b ? (FcChar8 *) "True" : (FcChar8 *) "False", 0);
+     case FcTypeMatrix:
+-	sprintf ((char *) temp, "%g %g %g %g",
++	snprintf ((char *) temp, sizeof (temp), "%g %g %g %g",
+ 		 v.u.m->xx, v.u.m->xy, v.u.m->yx, v.u.m->yy);
+ 	return FcNameUnparseString (buf, temp, 0);
+     case FcTypeCharSet:
+@@ -526,7 +526,7 @@
+     case FcTypeFTFace:
+ 	return FcTrue;
+     case FcTypeRange:
+-	sprintf ((char *) temp, "[%g %g)", v.u.r->begin, v.u.r->end);
++	snprintf ((char *) temp, sizeof (temp), "[%g %g)", v.u.r->begin, v.u.r->end);
+ 	return FcNameUnparseString (buf, temp, 0);
+     }
+     return FcFalse;
+diff -Paur --no-dereference -- libfontconfig.upstream/src/fcobjs.c libfontconfig/src/fcobjs.c
+--- libfontconfig.upstream/src/fcobjs.c
++++ libfontconfig/src/fcobjs.c
+@@ -24,11 +24,12 @@
+ 
+ #include "fcint.h"
+ 
++/* TODO: Stick with existing fcobjshash.h regardless of system gperf. */
+ static unsigned int
+-FcObjectTypeHash (register const char *str, register FC_GPERF_SIZE_T len);
++FcObjectTypeHash (register const char *str, register size_t len);
+ 
+ static const struct FcObjectTypeInfo *
+-FcObjectTypeLookup (register const char *str, register FC_GPERF_SIZE_T len);
++FcObjectTypeLookup (register const char *str, register size_t len);
+ 
+ #include "fcobjshash.h"
+ 
+diff -Paur --no-dereference -- libfontconfig.upstream/src/Makefile.in libfontconfig/src/Makefile.in
+--- libfontconfig.upstream/src/Makefile.in
++++ libfontconfig/src/Makefile.in
+@@ -496,7 +496,6 @@
+ 	stamp-fcstdint	\
+ 	fcstdint.h	\
+ 	stamp-fcobjshash.gperf	\
+-	fcobjshash.h	\
+ 	fcobjshash.gperf
+ 
+ all: $(BUILT_SOURCES)
+@@ -912,9 +911,10 @@
+ 	' - > $@.tmp && \
+ 	mv -f $@.tmp fcobjshash.gperf && touch $@ || ( $(RM) $@.tmp && false )
+ 
+-fcobjshash.h: Makefile fcobjshash.gperf
+-	$(AM_V_GEN) $(GPERF) --pic -m 100 fcobjshash.gperf > $@.tmp && \
+-	mv -f $@.tmp $@ || ( $(RM) $@.tmp && false )
++# PATCH: Sortix doesn't have gperf at the moment.
++#fcobjshash.h: Makefile fcobjshash.gperf
++#	$(AM_V_GEN) $(GPERF) --pic -m 100 fcobjshash.gperf > $@.tmp && \
++#	mv -f $@.tmp $@ || ( $(RM) $@.tmp && false )
+ 
+ @ENABLE_SHARED_TRUE@install-data-local: install-ms-import-lib install-libtool-import-lib
+ 
+diff -Paur --no-dereference -- libfontconfig.upstream/test/test-migration.c libfontconfig/test/test-migration.c
+--- libfontconfig.upstream/test/test-migration.c
++++ libfontconfig/test/test-migration.c
+@@ -22,6 +22,8 @@
+  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+  * PERFORMANCE OF THIS SOFTWARE.
+  */
++/* PATCH: Need HAVE_FOO macros.. */
++#include "../config.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>

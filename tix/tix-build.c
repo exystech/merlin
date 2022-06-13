@@ -142,7 +142,36 @@ struct metainfo
 	enum build_step end_step;
 	bool bootstrapping;
 	bool cross;
+	// TODO: After releasing Sortix 1.1, remove tixbuildinfo support.
+	bool tixbuildinfo;
 };
+
+static const char* metainfo_get_def(const struct metainfo* minfo,
+                                    const char* key,
+                                    const char* old_key,
+                                    const char* def)
+{
+	return dictionary_get_def((string_array_t*) &minfo->package_info,
+	                          !minfo->tixbuildinfo ? key : old_key, def);
+}
+
+static const char* metainfo_get(const struct metainfo* minfo,
+                                const char* key,
+                                const char* old_key)
+{
+	return metainfo_get_def(minfo, key, old_key, NULL);
+}
+
+static const char* metainfo_verify(struct metainfo* minfo,
+                                   const char* key,
+                                   const char* old_key)
+{
+	const char* ret = metainfo_get(minfo, key, old_key);
+	if ( !ret )
+		errx(1, "error: `%s': no `%s' variable declared",
+		     minfo->package_info_path, !minfo->tixbuildinfo ? key : old_key);
+	return ret;
+}
 
 static bool has_in_path(const char* program)
 {
@@ -343,13 +372,15 @@ static void SetNeedVariableBuildTool(struct metainfo* minfo,
                                      const char* variable,
                                      const char* value)
 {
-	string_array_t* pkg_info = &minfo->package_info;
 	const char* needed_vars =
-		dictionary_get_def(pkg_info, "pkg.make.needed-vars", "true");
-	char* key = print_string("pkg.make.needed-vars.%s", variable);
+		metainfo_get_def(minfo, "MAKE_NEEDED_VARS", "pkg.make.needed-vars",
+		                 "true");
+	char* key = minfo->tixbuildinfo ?
+	            print_string("pkg.make.needed-vars.%s", variable) :
+	            print_string("MAKE_NEEDED_VARS_%s", variable);
 	if ( !key )
 		err(1, "malloc");
-	const char* needed_var = dictionary_get_def(pkg_info, key, needed_vars);
+	const char* needed_var = metainfo_get_def(minfo, key, key, needed_vars);
 	free(key);
 	if ( !parse_boolean(needed_var) )
 		return;
@@ -413,10 +444,10 @@ static void Configure(struct metainfo* minfo)
 {
 	if ( !fork_and_wait_or_recovery() )
 		return;
-	string_array_t* pkg_info = &minfo->package_info;
-	const char* subdir = dictionary_get(pkg_info, "pkg.subdir");
+	const char* subdir = metainfo_get(minfo, "SUBDIR", "pkg.subdir");
 	const char* configure_raw =
-		dictionary_get_def(pkg_info, "pkg.configure.cmd", "./configure");
+		metainfo_get_def(minfo, "CONFIGURE", "pkg.configure.cmd",
+		                 "./configure");
 	char* configure;
 	if ( strcmp(minfo->build_dir, minfo->package_dir) == 0 )
 		configure = strdup(configure_raw);
@@ -425,22 +456,22 @@ static void Configure(struct metainfo* minfo)
 	if ( !configure )
 		err(1, "malloc");
 	const char* conf_extra_args =
-		dictionary_get_def(pkg_info, "pkg.configure.args", "");
+		metainfo_get_def(minfo, "CONFIGURE_ARGS", "pkg.configure.args", "");
 	const char* conf_extra_vars =
-		dictionary_get_def(pkg_info, "pkg.configure.vars", "");
+		metainfo_get_def(minfo, "CONFIGURE_VARS", "pkg.configure.vars", "");
 	bool with_sysroot =
-		parse_boolean(dictionary_get_def(pkg_info,
-			"pkg.configure.with-sysroot", "false"));
+		parse_boolean(metainfo_get_def(minfo,
+			"CONFIGURE_WITH_SYSROOT", "pkg.configure.with-sysroot", "false"));
 	// TODO: I am unclear if this issue still affects gcc, I might have
 	//       forgotten to set pkg.configure.with-sysroot-ld-bug=true there.
 	const char* with_sysroot_ld_bug_default = "false";
 	if ( !strcmp(minfo->package_name, "gcc") )
 		with_sysroot_ld_bug_default = "true";
 	bool with_sysroot_ld_bug =
-		parse_boolean(dictionary_get_def(pkg_info,
+		parse_boolean(metainfo_get_def(minfo, "CONFIGURE_WITH_SYSROOT_LD_BUG",
 			"pkg.configure.with-sysroot-ld-bug", with_sysroot_ld_bug_default ));
 	bool with_build_sysroot =
-		parse_boolean(dictionary_get_def(pkg_info,
+		parse_boolean(metainfo_get_def(minfo, "CONFIGURE_WITH_BUILD_SYSROOT",
 			"pkg.configure.with-build-sysroot", "false"));
 	if ( chdir(minfo->build_dir) != 0 )
 		err(1, "chdir: `%s'", minfo->build_dir);
@@ -523,9 +554,8 @@ static bool TestDirty(struct metainfo* minfo,
 
 static bool IsDirty(struct metainfo* minfo)
 {
-	string_array_t* pkg_info = &minfo->package_info;
-	const char* dirty_file = dictionary_get(pkg_info, "pkg.dirty-file");
-	const char* subdir = dictionary_get(pkg_info, "pkg.subdir");
+	const char* dirty_file = metainfo_get(minfo, "DIRTY_FILE", "pkg.dirty-file");
+	const char* subdir = metainfo_get(minfo, "SUBDIR", "pkg.subdir");
 	if ( dirty_file )
 		return TestDirty(minfo, subdir, dirty_file);
 	return TestDirty(minfo, subdir, "config.log") ||
@@ -544,17 +574,16 @@ static void Make(struct metainfo* minfo,
 	       fork_and_wait_or_death_def(false)) )
 		return;
 
-	string_array_t* pkg_info = &minfo->package_info;
 	char* make = strdup(minfo->make);
-	const char* override_make = dictionary_get(pkg_info, "pkg.make.cmd");
+	const char* override_make = metainfo_get(minfo, "MAKE", "pkg.make.cmd");
 	const char* make_extra_args =
-		dictionary_get_def(pkg_info, "pkg.make.args", "");
+		metainfo_get_def(minfo, "MAKE_ARGS", "pkg.make.args", "");
 	const char* make_extra_vars =
-		dictionary_get_def(pkg_info, "pkg.make.vars", "");
+		metainfo_get_def(minfo, "MAKE_VARS", "pkg.make.vars", "");
 	if ( override_make )
 	{
 		free(make);
-		make = join_paths(minfo->package_dir, override_make);
+		make = strdup(override_make);
 	}
 	SetNeededVariables(minfo);
 	if ( chdir(minfo->build_dir) != 0 )
@@ -612,17 +641,17 @@ static void Make(struct metainfo* minfo,
 
 static void Clean(struct metainfo* minfo)
 {
-	string_array_t* pinfo = &minfo->package_info;
-	const char* subdir = dictionary_get(pinfo, "pkg.subdir");
+	const char* subdir = metainfo_get(minfo, "SUBDIR", "pkg.subdir");
 	const char* build_system =
-		dictionary_get_def(pinfo, "pkg.build-system", "none");
+		metainfo_get_def(minfo, "BUILD_SYSTEM", "pkg.build-system", "none");
 	const char* default_clean_target =
 		!strcmp(build_system, "configure") ? "distclean" : "clean";
 	const char* clean_target =
-		dictionary_get_def(pinfo, "pkg.make.clean-target",
-		                   default_clean_target);
+		metainfo_get_def(minfo, "MAKE_CLEAN_TARGET", "pkg.make.clean-target",
+		                 default_clean_target);
 	const char* ignore_clean_failure_var =
-		dictionary_get_def(pinfo, "pkg.make.ignore-clean-failure", "true");
+		metainfo_get_def(minfo, "MAKE_IGNORE_CLEAN_FAILURE",
+		                 "pkg.make.ignore-clean-failure", "true");
 	bool ignore_clean_failure = parse_boolean(ignore_clean_failure_var);
 
 	Make(minfo, clean_target, NULL, !ignore_clean_failure, subdir);
@@ -630,10 +659,10 @@ static void Clean(struct metainfo* minfo)
 
 static void Build(struct metainfo* minfo)
 {
-	string_array_t* pinfo = &minfo->package_info;
-	const char* subdir = dictionary_get(pinfo, "pkg.subdir");
+	const char* subdir = metainfo_get(minfo, "SUBDIR", "pkg.subdir");
 	const char* build_target =
-		dictionary_get_def(pinfo, "pkg.make.build-target", "all");
+		metainfo_get_def(minfo, "MAKE_BUILD_TARGET", "pkg.make.build-target",
+		                 "all");
 
 	Make(minfo, build_target, NULL, true, subdir);
 }
@@ -658,10 +687,10 @@ static void CreateDestination(void)
 
 static void Install(struct metainfo* minfo)
 {
-	string_array_t* pinfo = &minfo->package_info;
-	const char* subdir = dictionary_get(pinfo, "pkg.subdir");
+	const char* subdir = metainfo_get(minfo, "SUBDIR", "pkg.subdir");
 	const char* install_target =
-		dictionary_get_def(pinfo, "pkg.make.install-target", "install");
+		metainfo_get_def(minfo, "MAKE_INSTALL_TARGET",
+		                 "pkg.make.install-target", "install");
 	char* tardir_rel = join_paths(tmp_root, "tix");
 	char* destdir_rel = join_paths(tardir_rel, "data");
 	char* destdir = realpath(destdir_rel, NULL);
@@ -677,16 +706,15 @@ static void Install(struct metainfo* minfo)
 
 static void PostInstall(struct metainfo* minfo)
 {
-	string_array_t* pinfo = &minfo->package_info;
 	const char* post_install_cmd =
-		dictionary_get(pinfo, "pkg.post-install.cmd");
+		metainfo_get(minfo, "POST_INSTALL", "pkg.post-install.cmd");
 	if ( !post_install_cmd )
 		return;
 
 	if ( !fork_and_wait_or_recovery() )
 		return;
 
-	const char* subdir = dictionary_get(pinfo, "pkg.subdir");
+	const char* subdir = metainfo_get(minfo, "SUBDIR", "pkg.subdir");
 	char* tardir_rel = join_paths(tmp_root, "tix");
 	char* destdir_rel = join_paths(tardir_rel, "data");
 	char* destdir = realpath(destdir_rel, NULL);
@@ -727,18 +755,18 @@ static void PostInstall(struct metainfo* minfo)
 
 static void TixInfo(struct metainfo* minfo)
 {
-	string_array_t* pinfo = &minfo->package_info;
 	char* tardir_rel = join_paths(tmp_root, "tix");
 	if ( !tardir_rel )
 		err(1, "malloc");
 	char* tixinfo_rel = join_paths(tardir_rel, "tix/tixinfo");
 	if ( !tixinfo_rel )
 		err(1, "malloc");
-	const char* alias = dictionary_get(pinfo, "pkg.alias-of");
-	const char* runtime_deps = dictionary_get(pinfo, "pkg.runtime-deps");
+	const char* alias = metainfo_get(minfo, "ALIAS_OF", "pkg.alias-of");
+	const char* runtime_deps =
+		metainfo_get(minfo, "RUNTIME_DEPS", "pkg.runtime-deps");
 	bool location_independent =
-		parse_boolean(dictionary_get_def(pinfo,
-			"pkg.location-independent", "false"));
+		parse_boolean(metainfo_get_def(minfo,
+			"LOCATION_INDEPENDENT", "pkg.location-independent", "false"));
 
 	FILE* tixinfo_fp = fopen(tixinfo_rel, "w");
 	if ( !tixinfo_fp )
@@ -803,16 +831,16 @@ static void Package(struct metainfo* minfo)
 
 static void Compile(struct metainfo* minfo)
 {
-	string_array_t* pinfo = &minfo->package_info;
-
 	// Detect which build system we are interfacing with.
-	const char* build_system = dictionary_get(pinfo, "pkg.build-system");
+	const char* build_system =
+		metainfo_get(minfo, "BUILD_SYSTEM", "pkg.build-system");
 	if ( !build_system )
 		errx(1, "%s: pkg.build-system was not found", minfo->package_info_path);
 
 	// Determine whether need to do an out-of-directory build.
 	const char* use_build_dir_var =
-		dictionary_get_def(pinfo, "pkg.configure.use-build-directory", "false");
+		metainfo_get_def(minfo, "CONFIGURE_USE_BUILD_DIRECTORY",
+		                 "pkg.configure.use-build-directory", "false");
 	bool use_build_dir = parse_boolean(use_build_dir_var);
 	if ( use_build_dir )
 	{
@@ -876,15 +904,21 @@ static void Bootstrap(struct metainfo* minfo)
 	newinfo.tar = minfo->tar;
 	newinfo.target = minfo->host;
 	newinfo.tmp = minfo->tmp;
+	const char* bootstrap_prefix =
+		minfo->tixbuildinfo ? "bootstrap." : "BOOTSTRAP_";
 	for ( size_t i = 0; i < minfo->package_info.length; i++ )
 	{
 		const char* string = minfo->package_info.strings[i];
-		if ( !strncmp(string, "pkg.", strlen("pkg.")) )
+		if ( minfo->tixbuildinfo ?
+		     !strncmp(string, "pkg.", strlen("pkg.")) :
+		     strncmp(string, bootstrap_prefix, strlen(bootstrap_prefix)) != 0 )
 			continue;
-		if ( !strncmp(string, "bootstrap.", strlen("bootstrap.")) )
+		if ( !strncmp(string, bootstrap_prefix, strlen(bootstrap_prefix)) )
 		{
-			const char* rest = string + strlen("bootstrap.");
-			char* newstring = print_string("pkg.%s", rest);
+			const char* rest = string + strlen(bootstrap_prefix);
+			char* newstring = minfo->tixbuildinfo ?
+			                  print_string("pkg.%s", rest) :
+			                  strdup(rest);
 			if ( !newstring )
 				err(1, "malloc");
 			if ( !string_array_append(&newinfo.package_info, newstring) )
@@ -924,15 +958,13 @@ static void Bootstrap(struct metainfo* minfo)
 
 static void BuildPackage(struct metainfo* minfo)
 {
-	string_array_t* pinfo = &minfo->package_info;
-
 	// Whether this is just an alias for another package.
-	const char* alias = dictionary_get(pinfo, "pkg.alias-of");
+	const char* alias = metainfo_get(minfo, "ALIAS_OF", "pkg.alias-of");
 
 	// Determine if the package is location independent.
 	bool location_independent =
-		parse_boolean(dictionary_get_def(pinfo, "pkg.location-independent",
-		                                 "false"));
+		parse_boolean(metainfo_get_def(minfo, "LOCATION_INDEPENDENT",
+		                               "pkg.location-independent", "false"));
 	if ( !alias && !location_independent && !minfo->prefix )
 		errx(1, "error: %s is not location independent and you need to "
 		        "specify the intended destination prefix using --prefix",
@@ -945,7 +977,7 @@ static void BuildPackage(struct metainfo* minfo)
 	// handle this case entirely themselves. There's a few packages that need
 	// the exact same version around natively in order to cross-compile.
 	const char* use_bootstrap_var =
-		dictionary_get_def(pinfo, "pkg.use-bootstrap", "false");
+		metainfo_get_def(minfo, "USE_BOOTSTRAP", "pkg.use-bootstrap", "false");
 	bool use_bootstrap = parse_boolean(use_bootstrap_var);
 	if ( !alias && use_bootstrap && strcmp(minfo->build, minfo->host) != 0 &&
 	     SHOULD_DO_BUILD_STEP(BUILD_STEP_CONFIGURE, minfo) )
@@ -965,22 +997,26 @@ static void BuildPackage(struct metainfo* minfo)
 
 static void VerifySourceTixInformation(struct metainfo* minfo)
 {
-	const char* pipath = minfo->package_info_path;
-	string_array_t* pinfo = &minfo->package_info;
-	const char* tix_version = VerifyInfoVariable(pinfo, "tix.version", pipath);
-	if ( atoi(tix_version) != 1 )
-		errx(1, "error: `%s': tix version `%s' not supported", pipath,
-		        tix_version);
-	const char* tix_class = VerifyInfoVariable(pinfo, "tix.class", pipath);
-	if ( !strcmp(tix_class, "tix") )
-		errx(1, "error: `%s': this object is a binary tix and is already "
-		        "compiled.\n", pipath);
-	if ( strcmp(tix_class, "srctix") )
-		errx(1, "error: `%s': tix class `%s' is not `srctix': this object "
-		        "is not suitable for compilation.", pipath, tix_class);
-	VerifyInfoVariable(pinfo, "pkg.name", pipath);
-	if ( !dictionary_get(pinfo, "pkg.alias-of") )
-		VerifyInfoVariable(pinfo, "pkg.build-system", pipath);
+	if ( minfo->tixbuildinfo )
+	{
+		const char* pipath = minfo->package_info_path;
+		string_array_t* pinfo = &minfo->package_info;
+		const char* tix_version =
+			VerifyInfoVariable(pinfo, "tix.version", pipath);
+		if ( atoi(tix_version) != 1 )
+			errx(1, "error: `%s': tix version `%s' not supported", pipath,
+				    tix_version);
+		const char* tix_class = VerifyInfoVariable(pinfo, "tix.class", pipath);
+		if ( !strcmp(tix_class, "tix") )
+			errx(1, "error: `%s': this object is a binary tix and is already "
+				    "compiled.\n", pipath);
+		if ( strcmp(tix_class, "srctix") )
+			errx(1, "error: `%s': tix class `%s' is not `srctix': this object "
+				    "is not suitable for compilation.", pipath, tix_class);
+	}
+	metainfo_verify(minfo, "NAME", "pkg.name");
+	if ( !metainfo_get(minfo, "ALIAS_OF", "pkg.alias-of") )
+		metainfo_verify(minfo, "BUILD_SYSTEM", "pkg.build-system");
 }
 
 // TODO: The MAKEFLAGS variable is actually not in the same format as the token
@@ -1017,15 +1053,32 @@ static void PurifyMakeflags(void)
 	string_array_reset(&makeflags);
 }
 
-static void help(FILE* fp, const char* argv0)
+static char* FindPortFile(char* package_dir)
 {
-	fprintf(fp, "Usage: %s [OPTION]... PACKAGE\n", argv0);
-	fprintf(fp, "Compile a source tix into a tix suitable for installation.\n");
+	char* path = print_string("%s.port", package_dir);
+	if ( !path )
+		err(1, "malloc");
+	if ( !access(path, F_OK) )
+		return path;
+	free(path);
+	path = join_paths(package_dir, "tix.port");
+	if ( !path )
+		err(1, "malloc");
+	if ( !access(path, F_OK) )
+		return path;
+	free(path);
+	return NULL;
 }
 
-static void version(FILE* fp, const char* argv0)
+static char* FindTixBuildInfo(char* package_dir)
 {
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
+	char* path = join_paths(package_dir, "tixbuildinfo");
+	if ( !path )
+		err(1, "malloc");
+	if ( !access(path, F_OK) )
+		return path;
+	free(path);
+	return NULL;
 }
 
 int main(int argc, char* argv[])
@@ -1048,7 +1101,7 @@ int main(int argc, char* argv[])
 	char* tmp = strdup(getenv_def("TMPDIR", "/tmp"));
 	char* start_step_string = strdup("start");
 	char* end_step_string = strdup("end");
-	char* source_package = NULL;
+	char* source_port = NULL;
 
 	const char* argv0 = argv[0];
 	for ( int i = 0; i < argc; i++ )
@@ -1065,36 +1118,28 @@ int main(int argc, char* argv[])
 			while ( (c = *++arg) ) switch ( c )
 			{
 			default:
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				help(stderr, argv0);
-				exit(1);
+				errx(1, "unknown option -- '%c'", c);
 			}
 		}
-		else if ( !strcmp(arg, "--help") )
-			help(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--version") )
-			version(stdout, argv0), exit(0);
 		else if ( GET_OPTION_VARIABLE("--build", &minfo.build) ) { }
 		else if ( GET_OPTION_VARIABLE("--destination", &minfo.destination) ) { }
 		else if ( GET_OPTION_VARIABLE("--end", &end_step_string) ) { }
-		else if ( GET_OPTION_VARIABLE("--host", &minfo.host) ) { }
-		else if ( GET_OPTION_VARIABLE("--generation", &generation_string) ) { }
-		else if ( GET_OPTION_VARIABLE("--makeflags", &minfo.makeflags) ) { }
-		else if ( GET_OPTION_VARIABLE("--make", &minfo.make) ) { }
-		else if ( GET_OPTION_VARIABLE("--prefix", &minfo.prefix) ) { }
 		else if ( GET_OPTION_VARIABLE("--exec-prefix", &minfo.exec_prefix) ) { }
-		else if ( GET_OPTION_VARIABLE("--source-package", &source_package) ) { }
+		else if ( GET_OPTION_VARIABLE("--generation", &generation_string) ) { }
+		else if ( GET_OPTION_VARIABLE("--host", &minfo.host) ) { }
+		else if ( GET_OPTION_VARIABLE("--make", &minfo.make) ) { }
+		else if ( GET_OPTION_VARIABLE("--makeflags", &minfo.makeflags) ) { }
+		else if ( GET_OPTION_VARIABLE("--prefix", &minfo.prefix) ) { }
+		// TODO: After releasing Sortix 1.1, remove this option.
+		else if ( GET_OPTION_VARIABLE("--source-package", &source_port) ) { }
+		else if ( GET_OPTION_VARIABLE("--source-port", &source_port) ) { }
 		else if ( GET_OPTION_VARIABLE("--start", &start_step_string) ) { }
 		else if ( GET_OPTION_VARIABLE("--sysroot", &minfo.sysroot) ) { }
-		else if ( GET_OPTION_VARIABLE("--target", &minfo.target) ) { }
 		else if ( GET_OPTION_VARIABLE("--tar", &minfo.tar) ) { }
+		else if ( GET_OPTION_VARIABLE("--target", &minfo.target) ) { }
 		else if ( GET_OPTION_VARIABLE("--tmp", &minfo.tmp) ) { }
 		else
-		{
-			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			help(stderr, argv0);
-			exit(1);
-		}
+			errx(1, "unknown option: %s", arg);
 	}
 
 	minfo.generation = atoi(generation_string);
@@ -1110,12 +1155,6 @@ int main(int argc, char* argv[])
 	{
 		fprintf(stderr, "%s: no such step `%s'\n", argv0, end_step_string);
 		exit(1);
-	}
-
-	if ( argc == 1 )
-	{
-		help(stdout, argv0);
-		exit(0);
 	}
 
 	compact_arguments(&argc, &argv);
@@ -1164,38 +1203,50 @@ int main(int argc, char* argv[])
 	if ( !IsDirectory(minfo.package_dir) )
 		err(1, "`%s'", minfo.package_dir);
 
-	minfo.package_info_path = join_paths(minfo.package_dir, "tixbuildinfo");
-	if ( !minfo.package_info_path )
-		err(1, "malloc");
-
-	minfo.package_info = string_array_make();
-	string_array_t* package_info = &minfo.package_info;
-	if ( !dictionary_append_file_path(package_info, minfo.package_info_path) )
+	if ( (minfo.package_info_path = FindPortFile(minfo.package_dir)) )
 	{
-		if ( errno == ENOENT )
-			warnx("`%s' doesn't appear to be a source .tix", minfo.package_dir);
-		err(1, "`%s'", minfo.package_info_path);
+		minfo.tixbuildinfo = false;
+		minfo.package_info = string_array_make();
+		string_array_t* package_info = &minfo.package_info;
+		int ret = variables_append_file_path(package_info,
+		                                     minfo.package_info_path);
+		if ( ret == -1 )
+			err(1, "`%s'", minfo.package_info_path);
+		else if ( ret == -2 )
+			errx(1, "`%s': Syntax error", minfo.package_info_path);
 	}
+	else if ( (minfo.package_info_path = FindTixBuildInfo(minfo.package_dir)) )
+	{
+		minfo.tixbuildinfo = true;
+		minfo.package_info = string_array_make();
+		string_array_t* package_info = &minfo.package_info;
+		if ( !dictionary_append_file_path(package_info,
+		                                  minfo.package_info_path) )
+			err(1, "`%s'", minfo.package_info_path);
+	}
+	else
+		err(1, "Failed to find: %s.port or %s/tix.port or %s/tixbuildinfo",
+		    minfo.package_dir, minfo.package_dir, minfo.package_dir);
 
 	VerifySourceTixInformation(&minfo);
-	minfo.package_name = strdup(dictionary_get(package_info, "pkg.name"));
+	minfo.package_name = strdup(metainfo_get(&minfo, "NAME", "pkg.name"));
 
-	const char* pkg_source_package =
-		dictionary_get(package_info, "pkg.source-package");
-	if ( pkg_source_package && !source_package )
+	const char* pkg_source_port =
+		metainfo_get(&minfo, "SOURCE_PORT", "pkg.source-package");
+	if ( pkg_source_port && !source_port )
 	{
-		source_package = print_string("%s/../%s", srctix, pkg_source_package);
-		if ( !source_package )
+		// TODO: Change this default location to match tix-port(8)?
+		source_port = print_string("%s/../%s", srctix, pkg_source_port);
+		if ( !source_port )
 			err(1, "malloc");
 	}
 
-	if ( source_package )
+	if ( source_port )
 	{
 		free(minfo.package_dir);
-		minfo.package_dir = realpath(source_package, NULL);
+		minfo.package_dir = realpath(source_port, NULL);
 		if ( !minfo.package_dir )
-			err(1, "%s: looking for source package: %s",
-			    srctix, source_package);
+			err(1, "%s: looking for source port: %s", srctix, source_port);
 	}
 
 	BuildPackage(&minfo);

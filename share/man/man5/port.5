@@ -1,0 +1,356 @@
+.Dd March 19, 2022
+.Dt PORT 5
+.Os
+.Sh NAME
+.Nm port
+.Nd port build instructions
+.Sh SYNOPSIS
+.Pa /src/ports/example/example.port
+.Sh DESCRIPTION
+The .port file format defines the build instructions for a piece of software
+ported to this operating system as a package.
+.Pp
+This manual documents the file format and
+.Xr porting 7
+is the guide on how to author a port.
+.Pp
+A port called
+.Sy example
+consists of the following adjacent files:
+.Pp
+.Bl -tag -width "example.execpatch" -compact
+.It Pa example.port
+build instructions and meta information.
+.It Pa example.patch
+optional
+.Xr patch 1
+applied to the upstream release.
+.It Pa example.execpatch
+optional
+.Xr tix-execpatch 8
+changing the executable bit on files.
+.It Pa example.rmpatch
+optional
+.Xr tix-rmpatch 8
+deleting files from the upstream release.
+.El
+.Pp
+The upstream release archive is downloaded and extracted into the
+.Pa example
+directory with each kind of patches applied, which is used as the working
+directory when building the port.
+Ports are extracted with read-only files and writable directories by default.
+The
+.Pa example.version
+file is created with the version number and checksums of the above files.
+.Pp
+If the port is placed in the
+.Pa /src/ports/example/
+directory then it's built as part of the operating system.
+The port can be built directly using
+.Xr tix-port 8
+which handles downloading and patching the source code, building the port,
+and installing the binary package.
+.Pp
+The .port files define the meta information using a subset of the
+.Xr sh 1
+language syntax for variable assignments as parsed by
+.Xr tix-vars 8 .
+Basic variable substitutions, escape sequences, single quotes, double quotes,
+and comments are supported.
+.Pp
+The variables are as follows:
+.Bl -tag -width "12345678"
+.It Sy ALIAS_OF
+Declares this port to be an empty port that's an alias for the named port.
+.It Sy ARCHIVE
+Extract the upstream archive by this file name if set,
+usually
+.Sy $DISTNAME.$COMPRESSION
+where
+$COMPRESSION
+is normally tar.xz or the appropriate file extension.
+.It Sy ARCHIVE_2
+A second
+.Sy ARCHIVE
+if set with its own set of similar variables.
+.It Sy BUILD_LIBRARIES
+Space delimited list of libraries (ports) linked with.
+Optional dependencies are suffixed with a question mark
+.Sq "?" .
+.It Sy BUILD_PROGRAMS
+Space delimited list of programs (ports) needed to build this port.
+Optional dependencies are suffixed with a question mark
+.Sq "?" .
+.It Sy BUILD_SYSTEM
+The build system used by this port:
+.Bl -tag -width "configure"
+.It Sy configure
+A
+.Pa ./configure
+script following the GNU coding conventions communicated with using standard
+command line options and standard environment variables.
+.It Sy makefile
+A
+.Pa Makefile
+using the below set of conventional environment variables.
+.El
+.It Sy CONFIGURE
+The path to the configure script relative to the source directory.
+(Default:
+.Pa ./configure )
+.It Sy CONFIGURE_ARGS
+Additional command line arguments passed to configure.
+.It Sy CONFIGURE_USE_BUILD_DIRECTORY Ns = Ns Oo Sy false "|" true Oc
+Whether to use a temporary working directory when building the port where the
+object files will be placed instead of inside the source directory.
+(Default:
+.Sy false )
+.It Sy CONFIGURE_VARS
+Additional environment variable assignments while configure is run.
+.It Sy CONFIGURE_WITH_BUILD_SYSROOT Ns = Ns Oo Sy false "|" true Oc
+Whether to tell configure where the system root is located during the build
+using the
+.Fl \-with-build-sysroot
+option.
+(Default:
+.Sy false )
+.It Sy CONFIGURE_WITH_SYSROOT Ns = Ns Oo Sy false "|" true Oc
+Whether to tell configure where the system root is located at runtime using the
+.Fl \-with-sysroot
+option.
+(Default:
+.Sy false )
+.It Sy CONFIGURE_WITH_SYSROOT_LD_BUG Ns = Ns Oo Sy false "|" true Oc
+Whether the
+.Fl \-with-sysroot
+option doesn't understand the empty string as meaning no system root will be
+used at runtime and
+.Fl \-with-sysroot Ns = Ns /
+should be used instead.
+(Default:
+.Sy false )
+.It Sy COMPRESSION Ns = Ns Oo Sy tar "|" tar.gz "|" tar.bz2 "|" tar.xz Oc
+The file extension of
+.Sy ARCHIVE
+including the compression format.
+.It Sy COMPRESSION_2 Ns = Ns Oo Sy tar "|" tar.gz "|" tar.bz2 "|" tar.xz Oc
+For
+.Sy ARCHIVE_2 .
+.It Sy DEVELOPMENT Ns = Ns Oo Sy false "|" true Oc
+Whether the port is in the development workflow per
+.Xr porting 7 .
+(Default:
+.Sy false )
+.Pp
+If
+.Sy false ,
+the port is extracted with read-only files and writable directories.
+The port's source directory is considered a cache that can be safely deleted
+without data loss e.g. whenever the meta information or the patches change.
+.Pp
+If
+.Sy true ,
+any old non-development extraction is deleted, and the archive is instead
+extracted with writable permissions in development mode.
+The port's source directory contains an in-progress port that's considered
+valuable and will not be deleted under any circumstances as long as the port
+remains in development mode.
+If the port builds successfully, then the patches are regenerated by diffing the
+upstream release with the source directory.
+.It Sy DIRTY_FILE
+The port doesn't need to be cleaned if this file doesn't exist.
+(Default:
+.Sy config.log ,
+.Sy Makefile ,
+and
+.Sy makefile )
+.It Sy DISTNAME
+The name of the upstream release, usually
+.Sy $NAME-$VERSION .
+.It Sy DISTNAME_2
+For
+.Sy ARCHIVE_2 .
+.It Sy DISTNAME_REGEX
+Extended regular expression recognizing distnames of releases with the version
+number matched in the first subexpression.
+(Default: Automatically determined using
+.Sy ARCHIVE
+and
+.Sy VERSION_REGEX )
+.It Sy LICENSE
+Abbreviation of the license the port is released under.
+.It Sy LOCATION_INDEPENDENT Ns = Ns Oo Sy false "|" true Oc
+Whether binary packages are location independent, i.e. can be installed in
+another prefix than one supplied at build time.
+(Default:
+.Sy false )
+.It Sy MAKE
+The
+.Xr make 1
+program to use.
+(Default: Search the PATH for the program in the
+.Ev MAKE
+environment variable or
+.Xr make 1
+as a fallback)
+.It Sy MAKE_ARGS
+Additional arguments passed to make.
+.It Sy MAKE_BUILD_TARGET
+Build the port by making this target.
+(Default:
+.Sy all )
+.It Sy MAKE_CLEAN_TARGET
+Clean the port by making this target.
+(Default:
+.Sy distclean
+if
+.Sy BUILD_SYSTEM=configure
+and
+.Sy clean
+otherwise)
+.It Sy MAKE_IGNORE_CLEAN_FAILURE Ns = Ns Oo Sy false "|" true Oc
+Whether to silently ignore if cleaning the port failed.
+(Default:
+.Sy true )
+.It Sy MAKE_INSTALL_TARGET
+Install the port by making this target with the
+.Ev DESTDIR
+environment variable set to a temporary secondary prefix for the purpose of
+installation-time packaging.
+(Default:
+.Sy install )
+.It Sy MAKE_VARS
+Additional environment variable assignments while make is run.
+.It Sy NAME
+The name of the port.
+.It Sy NEED_WRITABLE Ns = Ns Oo Sy false "|" true Oc
+Whether to extract the port with writable files because the port couldn't be
+fully normalized and the port actually needs to modify files shipped in the
+upstream releases at build time.
+(Default:
+.Sy false )
+.It Sy POST_INSTALL
+Optional program to invoke post-installation to fix up the installation.
+The
+.Sy TIX_BUILD_DIR ,
+.Sy TIX_SOURCE_DIR ,
+.Sy TIX_INSTALL_DIR ,
+.Sy TIX_SYSROOT ,
+.Sy BUILD ,
+.Sy HOST ,
+.Sy TARGET ,
+.Sy PREFIX ,
+and
+.Sy EXEC_PREFIX
+environment variables are set and unset appropriately.
+.It Sy RELEASE_SEARCH_PAGE
+Upstream URL listing the available versions of the port.
+.It Sy RELEASE_SEARCH_REGEX
+Locate new upstream versions of the port by searching
+.Sy RELEASE_SEARCH_PAGE
+using this regular expression matching the new version number in the first
+subexpression.
+.It Sy RUNTIME_DEPS
+Space delimited list of libraries (ports) needed at run time.
+Unsupported.
+.It Sy RUNTIME_PROGRAMS
+Space delimited list of programs (ports) needed at run time.
+Unsupported.
+.It Sy SHA256SUM
+.Xr sha256sum 1
+of the upstream release.
+.It Sy SHA256SUM_2
+For
+.Sy ARCHIVE_2 .
+.It Sy SOURCE_PORT
+Use the named port's source code instead.
+.It Sy SUBDIR
+Run the build commands in this subdir.
+.It Sy UPSTREAM_ARCHIVE
+The filename of the upstream release on
+.Sy UPSTREAM_SITE ,
+usually
+.Sy $ARCHIVE
+but may be different in cases where the upstream filename is poor (e.g. isn't
+unique, lacking the name of the port and the version) and
+.Sy ARCHIVE
+is set to a unique filename for use in the mirror.
+.It Sy UPSTREAM_ARCHIVE_2
+For
+.Sy ARCHIVE_2 .
+.It Sy UPSTREAM_SITE
+Download releases from this upstream URL (without a trailing slash) in case the
+mirror fails.
+.It Sy UPSTREAM_SITE_2
+For
+.Sy ARCHIVE_2 .
+.It Sy USE_BOOTSTRAP Ns = Ns Oo Sy false "|" true Oc
+Bootstrap a new version of this port by first building a local version installed
+into a temporary directory in the
+.Ev PATH
+and then use it to build the final version.
+(Default:
+.Sy false )
+.Pp
+This functionality is useful when e.g. cross-compiling a port requires the same
+version of the port to already be locally installed.
+The bootstrap phase uses its own set of variables prefixed with
+.Sy BOOTSTRAP_
+with the same semantics as their counterparts, e.g.:
+.Pp
+.Bl -tag -compact -width "12345678"
+.It Sy BOOTSTRAP_BUILD_SYSTEM
+.It Sy BOOTSTRAP_CONFIGURE
+.It Sy BOOTSTRAP_CONFIGURE_ARGS
+.It Sy BOOTSTRAP_CONFIGURE_USE_BUILD_DIRECTORY
+.It Sy BOOTSTRAP_CONFIGURE_VARS
+.It Sy BOOTSTRAP_MAKE
+.It Sy BOOTSTRAP_MAKE_ARGS
+.It Sy BOOTSTRAP_MAKE_VARS
+.El
+.It Sy VERSION
+The version of the port.
+If the version number components are used individually, define them as
+.Sy VERSION_MAJOR ,
+.Sy VERSION_MINOR ,
+and
+.Sy VERSION_PATCH
+and define
+.Sy VERSION
+as
+.Sy $VERSION_MAJOR.$VERSION_MINOR.$VERSION_PATCH .
+.It Sy VERSION_2
+For
+.Sy ARCHIVE_2 .
+.It Sy VERSION_REGEX
+Extended regular expression parsing the version number with the full version in
+the first subexpression.
+(Default:
+.Sq ([0-9]+\.[0-9]+(\.[0-9]+)*) )
+.El
+.Pp
+The following environment variables are set by default during the port build:
+.Bl -tag -width "12345678"
+.It Ev CC
+The C compiler.
+.It Ev CFLAGS
+Command line options when compiling C code.
+.It Ev DESTDIR
+An optional extra prefix used when installing the port for packaging.
+.It Ev PKG_CONFIG
+The
+.Xr pkg-config 1
+to use for locating dependencies.
+.El
+.Sh SEE ALSO
+.Xr development 7 ,
+.Xr porting 7 ,
+.Xr tix-vars 8
+.Sh HISTORY
+The
+.Nm
+format originally appeared in Sortix 1.1 as the semantic continuation of the
+former
+.Pa tixbuildinfo
+format introduced in Sortix 0.8.

@@ -1,0 +1,157 @@
+diff -Paur --no-dereference -- nano.upstream/config.sub nano/config.sub
+--- nano.upstream/config.sub
++++ nano/config.sub
+@@ -1373,7 +1373,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* | -plan9* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -sortix* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -Paur --no-dereference -- nano.upstream/configure nano/configure
+--- nano.upstream/configure
++++ nano/configure
+@@ -8675,6 +8675,7 @@
+   # Extract the first word of "${ac_tool_prefix}ncursesw5-config", so it can be a program name with args.
+ set dummy ${ac_tool_prefix}ncursesw5-config; ac_word=$2
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
++ac_cv_prog_NCURSESW_CONFIG=false
+ $as_echo_n "checking for $ac_word... " >&6; }
+ if ${ac_cv_prog_NCURSESW_CONFIG+:} false; then :
+   $as_echo_n "(cached) " >&6
+diff -Paur --no-dereference -- nano.upstream/src/files.c nano/src/files.c
+--- nano.upstream/src/files.c
++++ nano/src/files.c
+@@ -1501,10 +1501,12 @@
+     if (tmpdir_env != NULL)
+ 	full_tempdir = check_writable_directory(tmpdir_env);
+ 
++#ifdef P_tmpdir
+     /* If $TMPDIR is unset, empty, or not a writable directory, and
+      * full_tempdir is NULL, try P_tmpdir instead. */
+     if (full_tempdir == NULL)
+ 	full_tempdir = check_writable_directory(P_tmpdir);
++#endif
+ 
+     /* if P_tmpdir is NULL, use /tmp. */
+     if (full_tempdir == NULL)
+diff -Paur --no-dereference -- nano.upstream/src/Makefile.in nano/src/Makefile.in
+--- nano.upstream/src/Makefile.in
++++ nano/src/Makefile.in
+@@ -559,6 +559,7 @@
+ distclean: distclean-am
+ 	-rm -rf ./$(DEPDIR)
+ 	-rm -f Makefile
++	-rm -f revision.h
+ distclean-am: clean-am distclean-compile distclean-generic \
+ 	distclean-tags
+ 
+diff -Paur --no-dereference -- nano.upstream/src/rcfile.c nano/src/rcfile.c
+--- nano.upstream/src/rcfile.c
++++ nano/src/rcfile.c
+@@ -23,7 +23,9 @@
+ 
+ #include "proto.h"
+ 
++#if defined(__has_include) && __has_include(<glob.h>)
+ #include <glob.h>
++#endif
+ #include <stdarg.h>
+ #include <string.h>
+ #include <stdio.h>
+@@ -223,13 +225,35 @@
+  * null-terminate it, and return a pointer to the /next/ word. */
+ char *parse_next_regex(char *ptr)
+ {
++    char* outptr = ptr;
++    int escaped = 0;
++    char c;
++    size_t bracket = 0;
++
+     assert(ptr != NULL);
+ 
+-    /* Continue until the end of line, or until a " followed by a
+-     * blank character or the end of line. */
+-    while (*ptr != '\0' && (*ptr != '"' ||
+-		(*(ptr + 1) != '\0' && !isblank(*(ptr + 1)))))
+-	ptr++;
++    /* PATCH: This fixes issues in the nanorc parser because the Sortix regcomp
++              does not support \" and \' (just use " and ' instead). */
++    while ((c = *ptr)) {
++      if (!escaped && !bracket && c == '"' &&
++          (!ptr[1] || isspace((unsigned char) ptr[1])) )
++	break;
++      if (escaped && c != '"' && c != '\'')
++        *outptr++ = '\\';
++      if (c == '\\' && !escaped && !bracket)
++	escaped = 1;
++      else if (c == '[' && !escaped) {
++	bracket++;
++	*outptr++ = c;
++      } else if (bracket && c == ']' && !escaped) {
++	bracket--;
++	*outptr++ = c;
++      } else {
++	*outptr++ = c;
++	escaped = 0;
++      }
++      ptr++;
++    }
+ 
+     assert(*ptr == '"' || *ptr == '\0');
+ 
+@@ -240,7 +264,8 @@
+     }
+ 
+     /* Null-terminate and advance ptr. */
+-    *ptr++ = '\0';
++    *outptr = '\0';
++    ptr++;
+ 
+     while (isblank(*ptr))
+ 	ptr++;
+@@ -570,8 +595,11 @@
+ void parse_includes(char *ptr)
+ {
+     char *option, *nanorc_save = nanorc, *expanded;
+-    size_t lineno_save = lineno, i;
++    size_t lineno_save = lineno;
++#if defined(__has_include) && __has_include(<glob.h>)
++    size_t i;
+     glob_t files;
++#endif
+ 
+     option = ptr;
+     if (*option == '"')
+@@ -581,6 +609,7 @@
+     /* Expand tildes first, then the globs. */
+     expanded = real_dir_from_tilde(option);
+ 
++#if defined(__has_include) && __has_include(<glob.h>)
+     if (glob(expanded, GLOB_ERR|GLOB_NOSORT, NULL, &files) == 0) {
+ 	for (i = 0; i < files.gl_pathc; ++i)
+ 	    parse_one_include(files.gl_pathv[i]);
+@@ -589,6 +618,9 @@
+ 		strerror(errno));
+ 
+     globfree(&files);
++#else
++    parse_one_include(expanded);
++#endif
+     free(expanded);
+ 
+     /* We're done with the included file(s).  Restore the original
+diff -Paur --no-dereference -- nano.upstream/src/winio.c nano/src/winio.c
+--- nano.upstream/src/winio.c
++++ nano/src/winio.c
+@@ -2274,7 +2274,7 @@
+     if (margin > 0) {
+ 	wattron(edit, interface_color_pair[LINE_NUMBER]);
+ 	if (last_drawn_line != fileptr->lineno || last_line_y >= line)
+-	    mvwprintw(edit, line, 0, "%*i", margin - 1, fileptr->lineno);
++	    mvwprintw(edit, line, 0, "%*zi", margin - 1, fileptr->lineno);
+ 	else
+ 	    mvwprintw(edit, line, 0, "%*s", margin - 1, " ");
+ 	wattroff(edit, interface_color_pair[LINE_NUMBER]);

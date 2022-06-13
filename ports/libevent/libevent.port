@@ -1,0 +1,13 @@
+NAME=libevent
+BUILD_LIBRARIES='libz? libssl?'
+VERSION=2.0.22-stable
+DISTNAME=$NAME-$VERSION
+COMPRESSION=tar.gz
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=71c2c49f0adadacfdbe6332a372c38cf9c8b7895bb73dabeaa53cdcc1d4e1fa3
+UPSTREAM_SITE=https://github.com/libevent/libevent/releases/download/release-$VERSION
+UPSTREAM_ARCHIVE=$ARCHIVE
+BUILD_SYSTEM=configure
+CONFIGURE_ARGS=--disable-malloc-replacement
+POST_INSTALL=tix-eradicate-libtool-la
+VERSION_REGEX='([0-9]+\.[0-9]+(\.[0-9]+)*-stable)'

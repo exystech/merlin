@@ -69,6 +69,40 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Add ports to the Sortix repository
+The ports have been moved from the porttix/srctix repositories into the
+.Pa ports/
+subdirectory in the main repository.
+The upstream releases are downloaded from the appropriate mirror when built and
+patched with the patches in the
+.Pa ports/
+subdirectory.
+.Pp
+Any existing manually created
+.Pa ports/
+directory should be removed before checking out the new source code.
+.Pp
+Tix must be upgraded to build the new ports:
+.Bd -literal
+    cd /src/tix &&
+    make clean &&
+    make install
+.Ed
+.Pp
+If not developing natively, set
+.Ev PREFIX
+to the desired location.
+.Pp
+All ports are built by default and the
+.Ev PACKAGES
+environment variable configures which ports are built.
+.Pp
+Sortix 1.0 has a broken
+.Xr patch 1
+and the
+.Sy extract-ports
+makefile target should be invoked on another system in order to bootstrap the
+new version.
 .Ss Implement file descriptor passing
 The
 .Dv SCM_RIGHTS

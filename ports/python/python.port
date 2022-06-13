@@ -1,0 +1,20 @@
+NAME=python
+BUILD_LIBRARIES='bzip2 libcurses libexpat libffi libreadline libssl libz xz libiconv? libintl? llibmpdec?'
+VERSION=3.6.0
+DISTNAME=Python-$VERSION
+COMPRESSION=tar.xz
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=b0c5f904f685e32d9232f7bdcbece9819a892929063b6e385414ad2dd6a23622
+UPSTREAM_SITE=https://www.python.org/ftp/python/$VERSION
+UPSTREAM_ARCHIVE=$ARCHIVE
+BUILD_SYSTEM=configure
+USE_BOOTSTRAP=true
+# Work around that pip always ends up in /usr despite the prefix and that this
+# appears to be downloading and installing software from the internet.
+CONFIGURE_ARGS=--without-ensurepip
+POST_INSTALL=../python.post-install
+BOOTSTRAP_BUILD_SYSTEM=configure
+BOOTSTRAP_CONFIGURE_ARGS=--without-ensurepip
+RELEASE_SEARCH_PAGE=https://www.python.org/downloads/source/
+RELEASE_SEARCH_REGEX='Python-([0-9]+\.[0-9]+(\.[0-9]+)*)(\.tar(\.(gz|bz2|xz)))'
+NEED_WRITABLE=true

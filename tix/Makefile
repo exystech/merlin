@@ -14,15 +14,15 @@ ifeq ($(HOST_IS_SORTIX),0)
 endif
 
 BINARIES:=\
-porttix-create \
-srctix-create \
 tix \
 tix-build \
 tix-collection \
 tix-execdiff \
 tix-execpatch \
 tix-install \
+tix-rmdiff \
 tix-rmpatch \
+tix-vars \
 
 PROGRAMS:=\
 $(BINARIES) \
@@ -30,11 +30,20 @@ tix-eradicate-libtool-la \
 tix-iso-add \
 tix-iso-bootconfig \
 tix-iso-liveconfig \
+tix-port \
 
 MANPAGES8=\
+tix-build.8 \
+tix-eradicate-libtool-la.8 \
+tix-execdiff.8 \
+tix-execpatch.8 \
 tix-iso-add.8 \
 tix-iso-bootconfig.8 \
 tix-iso-liveconfig.8 \
+tix-port.8 \
+tix-rmdiff.8 \
+tix-rmpatch.8 \
+tix-vars.8 \
 
 all: $(PROGRAMS)
 

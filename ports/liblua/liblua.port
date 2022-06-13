@@ -1,0 +1,5 @@
+NAME=liblua
+SOURCE_PORT=lua
+BUILD_SYSTEM=makefile
+MAKE_BUILD_TARGET=lib
+MAKE_INSTALL_TARGET=install-lib

@@ -1,0 +1,9 @@
+#!/bin/sh -e
+tix-eradicate-libtool-la
+programs=$(ls "$TIX_INSTALL_DIR$EXEC_PREFIX/bin")
+for program in $programs; do
+  if [ ! -e "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/$TARGET-$program" ]; then
+    ln "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/$program" \
+       "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/$TARGET-$program"
+  fi
+done

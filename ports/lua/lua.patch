@@ -1,0 +1,219 @@
+diff -Paur --no-dereference -- lua.upstream/Makefile lua/Makefile
+--- lua.upstream/Makefile
++++ lua/Makefile
+@@ -10,13 +10,16 @@
+ # so take care if INSTALL_TOP is not an absolute path. See the local target.
+ # You may want to make INSTALL_LMOD and INSTALL_CMOD consistent with
+ # LUA_ROOT, LUA_LDIR, and LUA_CDIR in luaconf.h.
+-INSTALL_TOP= /usr/local
+-INSTALL_BIN= $(INSTALL_TOP)/bin
+-INSTALL_INC= $(INSTALL_TOP)/include
+-INSTALL_LIB= $(INSTALL_TOP)/lib
+-INSTALL_MAN= $(INSTALL_TOP)/man/man1
+-INSTALL_LMOD= $(INSTALL_TOP)/share/lua/$V
+-INSTALL_CMOD= $(INSTALL_TOP)/lib/lua/$V
++PREFIX?=/usr/local
++EXEC_PREFIX?=$(EXEC_PREFIX)
++BINDIR?=$(EXEC_PREFIX)/bin
++INCLUDEDIR?=$(PREFIX)/include
++LIBDIR?=$(EXEC_PREFIX)/lib
++DATAROOTDIR?=$(PREFIX)/share
++DATADIR?=$(DATAROOTDIR)
++MANDIR?=$(DATAROOTDIR)/man
++LMODDIR=$(DATADIR)/lua/$V
++CMODDIR?=$(LIBDIR)/lua/$V
+ 
+ # How to install. If your install program does not support "-p", then
+ # you may have to run ranlib on the installed liblua.a.
+@@ -49,29 +52,31 @@
+ R= $V.4
+ 
+ # Targets start here.
+-all:	$(PLAT)
++all:
++	cd src && $(MAKE) posix LMODDIR=$(LMODDIR) CMODDIR=$(CMODDIR)
++
++lib:
++	cd src && $(MAKE) posix-lib LMODDIR=$(LMODDIR) CMODDIR=$(CMODDIR)
+ 
+ $(PLATS) clean:
+-	cd src && $(MAKE) $@
++	cd src && $(MAKE) $@ LMODDIR=$(LMODDIR) CMODDIR=$(CMODDIR)
+ 
+ test:	dummy
+ 	src/lua -v
+ 
+-install: dummy
+-	cd src && $(MKDIR) $(INSTALL_BIN) $(INSTALL_INC) $(INSTALL_LIB) $(INSTALL_MAN) $(INSTALL_LMOD) $(INSTALL_CMOD)
+-	cd src && $(INSTALL_EXEC) $(TO_BIN) $(INSTALL_BIN)
+-	cd src && $(INSTALL_DATA) $(TO_INC) $(INSTALL_INC)
+-	cd src && $(INSTALL_DATA) $(TO_LIB) $(INSTALL_LIB)
+-	cd doc && $(INSTALL_DATA) $(TO_MAN) $(INSTALL_MAN)
+-
+-uninstall:
+-	cd src && cd $(INSTALL_BIN) && $(RM) $(TO_BIN)
+-	cd src && cd $(INSTALL_INC) && $(RM) $(TO_INC)
+-	cd src && cd $(INSTALL_LIB) && $(RM) $(TO_LIB)
+-	cd doc && cd $(INSTALL_MAN) && $(RM) $(TO_MAN)
+-
+-local:
+-	$(MAKE) install INSTALL_TOP=../install
++install: all
++	$(MKDIR) $(DESTDIR)$(BINDIR)
++	cd src && $(INSTALL_EXEC) $(TO_BIN) $(DESTDIR)$(BINDIR)
++	$(MKDIR) $(DESTDIR)$(MANDIR)/man1
++	cd doc && $(INSTALL_DATA) $(TO_MAN) $(DESTDIR)$(MANDIR)/man1
++	$(MKDIR) $(DESTDIR)$(LMODDIR)
++	$(MKDIR) $(DESTDIR)$(CMODDIR)
++
++install-lib:
++	$(MKDIR) $(DESTDIR)$(INCLUDEDIR)
++	cd src && $(INSTALL_DATA) $(TO_INC) $(DESTDIR)$(INCLUDEDIR)
++	$(MKDIR) $(DESTDIR)$(LIBDIR)
++	cd src && $(INSTALL_DATA) $(TO_LIB) $(DESTDIR)$(LIBDIR)
+ 
+ none:
+ 	@echo "Please do 'make PLATFORM' where PLATFORM is one of these:"
+diff -Paur --no-dereference -- lua.upstream/src/ldo.c lua/src/ldo.c
+--- lua.upstream/src/ldo.c
++++ lua/src/ldo.c
+@@ -62,9 +62,9 @@
+ 
+ #elif defined(LUA_USE_POSIX)				/* }{ */
+ 
+-/* in POSIX, try _longjmp/_setjmp (more efficient) */
+-#define LUAI_THROW(L,c)		_longjmp((c)->b, 1)
+-#define LUAI_TRY(L,c,a)		if (_setjmp((c)->b) == 0) { a }
++/* in POSIX, try siglongjmp/sigsetjmp (more efficient) */
++#define LUAI_THROW(L,c)		siglongjmp((c)->b, 1)
++#define LUAI_TRY(L,c,a)		if (sigsetjmp((c)->b, 0) == 0) { a }
+ #define luai_jmpbuf		jmp_buf
+ 
+ #else							/* }{ */
+@@ -72,7 +72,7 @@
+ /* ISO C handling with long jumps */
+ #define LUAI_THROW(L,c)		longjmp((c)->b, 1)
+ #define LUAI_TRY(L,c,a)		if (setjmp((c)->b) == 0) { a }
+-#define luai_jmpbuf		jmp_buf
++#define luai_jmpbuf		sigjmp_buf
+ 
+ #endif							/* } */
+ 
+diff -Paur --no-dereference -- lua.upstream/src/lmathlib.c lua/src/lmathlib.c
+--- lua.upstream/src/lmathlib.c
++++ lua/src/lmathlib.c
+@@ -24,7 +24,7 @@
+ 
+ 
+ #if !defined(l_rand)		/* { */
+-#if defined(LUA_USE_POSIX)
++#if defined(LUA_USE_XSI)
+ #define l_rand()	random()
+ #define l_srand(x)	srandom(x)
+ #define L_RANDMAX	2147483647	/* (2^31 - 1), following POSIX */
+diff -Paur --no-dereference -- lua.upstream/src/luac.c lua/src/luac.c
+--- lua.upstream/src/luac.c
++++ lua/src/luac.c
+@@ -265,7 +265,7 @@
+   case LUA_TNUMFLT:
+ 	{
+ 	char buff[100];
+-	sprintf(buff,LUA_NUMBER_FMT,fltvalue(o));
++	snprintf(buff,sizeof(buff),LUA_NUMBER_FMT,fltvalue(o));
+ 	printf("%s",buff);
+ 	if (buff[strspn(buff,"-0123456789")]=='\0') printf(".0");
+ 	break;
+diff -Paur --no-dereference -- lua.upstream/src/luaconf.h lua/src/luaconf.h
+--- lua.upstream/src/luaconf.h
++++ lua/src/luaconf.h
+@@ -200,9 +200,6 @@
+ 
+ #else			/* }{ */
+ 
+-#define LUA_ROOT	"/usr/local/"
+-#define LUA_LDIR	LUA_ROOT "share/lua/" LUA_VDIR "/"
+-#define LUA_CDIR	LUA_ROOT "lib/lua/" LUA_VDIR "/"
+ #define LUA_PATH_DEFAULT  \
+ 		LUA_LDIR"?.lua;"  LUA_LDIR"?/init.lua;" \
+ 		LUA_CDIR"?.lua;"  LUA_CDIR"?/init.lua;" \
+diff -Paur --no-dereference -- lua.upstream/src/Makefile lua/src/Makefile
+--- lua.upstream/src/Makefile
++++ lua/src/Makefile
+@@ -6,22 +6,19 @@
+ # Your platform. See PLATS for possible values.
+ PLAT= none
+ 
+-CC= gcc -std=gnu99
+-CFLAGS= -O2 -Wall -Wextra -DLUA_COMPAT_5_2 $(SYSCFLAGS) $(MYCFLAGS)
+-LDFLAGS= $(SYSLDFLAGS) $(MYLDFLAGS)
+-LIBS= -lm $(SYSLIBS) $(MYLIBS)
++CC?= gcc
++CFLAGS?= -O2
++LDFLAGS?=
++LIBS?=
++
++CFLAGS+= -std=c99 -Wall -Wextra -DLUA_COMPAT_5_2 \
++         -DLUA_LDIR=\"$(LMODDIR)\" -DLUA_CDIR=\"$(CMODDIR)\" $(SYSCFLAGS)
++LIBS+= -llua -lm $(SYSLIBS)
+ 
+-AR= ar rcu
+-RANLIB= ranlib
++AR?= ar
++RANLIB?= ranlib
+ RM= rm -f
+ 
+-SYSCFLAGS=
+-SYSLDFLAGS=
+-SYSLIBS=
+-
+-MYCFLAGS=
+-MYLDFLAGS=
+-MYLIBS=
+ MYOBJS=
+ 
+ # == END OF USER SETTINGS -- NO NEED TO CHANGE ANYTHING BELOW THIS LINE =======
+@@ -43,7 +40,7 @@
+ LUAC_O=	luac.o
+ 
+ ALL_O= $(BASE_O) $(LUA_O) $(LUAC_O)
+-ALL_T= $(LUA_A) $(LUA_T) $(LUAC_T)
++ALL_T= $(LUA_T) $(LUAC_T)
+ ALL_A= $(LUA_A)
+ 
+ # Targets start here.
+@@ -56,17 +53,17 @@
+ a:	$(ALL_A)
+ 
+ $(LUA_A): $(BASE_O)
+-	$(AR) $@ $(BASE_O)
++	$(AR) rcu $@ $(BASE_O)
+ 	$(RANLIB) $@
+ 
+-$(LUA_T): $(LUA_O) $(LUA_A)
+-	$(CC) -o $@ $(LDFLAGS) $(LUA_O) $(LUA_A) $(LIBS)
++$(LUA_T): $(LUA_O)
++	$(CC) -o $@ $(LDFLAGS) $(LUA_O) $(LIBS)
+ 
+-$(LUAC_T): $(LUAC_O) $(LUA_A)
+-	$(CC) -o $@ $(LDFLAGS) $(LUAC_O) $(LUA_A) $(LIBS)
++$(LUAC_T): $(LUAC_O)
++	$(CC) -o $@ $(LDFLAGS) $(LUAC_O) $(LIBS)
+ 
+ clean:
+-	$(RM) $(ALL_T) $(ALL_O)
++	$(RM) $(ALL_T) $(ALL_A) $(ALL_O)
+ 
+ depend:
+ 	@$(CC) $(CFLAGS) -MM l*.c
+@@ -119,7 +116,10 @@
+ 	$(MAKE) "LUAC_T=luac.exe" luac.exe
+ 
+ posix:
+-	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_POSIX"
++	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_POSIX -DLUA_USE_READLINE" SYSLIBS="-lreadline -lterminfo"
++
++posix-lib:
++	$(MAKE) $(ALL_A) SYSCFLAGS="-DLUA_USE_POSIX -DLUA_USE_READLINE" SYSLIBS="-lreadline -lterminfo"
+ 
+ solaris:
+ 	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_POSIX -DLUA_USE_DLOPEN -D_REENTRANT" SYSLIBS="-ldl"

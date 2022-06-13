@@ -1,0 +1,49 @@
+diff -Paur --no-dereference -- xz.upstream/build-aux/config.sub xz/build-aux/config.sub
+--- xz.upstream/build-aux/config.sub
++++ xz/build-aux/config.sub
+@@ -1373,7 +1373,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* | -plan9* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -sortix* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -Paur --no-dereference -- xz.upstream/configure xz/configure
+--- xz.upstream/configure
++++ xz/configure
+@@ -18313,6 +18313,7 @@
+ 
+ #if defined(_WIN32) || defined(__CYGWIN__) || defined(__OS2__) \
+ 		|| defined(__DJGPP__) || defined(__VMS) \
++		|| defined(__sortix__) \
+ 		|| defined(AMIGA) || defined(__AROS__)
+ int main(void) { return 0; }
+ #else
+diff -Paur --no-dereference -- xz.upstream/src/common/tuklib_physmem.c xz/src/common/tuklib_physmem.c
+--- xz.upstream/src/common/tuklib_physmem.c
++++ xz/src/common/tuklib_physmem.c
+@@ -67,6 +67,11 @@
+ // This sysinfo() is Linux-specific.
+ #elif defined(TUKLIB_PHYSMEM_SYSINFO)
+ #	include <sys/sysinfo.h>
++
++// Sortix
++#elif defined(__sortix__)
++#	include <unistd.h>
++
+ #endif
+ 
+ 
+@@ -197,6 +202,10 @@
+ 	struct sysinfo si;
+ 	if (sysinfo(&si) == 0)
+ 		ret = (uint64_t)si.totalram * si.mem_unit;
++#elif defined(__sortix__)
++	size_t ret_size_t;
++	memstat(NULL, &ret_size_t);
++	ret = ret_size_t;
+ #endif
+ 
+ 	return ret;

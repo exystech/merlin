@@ -1,0 +1,6 @@
+NAME=libavcodec
+SOURCE_PORT=ffmpeg
+BUILD_SYSTEM=configure
+DIRTY_FILE=ffbuild/config.mak
+CONFIGURE_ARGS='--disable-x86asm --enable-version3 --optflags=" " --disable-debug --disable-programs'
+MAKE_VARS='V=1'

@@ -1,4 +1,5 @@
-#!/bin/sh -e
+#!/bin/sh
+set -e
 
 # Detect if the environment isn't set up properly.
 if [ -z "$HOST" ]; then
@@ -17,12 +18,11 @@ if ! [ -d "$SORTIX_REPOSITORY_DIR" ]; then
   exit 0
 fi
 
+PACKAGES="$("$(dirname -- "$0")"/list-packages.sh PACKAGES)"
+
 mkdir -p "$1"
 
-if [ -z "${PACKAGES+x}" ]; then
-  cp -RT "$SORTIX_REPOSITORY_DIR" "$1"
-else
-  for PACKAGE in $PACKAGES; do
-    cp "$SORTIX_REPOSITORY_DIR/$PACKAGE.tix.tar.xz" "$1"
-  done
-fi
+for PACKAGE in $PACKAGES; do
+  cp "$SORTIX_REPOSITORY_DIR/$PACKAGE.tix.tar.xz" "$1"
+  cp "$SORTIX_REPOSITORY_DIR/$PACKAGE.version" "$1"
+done

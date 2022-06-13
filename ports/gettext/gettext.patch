@@ -1,0 +1,700 @@
+diff -Paur --no-dereference -- gettext.upstream/gettext-runtime/configure gettext/gettext-runtime/configure
+--- gettext.upstream/gettext-runtime/configure
++++ gettext/gettext-runtime/configure
+@@ -1,4 +1,124 @@
+ #! /bin/sh
++# Make gnulib assume the best about unknown operating systems when cross-compiling.
++export ac_cv_func_calloc_0_nonnull=yes
++export ac_cv_func_chown_works=yes
++export ac_cv_func_getgroups_works=yes
++export ac_cv_func_malloc_0_nonnull=yes
++export gl_cv_func_cbrtl_ieee=yes
++export gl_cv_func_ceilf_ieee=yes
++export gl_cv_func_ceil_ieee=yes
++export gl_cv_func_ceill_ieee=yes
++export gl_cv_func_chown_ctime_works=yes
++export gl_cv_func_chown_slash_works=yes
++export gl_cv_func_exp2l_ieee=yes
++export gl_cv_func_expm1_ieee=yes
++export gl_cv_func_fcntl_f_dupfd_works=yes # Not needed since February 2015
++export gl_cv_func_fdopendir_works=yes
++export gl_cv_func_floorf_ieee=yes
++export gl_cv_func_fmaf_works=yes
++export gl_cv_func_fmal_works=yes
++export gl_cv_func_fma_works=yes
++export gl_cv_func_fmodf_ieee=yes
++export gl_cv_func_fmod_ieee=yes
++export gl_cv_func_fmodl_ieee=yes
++export gl_cv_func_fpurge_works=yes
++export gl_cv_func_futimens_works=yes
++export gl_cv_func_futimesat_works=yes
++export gl_cv_func_getgroups_works=yes
++export gl_cv_func_gettimeofday_clobber=no
++export gl_cv_func_hypotf_ieee=yes
++export gl_cv_func_hypotl_ieee=yes
++export gl_cv_func_hypot_ieee=yes
++export gl_cv_func_isfinitel_works=yes
++export gl_cv_func_isnanl_works=yes
++export gl_cv_func_linkat_slash=yes
++export gl_cv_func_link_works=yes
++export gl_cv_func_log10f_ieee=yes
++export gl_cv_func_log10_ieee=yes
++export gl_cv_func_log1pf_ieee=yes
++export gl_cv_func_log1p_ieee=yes
++export gl_cv_func_log1pl_ieee=yes
++export gl_cv_func_log2f_ieee=yes
++export gl_cv_func_log2_ieee=yes
++export gl_cv_func_logf_ieee=yes
++export gl_cv_func_log_ieee=yes
++export gl_cv_func_lstat_dereferences_slashed_symlink=yes
++export gl_cv_func_mbrlen_empty_input=yes
++export gl_cv_func_mbrtowc_empty_input=yes
++export gl_cv_func_memchr_works=yes
++export gl_cv_func_memmem_works_fast=yes
++export gl_cv_func_mkdir_trailing_dot_works=yes
++export gl_cv_func_mkdir_trailing_slash_works=yes
++export gl_cv_func_mkfifo_works=yes
++export gl_cv_func_mknod_works=yes
++export gl_cv_func_modff_ieee=yes
++export gl_cv_func_modf_ieee=yes
++export gl_cv_func_modfl_ieee=yes
++export gl_cv_func_nanosleep=yes
++export gl_cv_func_open_directory_works=yes
++export gl_cv_func_perror_works=yes
++export gl_cv_func_printf_directive_a=yes
++export gl_cv_func_printf_directive_f=yes
++export gl_cv_func_printf_directive_n=yes
++export gl_cv_func_printf_enomem=yes
++export gl_cv_func_printf_flag_zero=yes
++export gl_cv_func_printf_infinite_long_double=yes
++export gl_cv_func_printf_infinite=yes
++export gl_cv_func_printf_sizes_c99=yes
++export gl_cv_func_pselect_detects_ebadf=yes
++export gl_cv_func_ptsname_sets_errno=yes
++export gl_cv_func_readlink_works=yes
++export gl_cv_func_realpath_works=yes
++export gl_cv_func_remainderf_ieee=yes
++export gl_cv_func_remainder_ieee=yes
++export gl_cv_func_remainderl_ieee=yes
++export gl_cv_func_rename_dest_works=yes
++export gl_cv_func_rename_link_works=yes
++export gl_cv_func_rename_slash_dst_works=yes
++export gl_cv_func_rename_slash_src_works=yes
++export gl_cv_func_rmdir_works=yes
++export gl_cv_func_roundf_ieee=yes
++export gl_cv_func_round_ieee=yes
++export gl_cv_func_select_detects_ebadf=yes
++export gl_cv_func_setenv_works=yes
++export gl_cv_func_signbit_gcc=yes
++export gl_cv_func_signbit=yes
++export gl_cv_func_sleep_works=yes
++export gl_cv_func_snprintf_directive_n=yes
++export gl_cv_func_snprintf_retval_c99=yes
++export gl_cv_func_snprintf_truncation_c99=yes
++export gl_cv_func_stat_dir_slash=yes
++export gl_cv_func_stat_file_slash=yes
++export gl_cv_func_stpncpy=yes
++export gl_cv_func_strcasestr_linear=yes
++export gl_cv_func_strchrnul_works=yes
++export gl_cv_func_strerror_0_works=yes
++export gl_cv_func_strstr_linear=yes
++export gl_cv_func_strtod_works=yes
++export gl_cv_func_svid_putenv=yes
++export gl_cv_func_symlink_works=yes
++export gl_cv_func_tdelete_works=yes
++export gl_cv_func_truncf_ieee=yes
++export gl_cv_func_trunc_ieee=yes
++export gl_cv_func_truncl_ieee=yes
++export gl_cv_func_tzset_clobber=no
++export gl_cv_func_ungetc_works=yes
++export gl_cv_func_unlink_honors_slashes=yes
++export gl_cv_func_unsetenv_works=yes
++export gl_cv_func_usleep_works=yes
++export gl_cv_func_utimensat_works=yes
++export gl_cv_func_vsnprintf_posix=yes
++export gl_cv_func_vsnprintf_zerosize_c99=yes
++export gl_cv_func_vsprintf_posix=yes
++export gl_cv_func_wcwidth_works=yes
++export gl_cv_func_working_getdelim=yes
++export gl_cv_func_working_mkstemp=yes
++export gl_cv_func_working_mktime=yes
++export gl_cv_func_working_strerror=yes
++export ac_cv_func___fseterr=yes # Only if the OS actually supports this, Sortix does.
++export gl_cv_func_getcwd_null=yes # Only if the OS actually supports this, Sortix does.
++export gl_cv_struct_dirent_d_ino=yes # Only if the OS actually supports this, Sortix does.
++export ac_cv_func_realloc_0_nonnull=yes # TODO: Investigate this, found in flex.
+ # Guess values for system-dependent variables and create Makefiles.
+ # Generated by GNU Autoconf 2.69 for gettext-runtime 0.19.8.
+ #
+@@ -18912,6 +19032,8 @@
+ static char buf[100];
+ int main ()
+ {
++  /* PATCH: Never replace Sortix printf even if it doesn't have this feature. */
++  return 0;
+   sprintf (buf, format, 33, 55);
+   return (strcmp (buf, "55 33") != 0);
+ }
+diff -Paur --no-dereference -- gettext.upstream/gettext-runtime/gnulib-lib/propername.c gettext/gettext-runtime/gnulib-lib/propername.c
+--- gettext.upstream/gettext-runtime/gnulib-lib/propername.c
++++ gettext/gettext-runtime/gnulib-lib/propername.c
+@@ -168,10 +168,10 @@
+       else
+         {
+           /* Return "TRANSLATION (NAME)".  */
+-          char *result =
+-            XNMALLOC (strlen (translation) + 2 + strlen (name) + 1 + 1, char);
++          size_t size = strlen (translation) + 2 + strlen (name) + 1 + 1;
++          char *result = XNMALLOC (size, char);
+ 
+-          sprintf (result, "%s (%s)", translation, name);
++          snprintf (result, size, "%s (%s)", translation, name);
+           return result;
+         }
+     }
+@@ -270,10 +270,10 @@
+       else
+         {
+           /* Return "TRANSLATION (NAME)".  */
+-          char *result =
+-            XNMALLOC (strlen (translation) + 2 + strlen (name) + 1 + 1, char);
++          size_t size = strlen (translation) + 2 + strlen (name) + 1 + 1;
++          char *result = XNMALLOC (size, char);
+ 
+-          sprintf (result, "%s (%s)", translation, name);
++          snprintf (result, size, "%s (%s)", translation, name);
+ 
+           if (alloc_name_converted != NULL)
+             free (alloc_name_converted);
+diff -Paur --no-dereference -- gettext.upstream/gettext-runtime/intl/dcigettext.c gettext/gettext-runtime/intl/dcigettext.c
+--- gettext.upstream/gettext-runtime/intl/dcigettext.c
++++ gettext/gettext-runtime/intl/dcigettext.c
+@@ -997,6 +997,8 @@
+       resultlen = domain->trans_sysdep_tab[act - nstrings].length;
+     }
+ 
++#if 0 /* PATCH: Disable iconv dependency to produce smaller programs.  With luck
++         anything that matters at this time is already UTF-8. */
+ #if defined _LIBC || HAVE_ICONV
+ # ifdef IN_LIBGLOCALE
+   if (encoding != NULL)
+@@ -1406,6 +1408,7 @@
+   /* The result string is converted.  */
+ 
+ #endif /* _LIBC || HAVE_ICONV */
++#endif
+ 
+   *lengthp = resultlen;
+   return result;
+diff -Paur --no-dereference -- gettext.upstream/gettext-runtime/libasprintf/configure gettext/gettext-runtime/libasprintf/configure
+--- gettext.upstream/gettext-runtime/libasprintf/configure
++++ gettext/gettext-runtime/libasprintf/configure
+@@ -18352,6 +18352,8 @@
+ static char buf[100];
+ int main ()
+ {
++  /* PATCH: Never replace Sortix printf even if it doesn't have this feature. */
++  return 0;
+   sprintf (buf, format, 33, 55);
+   return (strcmp (buf, "55 33") != 0);
+ }
+diff -Paur --no-dereference -- gettext.upstream/gettext-tools/configure gettext/gettext-tools/configure
+--- gettext.upstream/gettext-tools/configure
++++ gettext/gettext-tools/configure
+@@ -1,4 +1,124 @@
+ #! /bin/sh
++# Make gnulib assume the best about unknown operating systems when cross-compiling.
++export ac_cv_func_calloc_0_nonnull=yes
++export ac_cv_func_chown_works=yes
++export ac_cv_func_getgroups_works=yes
++export ac_cv_func_malloc_0_nonnull=yes
++export gl_cv_func_cbrtl_ieee=yes
++export gl_cv_func_ceilf_ieee=yes
++export gl_cv_func_ceil_ieee=yes
++export gl_cv_func_ceill_ieee=yes
++export gl_cv_func_chown_ctime_works=yes
++export gl_cv_func_chown_slash_works=yes
++export gl_cv_func_exp2l_ieee=yes
++export gl_cv_func_expm1_ieee=yes
++export gl_cv_func_fcntl_f_dupfd_works=yes # Not needed since February 2015
++export gl_cv_func_fdopendir_works=yes
++export gl_cv_func_floorf_ieee=yes
++export gl_cv_func_fmaf_works=yes
++export gl_cv_func_fmal_works=yes
++export gl_cv_func_fma_works=yes
++export gl_cv_func_fmodf_ieee=yes
++export gl_cv_func_fmod_ieee=yes
++export gl_cv_func_fmodl_ieee=yes
++export gl_cv_func_fpurge_works=yes
++export gl_cv_func_futimens_works=yes
++export gl_cv_func_futimesat_works=yes
++export gl_cv_func_getgroups_works=yes
++export gl_cv_func_gettimeofday_clobber=no
++export gl_cv_func_hypotf_ieee=yes
++export gl_cv_func_hypotl_ieee=yes
++export gl_cv_func_hypot_ieee=yes
++export gl_cv_func_isfinitel_works=yes
++export gl_cv_func_isnanl_works=yes
++export gl_cv_func_linkat_slash=yes
++export gl_cv_func_link_works=yes
++export gl_cv_func_log10f_ieee=yes
++export gl_cv_func_log10_ieee=yes
++export gl_cv_func_log1pf_ieee=yes
++export gl_cv_func_log1p_ieee=yes
++export gl_cv_func_log1pl_ieee=yes
++export gl_cv_func_log2f_ieee=yes
++export gl_cv_func_log2_ieee=yes
++export gl_cv_func_logf_ieee=yes
++export gl_cv_func_log_ieee=yes
++export gl_cv_func_lstat_dereferences_slashed_symlink=yes
++export gl_cv_func_mbrlen_empty_input=yes
++export gl_cv_func_mbrtowc_empty_input=yes
++export gl_cv_func_memchr_works=yes
++export gl_cv_func_memmem_works_fast=yes
++export gl_cv_func_mkdir_trailing_dot_works=yes
++export gl_cv_func_mkdir_trailing_slash_works=yes
++export gl_cv_func_mkfifo_works=yes
++export gl_cv_func_mknod_works=yes
++export gl_cv_func_modff_ieee=yes
++export gl_cv_func_modf_ieee=yes
++export gl_cv_func_modfl_ieee=yes
++export gl_cv_func_nanosleep=yes
++export gl_cv_func_open_directory_works=yes
++export gl_cv_func_perror_works=yes
++export gl_cv_func_printf_directive_a=yes
++export gl_cv_func_printf_directive_f=yes
++export gl_cv_func_printf_directive_n=yes
++export gl_cv_func_printf_enomem=yes
++export gl_cv_func_printf_flag_zero=yes
++export gl_cv_func_printf_infinite_long_double=yes
++export gl_cv_func_printf_infinite=yes
++export gl_cv_func_printf_sizes_c99=yes
++export gl_cv_func_pselect_detects_ebadf=yes
++export gl_cv_func_ptsname_sets_errno=yes
++export gl_cv_func_readlink_works=yes
++export gl_cv_func_realpath_works=yes
++export gl_cv_func_remainderf_ieee=yes
++export gl_cv_func_remainder_ieee=yes
++export gl_cv_func_remainderl_ieee=yes
++export gl_cv_func_rename_dest_works=yes
++export gl_cv_func_rename_link_works=yes
++export gl_cv_func_rename_slash_dst_works=yes
++export gl_cv_func_rename_slash_src_works=yes
++export gl_cv_func_rmdir_works=yes
++export gl_cv_func_roundf_ieee=yes
++export gl_cv_func_round_ieee=yes
++export gl_cv_func_select_detects_ebadf=yes
++export gl_cv_func_setenv_works=yes
++export gl_cv_func_signbit_gcc=yes
++export gl_cv_func_signbit=yes
++export gl_cv_func_sleep_works=yes
++export gl_cv_func_snprintf_directive_n=yes
++export gl_cv_func_snprintf_retval_c99=yes
++export gl_cv_func_snprintf_truncation_c99=yes
++export gl_cv_func_stat_dir_slash=yes
++export gl_cv_func_stat_file_slash=yes
++export gl_cv_func_stpncpy=yes
++export gl_cv_func_strcasestr_linear=yes
++export gl_cv_func_strchrnul_works=yes
++export gl_cv_func_strerror_0_works=yes
++export gl_cv_func_strstr_linear=yes
++export gl_cv_func_strtod_works=yes
++export gl_cv_func_svid_putenv=yes
++export gl_cv_func_symlink_works=yes
++export gl_cv_func_tdelete_works=yes
++export gl_cv_func_truncf_ieee=yes
++export gl_cv_func_trunc_ieee=yes
++export gl_cv_func_truncl_ieee=yes
++export gl_cv_func_tzset_clobber=no
++export gl_cv_func_ungetc_works=yes
++export gl_cv_func_unlink_honors_slashes=yes
++export gl_cv_func_unsetenv_works=yes
++export gl_cv_func_usleep_works=yes
++export gl_cv_func_utimensat_works=yes
++export gl_cv_func_vsnprintf_posix=yes
++export gl_cv_func_vsnprintf_zerosize_c99=yes
++export gl_cv_func_vsprintf_posix=yes
++export gl_cv_func_wcwidth_works=yes
++export gl_cv_func_working_getdelim=yes
++export gl_cv_func_working_mkstemp=yes
++export gl_cv_func_working_mktime=yes
++export gl_cv_func_working_strerror=yes
++export ac_cv_func___fseterr=yes # Only if the OS actually supports this, Sortix does.
++export gl_cv_func_getcwd_null=yes # Only if the OS actually supports this, Sortix does.
++export gl_cv_struct_dirent_d_ino=yes # Only if the OS actually supports this, Sortix does.
++export ac_cv_func_realloc_0_nonnull=yes # TODO: Investigate this, found in flex.
+ # Guess values for system-dependent variables and create Makefiles.
+ # Generated by GNU Autoconf 2.69 for gettext-tools 0.19.8.
+ #
+@@ -21267,6 +21387,8 @@
+ static char buf[100];
+ int main ()
+ {
++  /* PATCH: Never replace Sortix printf even if it doesn't have this feature. */
++  return 0;
+   sprintf (buf, format, 33, 55);
+   return (strcmp (buf, "55 33") != 0);
+ }
+@@ -44404,7 +44526,9 @@
+ 
+ 
+ 
+-    use_additional=yes
++    # PATCH: It's just plain wrong to search for libxml2 in the prefix rather
++    #        than using the pkg-config, or at least using the system root.
++    use_additional=no
+ 
+   acl_save_prefix="$prefix"
+   prefix="$acl_final_prefix"
+@@ -44424,6 +44548,7 @@
+     if test "X$withval" = "Xno"; then
+       use_additional=no
+     else
++      use_additional=yes
+       if test "X$withval" = "X"; then
+ 
+   acl_save_prefix="$prefix"
+@@ -44858,6 +44983,8 @@
+ 
+ 
+ 
++      LIBXML2="$LIBXML2 $(${PKG_CONFIG-pkg-config} --libs libxml-2.0)"
++      LTLIBXML2="$LTLIBXML2 $(${PKG_CONFIG-pkg-config} --libs libxml-2.0)"
+       LIBS="$gl_save_LIBS $LIBXML2 $LIBICONV"
+       cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+@@ -50550,6 +50677,8 @@
+ static char buf[100];
+ int main ()
+ {
++  /* PATCH: Never replace Sortix printf even if it doesn't have this feature. */
++  return 0;
+   sprintf (buf, format, 33, 55);
+   return (strcmp (buf, "55 33") != 0);
+ }
+@@ -54324,6 +54453,8 @@
+ static char buf[100];
+ int main ()
+ {
++  /* PATCH: Never replace Sortix printf even if it doesn't have this feature. */
++  return 0;
+   sprintf (buf, format, 33, 55);
+   return (strcmp (buf, "55 33") != 0);
+ }
+diff -Paur --no-dereference -- gettext.upstream/gettext-tools/gnulib-lib/backupfile.c gettext/gettext-tools/gnulib-lib/backupfile.c
+--- gettext.upstream/gettext-tools/gnulib-lib/backupfile.c
++++ gettext/gettext-tools/gnulib-lib/backupfile.c
+@@ -90,14 +90,15 @@
+   size_t numbered_suffix_size_max = INT_STRLEN_BOUND (int) + 4;
+   char *s;
+   const char *suffix = simple_backup_suffix;
++  size_t ssize;
+ 
+   /* Allow room for simple or '.~N~' backups.  */
+   backup_suffix_size_max = strlen (simple_backup_suffix) + 1;
+   if (HAVE_DIR && backup_suffix_size_max < numbered_suffix_size_max)
+     backup_suffix_size_max = numbered_suffix_size_max;
+ 
+-  s = (char *) malloc (file_len + backup_suffix_size_max
+-                       + numbered_suffix_size_max);
++  ssize = file_len + backup_suffix_size_max + numbered_suffix_size_max;
++  s = (char *) malloc (ssize);
+   if (s)
+     {
+       strcpy (s, file);
+@@ -112,8 +113,10 @@
+           highest_backup = max_backup_version (file + dir_len, s);
+           if (! (backup_type == numbered_existing && highest_backup == 0))
+             {
+-              char *numbered_suffix = s + (file_len + backup_suffix_size_max);
+-              sprintf (numbered_suffix, ".~%d~", highest_backup + 1);
++              size_t off = file_len + backup_suffix_size_max;
++              size_t rem = ssize - off;
++              char *numbered_suffix = s + off;
++              snprintf (numbered_suffix, rem, ".~%d~", highest_backup + 1);
+               suffix = numbered_suffix;
+             }
+           strcpy (s, file);
+diff -Paur --no-dereference -- gettext.upstream/gettext-tools/gnulib-lib/html-ostream.c gettext/gettext-tools/gnulib-lib/html-ostream.c
+--- gettext.upstream/gettext-tools/gnulib-lib/html-ostream.c
++++ gettext/gettext-tools/gnulib-lib/html-ostream.c
+@@ -178,7 +178,7 @@
+                             /* Output non-ASCII characters in #&nnn;
+                                notation.  */
+                             char bytes[32];
+-                            sprintf (bytes, "&#%d;", (int) uc);
++                            snprintf (bytes, sizeof(bytes), "&#%d;", (int) uc);
+                             ostream_write_str (stream->destination, bytes);
+                           }
+                         break;
+diff -Paur --no-dereference -- gettext.upstream/gettext-tools/gnulib-lib/html-ostream.oo.c gettext/gettext-tools/gnulib-lib/html-ostream.oo.c
+--- gettext.upstream/gettext-tools/gnulib-lib/html-ostream.oo.c
++++ gettext/gettext-tools/gnulib-lib/html-ostream.oo.c
+@@ -177,7 +177,7 @@
+                             /* Output non-ASCII characters in #&nnn;
+                                notation.  */
+                             char bytes[32];
+-                            sprintf (bytes, "&#%d;", (int) uc);
++                            snprintf (bytes, sizeof(bytes), "&#%d;", (int) uc);
+                             ostream_write_str (stream->destination, bytes);
+                           }
+                         break;
+diff -Paur --no-dereference -- gettext.upstream/gettext-tools/gnulib-lib/propername.c gettext/gettext-tools/gnulib-lib/propername.c
+--- gettext.upstream/gettext-tools/gnulib-lib/propername.c
++++ gettext/gettext-tools/gnulib-lib/propername.c
+@@ -168,10 +168,10 @@
+       else
+         {
+           /* Return "TRANSLATION (NAME)".  */
+-          char *result =
+-            XNMALLOC (strlen (translation) + 2 + strlen (name) + 1 + 1, char);
++          size_t size = strlen (translation) + 2 + strlen (name) + 1 + 1;
++          char *result = XNMALLOC (size, char);
+ 
+-          sprintf (result, "%s (%s)", translation, name);
++          snprintf (result, size, "%s (%s)", translation, name);
+           return result;
+         }
+     }
+@@ -270,10 +270,10 @@
+       else
+         {
+           /* Return "TRANSLATION (NAME)".  */
+-          char *result =
+-            XNMALLOC (strlen (translation) + 2 + strlen (name) + 1 + 1, char);
++          size_t size = strlen (translation) + 2 + strlen (name) + 1 + 1;
++          char *result = XNMALLOC (size, char);
+ 
+-          sprintf (result, "%s (%s)", translation, name);
++          snprintf (result, size, "%s (%s)", translation, name);
+ 
+           if (alloc_name_converted != NULL)
+             free (alloc_name_converted);
+diff -Paur --no-dereference -- gettext.upstream/gettext-tools/gnulib-lib/tmpdir.c gettext/gettext-tools/gnulib-lib/tmpdir.c
+--- gettext.upstream/gettext-tools/gnulib-lib/tmpdir.c
++++ gettext/gettext-tools/gnulib-lib/tmpdir.c
+@@ -154,6 +154,7 @@
+     }
+ 
+   memcpy (tmpl, dir, dlen);
+-  sprintf (tmpl + dlen, &"/%.*sXXXXXX"[!add_slash], (int) plen, pfx);
++  snprintf (tmpl + dlen, 1 + tmpl_len - dlen, &"/%.*sXXXXXX"[!add_slash],
++            (int) plen, pfx);
+   return 0;
+ }
+diff -Paur --no-dereference -- gettext.upstream/gettext-tools/gnulib-lib/tparm.c gettext/gettext-tools/gnulib-lib/tparm.c
+--- gettext.upstream/gettext-tools/gnulib-lib/tparm.c
++++ gettext/gettext-tools/gnulib-lib/tparm.c
+@@ -496,7 +496,7 @@
+                     char *s;
+                     if (popstring (&s))
+                       return OOPS;
+-                    sprintf (sbuf, fmt, s);
++                    snprintf (sbuf, sizeof(sbuf), fmt, s);
+                   }
+                 else
+                   {
+@@ -512,7 +512,7 @@
+                     if (i == 0 && conv_char == 'c')
+                       strcpy (sbuf, "\000");
+                     else
+-                      sprintf (sbuf, fmt, i);
++                      snprintf (sbuf, sizeof(sbuf), fmt, i);
+                   }
+               }
+               sp++;
+diff -Paur --no-dereference -- gettext.upstream/gettext-tools/gnulib-lib/uniname/uniname.c gettext/gettext-tools/gnulib-lib/uniname/uniname.c
+--- gettext.upstream/gettext-tools/gnulib-lib/uniname/uniname.c
++++ gettext/gettext-tools/gnulib-lib/uniname/uniname.c
+@@ -284,8 +284,8 @@
+          small.  */
+ 
+       /* buf needs to have at least 19 + 3 bytes here.  */
+-      sprintf (buf, "VARIATION SELECTOR-%d",
+-               c <= 0xFE0F ? c - 0xFE00 + 1 : c - 0xE0100 + 17);
++      snprintf (buf, UNINAME_MAX, "VARIATION SELECTOR-%d",
++                c <= 0xFE0F ? c - 0xFE00 + 1 : c - 0xE0100 + 17);
+       return buf;
+     }
+   else
+diff -Paur --no-dereference -- gettext.upstream/gettext-tools/src/cldr-plurals.c gettext/gettext-tools/src/cldr-plurals.c
+--- gettext.upstream/gettext-tools/src/cldr-plurals.c
++++ gettext/gettext-tools/src/cldr-plurals.c
+@@ -162,7 +162,7 @@
+               buffer = (char *) xrealloc (buffer, bufmax);
+             }
+ 
+-          sprintf (buffer + buflen, "%s: %s; ", count, content);
++          snprintf (buffer + buflen, bufmax - buflen, "%s: %s; ", count, content);
+           xmlFree (count);
+           xmlFree (content);
+ 
+diff -Paur --no-dereference -- gettext.upstream/gettext-tools/src/format.c gettext/gettext-tools/src/format.c
+--- gettext.upstream/gettext-tools/src/format.c
++++ gettext/gettext-tools/src/format.c
+@@ -110,7 +110,7 @@
+ 
+           if (msgid_plural != NULL)
+             {
+-              sprintf (buf, "msgstr[%u]", j);
++              snprintf (buf, sizeof(buf), "msgstr[%u]", j);
+               pretty_msgstr = buf;
+             }
+ 
+diff -Paur --no-dereference -- gettext.upstream/gettext-tools/src/read-mo.c gettext/gettext-tools/src/read-mo.c
+--- gettext.upstream/gettext-tools/src/read-mo.c
++++ gettext/gettext-tools/src/read-mo.c
+@@ -184,7 +184,8 @@
+       if (!(ss_length > 0 && bfp->data[ss_end - 1] == '\0'))
+         {
+           char location[30];
+-          sprintf (location, "sysdep_segment[%u]", (unsigned int) sysdepref);
++          snprintf (location, sizeof (location),
++                    "sysdep_segment[%u]", (unsigned int) sysdepref);
+           error (EXIT_FAILURE, 0,
+                  _("file \"%s\" contains a not NUL terminated string, at %s"),
+                  bfp->filename, location);
+diff -Paur --no-dereference -- gettext.upstream/gettext-tools/src/search-path.c gettext/gettext-tools/src/search-path.c
+--- gettext.upstream/gettext-tools/src/search-path.c
++++ gettext/gettext-tools/src/search-path.c
+@@ -142,7 +142,7 @@
+   gettextdatadirs = getenv ("XDG_DATA_DIRS");
+   if (gettextdatadirs != NULL)
+     foreach_elements (gettextdatadirs, fill, &array);
+-  free (array.sub);
++  free ((char *)array.sub);
+ 
+   /* Append version specific directory.  */
+   base = xasprintf ("%s%s", gettextdatadir, PACKAGE_SUFFIX);
+diff -Paur --no-dereference -- gettext.upstream/gettext-tools/src/write-csharp.c gettext/gettext-tools/src/write-csharp.c
+--- gettext.upstream/gettext-tools/src/write-csharp.c
++++ gettext/gettext-tools/src/write-csharp.c
+@@ -716,10 +716,10 @@
+   {
+     char *class_name_part1 = construct_class_name (resource_name);
+     char *p;
++    size_t size = strlen (class_name_part1) + 1 + strlen (culture_name) + 1;
+ 
+-    class_name =
+-      XNMALLOC (strlen (class_name_part1) + 1 + strlen (culture_name) + 1, char);
+-    sprintf (class_name, "%s_%s", class_name_part1, culture_name);
++    class_name = XNMALLOC (size, char);
++    snprintf (class_name, size, "%s_%s", class_name_part1, culture_name);
+     for (p = class_name + strlen (class_name_part1) + 1; *p != '\0'; p++)
+       if (*p == '-')
+         *p = '_';
+diff -Paur --no-dereference -- gettext.upstream/gettext-tools/src/write-po.c gettext/gettext-tools/src/write-po.c
+--- gettext.upstream/gettext-tools/src/write-po.c
++++ gettext/gettext-tools/src/write-po.c
+@@ -78,16 +78,16 @@
+     case possible:
+       if (debug)
+         {
+-          sprintf (result, "possible-%s-format", lang);
++          snprintf (result, sizeof(result), "possible-%s-format", lang);
+           break;
+         }
+       /* FALLTHROUGH */
+     case yes_according_to_context:
+     case yes:
+-      sprintf (result, "%s-format", lang);
++      snprintf (result, sizeof(result), "%s-format", lang);
+       break;
+     case no:
+-      sprintf (result, "no-%s-format", lang);
++      snprintf (result, sizeof(result), "no-%s-format", lang);
+       break;
+     default:
+       /* The others have already been filtered out by significant_format_p.  */
+@@ -399,7 +399,7 @@
+                   || pp->line_number == (size_t)(-1))
+                 buffer[0] = '\0';
+               else
+-                sprintf (buffer, ":%ld", (long) pp->line_number);
++                snprintf (buffer, sizeof (buffer), ":%ld", (long) pp->line_number);
+               len = strlen (cp) + strlen (buffer) + 1;
+               if (column > 2 && column + len > page_width)
+                 {
+@@ -1375,7 +1375,7 @@
+            p < mp->msgstr + mp->msgstr_len;
+            p += strlen (p) + 1, i++)
+         {
+-          sprintf (prefix_buf, "msgstr[%u]", i);
++          snprintf (prefix_buf, sizeof (prefix_buf), "msgstr[%u]", i);
+           wrap (mp, stream, NULL, extra_indent, class_msgstr, prefix_buf, p,
+                 mp->do_wrap, page_width, charset);
+         }
+@@ -1499,7 +1499,7 @@
+            p < mp->msgstr + mp->msgstr_len;
+            p += strlen (p) + 1, i++)
+         {
+-          sprintf (prefix_buf, "msgstr[%u]", i);
++          snprintf (prefix_buf, sizeof (prefix_buf), "msgstr[%u]", i);
+           wrap (mp, stream, "#~ ", extra_indent, class_msgstr, prefix_buf, p,
+                 mp->do_wrap, page_width, charset);
+         }
+diff -Paur --no-dereference -- gettext.upstream/gettext-tools/src/write-properties.c gettext/gettext-tools/src/write-properties.c
+--- gettext.upstream/gettext-tools/src/write-properties.c
++++ gettext/gettext-tools/src/write-properties.c
+@@ -96,7 +96,7 @@
+         else if (uc < 0x10000)
+           {
+             /* Single UCS-2 'char'  */
+-            sprintf (newstr, "\\u%c%c%c%c",
++            snprintf (newstr, length + 1 - (newstr - result), "\\u%c%c%c%c",
+                      hexdigit[(uc >> 12) & 0x0f], hexdigit[(uc >> 8) & 0x0f],
+                      hexdigit[(uc >> 4) & 0x0f], hexdigit[uc & 0x0f]);
+             newstr += 6;
+@@ -106,11 +106,11 @@
+             /* UTF-16 surrogate: two 'char's.  */
+             ucs4_t uc1 = 0xd800 + ((uc - 0x10000) >> 10);
+             ucs4_t uc2 = 0xdc00 + ((uc - 0x10000) & 0x3ff);
+-            sprintf (newstr, "\\u%c%c%c%c",
++            snprintf (newstr, length + 1 - (newstr - result), "\\u%c%c%c%c",
+                      hexdigit[(uc1 >> 12) & 0x0f], hexdigit[(uc1 >> 8) & 0x0f],
+                      hexdigit[(uc1 >> 4) & 0x0f], hexdigit[uc1 & 0x0f]);
+             newstr += 6;
+-            sprintf (newstr, "\\u%c%c%c%c",
++            snprintf (newstr, length + 1 - (newstr - result), "\\u%c%c%c%c",
+                      hexdigit[(uc2 >> 12) & 0x0f], hexdigit[(uc2 >> 8) & 0x0f],
+                      hexdigit[(uc2 >> 4) & 0x0f], hexdigit[uc2 & 0x0f]);
+             newstr += 6;
+diff -Paur --no-dereference -- gettext.upstream/gettext-tools/src/xgettext.c gettext/gettext-tools/src/xgettext.c
+--- gettext.upstream/gettext-tools/src/xgettext.c
++++ gettext/gettext-tools/src/xgettext.c
+@@ -2321,7 +2321,7 @@
+   if (line_number == (size_t)(-1))
+     buffer[0] = '\0';
+   else
+-    sprintf (buffer, ":%ld", (long) line_number);
++    snprintf (buffer, sizeof (buffer), ":%ld", (long) line_number);
+ 
+   switch (lcontext)
+     {
+@@ -2441,7 +2441,7 @@
+                     if (pos->line_number == (size_t)(-1))
+                       buffer[0] = '\0';
+                     else
+-                      sprintf (buffer, ":%ld", (long) pos->line_number);
++                      snprintf (buffer, sizeof (buffer), ":%ld", (long) pos->line_number);
+                     multiline_warning (xasprintf (_("%s%s: warning: "),
+                                                   pos->file_name, buffer),
+                                        xasprintf (is_format[i] == yes_according_to_context
+@@ -2474,7 +2474,7 @@
+       if (pos->line_number == (size_t)(-1))
+         buffer[0] = '\0';
+       else
+-        sprintf (buffer, ":%ld", (long) pos->line_number);
++        snprintf (buffer, sizeof (buffer), ":%ld", (long) pos->line_number);
+       multiline_warning (xasprintf (_("%s%s: warning: "),
+                                     pos->file_name, buffer),
+                          xasprintf (_("\
+@@ -2539,7 +2539,7 @@
+       if (pos->line_number == (size_t)(-1))
+         buffer[0] = '\0';
+       else
+-        sprintf (buffer, ":%ld", (long) pos->line_number);
++        snprintf (buffer, sizeof (buffer), ":%ld", (long) pos->line_number);
+       multiline_warning (xasprintf (_("%s%s: warning: "), pos->file_name,
+                                     buffer),
+                          xstrdup (_("\

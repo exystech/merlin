@@ -1,0 +1,3 @@
+rm -rf -- 'Makefile'
+rm -rf -- 'docs/curl.1'
+rm -rf -- 'src/tool_hugehelp.c'

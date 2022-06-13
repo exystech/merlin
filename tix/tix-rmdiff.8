@@ -1,0 +1,39 @@
+.Dd June 6, 2022
+.Dt TIX-RMDIFF 8
+.Os
+.Sh NAME
+.Nm tix-rmdiff
+.Nd compare removed files between two trees
+.Sh SYNOPSIS
+.Nm
+.Ar old
+.Ar new
+.Sh DESCRIPTION
+.Nm
+recursively finds the files and directories that have been removed between the
+.Ar old
+and
+.Ar new
+directory trees.
+.Nm
+writes a shell script that transforms the old tree into the new tree by deleting
+the removed files and directories, which can be applied using
+.Xr tix-rmpatch 8 .
+.Pp
+Removals are written shell single quoted as:
+.Bd -ragged -offset indent
+rm -rf -- 'path'
+.Ed
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr diff 1 ,
+.Xr patch 1 ,
+.Xr port 5 ,
+.Xr tix-execdiff 8 ,
+.Xr tix-execpatch 8 ,
+.Xr tix-rmpatch 8
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 1.1.

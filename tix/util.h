@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2016, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -352,6 +352,169 @@ bool dictionary_append_file_path(string_array_t* sa, const char* path)
 	dictionary_append_file(sa, fp);
 	fclose(fp);
 	return true;
+}
+
+bool is_identifier_char(char c)
+{
+	return ('a' <= c && c <= 'z') ||
+	       ('A' <= c && c <= 'Z') ||
+	       ('0' <= c && c <= '9') ||
+	       c == '_';
+}
+
+// 0 on success, -1 on error, -2 on syntax error.
+int variables_parse_fp(string_array_t* sa, const char* line, FILE* fp)
+{
+	size_t i = 0;
+	while ( isspace((unsigned char) line[i]) )
+		i++;
+	if ( !line[i] || line[i] == '#' )
+		return 0;
+	if ( line[i] == '=' )
+		return -2;
+	size_t keylen = 0;
+	while ( line[i + keylen] &&
+	        line[i + keylen] != '=' &&
+	        line[i + keylen] != '#' &&
+	        !isspace((unsigned char) line[i + keylen]) )
+	{
+		if ( fputc((unsigned char) line[i + keylen++], fp) == EOF )
+			return -1;
+	}
+	i += keylen;
+	if ( line[i++] != '=' )
+		return -2;
+	fputc('=', fp);
+	bool escaped = false;
+	bool singly_quote = false;
+	bool doubly_quote = false;
+	while ( true )
+	{
+		unsigned char c = (unsigned char) line[i++];
+		if ( !c )
+		{
+			i--;
+			break;
+		}
+		else if ( !escaped && !singly_quote && c == '\\' )
+			escaped = true;
+		else if ( !escaped && !doubly_quote && c == '\'' )
+			singly_quote = !singly_quote;
+		else if ( !escaped && !singly_quote && c == '"' )
+			doubly_quote = !doubly_quote;
+		else if ( !escaped && !singly_quote && c == '$' &&
+		          (is_identifier_char(line[i]) || line[i] == '{') )
+		{
+			size_t start = i;
+			size_t keylen = 0;
+			if ( line[start] == '{' )
+			{
+				start++;
+				while ( line[start + keylen] && line[start + keylen] != '}' )
+					keylen++;
+				if ( !keylen )
+					return -2;
+				if ( line[start + keylen] != '}' )
+					return -2;
+				i = start + keylen + 1;
+			}
+			else
+			{
+				while ( line[start + keylen] &&
+				        is_identifier_char(line[start + keylen]) )
+					keylen++;
+				i = start + keylen;
+			}
+			const char* key = line + start;
+			const char* value = NULL;
+			for ( size_t n = 0; !value && n < sa->length; n++ )
+			{
+				const char* entry = sa->strings[n];
+				if ( strncmp(key, entry, keylen) != 0 )
+					continue;
+				if ( entry[keylen] != '=' )
+					continue;
+				value = entry + keylen + 1;
+			}
+			if ( !value )
+				return -2;
+			size_t length = strlen(value);
+			if ( fwrite(value, 1, length, fp) != length )
+				return -1;
+		}
+		else
+		{
+			if ( !escaped && !singly_quote && !doubly_quote && isspace(c) )
+			{
+				i--;
+				break;
+			}
+			if ( fputc(c, fp) == EOF )
+				return -1;
+			escaped = false;
+		}
+	}
+	while ( isspace((unsigned char) line[i]) )
+		i++;
+	if ( line[i] && line[i] != '#' )
+		return -2;
+	return 1;
+}
+
+int variables_parse(string_array_t* sa, const char* line, char** out_ptr)
+{
+	size_t out_size;
+	FILE* fp = open_memstream(out_ptr, &out_size);
+	if ( !fp )
+		return -1;
+	int result = variables_parse_fp(sa, line, fp);
+	if ( fclose(fp) == EOF )
+		result = -1;
+	if ( result <= 0 )
+		free(*out_ptr);
+	return result;
+}
+
+int variables_append_file(string_array_t* sa, FILE* fp)
+{
+	char* line = NULL;
+	size_t line_size = 0;
+	ssize_t line_length;
+	while ( 0 < (line_length = getline(&line, &line_size, fp)) )
+	{
+		if ( line[line_length-1] == '\n' )
+			line[--line_length] = '\0';
+		char* entry;
+		int result = variables_parse(sa, line, &entry);
+		if ( result == 0 )
+			continue;
+		if ( result < 0 )
+		{
+			free(line);
+			return result;
+		}
+		if ( !string_array_append(sa, entry) )
+		{
+			free(entry);
+			free(line);
+			return -1;
+		}
+		free(entry);
+	}
+	free(line);
+	if ( ferror(fp) )
+		return -1;
+	return 0;
+}
+
+int variables_append_file_path(string_array_t* sa, const char* path)
+{
+	FILE* fp = fopen(path, "r");
+	if ( !fp )
+		return -1;
+	int result = variables_append_file(sa, fp);
+	fclose(fp);
+	return result;
 }
 
 __attribute__((format(printf, 1, 2)))

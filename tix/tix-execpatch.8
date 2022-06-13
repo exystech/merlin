@@ -1,0 +1,43 @@
+.Dd June 6, 2022
+.Dt TIX-EXECPATCH 8
+.Os
+.Sh NAME
+.Nm tix-execpatch
+.Nd apply executable permissions per the execpatch
+.Sh SYNOPSIS
+.Nm
+.Op Fl \-check
+.Op Fl \-directory Ns = Ns Ar directory
+.Ar execpatch
+.Sh DESCRIPTION
+.Nm
+updates the executable permissions in the working directory per an execpatch
+produced by
+.Xr tix-execdiff 8 .
+The execpatch is checked for validity and absolute paths and paths containing
+.Sq ..
+components are rejected.
+The executable permissions are updated per the umask.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl \-check
+Check only the execpatch is valid and don't update any permissions.
+.It Fl \-directory Ns = Ns Ar directory
+Apply permission changes inside
+.Ar directory
+instead of the working directory.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr diff 1 ,
+.Xr patch 1 ,
+.Xr port 5 ,
+.Xr tix-execdiff 8 ,
+.Xr tix-rmdiff 8 ,
+.Xr tix-rmpatch 8
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 0.8.

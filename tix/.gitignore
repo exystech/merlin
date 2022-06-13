@@ -1,10 +1,9 @@
-porttix-create
-srctix-create
 tix
 tix-build
 tix-collection
 tix-execdiff
 tix-execpatch
 tix-install
-tix-object-insert
+tix-rmdiff
 tix-rmpatch
+tix-vars

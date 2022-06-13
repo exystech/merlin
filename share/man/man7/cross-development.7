@@ -275,16 +275,21 @@ cross-compiler you can run:
 .Ed
 .Pp
 This creates a bootable
-.Pa sortix.iso .
+.Pa sortix.iso
+including all ports of third party software.
+To build only the minimal set of ports required for installation, set the
+.Ev PACKAGES
+environment variable to
+.Sy minimal!
+or set it to the empty string to only build the base system.
+Cross-compiling the ports requires installing additional dependencies locally
+in order to bootstrap the cross-compilation of some ports.
 .Ss Additional Required Reading
 The
 .Xr development 7
 manual page documents how to develop Sortix and how to use the build system.
 This manual page only documents how to set up a cross-development environment
-and is not sufficient to develop Sortix, or to make a fully functional and
-installable Sortix system.
-The above instructions only gives you a cross-compilation of the base system
-without any of the nessesary ports of third party software.
+and is not sufficient to develop Sortix.
 .Pp
 The
 .Xr following-development 7
@@ -310,5 +315,5 @@ in your case.
 .Xr development 7 ,
 .Xr following-development 7 ,
 .Xr installation 7 ,
-.Xr porting-guide 7 ,
+.Xr porting 7 ,
 .Xr sysinstall 8

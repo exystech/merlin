@@ -1,0 +1,262 @@
+.Dd April 10, 2022
+.Dt TIX-PORT 8
+.Os
+.Sh NAME
+.Nm tix-port
+.Nd download, patch, build, install, and clean a port
+.Sh SYNOPSIS
+.Nm
+.Op Fl \-build Ns = Ns Ar triplet
+.Op Fl \-cache-package
+.Op Fl \-collection Ns = Ns Ar collection
+.Op Fl \-destination Ns = Ns Ar directory
+.Op Fl \-end Ns = Ns Ar step
+.Op Fl \-exec-prefix Ns = Ns Ar prefix
+.Op Fl \-generation Ns = Ns Ar level
+.Op Fl \-host Ns = Ns Ar triplet
+.Op Fl \-make Ns = Ns Ar path
+.Op Fl \-makeflags Ns = Ns Ar makeflags
+.Op Fl \-prefix Ns = Ns Ar prefix
+.Op Fl \-source-port Ns = Ns Ar source-port
+.Op Fl \-start Ns = Ns Ar step
+.Op Fl \-sysroot Ns = Ns Ar directory
+.Op Fl \-tar Ns = Ns Ar path
+.Op Fl \-target Ns = Ns Ar triplet
+.Op Fl \-tmp Ns = Ns Ar directory
+.Op Fl \-mirror Ns = Ns Ar url
+.Op Fl \-mirror-directory Ns = Ns Ar directory
+.Ar port
+.Sh DESCRIPTION
+.Nm
+manages the build of a
+.Xr port 5
+of software for this operating system by downloading the source code, applying
+the patches, building the port, and installing the binary package.
+Many of the options are forwarded to the low-level
+.Xr tix-build 8
+which performs the build once the source code has been prepared.
+.Nm
+is usually invoked through
+.Xr development 7
+for the official ports.
+.Pp
+The mandatory
+.Ar port
+argument is the directory where the port's source code will be placed and the
+.Xr port 5
+file is found by adding
+.Pa .port
+to this path.
+The downloaded upstream releases are placed in the created
+.Pa port.mirror
+cache directory, the source code is extracted in the
+.Ar port
+directory with the
+.Pa port.patch ,
+.Pa port.execpatch ,
+and
+.Pa port.rmpatch
+patches applied if they exist, and the
+.Pa port.version
+stamp file is created to avoid reextracting the port if the right version is
+already extracted.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl \-build Ns = Ns Ar triplet
+The platform
+.Ar triplet
+for the machine the port is built on.
+(Default: Automatically detected.)
+.It Fl \-cache-package
+Skip the build if the binary package already exists and is the right version.
+.It Fl \-collection Ns = Ns Ar collection
+Install the binary package into this
+.Ar collection
+created with
+.Xr tix-collection 8 .
+(Default:
+.Fl \-sysroot
+plus
+.Fl \-prefix )
+.It Fl \-destination Ns = Ns Ar directory
+The binary package is placed inside this
+.Ar directory .
+.It Fl \-end Ns = Ns Ar step
+Stop the build after this
+.Ar step :
+.Pp
+.Bl -tag -width "clean, pre-clean" -compact
+.It start
+The start step before anything has happened.
+.It download
+Download the source code.
+.It extract
+Extract the source code and apply patches.
+.It tix-build-start
+The start step in
+.Xr tix-build 8 .
+.It clean, pre-clean
+Clean the source directory before the build.
+.It configure
+Configure the port.
+.It build
+Build the port.
+.It install
+Install the port into the
+.Ev DESTDIR .
+.It post-install
+Run the post-installation script.
+.It post-clean
+Clean the source code after the port.
+.It package
+Create the binary package.
+.It tix-build-end
+The end step in
+.Xr tix-build 8 .
+.It strip
+Strip the executables in the binary package.
+.It diff
+Regenerate the patches if in development.
+.It tix-install
+Install the binary package.
+.It end
+The end step after everything has happened.
+(Default)
+.El
+.It Fl \-exec-prefix Ns = Ns Ar prefix
+The
+.Ar prefix
+where architecture dependent files are installed.
+(Default:
+.Fl \-prefix )
+.It Fl \-generation Ns = Ns Ar generation
+Create a binary package in the format of this tix generation
+.Ar level .
+(Default: 2)
+.It Fl \-host Ns = Ns Ar triplet
+The platform
+.Ar triplet
+for the machine the port will run on.
+(Default:
+.Fl \-build )
+.It Fl \-make Ns = Ns Ar path
+Which
+.Xr make 1
+to use.
+(Default:
+.Ev MAKE
+if set and otherwise
+.Xr make 1 )
+.It Fl \-makeflags Ns = Ns Ar makeflags
+Override the
+.Ev MAKEFLAGS
+variable inherited by make.
+.It Fl \-prefix Ns = Ns Ar prefix
+Build the port into this
+.Ar prefix .
+(Default: The empty prefix designating the root directory)
+.It Fl \-source-port Ns = Ns Ar source-port
+The source code for the
+.Sy SOURCE_PORT
+per
+.Xr port 5
+will be placed in the
+.Ar source-port
+directory along with the mirror and version file where the source port's file is
+found by adding
+.Pa .port
+to this path.
+(Default: ../$SOURCE_PORT/$SOURCE_PORT)
+.It Fl \-start Ns = Ns Ar step
+Start the build at this step (see
+.Fl \-end ) .
+(Default:
+.Sy start )
+.It Fl \-sysroot Ns = Ns Ar directory
+The system root to use while building and installing the port.
+The toolchain is wrapped to transparently use this sysroot during the build.
+.It Fl \-tar Ns = Ns Ar path
+Which
+.Xr tar 1
+to use during the build.
+(Default:
+.Xr tar 1 )
+.It Fl \-target Ns = Ns Ar triplet
+The port's outputs targets this platform
+.Ar triplet .
+(Default:
+.Fl \-host )
+.It Fl \-tmp Ns = Ns Ar directory
+Place temporary files in this
+.Ar directory .
+(Default:
+.Ev TMPDIR
+if set otherwise
+.Pa /tmp )
+.It Fl \-mirror Ns = Ns Ar url
+First attempt to download the upstream releases from the port's source code
+mirror at
+.Ar url
+before attempting the upstream site.
+The files are copied from the filesystem if the
+.Ar url
+has no schema.
+.It Fl \-mirror-directory Ns = Ns Ar directory
+Place the downloaded upstream releases in this
+.Ar directory
+in the layout that can be used as a mirror for the
+.Fl \-mirror
+option.
+(Default:
+.Ar port Ns Pa .mirror )
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh EXAMPLES
+A
+.Xr port 5
+called
+.Pa example.port
+with optional patches
+.Pa example.patch ,
+.Pa example.execpatch ,
+and
+.Pa example.rmpatch
+can be downloaded, extracted, patched, built and installed into the
+.Pa /local
+prefix for non-system software by running:
+.Bd -literal -offset indent
+mkdir -p /local # if not already done
+tix-collection /local create # if not already done
+tix-port --prefix=/local example
+.Ed
+.Pp
+This command makes a
+.Pa example
+directory with the patched source code, a
+.Pa example.version
+version stamp file to avoid unnecessary reextractions, a
+.Pa example.mirror
+cache directory with the downloaded upstream release, and the
+.Pa example.tix.tar.xz
+binary package, which is installed into
+.Pa /local .
+The
+.Fl \-end=strip
+option can be used to just get the binary package (and not install it)
+by stopping after the binary package has been stripped.
+.Sh SEE ALSO
+.Xr port 5 ,
+.Xr development 7 ,
+.Xr porting 7 ,
+.Xr tix-build 8 ,
+.Xr tix-collection 8 ,
+.Xr tix-install 8
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 1.1 as a networked higher level interface around
+the lower level
+.Xr tix-build 8
+from Sortix 0.8.

@@ -1,0 +1,312 @@
+diff -Paur --no-dereference -- libfreetype.upstream/builds/unix/configure libfreetype/builds/unix/configure
+--- libfreetype.upstream/builds/unix/configure
++++ libfreetype/builds/unix/configure
+@@ -13690,22 +13690,7 @@
+       libpng_libspriv="$LIBPNG_LIBS"
+       libpng_libsstaticconf="$LIBPNG_LIBS"
+       have_libpng="yes (LIBPNG_CFLAGS and LIBPNG_LIBS)"
+-    else
+-      # fall back to config script.
+-      { $as_echo "$as_me:${as_lineno-$LINENO}: checking for libpng-config" >&5
+-$as_echo_n "checking for libpng-config... " >&6; }
+-      if which libpng-config > /dev/null 2>&1; then
+-        LIBPNG_CFLAGS=`libpng-config --cflags`
+-        LIBPNG_LIBS=`libpng-config --ldflags`
+-        libpng_libspriv=`libpng-config --static --ldflags`
+-        libpng_libsstaticconf="$libpng_libspriv"
+-        have_libpng="yes (libpng-config)"
+-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+-$as_echo "yes" >&6; }
+-      else
+-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+-$as_echo "no" >&6; }
+-      fi
++    # PATCH: libpng-config should never be used.
+     fi
+   fi
+ fi
+diff -Paur --no-dereference -- libfreetype.upstream/builds/unix/freetype2.in libfreetype/builds/unix/freetype2.in
+--- libfreetype.upstream/builds/unix/freetype2.in
++++ libfreetype/builds/unix/freetype2.in
+@@ -4,7 +4,7 @@
+ includedir=%includedir%
+ 
+ Name: FreeType 2
+-URL: http://freetype.org
++URL: https://freetype.org
+ Description: A free, high-quality, and portable font engine.
+ Version: %ft_version%
+ Requires:
+diff -Paur --no-dereference -- libfreetype.upstream/builds/unix/install.mk libfreetype/builds/unix/install.mk
+--- libfreetype.upstream/builds/unix/install.mk
++++ libfreetype/builds/unix/install.mk
+@@ -30,15 +30,14 @@
+ #
+ # We also remove `$(includedir)/ft2build.h' for the same reason.
+ #
++# PATCH: freetype-config should never be used.
+ install: $(PROJECT_LIBRARY)
+ 	-$(DELDIR) $(DESTDIR)$(includedir)/freetype2
+ 	-$(DELETE) $(DESTDIR)$(includedir)/ft2build.h
+ 	$(MKINSTALLDIRS) $(DESTDIR)$(libdir)                               \
+                          $(DESTDIR)$(libdir)/pkgconfig                     \
+                          $(DESTDIR)$(includedir)/freetype2/freetype/config \
+-                         $(DESTDIR)$(bindir)                               \
+-                         $(DESTDIR)$(datadir)/aclocal                      \
+-                         $(DESTDIR)$(mandir)/man1
++                         $(DESTDIR)$(datadir)/aclocal
+ 	$(LIBTOOL) --mode=install $(INSTALL)                             \
+                                   $(PROJECT_LIBRARY) $(DESTDIR)$(libdir)
+ 	-for P in $(PUBLIC_H) ; do                           \
+@@ -55,23 +54,17 @@
+           $(DESTDIR)$(includedir)/freetype2/freetype/config/ftconfig.h
+ 	$(INSTALL_DATA) $(OBJ_DIR)/ftmodule.h                          \
+           $(DESTDIR)$(includedir)/freetype2/freetype/config/ftmodule.h
+-	$(INSTALL_SCRIPT) -m 755 $(OBJ_BUILD)/freetype-config \
+-          $(DESTDIR)$(bindir)/freetype-config
+ 	$(INSTALL_SCRIPT) -m 644 $(BUILD_DIR)/freetype2.m4 \
+           $(DESTDIR)$(datadir)/aclocal/freetype2.m4
+ 	$(INSTALL_SCRIPT) -m 644 $(OBJ_BUILD)/freetype2.pc \
+           $(DESTDIR)$(libdir)/pkgconfig/freetype2.pc
+-	$(INSTALL_DATA) $(TOP_DIR)/docs/freetype-config.1 \
+-          $(DESTDIR)$(mandir)/man1/freetype-config.1
+ 
+ 
+ uninstall:
+ 	-$(LIBTOOL) --mode=uninstall $(RM) $(DESTDIR)$(libdir)/$(LIBRARY).$A
+ 	-$(DELDIR) $(DESTDIR)$(includedir)/freetype2
+-	-$(DELETE) $(DESTDIR)$(bindir)/freetype-config
+ 	-$(DELETE) $(DESTDIR)$(datadir)/aclocal/freetype2.m4
+ 	-$(DELETE) $(DESTDIR)$(libdir)/pkgconfig/freetype2.pc
+-	-$(DELETE) $(DESTDIR)$(mandir)/man1/freetype-config.1
+ 
+ 
+ check:
+diff -Paur --no-dereference -- libfreetype.upstream/src/autofit/afhints.c libfreetype/src/autofit/afhints.c
+--- libfreetype.upstream/src/autofit/afhints.c
++++ libfreetype/src/autofit/afhints.c
+@@ -16,6 +16,8 @@
+ /***************************************************************************/
+ 
+ 
++/* PATCH: Make snprintf available. */
++#define _ISOC99_SOURCE
+ #include "afhints.h"
+ #include "aferrors.h"
+ #include FT_INTERNAL_CALC_H
+@@ -223,6 +225,7 @@
+ 
+   static char*
+   af_print_idx( char* p,
++                size_t len,
+                 int   idx )
+   {
+     if ( idx == -1 )
+@@ -232,7 +235,7 @@
+       p[2] = '\0';
+     }
+     else
+-      ft_sprintf( p, "%d", idx );
++      snprintf( p, len, "%d", idx );
+ 
+     return p;
+   }
+@@ -338,12 +341,12 @@
+       AF_DUMP(( "  %5d  %5s %5s  %5s %5s  %s"
+                 " %5d %5d %7.2f %7.2f %7.2f %7.2f\n",
+                 point_idx,
+-                af_print_idx( buf1,
++                af_print_idx( buf1, sizeof(buf1),
+                               af_get_edge_index( hints, segment_idx_1, 1 ) ),
+-                af_print_idx( buf2, segment_idx_1 ),
+-                af_print_idx( buf3,
++                af_print_idx( buf2, sizeof(buf2), segment_idx_1 ),
++                af_print_idx( buf3, sizeof(buf3),
+                               af_get_edge_index( hints, segment_idx_0, 0 ) ),
+-                af_print_idx( buf4, segment_idx_0 ),
++                af_print_idx( buf4, sizeof(buf4), segment_idx_0 ),
+                 ( point->flags & AF_FLAG_NEAR )
+                   ? " near "
+                   : ( point->flags & AF_FLAG_WEAK_INTERPOLATION )
+diff -Paur --no-dereference -- libfreetype.upstream/src/bdf/bdflib.c libfreetype/src/bdf/bdflib.c
+--- libfreetype.upstream/src/bdf/bdflib.c
++++ libfreetype/src/bdf/bdflib.c
+@@ -31,6 +31,8 @@
+   /*************************************************************************/
+ 
+ 
++/* PATCH: Make snprintf available. */
++#define _ISOC99_SOURCE
+ #include <ft2build.h>
+ 
+ #include FT_FREETYPE_H
+@@ -1822,7 +1824,7 @@
+       if ( bdf_get_font_property( p->font, "FONT_ASCENT" ) == 0 )
+       {
+         p->font->font_ascent = p->font->bbx.ascent;
+-        ft_sprintf( nbuf, "%hd", p->font->bbx.ascent );
++        snprintf( nbuf, sizeof ( nbuf ), "%hd", p->font->bbx.ascent );
+         error = _bdf_add_property( p->font, (char *)"FONT_ASCENT",
+                                    nbuf, lineno );
+         if ( error )
+@@ -1835,7 +1837,7 @@
+       if ( bdf_get_font_property( p->font, "FONT_DESCENT" ) == 0 )
+       {
+         p->font->font_descent = p->font->bbx.descent;
+-        ft_sprintf( nbuf, "%hd", p->font->bbx.descent );
++        snprintf( nbuf, sizeof ( nbuf ), "%hd", p->font->bbx.descent );
+         error = _bdf_add_property( p->font, (char *)"FONT_DESCENT",
+                                    nbuf, lineno );
+         if ( error )
+@@ -2164,7 +2166,7 @@
+       /* Add the two standard X11 properties which are required */
+       /* for compiling fonts.                                   */
+       p->font->font_ascent = p->font->bbx.ascent;
+-      ft_sprintf( nbuf, "%hd", p->font->bbx.ascent );
++      snprintf( nbuf, sizeof ( nbuf ), "%hd", p->font->bbx.ascent );
+       error = _bdf_add_property( p->font, (char *)"FONT_ASCENT",
+                                  nbuf, lineno );
+       if ( error )
+@@ -2172,7 +2174,7 @@
+       FT_TRACE2(( "_bdf_parse_properties: " ACMSG1, p->font->bbx.ascent ));
+ 
+       p->font->font_descent = p->font->bbx.descent;
+-      ft_sprintf( nbuf, "%hd", p->font->bbx.descent );
++      snprintf( nbuf, sizeof ( nbuf ), "%hd", p->font->bbx.descent );
+       error = _bdf_add_property( p->font, (char *)"FONT_DESCENT",
+                                  nbuf, lineno );
+       if ( error )
+diff -Paur --no-dereference -- libfreetype.upstream/src/gzip/adler32.c libfreetype/src/gzip/adler32.c
+--- libfreetype.upstream/src/gzip/adler32.c
++++ libfreetype/src/gzip/adler32.c
+@@ -1,3 +1,4 @@
++#error no
+ /* adler32.c -- compute the Adler-32 checksum of a data stream
+  * Copyright (C) 1995-2002 Mark Adler
+  * For conditions of distribution and use, see copyright notice in zlib.h
+diff -Paur --no-dereference -- libfreetype.upstream/src/gzip/ftzconf.h libfreetype/src/gzip/ftzconf.h
+--- libfreetype.upstream/src/gzip/ftzconf.h
++++ libfreetype/src/gzip/ftzconf.h
+@@ -1,3 +1,4 @@
++#error no
+ /* zconf.h -- configuration of the zlib compression library
+  * Copyright (C) 1995-2002 Jean-loup Gailly.
+  * For conditions of distribution and use, see copyright notice in zlib.h
+diff -Paur --no-dereference -- libfreetype.upstream/src/gzip/infblock.c libfreetype/src/gzip/infblock.c
+--- libfreetype.upstream/src/gzip/infblock.c
++++ libfreetype/src/gzip/infblock.c
+@@ -1,3 +1,4 @@
++#error no
+ /* infblock.c -- interpret and process block types to last block
+  * Copyright (C) 1995-2002 Mark Adler
+  * For conditions of distribution and use, see copyright notice in zlib.h
+diff -Paur --no-dereference -- libfreetype.upstream/src/gzip/infblock.h libfreetype/src/gzip/infblock.h
+--- libfreetype.upstream/src/gzip/infblock.h
++++ libfreetype/src/gzip/infblock.h
+@@ -1,3 +1,4 @@
++#error no
+ /* infblock.h -- header to use infblock.c
+  * Copyright (C) 1995-2002 Mark Adler
+  * For conditions of distribution and use, see copyright notice in zlib.h
+diff -Paur --no-dereference -- libfreetype.upstream/src/gzip/infcodes.c libfreetype/src/gzip/infcodes.c
+--- libfreetype.upstream/src/gzip/infcodes.c
++++ libfreetype/src/gzip/infcodes.c
+@@ -1,3 +1,4 @@
++#error no
+ /* infcodes.c -- process literals and length/distance pairs
+  * Copyright (C) 1995-2002 Mark Adler
+  * For conditions of distribution and use, see copyright notice in zlib.h
+diff -Paur --no-dereference -- libfreetype.upstream/src/gzip/infcodes.h libfreetype/src/gzip/infcodes.h
+--- libfreetype.upstream/src/gzip/infcodes.h
++++ libfreetype/src/gzip/infcodes.h
+@@ -1,3 +1,4 @@
++#error no
+ /* infcodes.h -- header to use infcodes.c
+  * Copyright (C) 1995-2002 Mark Adler
+  * For conditions of distribution and use, see copyright notice in zlib.h
+diff -Paur --no-dereference -- libfreetype.upstream/src/gzip/inffixed.h libfreetype/src/gzip/inffixed.h
+--- libfreetype.upstream/src/gzip/inffixed.h
++++ libfreetype/src/gzip/inffixed.h
+@@ -1,3 +1,4 @@
++#error no
+ /* inffixed.h -- table for decoding fixed codes
+  * Generated automatically by the maketree.c program
+  */
+diff -Paur --no-dereference -- libfreetype.upstream/src/gzip/inflate.c libfreetype/src/gzip/inflate.c
+--- libfreetype.upstream/src/gzip/inflate.c
++++ libfreetype/src/gzip/inflate.c
+@@ -1,3 +1,4 @@
++#error no
+ /* inflate.c -- zlib interface to inflate modules
+  * Copyright (C) 1995-2002 Mark Adler
+  * For conditions of distribution and use, see copyright notice in zlib.h
+diff -Paur --no-dereference -- libfreetype.upstream/src/gzip/inftrees.c libfreetype/src/gzip/inftrees.c
+--- libfreetype.upstream/src/gzip/inftrees.c
++++ libfreetype/src/gzip/inftrees.c
+@@ -1,3 +1,4 @@
++#error no
+ /* inftrees.c -- generate Huffman trees for efficient decoding
+  * Copyright (C) 1995-2002 Mark Adler
+  * For conditions of distribution and use, see copyright notice in zlib.h
+diff -Paur --no-dereference -- libfreetype.upstream/src/gzip/inftrees.h libfreetype/src/gzip/inftrees.h
+--- libfreetype.upstream/src/gzip/inftrees.h
++++ libfreetype/src/gzip/inftrees.h
+@@ -1,3 +1,4 @@
++#error no
+ /* inftrees.h -- header to use inftrees.c
+  * Copyright (C) 1995-2002 Mark Adler
+  * For conditions of distribution and use, see copyright notice in zlib.h
+diff -Paur --no-dereference -- libfreetype.upstream/src/gzip/infutil.c libfreetype/src/gzip/infutil.c
+--- libfreetype.upstream/src/gzip/infutil.c
++++ libfreetype/src/gzip/infutil.c
+@@ -1,3 +1,4 @@
++#error no
+ /* inflate_util.c -- data and routines common to blocks and codes
+  * Copyright (C) 1995-2002 Mark Adler
+  * For conditions of distribution and use, see copyright notice in zlib.h
+diff -Paur --no-dereference -- libfreetype.upstream/src/gzip/infutil.h libfreetype/src/gzip/infutil.h
+--- libfreetype.upstream/src/gzip/infutil.h
++++ libfreetype/src/gzip/infutil.h
+@@ -1,3 +1,4 @@
++#error no
+ /* infutil.h -- types and macros common to blocks and codes
+  * Copyright (C) 1995-2002 Mark Adler
+  * For conditions of distribution and use, see copyright notice in zlib.h
+diff -Paur --no-dereference -- libfreetype.upstream/src/gzip/zlib.h libfreetype/src/gzip/zlib.h
+--- libfreetype.upstream/src/gzip/zlib.h
++++ libfreetype/src/gzip/zlib.h
+@@ -1,3 +1,4 @@
++#error no
+ /* zlib.h -- interface of the 'zlib' general purpose compression library
+   version 1.1.4, March 11th, 2002
+ 
+diff -Paur --no-dereference -- libfreetype.upstream/src/gzip/zutil.c libfreetype/src/gzip/zutil.c
+--- libfreetype.upstream/src/gzip/zutil.c
++++ libfreetype/src/gzip/zutil.c
+@@ -1,3 +1,4 @@
++#error no
+ /* zutil.c -- target dependent utility functions for the compression library
+  * Copyright (C) 1995-2002 Jean-loup Gailly.
+  * For conditions of distribution and use, see copyright notice in zlib.h
+diff -Paur --no-dereference -- libfreetype.upstream/src/gzip/zutil.h libfreetype/src/gzip/zutil.h
+--- libfreetype.upstream/src/gzip/zutil.h
++++ libfreetype/src/gzip/zutil.h
+@@ -1,3 +1,4 @@
++#error no
+ /* zutil.h -- internal interface and configuration of the compression library
+  * Copyright (C) 1995-2002 Jean-loup Gailly.
+  * For conditions of distribution and use, see copyright notice in zlib.h
+diff -Paur --no-dereference -- libfreetype.upstream/src/sfnt/ttload.c libfreetype/src/sfnt/ttload.c
+--- libfreetype.upstream/src/sfnt/ttload.c
++++ libfreetype/src/sfnt/ttload.c
+@@ -338,7 +338,9 @@
+     SFNT_HeaderRec  sfnt;
+     FT_Error        error;
+     FT_Memory       memory = stream->memory;
+-    FT_UShort       nn, valid_entries;
++    /* PATCH: warning: `valid_entries' may be used uninitialized in this
++              function [-Wmaybe-uninitialized] */
++    FT_UShort       nn, valid_entries = 0;
+ 
+     static const FT_Frame_Field  offset_table_fields[] =
+     {

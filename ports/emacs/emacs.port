@@ -1,0 +1,17 @@
+NAME=emacs
+BUILD_LIBRARIES='libcurses libcairo? libdbus? libfontconfig? libfreetype? libgconf? libgif? libgnutls? libgobject-introspection? libgpm? libgtk? libjpeg? liblcms2? libMagick? libm17t? libotf? libpng? librsvg? libtiff? libxml2? libxpm? libz?'
+VERSION=26.2
+DISTNAME=$NAME-$VERSION
+COMPRESSION=tar.xz
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=151ce69dbe5b809d4492ffae4a4b153b2778459de6deb26f35691e1281a9c58e
+UPSTREAM_SITE=https://ftp.gnu.org/gnu/emacs
+UPSTREAM_ARCHIVE=$ARCHIVE
+BUILD_SYSTEM=configure
+USE_BOOTSTRAP=true
+CONFIGURE_ARGS=--without-x
+MAKE_VARS='V=1'
+POST_INSTALL=../emacs.post-install
+BOOTSTRAP_BUILD_SYSTEM=configure
+BOOTSTRAP_CONFIGURE_ARGS=--without-x
+BOOTSTRAP_MAKE_VARS='V=1'

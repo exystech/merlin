@@ -1,0 +1,24 @@
+diff -Paur --no-dereference -- pkg-config.upstream/config.sub pkg-config/config.sub
+--- pkg-config.upstream/config.sub
++++ pkg-config/config.sub
+@@ -1373,7 +1373,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* | -plan9* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -sortix* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -Paur --no-dereference -- pkg-config.upstream/Makefile.in pkg-config/Makefile.in
+--- pkg-config.upstream/Makefile.in
++++ pkg-config/Makefile.in
+@@ -439,7 +439,7 @@
+ 	rpmvercmp.h \
+ 	main.c
+ 
+-@HOST_TOOL_TRUE@host_tool = $(host)-pkg-config$(EXEEXT)
++@HOST_TOOL_TRUE@host_tool = $(host_alias)-pkg-config$(EXEEXT)
+ 
+ # Various data files
+ m4dir = $(datadir)/aclocal

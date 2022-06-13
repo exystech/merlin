@@ -1,0 +1,527 @@
+#!/bin/sh
+# Copyright (c) 2022 Jonas 'Sortie' Termansen.
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# tix-port
+# Download, patch, build, install, and clean ports.
+
+set -e
+
+unset build
+cache_package=false
+unset collection
+destination=.
+unset end
+unset exec_prefix
+unset generation
+unset host
+unset make
+unset makeflags
+unset prefix
+unset source_port
+unset start
+unset sysroot
+unset tar
+unset target
+unset tmp
+unset mirror
+unset mirror_directory
+
+unset port
+
+operand=1
+dashdash=
+previous_option=
+for argument do
+  if [ -n "$previous_option" ]; then
+    eval $previous_option=\$argument
+    previous_option=
+    continue
+  fi
+
+  case $argument in
+  *=?*) parameter=$(expr "X$argument" : '[^=]*=\(.*\)' || true) ;;
+  *=)   parameter= ;;
+  *)    parameter=yes ;;
+  esac
+
+  case $dashdash$argument in
+  --) dashdash=yes ;;
+  --build=*) build=$parameter ;;
+  --build) previous_option=build ;;
+  --cache-package) cache_package=true ;;
+  --collection=*) collection=$parameter ;;
+  --collection) previous_option=collection ;;
+  --destination=*) destination=$parameter ;;
+  --destination) previous_option=destination ;;
+  --end=*) end=$parameter ;;
+  --end) previous_option=end ;;
+  --exec-prefix=*) exec_prefix=$parameter ;;
+  --exec-prefix) previous_option=exec_prefix ;;
+  --generation=*) generation=$parameter ;;
+  --generation) previous_option=generation ;;
+  --host=*) host=$parameter ;;
+  --host) previous_option=host ;;
+  --make=*) make=$parameter ;;
+  --make) previous_option=make ;;
+  --makeflags=*) makeflags=$parameter ;;
+  --makeflags) previous_option=makeflags ;;
+  --prefix=*) prefix=$parameter ;;
+  --prefix) previous_option=prefix ;;
+  --source-port=*) source_port=$parameter ;;
+  --source-port) previous_option=source_port ;;
+  --start=*) start=$parameter ;;
+  --start) previous_option=start ;;
+  --sysroot=*) sysroot=$parameter ;;
+  --sysroot) previous_option=sysroot ;;
+  --tar=*) tar=$parameter ;;
+  --tar) previous_option=tar ;;
+  --target=*) target=$parameter ;;
+  --target) previous_option=target ;;
+  --tmp=*) tmp=$parameter ;;
+  --tmp) previous_option=tmp ;;
+  --mirror=*) mirror=$parameter ;;
+  --mirror) previous_option=mirror ;;
+  --mirror-directory=*) mirror_directory=$parameter ;;
+  --mirror-directory) previous_option=mirror_directory ;;
+  -*) echo "$0: unrecognized option $argument" >&2
+      exit 1 ;;
+  *)
+    if [ $operand = 1 ]; then
+      port="$argument"
+      operand=2
+    else
+      echo "$0: unexpected extra operand $argument" >&2
+      exit 1
+    fi
+    ;;
+  esac
+done
+
+if [ -n "$previous_option" ]; then
+  echo "$0: option '$argument' requires an argument" >&2
+  exit 1
+fi
+
+if [ -z "$port" ]; then
+  echo "$0: error: No port was specified" >&2
+  exit 1
+fi
+
+if [ ! -e "$port.port" ]; then
+  echo "$0: error: Port file doesn't exist: $port.port" >&2
+  exit 1
+fi
+
+port_dirname=$(dirname -- "$port" )
+
+if [ "${collection+x}" = "" -a \
+     '(' "${sysroot+x}" = x -o "${prefix+x}" = x ')' ]; then
+  collection="$sysroot$prefix"
+fi
+
+NAME=$(tix-vars "$port.port" NAME)
+SOURCE_PORT=$(tix-vars -d '' "$port.port" SOURCE_PORT)
+DEVELOPMENT=$(tix-vars -d false "$port.port" DEVELOPMENT)
+
+if [ -z "$NAME" ]; then
+  echo "$0: error: NAME must be set: $port.port" >&2
+  exit 1
+fi
+
+if [ -n "$SOURCE_PORT" ]; then
+  if [ -z "${source_port+x}" ]; then
+    source_port="$port_dirname/../$SOURCE_PORT/$SOURCE_PORT"
+  fi
+  if [ ! -e "$source_port.port" ]; then
+    echo "$0: error: Port file for source port $SOURCE_PORT doesn't exist:" \
+         "$source_port.port" >&2
+    exit 1
+  fi
+fi
+
+step_number() {
+  nl << EOF | grep -E -- "	$1$" | grep -Eo '[0-9]+'
+start
+download
+extract
+tix-build-start
+clean
+pre-clean
+configure
+build
+install
+post-install
+post-clean
+package
+tix-build-end
+strip
+diff
+tix-install
+end
+EOF
+}
+
+if [ -n "$start" ] && [ -z "$(step_number "$start")" ]; then
+  echo "$0: error: Invalid --start: $start" >&2
+  exit 1
+fi
+
+if [ -n "$end" ] && [ -z "$(step_number "$end")" ]; then
+  echo "$0: error: Invalid --end: $end" >&2
+  exit 1
+fi
+
+should_run_step() {
+  ([ -z "$start" ] || [ $(step_number "$start") -le $(step_number "$1") ]) &&
+  ([ -z "$end" ] || [ $(step_number "$end") -ge $(step_number "$1") ])
+}
+
+announce() {
+  cat << EOF
+================================================================================
+==== $1
+================================================================================
+EOF
+}
+
+download_archive_from_url() {(
+  port="$1"
+  name="$2"
+  archive="$3"
+  url="$4"
+  sha256sum="$5"
+  if [ -z "$mirror_directory" ]; then
+    mirror_directory="$port.mirror/$name"
+  fi
+  mirror_directory="$mirror_directory/$name"
+  mkdir -p -- "$mirror_directory"
+  if [ ! -e "$mirror_directory/$archive.sha256sum" ]; then
+    announce "Downloading $1: $archive"
+    (if echo "$url" | grep -Eq '^[a-z][a-z0-9.+-]*://'; then
+       if ! wget -O "$mirror_directory/$archive.untrusted" -- "$url"; then
+         echo "$0: warning: Failed to download $archive from $url" >&2
+         exit 1
+       fi
+     else
+       if ! cp -- "$url" "$mirror_directory/$archive.untrusted"; then
+         echo "$0: warning: Failed to copy $archive from $url" >&2
+         exit 1
+       fi
+     fi
+     if ! echo "$sha256sum  $mirror_directory/$archive.untrusted" | \
+        sha256sum -c; then
+       sha256sum "$mirror_directory/$archive.untrusted"
+       echo "$0: warning: $port.port: Wrong sha256sum downloading $archive from $url" >&2
+       exit 1
+     fi
+     mv "$mirror_directory/$archive.untrusted" "$mirror_directory/$archive"
+     echo "$url" > "$mirror_directory/$archive.url"
+     echo "$SHA256SUM  $archive" > "$mirror_directory/$archive.sha256sum.new"
+     mv "$mirror_directory/$archive.sha256sum.new" \
+        "$mirror_directory/$archive.sha256sum"
+    ) || (
+     rm -f "$mirror_directory/$archive.untrusted"
+     rm -f "$mirror_directory/$archive.url"
+     rm -f "$mirror_directory/$archive.sha256sum.new"
+     rm -f "$mirror_directory/$archive.sha256sum"
+     exit 1
+    )
+  fi
+)}
+
+download_archive() {(
+  port="$1"
+  name="$2"
+  archive="$3"
+  upstream_site="$4"
+  upstream_archive="$5"
+  sha256sum="$6"
+  if ! ([ -n "$mirror" ] &&
+        download_archive_from_url "$port" "$name" "$archive" \
+                                  "$mirror/$name/$archive" "$sha256sum") &&
+     ! download_archive_from_url "$port" "$name" "$archive" \
+                                 "$upstream_site/$upstream_archive" \
+                                 "$sha256sum"; then
+    echo "$0: error: Failed to download $archive with sha256sum $sha256sum" >&2
+    false
+  fi
+)}
+
+download_port() {(
+  port="$1"
+  NAME=$(tix-vars "$port.port" NAME)
+  ARCHIVE=$(tix-vars -d '' "$port.port" ARCHIVE)
+  if [ -n "$ARCHIVE" ]; then
+    UPSTREAM_SITE=$(tix-vars "$port.port" UPSTREAM_SITE)
+    UPSTREAM_ARCHIVE=$(tix-vars "$port.port" UPSTREAM_ARCHIVE)
+    SHA256SUM=$(tix-vars "$port.port" SHA256SUM)
+    download_archive "$port" "$NAME" "$ARCHIVE" "$UPSTREAM_SITE" \
+                     "$UPSTREAM_ARCHIVE" "$SHA256SUM"
+    ARCHIVE_2=$(tix-vars -d '' "$port.port" ARCHIVE_2)
+    if [ -n "$ARCHIVE_2" ]; then
+      UPSTREAM_SITE_2=$(tix-vars "$port.port" UPSTREAM_SITE_2)
+      UPSTREAM_ARCHIVE_2=$(tix-vars "$port.port" UPSTREAM_ARCHIVE_2)
+      SHA256SUM_2=$(tix-vars "$port.port" SHA256SUM_2)
+      download_archive "$port" "$NAME" "$ARCHIVE_2" \
+                       "$UPSTREAM_SITE_2" "$UPSTREAM_ARCHIVE_2" "$SHA256SUM_2"
+    fi
+  fi
+)}
+
+desired_version() {(
+  port="$1"
+  ARCHIVE=$(tix-vars -d '' "$port.port" ARCHIVE)
+  stamp="$NAME"
+  if [ -n "$ARCHIVE" ]; then
+    VERSION=$(tix-vars "$port.port" VERSION)
+    SHA256SUM=$(tix-vars "$port.port" SHA256SUM)
+    stamp="$stamp.$VERSION.$SHA256SUM"
+    ARCHIVE_2=$(tix-vars -d '' "$port.port" ARCHIVE_2)
+    if [ -n "$ARCHIVE_2" ]; then
+      VERSION_2=$(tix-vars "$port.port" VERSION_2)
+      SHA256SUM_2=$(tix-vars "$port.port" SHA256SUM_2)
+      stamp="$stamp.$VERSION_2.$SHA256SUM_2"
+    fi
+  fi
+  if [ -f "$port.patch" ]; then
+    stamp="$stamp.$(cat "$port.patch" | sha256sum | grep -Eo '^[^ ]*')"
+  fi
+  if [ -f "$port.execpatch" ]; then
+    stamp="$stamp.$(cat "$port.execpatch" | sha256sum | grep -Eo '^[^ ]*')"
+  fi
+  if [ -f "$port.rmpatch" ]; then
+    stamp="$stamp.$(cat "$port.rmpatch" | sha256sum | grep -Eo '^[^ ]*')"
+  fi
+  DEVELOPMENT=$(tix-vars -d false "$port.port" DEVELOPMENT)
+  if [ "$DEVELOPMENT" = true ]; then
+    stamp="$stamp.development"
+  fi
+  echo "$stamp"
+)}
+
+diff_package() {(
+  port="$1"
+  cd "$(dirname -- "$port")"
+  base=$(basename -- "$port")
+  if [ -e "$base.upstream" ]; then
+    announce "diff $base.upstream $base"
+    diff -Paur --no-dereference -- "$base.upstream" "$base" |
+    sed -E -e '/^Only in.*$/d' -e 's/^((---|\+\+\+)[^\t]+)\t.*/\1/' \
+    > "$base.patch"
+    if [ ! -s "$base.patch" ]; then rm "$base.patch"; fi
+    tix-execdiff -- "$base.upstream" "$base" |
+    LC_ALL=C sort > "$base.execpatch"
+    if [ ! -s "$base.execpatch" ]; then rm "$base.execpatch"; fi
+    tix-rmdiff -- "$base.upstream" "$base" |
+    LC_ALL=C sort > "$base.rmpatch"
+    if [ ! -s "$base.rmpatch" ]; then rm "$base.rmpatch"; fi
+    desired_version "$port" > "$base.version"
+  fi
+)}
+
+extract_package() {(
+  port="$1"
+  NAME=$(tix-vars "$port.port" NAME)
+  DEVELOPMENT=$(tix-vars -d false "$port.port" DEVELOPMENT)
+  NEED_WRITABLE=$(tix-vars -d false "$port.port" NEED_WRITABLE)
+  ARCHIVE=$(tix-vars -d '' "$port.port" ARCHIVE)
+  ARCHIVE_2=$(tix-vars -d '' "$port.port" ARCHIVE_2)
+  if [ -z "$mirror_directory" ]; then
+    mirror_directory="$port.mirror"
+  fi
+  mirror_directory="$mirror_directory/$NAME"
+  version_stamp="$(desired_version "$port")"
+  if [ ! -e "$port.version" ] ||
+     [ "$(cat "$port.version")" != "$version_stamp" ] ||
+     [ ! -e "$port.version" ]; then
+    if [ -e "$port.version" ]; then
+      old_version_stamp="$(cat "$port.version")"
+      case "$old_version_stamp" in
+      *.development)
+        if [ "$DEVELOPMENT" = true ]; then
+          echo "$0: error: $NAME: Refusing to delete port in development" >&2
+          echo "$0: error: $NAME: .version is currently: $old_version_stamp" >&2
+          echo "$0: error: $NAME: .version should be: $version_stamp" >&2
+          exit 1
+        fi
+      esac
+    fi
+    echo "$version_stamp" > "$port.version.new"
+    rm -rf "$port"
+    rm -rf "$port.upstream"
+    mkdir "$port"
+    if [ "$DEVELOPMENT" = true ]; then
+      mkdir "$port.upstream"
+    fi
+    if [ -n "$ARCHIVE" ]; then
+      announce "Extracting $1: $ARCHIVE"
+      tar -C "$port" -xf "$mirror_directory/$ARCHIVE" --strip-components=1
+      if [ "$DEVELOPMENT" = true ]; then
+        tar -C "$port.upstream" -xf "$mirror_directory/$ARCHIVE" \
+            --strip-components=1
+      fi
+      if [ -n "$ARCHIVE_2" ]; then
+        announce "Extracting $1: $ARCHIVE_2"
+        tar -C "$port" -xf "$mirror_directory/$ARCHIVE_2" --strip-components=1
+        if [ "$DEVELOPMENT" = true ]; then
+          tar -C "$port.upstream" -xf "$mirror_directory/$ARCHIVE_2" \
+              --strip-components=1
+        fi
+      fi
+    fi
+    if [ -f "$port.patch" ]; then
+      if [ "$DEVELOPMENT" = true ]; then
+        patch -f -d "$port" -p1 < "$port.patch" || true
+        # .rej files might already have been applied
+        (cd "$port" &&
+         find \
+           -name '*.rej' \
+           -exec sh -c 'patch -fRs -p0 --dry-run < "$0" >/dev/null 2>&1' \
+           '{}' ';' -delete)
+        # .orig files aren't useful unless part of the patch got rejected.
+        find "$port" \
+          -name '*.orig' \
+          -exec sh -c 'test ! -e "$(echo "$0" | sed -E "s,\\.orig$,.rej,")"' \
+          '{}' ';' -delete
+      else
+        patch -d "$port" -p1 < "$port.patch"
+      fi
+    fi
+    if [ -f "$port.execpatch" ]; then
+      tix-execpatch --directory "$port" "$port.execpatch"
+    fi
+    if [ -f "$port.rmpatch" ]; then
+      tix-rmpatch --directory "$port" "$port.rmpatch"
+    fi
+    if [ "$DEVELOPMENT" != true -a "$NEED_WRITABLE" != true ]; then
+      find "$port" '!' -type d -exec chmod a-w '{}' +
+    fi
+    mv "$port.version.new" "$port.version"
+    if [ "$DEVELOPMENT" = true ]; then
+       REJECTS="$(find "$port" -name '*.rej' -o -name '*.orig' | sort)"
+       if [ -n "$REJECTS" ]; then
+         echo >&2
+         echo "$REJECTS" >&2
+         echo "$0: error: $NAME: The above patch hunks were rejected" >&2
+         exit 1
+       fi
+    fi
+  fi
+)}
+
+# TODO: This adds another decompression and compression to the build time, this
+#       should be done as a tix post installation step.  Also this might miss
+#       programs in unusual locations, so a thorough search and strip is needed.
+strip_tix() {(
+  strip=${host+$host-}strip
+  dir=$(mktemp -d)
+  tar -C "$dir" -xf "$1"
+  $strip -d "$dir/data/bin/"* 2>/dev/null || true
+  $strip -d "$dir/data/lib/"* 2>/dev/null || true
+  $strip -d "$dir/data/libexec"* 2>/dev/null || true
+  $strip -d "$dir/data/libexec/git-core/"* 2>/dev/null || true
+  $strip -d "$dir/data/sbin/"* 2>/dev/null || true
+  (cd "$dir" && tar --numeric-owner --owner=0 --group=0 -cJf port.tar.tix.xz tix data)
+  cp "$dir/port.tar.tix.xz" "$1"
+  rm -rf "$dir"
+)}
+
+if $cache_package &&
+   [ -f "$destination/$NAME.tix.tar.xz" -a \
+     -f "$destination/$NAME.version" ] &&
+   [ "$(cat $destination/$NAME.version)" = "$(desired_version $port)" ]; then
+  start=tix-install
+fi
+
+if should_run_step download; then
+  if [ -n "$SOURCE_PORT" ]; then
+    download_port "$source_port"
+  fi
+  download_port "$port"
+fi
+
+if should_run_step extract; then
+  if [ -n "$SOURCE_PORT" ]; then
+    extract_package "$source_port"
+  fi
+  extract_package "$port"
+fi
+
+update_version=false
+if [ $(step_number "${start-start}") -lt $(step_number tix-build-end) ] &&
+   [ $(step_number "${end-end}") -gt $(step_number tix-build-start) ]; then
+  announce "Building $NAME"
+  unset tix_build_start
+  unset tix_build_end
+  if [ -n "$start" ]; then
+    if [ $(step_number "$start") -le $(step_number tix-build-start) ]; then
+      tix_build_start=start
+    else
+      tix_build_start="$start"
+    fi
+  fi
+  if [ -n "$end" ]; then
+    if [ $(step_number "$end") -ge $(step_number tix-build-end) ]; then
+      tix_build_end=end
+    else
+      tix_build_end="$end"
+    fi
+  fi
+  if should_run_step package; then
+    mkdir -p "$destination"
+  fi
+  tix-build \
+    ${build+--build="$build"} \
+    ${destination+--destination="$destination"} \
+    ${tix_build_end+--end="$tix_build_end"} \
+    ${exec_prefix+--exec-prefix="$exec_prefix"} \
+    ${generation+--generation="$generation"} \
+    ${host+--host="$host"} \
+    ${make+--make="$make"} \
+    ${makeflags+--makeflags="$makeflags"} \
+    ${prefix+--prefix="$prefix"} \
+    ${source_port+--source-port="$source_port"} \
+    ${tix_build_start+--start="$tix_build_start"} \
+    ${sysroot+--sysroot="$sysroot"} \
+    ${tar+--tar="$tar"} \
+    ${target+--target="$target"} \
+    ${tmp+--tmp="$tmp"} \
+    "$port"
+  update_version=true
+fi
+
+if should_run_step strip; then
+  strip_tix "$destination/$NAME.tix.tar.xz"
+  update_version=true
+fi
+
+if should_run_step diff; then
+  if [ "$DEVELOPMENT" = true ]; then
+    diff_package "$port"
+  fi
+  update_version=true
+fi
+
+if $update_version; then
+  cp "$port.version" "$destination/$NAME.version"
+fi
+
+if should_run_step tix-install; then
+  announce "Installing $NAME"
+  tix-install \
+    ${collection+--collection="$collection"} \
+    --reinstall \
+    "$destination/$NAME.tix.tar.xz"
+fi
