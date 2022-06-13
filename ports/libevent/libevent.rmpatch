@@ -1,0 +1,2 @@
+rm -rf -- 'test/regress.gen.c'
+rm -rf -- 'test/regress.gen.h'

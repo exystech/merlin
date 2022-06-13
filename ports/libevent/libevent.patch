@@ -1,28 +1,7 @@
-diff -Paur --no-dereference -- libevent.upstream/buffer.c libevent/buffer.c
---- libevent.upstream/buffer.c
-+++ libevent/buffer.c
-@@ -183,7 +183,7 @@
- 	/* this way we can manipulate the buffer to different addresses,
- 	 * which is required for mmap for example.
- 	 */
--	chain->buffer = EVBUFFER_CHAIN_EXTRA(u_char, chain);
-+	chain->buffer = EVBUFFER_CHAIN_EXTRA(unsigned char, chain);
- 
- 	return (chain);
- }
-@@ -2749,7 +2749,7 @@
- 	if (!chain)
- 		return (-1);
- 	chain->flags |= EVBUFFER_REFERENCE | EVBUFFER_IMMUTABLE;
--	chain->buffer = (u_char *)data;
-+	chain->buffer = (unsigned char *)data;
- 	chain->buffer_len = datlen;
- 	chain->off = datlen;
- 
 diff -Paur --no-dereference -- libevent.upstream/bufferevent_sock.c libevent/bufferevent_sock.c
 --- libevent.upstream/bufferevent_sock.c
 +++ libevent/bufferevent_sock.c
-@@ -63,6 +63,7 @@
+@@ -64,6 +64,7 @@
  #include "event2/util.h"
  #include "event2/bufferevent.h"
  #include "event2/buffer.h"
@@ -30,7 +9,7 @@ diff -Paur --no-dereference -- libevent.upstream/bufferevent_sock.c libevent/buf
  #include "event2/bufferevent_struct.h"
  #include "event2/bufferevent_compat.h"
  #include "event2/event.h"
-@@ -75,6 +76,7 @@
+@@ -76,6 +77,7 @@
  #endif
  
  /* prototypes */
@@ -38,7 +17,7 @@ diff -Paur --no-dereference -- libevent.upstream/bufferevent_sock.c libevent/buf
  static int be_socket_enable(struct bufferevent *, short);
  static int be_socket_disable(struct bufferevent *, short);
  static void be_socket_destruct(struct bufferevent *);
-@@ -119,6 +121,40 @@
+@@ -145,6 +147,40 @@
  	}
  }
  
@@ -79,22 +58,10 @@ diff -Paur --no-dereference -- libevent.upstream/bufferevent_sock.c libevent/buf
  static void
  bufferevent_readcb(evutil_socket_t fd, short event, void *arg)
  {
-diff -Paur --no-dereference -- libevent.upstream/config.sub libevent/config.sub
---- libevent.upstream/config.sub
-+++ libevent/config.sub
-@@ -1348,7 +1348,7 @@
- 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
- 	      | -sym* | -kopensolaris* \
- 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
--	      | -aos* | -aros* \
-+	      | -aos* | -aros* | -sortix* \
- 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
- 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
- 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
 diff -Paur --no-dereference -- libevent.upstream/configure libevent/configure
 --- libevent.upstream/configure
 +++ libevent/configure
-@@ -14602,7 +14602,7 @@
+@@ -15961,7 +15961,7 @@
  # which indicates that we try without any flags at all, and "pthread-config"
  # which is a program returning the flags for the Pth emulation library.
  
@@ -103,7 +70,7 @@ diff -Paur --no-dereference -- libevent.upstream/configure libevent/configure
  
  # The ordering *is* (sometimes) important.  Some notes on the
  # individual items follow:
-@@ -14726,8 +14726,8 @@
+@@ -16085,8 +16085,8 @@
  main ()
  {
  pthread_t th; pthread_join(th, 0);
@@ -114,26 +81,10 @@ diff -Paur --no-dereference -- libevent.upstream/configure libevent/configure
    ;
    return 0;
  }
-diff -Paur --no-dereference -- libevent.upstream/evutil.c libevent/evutil.c
---- libevent.upstream/evutil.c
-+++ libevent/evutil.c
-@@ -2102,11 +2102,7 @@
- long
- _evutil_weakrand(void)
- {
--#ifdef WIN32
--	return rand();
--#else
--	return random();
--#endif
-+	return arc4random() & 0x7FFFFFFF;
- }
- 
- /**
 diff -Paur --no-dereference -- libevent.upstream/evutil_rand.c libevent/evutil_rand.c
 --- libevent.upstream/evutil_rand.c
 +++ libevent/evutil_rand.c
-@@ -174,7 +174,7 @@
+@@ -194,8 +194,8 @@
  void
  evutil_secure_rng_add_bytes(const char *buf, size_t n)
  {
@@ -142,78 +93,38 @@ diff -Paur --no-dereference -- libevent.upstream/evutil_rand.c libevent/evutil_r
 +	(void) buf;
 +	(void) n;
  }
+ #endif
  
-diff -Paur --no-dereference -- libevent.upstream/http-internal.h libevent/http-internal.h
---- libevent.upstream/http-internal.h
-+++ libevent/http-internal.h
-@@ -70,10 +70,10 @@
- 	struct event retry_ev;		/* for retrying connects */
- 
- 	char *bind_address;		/* address to use for binding the src */
--	u_short bind_port;		/* local port for binding the src */
-+	unsigned short bind_port;		/* local port for binding the src */
- 
- 	char *address;			/* address to connect to */
--	u_short port;
-+	unsigned short port;
- 
- 	size_t max_headers_size;
- 	ev_uint64_t max_body_size;
 diff -Paur --no-dereference -- libevent.upstream/Makefile.in libevent/Makefile.in
 --- libevent.upstream/Makefile.in
 +++ libevent/Makefile.in
-@@ -537,7 +537,7 @@
- @INSTALL_LIBEVENT_TRUE@lib_LTLIBRARIES = $(LIBEVENT_LIBS_LA)
- @INSTALL_LIBEVENT_TRUE@pkgconfig_DATA = $(LIBEVENT_PKGCONFIG)
- @INSTALL_LIBEVENT_FALSE@noinst_LTLIBRARIES = $(LIBEVENT_LIBS_LA)
--SUBDIRS = . include sample test
-+SUBDIRS = . include
- @BUILD_WIN32_FALSE@SYS_LIBS = 
- @BUILD_WIN32_TRUE@SYS_LIBS = -lws2_32 -lshell32 -ladvapi32
- @BUILD_WIN32_FALSE@SYS_SRC = $(am__append_5) $(am__append_6) \
-@@ -1219,6 +1219,9 @@
- 	clean-noinstLTLIBRARIES mostlyclean-am
+@@ -200,7 +200,7 @@
+ 	test/test-ratelim$(EXEEXT) test/test-time$(EXEEXT) \
+ 	test/test-weof$(EXEEXT) test/regress$(EXEEXT)
+ @BUILD_REGRESS_TRUE@am__EXEEXT_6 = $(am__EXEEXT_5)
+-PROGRAMS = $(noinst_PROGRAMS)
++PROGRAMS =
+ am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
+ am__vpath_adj = case $$p in \
+     $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
+@@ -2847,6 +2847,7 @@
+ 	clean-noinstLTLIBRARIES clean-noinstPROGRAMS mostlyclean-am
  
- distclean: distclean-recursive
-+	rm -f sample/Makefile
-+	rm -rf test/.deps
-+	rm -r test/Makefile
+ distclean: distclean-am
++	rm -rf sample/.deps
  	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
- 	-rm -rf $(DEPDIR) ./$(DEPDIR)
- 	-rm -f Makefile
-diff -Paur --no-dereference -- libevent.upstream/poll.c libevent/poll.c
---- libevent.upstream/poll.c
-+++ libevent/poll.c
-@@ -180,7 +180,7 @@
- 	if (res == 0 || nfds == 0)
- 		return (0);
+ 		-rm -f $(DEPDIR)/epoll_sub.Plo
+ 	-rm -f ./$(DEPDIR)/buffer.Plo
+diff -Paur --no-dereference -- libevent.upstream/openssl-compat.h libevent/openssl-compat.h
+--- libevent.upstream/openssl-compat.h
++++ libevent/openssl-compat.h
+@@ -40,7 +40,8 @@
+ #endif /* (OPENSSL_VERSION_NUMBER < 0x10100000L) || \
+ 	(defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x20700000L) */
  
--	i = random() % nfds;
-+	i = arc4random_uniform(nfds);
- 	for (j = 0; j < nfds; j++) {
- 		int what;
- 		if (++i == nfds)
-diff -Paur --no-dereference -- libevent.upstream/select.c libevent/select.c
---- libevent.upstream/select.c
-+++ libevent/select.c
-@@ -177,7 +177,7 @@
- 	event_debug(("%s: select reports %d", __func__, res));
+-#if defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER >= 0x20700000L
++#if defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER >= 0x20700000L && \
++	LIBRESSL_VERSION_NUMBER < 0x30500000L
+ #define BIO_get_init(b) (b)->init
+ #endif
  
- 	check_selectop(sop);
--	i = random() % nfds;
-+	i = arc4random_uniform(nfds);
- 	for (j = 0; j < nfds; ++j) {
- 		if (++i >= nfds)
- 			i = 0;
-diff -Paur --no-dereference -- libevent.upstream/util-internal.h libevent/util-internal.h
---- libevent.upstream/util-internal.h
-+++ libevent/util-internal.h
-@@ -75,7 +75,7 @@
- 
- /* True iff e is an error that means a read/write operation can be retried. */
- #define EVUTIL_ERR_RW_RETRIABLE(e)				\
--	((e) == EINTR || (e) == EAGAIN)
-+	((e) == EINTR || (e) == EAGAIN || (e) == EWOULDBLOCK)
- /* True iff e is an error that means an connect can be retried. */
- #define EVUTIL_ERR_CONNECT_RETRIABLE(e)			\
- 	((e) == EINTR || (e) == EINPROGRESS)
