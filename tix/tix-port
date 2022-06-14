@@ -514,7 +514,7 @@ if should_run_step diff; then
   update_version=true
 fi
 
-if $update_version; then
+if $update_version && [ "${destination-.}" != "." ]; then
   cp "$port.version" "$destination/$NAME.version"
 fi
 
