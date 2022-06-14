@@ -1,0 +1,4 @@
+#!/bin/sh
+set -e
+cd "$TIX_INSTALL_DIR/$PREFIX"
+rm -rf include lib # Provided by liblzma

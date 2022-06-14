@@ -1,5 +1,5 @@
 NAME=ag
-BUILD_LIBRARIES='libpcre libz xz'
+BUILD_LIBRARIES='libpcre libz liblzma'
 VERSION=0.33.0
 DISTNAME=the_silver_searcher-$VERSION
 COMPRESSION=tar.gz

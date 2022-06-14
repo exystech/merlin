@@ -1,5 +1,5 @@
 NAME=python
-BUILD_LIBRARIES='bzip2 libcurses libexpat libffi libreadline libssl libz xz libiconv? libintl? llibmpdec?'
+BUILD_LIBRARIES='bzip2 libcurses libexpat libffi libreadline libssl libz liblzma libiconv? libintl? llibmpdec?'
 VERSION=3.6.0
 DISTNAME=Python-$VERSION
 COMPRESSION=tar.xz

@@ -1,0 +1,6 @@
+NAME=liblzma
+BUILD_LIBRARIES='libiconv? libintl?'
+SOURCE_PORT=xz
+BUILD_SYSTEM=configure
+CONFIGURE_ARGS='--disable-lzmadec --disable-lzmainfo --disable-lzma-links --disable-xz --disable-xzdec --disable-scripts --disable-doc'
+POST_INSTALL=tix-eradicate-libtool-la
