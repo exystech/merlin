@@ -1,5 +1,5 @@
 NAME=nano
-BUILD_LIBRARIES='libiconv? gettext? libcurses libmagic? libz?'
+BUILD_LIBRARIES='libiconv? libintl? libcurses libmagic? libz?'
 VERSION=2.7.1
 DISTNAME=$NAME-$VERSION
 COMPRESSION=tar.xz

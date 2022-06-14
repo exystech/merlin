@@ -1,5 +1,5 @@
 NAME=hello
-BUILD_LIBRARIES='libiconv? gettext?'
+BUILD_LIBRARIES='libiconv? libintl?'
 VERSION=2.8
 DISTNAME=$NAME-$VERSION
 COMPRESSION=tar.gz

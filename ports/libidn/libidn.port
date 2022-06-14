@@ -1,5 +1,5 @@
 NAME=libidn
-BUILD_LIBRARIES='libiconv? gettext?'
+BUILD_LIBRARIES='libiconv? libintl?'
 VERSION=1.33
 DISTNAME=$NAME-$VERSION
 COMPRESSION=tar.gz

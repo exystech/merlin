@@ -1,5 +1,5 @@
 NAME=grub
-BUILD_LIBRARIES='libiconv? gettext? libfreetype? xz?'
+BUILD_LIBRARIES='libiconv? libintl? libfreetype? xz?'
 VERSION=1.0-rc1
 DISTNAME=sortix-grub-$VERSION
 COMPRESSION=tar.gz

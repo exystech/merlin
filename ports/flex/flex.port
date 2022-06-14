@@ -1,5 +1,5 @@
 NAME=flex
-BUILD_LIBRARIES='libiconv? gettext?'
+BUILD_LIBRARIES='libiconv? libintl?'
 VERSION=2.6.0
 DISTNAME=$NAME-$VERSION
 COMPRESSION=tar.xz

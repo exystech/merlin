@@ -1,5 +1,5 @@
 NAME=e2fsprogs
-BUILD_LIBRARIES='libiconv gettext'
+BUILD_LIBRARIES='libiconv libintl'
 VERSION=1.42.13
 DISTNAME=$NAME-$VERSION
 COMPRESSION=tar.xz

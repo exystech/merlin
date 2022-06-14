@@ -1,5 +1,5 @@
 NAME=tar
-BUILD_LIBRARIES='libiconv? gettext?'
+BUILD_LIBRARIES='libiconv? libintl?'
 VERSION=1.28
 DISTNAME=$NAME-$VERSION
 COMPRESSION=tar.xz

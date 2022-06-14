@@ -1,9 +1,11 @@
 NAME=libintl
+BUILD_LIBRARIES=libiconv?
 SOURCE_PORT=gettext
 SUBDIR=gettext-runtime
+LICENSE=LGPL-2.1-or-later
 BUILD_SYSTEM=configure
 # libstdc++ is a dependency if libasprintf is enabled. Right now, I suspect it
 # is more trouble than it is worth, so it's disabled. Does anything of value
 # actually use it?
-CONFIGURE_ARGS=--disable-libasprintf
+CONFIGURE_ARGS='--disable-libasprintf --without-included-gettext'
 POST_INSTALL=tix-eradicate-libtool-la

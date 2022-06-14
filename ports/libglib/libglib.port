@@ -1,5 +1,5 @@
 NAME=libglib
-BUILD_LIBRARIES='libiconv gettext libz libffi xz? libdbus?'
+BUILD_LIBRARIES='libiconv libintl libz libffi xz? libdbus?'
 VERSION=2.45.6
 DISTNAME=glib-$VERSION
 COMPRESSION=tar.xz

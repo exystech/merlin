@@ -1,5 +1,5 @@
 NAME=grep
-BUILD_LIBRARIES='libiconv? gettext?'
+BUILD_LIBRARIES='libiconv? libintl?'
 VERSION=2.20
 DISTNAME=$NAME-$VERSION
 COMPRESSION=tar.xz

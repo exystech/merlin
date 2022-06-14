@@ -1,0 +1,9 @@
+NAME=libtextstyle
+BUILD_LIBRARIES='libiconv?'
+SOURCE_PORT=gettext
+LICENSE=GPL-3-or-later
+SUBDIR=libtextstyle
+BUILD_SYSTEM=configure
+# gettext-tools doesn't try to -lcurses when detecting libtextstyle
+CONFIGURE_ARGS=--disable-curses
+POST_INSTALL=tix-eradicate-libtool-la
