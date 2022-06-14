@@ -31,7 +31,7 @@ diff -Paur --no-dereference -- libcurses.upstream/GNUmakefile libcurses/GNUmakef
  
  -include config.mak
  
-@@ -40,6 +43,7 @@
+@@ -41,6 +44,7 @@
  else
  STATIC_BINS=0
  endif
@@ -39,36 +39,41 @@ diff -Paur --no-dereference -- libcurses.upstream/GNUmakefile libcurses/GNUmakef
  
  CFLAGS+=-Werror-implicit-function-declaration
  CPPFLAGS+= -I. -I./libterminfo
-@@ -166,7 +170,8 @@
+@@ -81,6 +85,7 @@
+ libterminfo/compile.lo: CPPFLAGS+= -DTERMINFO_COMPILE -DTERMINFO_DB -DTERMINFO_COMPAT
+ libterminfo/termcap.o: CPPFLAGS+= -DTERMINFO_COMPILE -DTERMINFO_DB -DTERMINFO_COMPAT
+ libterminfo/termcap.lo: CPPFLAGS+= -DTERMINFO_COMPILE -DTERMINFO_DB -DTERMINFO_COMPAT
++tic/compile.o: CPPFLAGS+= -DTERMINFO_COMPAT
+ 
+ CU_SRCS_=acs.c addbytes.c addch.c addchnstr.c addnstr.c attributes.c \
+ 	background.c bell.c border.c box.c chgat.c clear.c clearok.c \
+@@ -172,7 +177,7 @@
  TI_LINKLIB=$(TI_LIBA)
  endif
  
 -all: $(STALIBS) $(DYNLIBS) $(PROGS)
-+#all: $(STALIBS) $(DYNLIBS) $(PROGS)
 +all: all-static
  
  all-static: $(STALIBS) $(PROGS)
  
-@@ -181,7 +186,7 @@
+@@ -187,7 +192,6 @@
  
  install-tput: tput/tput tput/clear.sh
  	$(INSTALL) -Dm 755 tput/tput $(DESTDIR)$(BINDIR)/tput
 -	$(INSTALL) -Dm 755 tput/clear.sh $(DESTDIR)$(BINDIR)/clear
-+	#$(INSTALL) -Dm 755 tput/clear.sh $(DESTDIR)$(BINDIR)/clear
  
  install-infocmp: infocmp/infocmp
  	$(INSTALL) -Dm 755 infocmp/infocmp $(DESTDIR)$(BINDIR)/infocmp
-@@ -257,7 +262,8 @@
+@@ -263,7 +267,7 @@
  	$(LN) -sf $(notdir $<) $(DESTDIR)$(LIBDIR)/$(basename $(notdir $<))w$(SO_SUFFIX)
  
  install-dynlibs: install-dynlib-terminfo install-dynlib-curses install-dynlib-panel install-dynlib-menu install-dynlib-form
 -install-libs: install-stalibs install-dynlibs
-+#install-libs: install-stalibs install-dynlibs
 +install-libs: install-stalibs
  
  install-pc-dir:
  	$(MKDIR) -p $(DESTDIR)$(LIBDIR)/pkgconfig
-@@ -329,7 +335,15 @@
+@@ -335,7 +339,15 @@
  
  install-manpages: install-prog-manpages install-lib-manpages
  
@@ -85,88 +90,40 @@ diff -Paur --no-dereference -- libcurses.upstream/GNUmakefile libcurses/GNUmakef
  
  install-static: install-headers install-progs install-pcs install-stalibs
  install-dynamic: TI_LINKLIB=$(TI_LIBSO)
-@@ -549,4 +563,4 @@
+@@ -564,4 +576,4 @@
  	install-man-infocmp install-man-tabs install-prog-manpages \
  	install-man-terminfo install-man-curses install-man-panel \
  	install-man-menu install-man-form install-lib-manpages \
 -	install-manpages
 +	install-manpages install-terminfo
-diff -Paur --no-dereference -- libcurses.upstream/libcurses/acs.c libcurses/libcurses/acs.c
---- libcurses.upstream/libcurses/acs.c
-+++ libcurses/libcurses/acs.c
-@@ -38,7 +38,9 @@
- #ifdef HAVE_WCHAR
- #include <assert.h>
- #include <locale.h>
-+#if !defined(__sortix__) || (defined(__has_include) && __has_include(<langinfo.h>))
- #include <langinfo.h>
-+#endif
- #include <strings.h>
- 
- cchar_t _wacs_char[ NUM_ACS ];
-@@ -156,7 +158,11 @@
- 	/* Add the SUSv2 defaults (those that are not '+') */
- 	if (!strcmp(setlocale(LC_CTYPE, NULL), "C"))
- 		setlocale(LC_CTYPE, "");
-+#if !defined(__sortix__) || (defined(__has_include) && __has_include(<langinfo.h>))
- 	lstr = nl_langinfo(CODESET);
-+#else
-+	lstr = "UTF-8";
-+#endif
- 	_DIAGASSERT(lstr);
- 	if (strcasecmp(lstr, "UTF-8")) {
- #ifdef DEBUG
-diff -Paur --no-dereference -- libcurses.upstream/libcurses/color.c libcurses/libcurses/color.c
---- libcurses.upstream/libcurses/color.c
-+++ libcurses/libcurses/color.c
-@@ -35,6 +35,8 @@
- #include "curses.h"
- #include "curses_private.h"
- 
-+typedef uint32_t u_int32_t;
-+
- /* Have we initialised colours? */
- int	__using_color = 0;
- 
-diff -Paur --no-dereference -- libcurses.upstream/libcurses/cur_hash.c libcurses/libcurses/cur_hash.c
---- libcurses.upstream/libcurses/cur_hash.c
-+++ libcurses/libcurses/cur_hash.c
-@@ -36,6 +36,8 @@
- #include "curses.h"
- #include "curses_private.h"
- 
-+typedef unsigned int u_int;
-+
- /*
-  * __hash_more() is "hashpjw" from the Dragon Book, Aho, Sethi & Ullman, p.436.
-  */
 diff -Paur --no-dereference -- libcurses.upstream/libcurses/get_wch.c libcurses/libcurses/get_wch.c
 --- libcurses.upstream/libcurses/get_wch.c
 +++ libcurses/libcurses/get_wch.c
-@@ -44,6 +44,35 @@
+@@ -45,6 +45,36 @@
  #include "curses_private.h"
  #include "keymap.h"
  
++// PATCH: Sortix does not yet have fgetwc(3)
 +#ifdef __sortix__
 +#include <errno.h>
 +#include <stdio_ext.h>
-+static wint_t getwchar(void)
++static wint_t fgetwc(FILE *infd)
 +{
 +	mbstate_t ps = { 0 };
 +	wchar_t wc;
 +	while (1) {
-+		int ic = getchar();
++		int ic = getc(infd);
 +		if (ic == EOF) {
 +			if (!mbsinit(&ps)) {
 +				errno = EILSEQ;
-+				__fseterr(stdin);
++				__fseterr(infd);
 +			}
 +			return WEOF;
 +		}
 +		char c = ic;
 +		size_t bytes = mbrtowc(&wc, &c, 1, &ps);
 +		if (bytes == (size_t) -1) {
-+			__fseterr(stdin);
++			__fseterr(infd);
 +			return WEOF;
 +		}
 +		if (bytes == (size_t) -2)
@@ -176,9 +133,9 @@ diff -Paur --no-dereference -- libcurses.upstream/libcurses/get_wch.c libcurses/
 +}
 +#endif
 +
- #ifdef HAVE_WCHAR
- static short   wstate;		  /* state of the wcinkey function */
- #endif /* HAVE_WCHAR */
+ static short wstate;		/* state of the wcinkey function */
+ extern short _cursesi_state;	/* storage declared in getch.c */
+ 
 diff -Paur --no-dereference -- libcurses.upstream/libcurses/putchar.c libcurses/libcurses/putchar.c
 --- libcurses.upstream/libcurses/putchar.c
 +++ libcurses/libcurses/putchar.c
@@ -191,29 +148,11 @@ diff -Paur --no-dereference -- libcurses.upstream/libcurses/putchar.c libcurses/
  #include "curses.h"
  #include "curses_private.h"
  
-@@ -68,7 +70,18 @@
- #ifdef DEBUG
- 	__CTRACE(__CTRACE_OUTPUT, "__cputwchar: 0x%x\n", wch);
- #endif
-+#ifdef __sortix__
-+	mbstate_t ps = { 0 };
-+	char mb[MB_CUR_MAX];
-+	size_t bytes = wcrtomb(mb, wch, &ps);
-+	if (bytes == (size_t) -1)
-+		return WEOF;
-+	if (fwrite(mb, bytes, 1, _cursesi_screen->outfd) != 1)
-+		return WEOF;
-+	return wch;
-+#else
- 	return (putwc(wch, _cursesi_screen->outfd));
-+#endif
- }
- 
- /*
-@@ -85,6 +98,17 @@
+@@ -89,7 +91,19 @@
  	__CTRACE(__CTRACE_OUTPUT, "__cputwchar_args: 0x%x on fd %d\n",
  	    wch, outfd->_file);
  #endif
++// PATCH: Sortix does not yet have putwc(3)
 +#ifdef __sortix__
 +	mbstate_t ps = { 0 };
 +	char mb[MB_CUR_MAX];
@@ -222,38 +161,45 @@ diff -Paur --no-dereference -- libcurses.upstream/libcurses/putchar.c libcurses/
 +		return WEOF;
 +	if (fwrite(mb, bytes, 1, outfd) != 1)
 +		return WEOF;
-+	return wch;
++	status = wch;
 +#else
- 	return putwc(wch, outfd);
+ 	status = putwc(wch, outfd);
 +#endif
+ 	fflush(outfd);
+ 	return status;
  }
- #endif /* HAVE_WCHAR */
-diff -Paur --no-dereference -- libcurses.upstream/libcurses/refresh.c libcurses/libcurses/refresh.c
---- libcurses.upstream/libcurses/refresh.c
-+++ libcurses/libcurses/refresh.c
-@@ -37,6 +37,8 @@
- #include "curses.h"
- #include "curses_private.h"
+diff -Paur --no-dereference -- libcurses.upstream/libcurses/tstp.c libcurses/libcurses/tstp.c
+--- libcurses.upstream/libcurses/tstp.c
++++ libcurses/libcurses/tstp.c
+@@ -34,7 +34,6 @@
+ #include <netbsd_sys/cdefs.h>
  
-+typedef unsigned int u_int;
-+
- static void	domvcur(int, int, int, int);
- static int	makech(int);
- static void	quickch(void);
+ #include <sys/ioctl.h>
+-#include <sys/param.h>
+ 
+ #include <errno.h>
+ #include <signal.h>
+@@ -148,8 +147,7 @@
+ 	 */
+ 	if (owsa.sa_handler != SIG_DFL &&
+ 	    owsa.sa_handler != SIG_IGN &&
+-	    owsa.sa_handler != SIG_ERR &&
+-	    owsa.sa_handler != SIG_HOLD)
++	    owsa.sa_handler != SIG_ERR)
+ 		owsa.sa_handler(signo);
+ 	else
+ 		_cursesi_screen->resized = 1;
 diff -Paur --no-dereference -- libcurses.upstream/libcurses/tty.c libcurses/libcurses/tty.c
 --- libcurses.upstream/libcurses/tty.c
 +++ libcurses/libcurses/tty.c
-@@ -63,6 +63,10 @@
- #endif
- #endif
+@@ -33,7 +33,6 @@
  
-+#ifndef ONLCR
-+#define ONLCR 0
-+#endif
-+
- /*
-  * baudrate --
-  *	Return the current baudrate
+ #include <fcntl.h>
+ #include <sys/ioctl.h>
+-#include <sys/param.h>
+ #include <sys/types.h>
+ 
+ #include <stdlib.h>
 diff -Paur --no-dereference -- libcurses.upstream/libform/field.c libcurses/libform/field.c
 --- libcurses.upstream/libform/field.c
 +++ libcurses/libform/field.c
@@ -289,11 +235,12 @@ diff -Paur --no-dereference -- libcurses.upstream/libterminfo/cdbr.c libcurses/l
  #include <sys/mman.h>
  #include <netbsd_sys/cdbr.h>
  #include <errno.h>
-@@ -142,7 +144,7 @@
+@@ -143,7 +145,8 @@
  
  
  	size = (size_t)sb.st_size;
 -	base = mmap(NULL, size, PROT_READ, MAP_FILE|MAP_SHARED, fd, 0);
++	// PATCH: Sortix does not yet support shared memory.
 +	base = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
  	close(fd);
  
@@ -310,9 +257,9 @@ diff -Paur --no-dereference -- libcurses.upstream/libterminfo/term.c libcurses/l
 +#define PATH_MAX 4096
 +#endif
 +
- static char database[PATH_MAX];
- static char pathbuf[PATH_MAX];
- const char *_ti_database;
+ #ifdef TERMINFO_DB
+ static char __ti_database[PATH_MAX];
+ #endif
 diff -Paur --no-dereference -- libcurses.upstream/libterminfo/tparm.c libcurses/libterminfo/tparm.c
 --- libcurses.upstream/libterminfo/tparm.c
 +++ libcurses/libterminfo/tparm.c
@@ -332,8 +279,8 @@ diff -Paur --no-dereference -- libcurses.upstream/libterminfo/tparm.c libcurses/
 diff -Paur --no-dereference -- libcurses.upstream/netbsd_sys/cdefs.h libcurses/netbsd_sys/cdefs.h
 --- libcurses.upstream/netbsd_sys/cdefs.h
 +++ libcurses/netbsd_sys/cdefs.h
-@@ -60,5 +60,10 @@
- #define __predict_false(exp)    (exp)
+@@ -72,5 +72,10 @@
+ #define __unused
  #endif
  
 +#if defined(__sortix__)
@@ -580,7 +527,30 @@ diff -Paur --no-dereference -- libcurses.upstream/terminfo/sortix.terminfo libcu
 diff -Paur --no-dereference -- libcurses.upstream/tic/musl-hsearch.c libcurses/tic/musl-hsearch.c
 --- libcurses.upstream/tic/musl-hsearch.c
 +++ libcurses/tic/musl-hsearch.c
-@@ -0,0 +1,149 @@
+@@ -0,0 +1,172 @@
++/*
++ * Copyright © 2005-2020 Rich Felker, et al.
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining
++ * a copy of this software and associated documentation files (the
++ * "Software"), to deal in the Software without restriction, including
++ * without limitation the rights to use, copy, modify, merge, publish,
++ * distribute, sublicense, and/or sell copies of the Software, and to
++ * permit persons to whom the Software is furnished to do so, subject to
++ * the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be
++ * included in all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
++ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
++ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
++ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
++ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
++ */
++
 +#define _GNU_SOURCE
 +#include <stdlib.h>
 +#include <string.h>
@@ -733,7 +703,30 @@ diff -Paur --no-dereference -- libcurses.upstream/tic/musl-hsearch.c libcurses/t
 diff -Paur --no-dereference -- libcurses.upstream/tic/musl-search.h libcurses/tic/musl-search.h
 --- libcurses.upstream/tic/musl-search.h
 +++ libcurses/tic/musl-search.h
-@@ -0,0 +1,60 @@
+@@ -0,0 +1,83 @@
++/*
++ * Copyright © 2005-2020 Rich Felker, et al.
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining
++ * a copy of this software and associated documentation files (the
++ * "Software"), to deal in the Software without restriction, including
++ * without limitation the rights to use, copy, modify, merge, publish,
++ * distribute, sublicense, and/or sell copies of the Software, and to
++ * permit persons to whom the Software is furnished to do so, subject to
++ * the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be
++ * included in all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
++ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
++ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
++ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
++ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
++ */
++
 +#ifndef _SEARCH_H
 +#define _SEARCH_H
 +
@@ -797,7 +790,7 @@ diff -Paur --no-dereference -- libcurses.upstream/tic/musl-search.h libcurses/ti
 diff -Paur --no-dereference -- libcurses.upstream/tic/tic.c libcurses/tic/tic.c
 --- libcurses.upstream/tic/tic.c
 +++ libcurses/tic/tic.c
-@@ -49,7 +49,12 @@
+@@ -50,7 +50,12 @@
  #include <getopt.h>
  #include <limits.h>
  #include <fcntl.h>
@@ -808,8 +801,8 @@ diff -Paur --no-dereference -- libcurses.upstream/tic/tic.c libcurses/tic/tic.c
 +#include "musl-hsearch.c"
 +#endif
  #include <stdarg.h>
+ #include <stdbool.h>
  #include <stdlib.h>
- #include <stdio.h>
 diff -Paur --no-dereference -- libcurses.upstream/tset/map.c libcurses/tset/map.c
 --- libcurses.upstream/tset/map.c
 +++ libcurses/tset/map.c
@@ -892,14 +885,3 @@ diff -Paur --no-dereference -- libcurses.upstream/tset/tset.c libcurses/tset/tse
  static void	obsolete(char *[]);
  static void	report(const char *, int, u_int);
  __dead static void	usage(char*);
-@@ -167,7 +176,10 @@
- 		    nlines > 0 && columns > 0) {
- 			win.ws_row = nlines;
- 			win.ws_col = ncolumns;
-+/* TODO: Remove after TIOCSWINSZ has been merged to Sortix master. */
-+#ifdef TIOCSWINSZ
- 			(void)ioctl(STDERR_FILENO, TIOCSWINSZ, &win);
-+#endif
- 		}
- #endif
- 		set_control_chars(erasechar, intrchar, killchar);
