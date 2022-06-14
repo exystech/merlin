@@ -179,7 +179,9 @@ number matched in the first subexpression.
 and
 .Sy VERSION_REGEX )
 .It Sy LICENSE
-Abbreviation of the license the port is released under.
+Primary license identifier for the installed files from the
+.Lk https://spdx.org/licenses/ "SPDX License List" .
+Library ports use the license for linking with the library.
 .It Sy LOCATION_INDEPENDENT Ns = Ns Oo Sy false "|" true Oc
 Whether binary packages are location independent, i.e. can be installed in
 another prefix than one supplied at build time.
