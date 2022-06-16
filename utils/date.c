@@ -1,5 +1,7 @@
 /*
  * Copyright (c) 2013, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2022 Juhani 'nortti' Krekelä.
+ * Copyright (c) 2022 Dennis Wölfing.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,6 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 // Note: There's no way to discern whether the format string was too long for
 // the output buffer or if the output was simply empty, so don't call this
@@ -49,14 +52,27 @@ int main(int argc, char* argv[])
 {
 	const char* format = "+%a %b %e %H:%M:%S %Z %Y";
 
-	if ( 2 <= argc )
+	int opt;
+	while ( (opt = getopt(argc, argv, "u")) != -1 )
 	{
-		if ( argv[1][0] != '+' )
-			errx(1, "setting the system time is not implemented");
-		format = argv[1];
+		switch ( opt )
+		{
+		case 'u':
+			if ( setenv("TZ", "UTC0", 1) )
+				err(1, "setenv");
+			break;
+		default: return 1;
+		}
 	}
-	if ( 3 <= argc )
-		errx(1, "unexpected extra operand: %s", argv[2]);
+
+	if ( 1 <= argc - optind )
+	{
+		if ( argv[optind][0] != '+' )
+			errx(1, "setting the system time is not implemented");
+		format = argv[optind];
+	}
+	if ( 2 <= argc - optind )
+		errx(1, "unexpected extra operand: %s", argv[optind + 1]);
 
 	time_t current_time = time(NULL);
 
@@ -69,6 +85,7 @@ int main(int argc, char* argv[])
 		err(1, "malloc");
 	if ( printf("%s\n", string + 1) == EOF )
 		err(1, "stdout");
+	free(string);
 	if ( ferror(stdout) || fflush(stdout) == EOF )
 		err(1, "stdout");
 	return 0;
