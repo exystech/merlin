@@ -1,0 +1,2 @@
+rm -rf -- 'doc/xmlwf.1'
+rm -rf -- 'expat_config.h'
