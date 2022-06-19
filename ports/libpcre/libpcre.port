@@ -1,5 +1,5 @@
 NAME=libpcre
-BUILD_LIBRARIES='libstdc++ libz bzip2 libedit? libreadline?'
+BUILD_LIBRARIES='libstdc++ libz libbz2 libedit? libreadline?'
 VERSION=8.39
 DISTNAME=pcre-$VERSION
 COMPRESSION=tar.bz2

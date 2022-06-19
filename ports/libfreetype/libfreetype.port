@@ -1,5 +1,5 @@
 NAME=libfreetype
-BUILD_LIBRARIES='libz bzip2? libpng?'
+BUILD_LIBRARIES='libz libbz2? libpng?'
 VERSION=2.8.1
 DISTNAME=freetype-$VERSION
 COMPRESSION=tar.bz2

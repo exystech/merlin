@@ -1,5 +1,5 @@
 NAME=qemu
-BUILD_LIBRARIES='libstdc++ libz libglib libpixman bzip2? libSDL? libcurses? libcurl? libGL? libgtk? libssh2? libgcrypt? libtasn1?'
+BUILD_LIBRARIES='libstdc++ libz libglib libpixman libbz2? libSDL? libcurses? libcurl? libGL? libgtk? libssh2? libgcrypt? libtasn1?'
 VERSION=2.7.0
 DISTNAME=$NAME-$VERSION
 COMPRESSION=tar.bz2

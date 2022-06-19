@@ -1,5 +1,5 @@
 NAME=libcairo
-BUILD_LIBRARIES='libz bzip2 libpng libfreetype libfontconfig? librsvg? libexpat? libpixman libglib?'
+BUILD_LIBRARIES='libz libbz2 libpng libfreetype libfontconfig? librsvg? libexpat? libpixman libglib?'
 VERSION=1.12.14
 DISTNAME=cairo-$VERSION
 COMPRESSION=tar.xz
