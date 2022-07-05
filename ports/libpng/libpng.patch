@@ -1,35 +1,57 @@
-diff -Paur --no-dereference -- libpng.upstream/config.sub libpng/config.sub
---- libpng.upstream/config.sub
-+++ libpng/config.sub
-@@ -1337,7 +1337,7 @@
- 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
- 	      | -sym* | -kopensolaris* \
- 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
--	      | -aos* | -aros* \
-+	      | -aos* | -aros* | -sortix* \
- 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
- 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
- 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
-diff -Paur --no-dereference -- libpng.upstream/libpng.pc.in libpng/libpng.pc.in
---- libpng.upstream/libpng.pc.in
-+++ libpng/libpng.pc.in
-@@ -6,6 +6,6 @@
- Name: libpng
- Description: Loads and saves PNG files
- Version: @PNGLIB_VERSION@
--Libs: -L${libdir} -lpng@PNGLIB_MAJOR@@PNGLIB_MINOR@
-+Libs: -L${libdir} -lpng@PNGLIB_MAJOR@@PNGLIB_MINOR@ -lz -lm
- Libs.private: @LIBS@
- Cflags: -I${includedir}
-diff -Paur --no-dereference -- libpng.upstream/Makefile.in libpng/Makefile.in
---- libpng.upstream/Makefile.in
-+++ libpng/Makefile.in
-@@ -1428,8 +1428,6 @@
+diff -Paur --no-dereference -- libpng.upstream/contrib/libtests/pngvalid.c libpng/contrib/libtests/pngvalid.c
+--- libpng.upstream/contrib/libtests/pngvalid.c
++++ libpng/contrib/libtests/pngvalid.c
+@@ -18,10 +18,7 @@
+  *   transformations performed by libpng.
+  */
  
- # do evil things to libpng to cause libpng@PNGLIB_MAJOR@@PNGLIB_MINOR@ to be used
- install-exec-hook:
--	cd $(DESTDIR)$(bindir); rm -f libpng-config
--	cd $(DESTDIR)$(bindir); $(LN_S) $(PNGLIB_BASENAME)-config libpng-config
- 	@set -x;\
- 	cd $(DESTDIR)$(libdir);\
- 	for ext in a la so so.@PNGLIB_MAJOR@@PNGLIB_MINOR@.@PNGLIB_RELEASE@ sl dylib dll.a; do\
+-#define _POSIX_SOURCE 1
+-#define _ISOC99_SOURCE 1 /* For floating point */
+-#define _GNU_SOURCE 1 /* For the floating point exception extension */
+-#define _BSD_SOURCE 1 /* For the floating point exception extension */
++/* PATCH: Get feenableexcept without any feature macros. */
+ 
+ #include <signal.h>
+ #include <stdio.h>
+diff -Paur --no-dereference -- libpng.upstream/contrib/libtests/timepng.c libpng/contrib/libtests/timepng.c
+--- libpng.upstream/contrib/libtests/timepng.c
++++ libpng/contrib/libtests/timepng.c
+@@ -22,6 +22,10 @@
+ #include <errno.h>
+ #include <limits.h>
+ 
++#if !defined(FILENAME_MAX) && defined(__sortix__)
++#define FILENAME_MAX 256
++#endif
++
+ #include <time.h>
+ 
+ #if defined(HAVE_CONFIG_H) && !defined(PNG_NO_CONFIG_H)
+diff -Paur --no-dereference -- libpng.upstream/contrib/tools/pngcp.c libpng/contrib/tools/pngcp.c
+--- libpng.upstream/contrib/tools/pngcp.c
++++ libpng/contrib/tools/pngcp.c
+@@ -70,6 +70,10 @@
+ #include <limits.h>
+ #include <assert.h>
+ 
++#if !defined(FILENAME_MAX) && defined(__sortix__)
++#define FILENAME_MAX 256
++#endif
++
+ #include <unistd.h>
+ #include <sys/stat.h>
+ 
+diff -Paur --no-dereference -- libpng.upstream/contrib/tools/pngfix.c libpng/contrib/tools/pngfix.c
+--- libpng.upstream/contrib/tools/pngfix.c
++++ libpng/contrib/tools/pngfix.c
+@@ -18,6 +18,10 @@
+ #include <errno.h>
+ #include <assert.h>
+ 
++#if !defined(FILENAME_MAX) && defined(__sortix__)
++#define FILENAME_MAX 256
++#endif
++
+ #define implies(x,y) assert(!(x) || (y))
+ 
+ #ifdef __GNUC__

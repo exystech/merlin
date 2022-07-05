@@ -1,13 +1,14 @@
 NAME=libpng
 BUILD_LIBRARIES=libz
-VERSION=1.5.13
+VERSION=1.6.37
 DISTNAME=$NAME-$VERSION
 COMPRESSION=tar.xz
 ARCHIVE=$DISTNAME.$COMPRESSION
-SHA256SUM=b843f9cb01d10ae22acd9aaf58aceaa4a6aeb9cf78943b41588004b271257aee
+SHA256SUM=505e70834d35383537b6491e7ae8641f1a4bed1876dbfe361201fc80868d88ca
 UPSTREAM_SITE=https://download.sourceforge.net/libpng
 UPSTREAM_ARCHIVE=$ARCHIVE
+LICENSE=Libpng
 BUILD_SYSTEM=configure
-CONFIGURE_ARGS='--with-binconfigs=no'
+CONFIGURE_ARGS='--with-binconfigs=no --disable-unversioned-libpng-config'
 POST_INSTALL=tix-eradicate-libtool-la
 RELEASE_SEARCH_PAGE=http://libpng.org/pub/png/libpng.html
