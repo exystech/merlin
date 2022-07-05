@@ -1,12 +1,13 @@
 NAME=libfreetype
-BUILD_LIBRARIES='libz libbz2? libpng?'
-VERSION=2.8.1
+BUILD_LIBRARIES='libz libbz2? libpng? libbrotli? libharfbuzz? librsvg?'
+VERSION=2.12.1
 DISTNAME=freetype-$VERSION
-COMPRESSION=tar.bz2
+COMPRESSION=tar.xz
 ARCHIVE=$DISTNAME.$COMPRESSION
-SHA256SUM=e5435f02e02d2b87bb8e4efdcaa14b1f78c9cf3ab1ed80f94b6382fb6acc7d78
+SHA256SUM=4766f20157cc4cf0cd292f80bf917f92d1c439b243ac3018debf6b9140c41a7f
 UPSTREAM_SITE=https://download.savannah.gnu.org/releases/freetype
 UPSTREAM_ARCHIVE=$ARCHIVE
+LICENSE='FTL OR GPL-2.0-or-later'
 BUILD_SYSTEM=configure
 DIRTY_FILE=config.log
 POST_INSTALL=tix-eradicate-libtool-la
