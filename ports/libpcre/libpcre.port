@@ -1,14 +1,15 @@
 NAME=libpcre
 BUILD_LIBRARIES='libstdc++ libz libbz2 libedit? libreadline?'
-VERSION=8.39
+VERSION=8.45
 DISTNAME=pcre-$VERSION
 COMPRESSION=tar.bz2
 ARCHIVE=$DISTNAME.$COMPRESSION
-SHA256SUM=b858099f82483031ee02092711689e7245586ada49e534a06e678b8ea9549e8b
+SHA256SUM=4dae6fdcd2bb0bb6c37b5f97c33c2be954da743985369cddac3546e3218bffb8
 UPSTREAM_SITE=https://sourceforge.net/projects/pcre/files/pcre/$VERSION
 UPSTREAM_ARCHIVE=$ARCHIVE
+LICENSE=BSD-3-Clause
 BUILD_SYSTEM=configure
-CONFIGURE_ARGS=--enable-utf
+CONFIGURE_ARGS='--enable-utf --enable-unicode-properties'
 MAKE_VARS='V=1'
 POST_INSTALL=tix-eradicate-libtool-la
 RELEASE_SEARCH_PAGE=https://sourceforge.net/projects/pcre/files/pcre/
