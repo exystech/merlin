@@ -10,6 +10,31 @@ diff -Paur --no-dereference -- libtheora.upstream/config.sub libtheora/config.su
  	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
  	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
  	      | -hiux* | -386bsd* | -netbsd* | -openbsd* | -freebsd* | -riscix* \
+diff -Paur --no-dereference -- libtheora.upstream/configure libtheora/configure
+--- libtheora.upstream/configure
++++ libtheora/configure
+@@ -13031,9 +13031,9 @@
+   fi
+ 
+ 
+-  PATH="$prefix/bin:$prefix/usr/bin:$PATH"
++  # PATCH: Don't put /bin in the front of the PATH.
+   # Extract the first word of "sdl-config", so it can be a program name with args.
+-set dummy sdl-config; ac_word=$2
++set dummy false; ac_word=$2
+ { $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
+ $as_echo_n "checking for $ac_word... " >&6; }
+ if test "${ac_cv_path_SDL_CONFIG+set}" = set; then
+@@ -14930,7 +14930,8 @@
+ if test -n "$CONFIG_FILES"; then
+ 
+ 
+-ac_cr=''
++ac_cr='
++'
+ ac_cs_awk_cr=`$AWK 'BEGIN { print "a\rb" }' </dev/null 2>/dev/null`
+ if test "$ac_cs_awk_cr" = "a${ac_cr}b"; then
+   ac_cs_awk_cr='\\r'
 diff -Paur --no-dereference -- libtheora.upstream/examples/dump_psnr.c libtheora/examples/dump_psnr.c
 --- libtheora.upstream/examples/dump_psnr.c
 +++ libtheora/examples/dump_psnr.c
@@ -89,3 +114,18 @@ diff -Paur --no-dereference -- libtheora.upstream/examples/dump_video.c libtheor
  
          fprintf(stderr,"\rframe:%d rate:%.2fx           ",
                  frames,
+diff -Paur --no-dereference -- libtheora.upstream/examples/png2theora.c libtheora/examples/png2theora.c
+--- libtheora.upstream/examples/png2theora.c
++++ libtheora/examples/png2theora.c
+@@ -462,9 +462,9 @@
+   png_set_strip_alpha(png_ptr);
+ 
+   row_data = (png_bytep)png_malloc(png_ptr,
+-    3*height*width*png_sizeof(*row_data));
++    3*height*width*sizeof(*row_data));
+   row_pointers = (png_bytep *)png_malloc(png_ptr,
+-    height*png_sizeof(*row_pointers));
++    height*sizeof(*row_pointers));
+   for(y = 0; y < height; y++) {
+     row_pointers[y] = row_data + y*(3*width);
+   }
