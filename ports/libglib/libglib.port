@@ -1,13 +1,21 @@
 NAME=libglib
-BUILD_LIBRARIES='libiconv libintl libz libffi liblzma? libdbus?'
-VERSION=2.45.6
+BUILD_LIBRARIES='libffi libiconv libintl libpcre libz libdbus? liblzma?'
+# NOTE: 2.58.0 and above do not ship with configure and instead require either
+#       creating it locally using autotools or meson, so for time being we are
+#       stuck at 2.56.4.
+VERSION_MAJOR=2
+VERSION_MINOR=56
+VERSION_PATCH=4
+VERSION=$VERSION_MAJOR.$VERSION_MINOR.$VERSION_PATCH
 DISTNAME=glib-$VERSION
 COMPRESSION=tar.xz
 ARCHIVE=$DISTNAME.$COMPRESSION
-SHA256SUM=a5710fcf8a073201ceca188c285af14d8da4bb2bbec22bdf6b5e0593d5bc6b77
-UPSTREAM_SITE=https://download.gnome.org/sources/glib/2.45
+SHA256SUM=27f703d125efb07f8a743666b580df0b4095c59fc8750e8890132c91d437504c
+UPSTREAM_SITE=https://download.gnome.org/sources/glib/$VERSION_MAJOR.$VERSION_MINOR
 UPSTREAM_ARCHIVE=$ARCHIVE
+LICENSE=LGPL-2.1-or-later
 BUILD_SYSTEM=configure
 CONFIGURE_ARGS=--disable-gtk-doc
 MAKE_VARS='V=1'
 POST_INSTALL=tix-eradicate-libtool-la
+RELEASE_SEARCH_PAGE=https://download.gnome.org/sources/glib/cache.json
