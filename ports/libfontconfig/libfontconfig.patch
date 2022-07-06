@@ -1,45 +1,63 @@
-diff -Paur --no-dereference -- libfontconfig.upstream/fc-blanks/Makefile.in libfontconfig/fc-blanks/Makefile.in
---- libfontconfig.upstream/fc-blanks/Makefile.in
-+++ libfontconfig/fc-blanks/Makefile.in
-@@ -350,7 +350,8 @@
- 	$(TMPL)		\
- 	$(NULL)
+diff -Paur --no-dereference -- libfontconfig.upstream/conf.d/Makefile.in libfontconfig/conf.d/Makefile.in
+--- libfontconfig.upstream/conf.d/Makefile.in
++++ libfontconfig/conf.d/Makefile.in
+@@ -451,6 +451,8 @@
+ 	80-delicious.conf		\
+ 	90-synthetic.conf
  
--DISTCLEANFILES = $(BLANKS_H)
-+# PATCH: fc-blanks.py doesn't work on Sortix (python2 urllib issues).
-+DISTCLEANFILES =
- all: all-am
++BASECONFIGDIR := $(BASECONFIGDIR:/fonts=/default/fonts)
++
+ all: $(BUILT_SOURCES)
+ 	$(MAKE) $(AM_MAKEFLAGS) all-am
  
- .SUFFIXES:
+diff -Paur --no-dereference -- libfontconfig.upstream/configure libfontconfig/configure
+--- libfontconfig.upstream/configure
++++ libfontconfig/configure
+@@ -15154,7 +15154,8 @@
+ 
+ 
+ 
+-    use_additional=yes
++    # PATCH: Don't search /lib which is not native sysroot safe.
++    use_additional=no
+ 
+   acl_save_prefix="$prefix"
+   prefix="$acl_final_prefix"
+@@ -16065,7 +16066,7 @@
+ 
+ 
+ 
+-    use_additional=yes
++    use_additional=no
+ 
+   acl_save_prefix="$prefix"
+   prefix="$acl_final_prefix"
 diff -Paur --no-dereference -- libfontconfig.upstream/fontconfig.pc.in libfontconfig/fontconfig.pc.in
 --- libfontconfig.upstream/fontconfig.pc.in
 +++ libfontconfig/fontconfig.pc.in
-@@ -14,5 +14,6 @@
+@@ -14,5 +14,5 @@
  Requires: @PKGCONFIG_REQUIRES@
  Requires.private: @PKGCONFIG_REQUIRES_PRIVATELY@
  Libs: -L${libdir} -lfontconfig
--Libs.private: @EXPAT_LIBS@ @FREETYPE_LIBS@ @ICONV_LIBS@ @LIBXML2_LIBS@
--Cflags: -I${includedir} @EXPAT_CFLAGS@ @FREETYPE_CFLAGS@ @ICONV_CFLAGS@ @LIBXML2_CFLAGS@
-+Libs.private: @ICONV_LIBS@
-+# PATCH: These were provided by the above Requires and were not cross safe.
-+Cflags: -I${includedir} @ICONV_CFLAGS@
+-Libs.private: @ICONV_LIBS@ @PKG_EXPAT_LIBS@
++Libs.private: @LTLIBINTL@ @ICONV_LIBS@ @PKG_EXPAT_LIBS@
+ Cflags: -I${includedir} @ICONV_CFLAGS@ @PKG_EXPAT_CFLAGS@
 diff -Paur --no-dereference -- libfontconfig.upstream/Makefile.in libfontconfig/Makefile.in
 --- libfontconfig.upstream/Makefile.in
 +++ libfontconfig/Makefile.in
-@@ -434,7 +434,8 @@
- top_build_prefix = @top_build_prefix@
- top_builddir = @top_builddir@
- top_srcdir = @top_srcdir@
--SUBDIRS = fontconfig fc-blanks fc-case fc-lang fc-glyphname src \
-+# PATCH: fc-blanks is a python script that doesn't run on Sortix right now.
-+SUBDIRS = fontconfig fc-case fc-lang fc-glyphname src \
- 	fc-cache fc-cat fc-list fc-match fc-pattern fc-query fc-scan \
- 	fc-validate conf.d test $(am__append_1)
- ACLOCAL_AMFLAGS = -I m4
+@@ -509,6 +509,8 @@
+ @ENABLE_CACHE_BUILD_TRUE@RUN_FC_CACHE_TEST = test -z "$(DESTDIR)"
+ FC_CONFIGDIR = $(subst $(BASECONFIGDIR)/,,$(CONFIGDIR))
+ DISTCHECK_CONFIGURE_FLAGS = 
++BASECONFIGDIR_ADMIN := $(BASECONFIGDIR)
++BASECONFIGDIR := $(BASECONFIGDIR:/fonts=/default/fonts)
+ all: config.h
+ 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
+ 
 diff -Paur --no-dereference -- libfontconfig.upstream/src/fccache.c libfontconfig/src/fccache.c
 --- libfontconfig.upstream/src/fccache.c
 +++ libfontconfig/src/fccache.c
-@@ -38,6 +38,9 @@
+@@ -48,11 +48,19 @@
  #if defined(_WIN32)
  #include <sys/locking.h>
  #endif
@@ -49,7 +67,44 @@ diff -Paur --no-dereference -- libfontconfig.upstream/src/fccache.c libfontconfi
  
  #ifndef O_BINARY
  #define O_BINARY 0
-@@ -1266,7 +1269,11 @@
+ #endif
+ 
++#if defined(__sortix__) && !defined(timercmp)
++#define timercmp(s,t,op) ((s)->tv_sec == (t)->tv_sec ? \
++	(s)->tv_usec op (t)->tv_usec : (s)->tv_sec op (t)->tv_sec)
++#endif
++
+ FcBool
+ FcDirCacheCreateUUID (FcChar8  *dir,
+ 		      FcBool    force,
+@@ -70,7 +78,7 @@
+     const FcChar8 *sysroot;
+     FcChar8 *target, *d;
+     struct stat statb;
+-    struct timeval times[2];
++    struct timespec times[2];
+ 
+     config = FcConfigReference (config);
+     if (!config)
+@@ -91,14 +99,9 @@
+     {
+ 	times[0].tv_sec = statb.st_atime;
+ 	times[1].tv_sec = statb.st_mtime;
+-#ifdef HAVE_STRUCT_STAT_ST_MTIM
+-	times[0].tv_usec = statb.st_atim.tv_nsec / 1000;
+-	times[1].tv_usec = statb.st_mtim.tv_nsec / 1000;
+-#else
+-	times[0].tv_usec = 0;
+-	times[1].tv_usec = 0;
+-#endif
+-	if (utimes ((const char *) d, times) != 0)
++	times[0].tv_nsec = statb.st_atim.tv_nsec;
++	times[1].tv_nsec = statb.st_mtim.tv_nsec;
++	if (utimens ((const char *) d, times) != 0)
+ 	{
+ 	    fprintf (stderr, "Unable to revert mtime: %s\n", d);
+ 	}
+@@ -1642,7 +1645,11 @@
  #if defined(_WIN32)
  	    if (_locking (fd, _LK_LOCK, 1) == -1)
  		goto bail;
@@ -62,7 +117,7 @@ diff -Paur --no-dereference -- libfontconfig.upstream/src/fccache.c libfontconfi
  	    struct flock fl;
  
  	    fl.l_type = F_WRLCK;
-@@ -1276,17 +1283,21 @@
+@@ -1652,17 +1659,21 @@
  	    fl.l_pid = getpid ();
  	    if (fcntl (fd, F_SETLKW, &fl) == -1)
  		goto bail;
@@ -84,7 +139,7 @@ diff -Paur --no-dereference -- libfontconfig.upstream/src/fccache.c libfontconfi
  }
  
  void
-@@ -1296,7 +1307,10 @@
+@@ -1672,7 +1683,10 @@
      {
  #if defined(_WIN32)
  	_locking (fd, _LK_UNLCK, 1);
@@ -99,7 +154,7 @@ diff -Paur --no-dereference -- libfontconfig.upstream/src/fccache.c libfontconfi
 diff -Paur --no-dereference -- libfontconfig.upstream/src/fccompat.c libfontconfig/src/fccompat.c
 --- libfontconfig.upstream/src/fccompat.c
 +++ libfontconfig/src/fccompat.c
-@@ -164,69 +164,8 @@
+@@ -182,69 +182,8 @@
  int32_t
  FcRandom(void)
  {
@@ -171,47 +226,12 @@ diff -Paur --no-dereference -- libfontconfig.upstream/src/fccompat.c libfontconf
  }
  
  #ifdef _WIN32
-diff -Paur --no-dereference -- libfontconfig.upstream/src/fcname.c libfontconfig/src/fcname.c
---- libfontconfig.upstream/src/fcname.c
-+++ libfontconfig/src/fcname.c
-@@ -506,17 +506,17 @@
-     case FcTypeVoid:
- 	return FcTrue;
-     case FcTypeInteger:
--	sprintf ((char *) temp, "%d", v.u.i);
-+	snprintf ((char *) temp, sizeof (temp), "%d", v.u.i);
- 	return FcNameUnparseString (buf, temp, 0);
-     case FcTypeDouble:
--	sprintf ((char *) temp, "%g", v.u.d);
-+	snprintf ((char *) temp, sizeof (temp), "%g", v.u.d);
- 	return FcNameUnparseString (buf, temp, 0);
-     case FcTypeString:
- 	return FcNameUnparseString (buf, v.u.s, escape);
-     case FcTypeBool:
- 	return FcNameUnparseString (buf, v.u.b ? (FcChar8 *) "True" : (FcChar8 *) "False", 0);
-     case FcTypeMatrix:
--	sprintf ((char *) temp, "%g %g %g %g",
-+	snprintf ((char *) temp, sizeof (temp), "%g %g %g %g",
- 		 v.u.m->xx, v.u.m->xy, v.u.m->yx, v.u.m->yy);
- 	return FcNameUnparseString (buf, temp, 0);
-     case FcTypeCharSet:
-@@ -526,7 +526,7 @@
-     case FcTypeFTFace:
- 	return FcTrue;
-     case FcTypeRange:
--	sprintf ((char *) temp, "[%g %g)", v.u.r->begin, v.u.r->end);
-+	snprintf ((char *) temp, sizeof (temp), "[%g %g)", v.u.r->begin, v.u.r->end);
- 	return FcNameUnparseString (buf, temp, 0);
-     }
-     return FcFalse;
 diff -Paur --no-dereference -- libfontconfig.upstream/src/fcobjs.c libfontconfig/src/fcobjs.c
 --- libfontconfig.upstream/src/fcobjs.c
 +++ libfontconfig/src/fcobjs.c
-@@ -24,11 +24,12 @@
- 
+@@ -25,10 +25,10 @@
  #include "fcint.h"
  
-+/* TODO: Stick with existing fcobjshash.h regardless of system gperf. */
  static unsigned int
 -FcObjectTypeHash (register const char *str, register FC_GPERF_SIZE_T len);
 +FcObjectTypeHash (register const char *str, register size_t len);
@@ -222,40 +242,327 @@ diff -Paur --no-dereference -- libfontconfig.upstream/src/fcobjs.c libfontconfig
  
  #include "fcobjshash.h"
  
+diff -Paur --no-dereference -- libfontconfig.upstream/src/fcobjshash.h libfontconfig/src/fcobjshash.h
+--- libfontconfig.upstream/src/fcobjshash.h
++++ libfontconfig/src/fcobjshash.h
+@@ -0,0 +1,265 @@
++/* ANSI-C code produced by gperf version 3.1 */
++/* Command-line: gperf --pic -m 100 fcobjshash.gperf  */
++/* Computed positions: -k'3,5' */
++
++struct FcObjectTypeInfo {
++int name;
++int id;
++};
++#include <string.h>
++/* maximum key range = 59, duplicates = 0 */
++
++#ifdef __GNUC__
++__inline
++#else
++#ifdef __cplusplus
++inline
++#endif
++#endif
++static unsigned int
++FcObjectTypeHash (register const char *str, register size_t len)
++{
++  static const unsigned char asso_values[] =
++    {
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66,  4, 10, 32,
++      21, 29, 28, 49, 14,  4, 66, 66,  5, 31,
++      18, 22, 27, 66, 15,  9,  8, 23, 23, 13,
++      23, 16,  4, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
++      66, 66, 66, 66, 66, 66
++    };
++  register unsigned int hval = len;
++
++  switch (hval)
++    {
++      default:
++        hval += asso_values[(unsigned char)str[4]];
++      /*FALLTHROUGH*/
++      case 4:
++      case 3:
++        hval += asso_values[(unsigned char)str[2]];
++        break;
++    }
++  return hval;
++}
++
++struct FcObjectTypeNamePool_t
++  {
++    char FcObjectTypeNamePool_str7[sizeof("dpi")];
++    char FcObjectTypeNamePool_str8[sizeof("size")];
++    char FcObjectTypeNamePool_str9[sizeof("file")];
++    char FcObjectTypeNamePool_str13[sizeof("hash")];
++    char FcObjectTypeNamePool_str14[sizeof("rgba")];
++    char FcObjectTypeNamePool_str15[sizeof("spacing")];
++    char FcObjectTypeNamePool_str16[sizeof("scalable")];
++    char FcObjectTypeNamePool_str17[sizeof("slant")];
++    char FcObjectTypeNamePool_str18[sizeof("matrix")];
++    char FcObjectTypeNamePool_str19[sizeof("outline")];
++    char FcObjectTypeNamePool_str20[sizeof("charset")];
++    char FcObjectTypeNamePool_str21[sizeof("antialias")];
++    char FcObjectTypeNamePool_str22[sizeof("lang")];
++    char FcObjectTypeNamePool_str23[sizeof("embolden")];
++    char FcObjectTypeNamePool_str24[sizeof("weight")];
++    char FcObjectTypeNamePool_str25[sizeof("color")];
++    char FcObjectTypeNamePool_str26[sizeof("charwidth")];
++    char FcObjectTypeNamePool_str27[sizeof("variable")];
++    char FcObjectTypeNamePool_str28[sizeof("charheight")];
++    char FcObjectTypeNamePool_str29[sizeof("hinting")];
++    char FcObjectTypeNamePool_str30[sizeof("autohint")];
++    char FcObjectTypeNamePool_str31[sizeof("fullname")];
++    char FcObjectTypeNamePool_str32[sizeof("postscriptname")];
++    char FcObjectTypeNamePool_str33[sizeof("verticallayout")];
++    char FcObjectTypeNamePool_str34[sizeof("lcdfilter")];
++    char FcObjectTypeNamePool_str35[sizeof("fullnamelang")];
++    char FcObjectTypeNamePool_str36[sizeof("hintstyle")];
++    char FcObjectTypeNamePool_str37[sizeof("pixelsize")];
++    char FcObjectTypeNamePool_str38[sizeof("scale")];
++    char FcObjectTypeNamePool_str39[sizeof("globaladvance")];
++    char FcObjectTypeNamePool_str40[sizeof("width")];
++    char FcObjectTypeNamePool_str41[sizeof("order")];
++    char FcObjectTypeNamePool_str42[sizeof("family")];
++    char FcObjectTypeNamePool_str43[sizeof("fonthashint")];
++    char FcObjectTypeNamePool_str44[sizeof("namelang")];
++    char FcObjectTypeNamePool_str45[sizeof("embeddedbitmap")];
++    char FcObjectTypeNamePool_str46[sizeof("familylang")];
++    char FcObjectTypeNamePool_str47[sizeof("capability")];
++    char FcObjectTypeNamePool_str48[sizeof("rasterizer")];
++    char FcObjectTypeNamePool_str49[sizeof("index")];
++    char FcObjectTypeNamePool_str50[sizeof("style")];
++    char FcObjectTypeNamePool_str51[sizeof("foundry")];
++    char FcObjectTypeNamePool_str52[sizeof("fontversion")];
++    char FcObjectTypeNamePool_str53[sizeof("minspace")];
++    char FcObjectTypeNamePool_str54[sizeof("stylelang")];
++    char FcObjectTypeNamePool_str55[sizeof("fontvariations")];
++    char FcObjectTypeNamePool_str56[sizeof("fontformat")];
++    char FcObjectTypeNamePool_str57[sizeof("decorative")];
++    char FcObjectTypeNamePool_str58[sizeof("fontfeatures")];
++    char FcObjectTypeNamePool_str59[sizeof("symbol")];
++    char FcObjectTypeNamePool_str60[sizeof("prgname")];
++    char FcObjectTypeNamePool_str65[sizeof("aspect")];
++  };
++static const struct FcObjectTypeNamePool_t FcObjectTypeNamePool_contents =
++  {
++    "dpi",
++    "size",
++    "file",
++    "hash",
++    "rgba",
++    "spacing",
++    "scalable",
++    "slant",
++    "matrix",
++    "outline",
++    "charset",
++    "antialias",
++    "lang",
++    "embolden",
++    "weight",
++    "color",
++    "charwidth",
++    "variable",
++    "charheight",
++    "hinting",
++    "autohint",
++    "fullname",
++    "postscriptname",
++    "verticallayout",
++    "lcdfilter",
++    "fullnamelang",
++    "hintstyle",
++    "pixelsize",
++    "scale",
++    "globaladvance",
++    "width",
++    "order",
++    "family",
++    "fonthashint",
++    "namelang",
++    "embeddedbitmap",
++    "familylang",
++    "capability",
++    "rasterizer",
++    "index",
++    "style",
++    "foundry",
++    "fontversion",
++    "minspace",
++    "stylelang",
++    "fontvariations",
++    "fontformat",
++    "decorative",
++    "fontfeatures",
++    "symbol",
++    "prgname",
++    "aspect"
++  };
++#define FcObjectTypeNamePool ((const char *) &FcObjectTypeNamePool_contents)
++const struct FcObjectTypeInfo *
++FcObjectTypeLookup (register const char *str, register size_t len)
++{
++  enum
++    {
++      TOTAL_KEYWORDS = 52,
++      MIN_WORD_LENGTH = 3,
++      MAX_WORD_LENGTH = 14,
++      MIN_HASH_VALUE = 7,
++      MAX_HASH_VALUE = 65
++    };
++
++  static const struct FcObjectTypeInfo wordlist[] =
++    {
++      {-1}, {-1}, {-1}, {-1}, {-1}, {-1}, {-1},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str7,FC_DPI_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str8,FC_SIZE_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str9,FC_FILE_OBJECT},
++      {-1}, {-1}, {-1},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str13,FC_HASH_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str14,FC_RGBA_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str15,FC_SPACING_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str16,FC_SCALABLE_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str17,FC_SLANT_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str18,FC_MATRIX_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str19,FC_OUTLINE_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str20,FC_CHARSET_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str21,FC_ANTIALIAS_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str22,FC_LANG_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str23,FC_EMBOLDEN_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str24,FC_WEIGHT_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str25,FC_COLOR_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str26,FC_CHARWIDTH_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str27,FC_VARIABLE_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str28,FC_CHAR_HEIGHT_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str29,FC_HINTING_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str30,FC_AUTOHINT_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str31,FC_FULLNAME_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str32,FC_POSTSCRIPT_NAME_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str33,FC_VERTICAL_LAYOUT_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str34,FC_LCD_FILTER_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str35,FC_FULLNAMELANG_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str36,FC_HINT_STYLE_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str37,FC_PIXEL_SIZE_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str38,FC_SCALE_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str39,FC_GLOBAL_ADVANCE_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str40,FC_WIDTH_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str41,FC_ORDER_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str42,FC_FAMILY_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str43,FC_FONT_HAS_HINT_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str44,FC_NAMELANG_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str45,FC_EMBEDDED_BITMAP_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str46,FC_FAMILYLANG_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str47,FC_CAPABILITY_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str48,FC_RASTERIZER_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str49,FC_INDEX_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str50,FC_STYLE_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str51,FC_FOUNDRY_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str52,FC_FONTVERSION_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str53,FC_MINSPACE_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str54,FC_STYLELANG_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str55,FC_FONT_VARIATIONS_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str56,FC_FONTFORMAT_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str57,FC_DECORATIVE_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str58,FC_FONT_FEATURES_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str59,FC_SYMBOL_OBJECT},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str60,FC_PRGNAME_OBJECT},
++      {-1}, {-1}, {-1}, {-1},
++      {(int)(size_t)&((struct FcObjectTypeNamePool_t *)0)->FcObjectTypeNamePool_str65,FC_ASPECT_OBJECT}
++    };
++
++  if (len <= MAX_WORD_LENGTH && len >= MIN_WORD_LENGTH)
++    {
++      register unsigned int key = FcObjectTypeHash (str, len);
++
++      if (key <= MAX_HASH_VALUE)
++        {
++          register int o = wordlist[key].name;
++          if (o >= 0)
++            {
++              register const char *s = o + FcObjectTypeNamePool;
++
++              if (*str == *s && !strcmp (str + 1, s + 1))
++                return &wordlist[key];
++            }
++        }
++    }
++  return 0;
++}
 diff -Paur --no-dereference -- libfontconfig.upstream/src/Makefile.in libfontconfig/src/Makefile.in
 --- libfontconfig.upstream/src/Makefile.in
 +++ libfontconfig/src/Makefile.in
-@@ -496,7 +496,6 @@
- 	stamp-fcstdint	\
- 	fcstdint.h	\
- 	stamp-fcobjshash.gperf	\
--	fcobjshash.h	\
+@@ -463,6 +463,10 @@
+ @OS_WIN32_FALSE@fontconfig_def_dependency = 
+ @OS_WIN32_TRUE@fontconfig_def_dependency = fontconfig.def
+ 
++# PATCH: Install fallback default configuration in /etc/default.
++BASECONFIGDIR_ADMIN := $(BASECONFIGDIR)
++BASECONFIGDIR := $(BASECONFIGDIR:/fonts=/default/fonts)
++
+ # Microsoft import library install/uninstall
+ @MS_LIB_AVAILABLE_TRUE@noinst_DATA = fontconfig.lib
+ AM_CPPFLAGS = \
+@@ -475,7 +479,7 @@
+ 	$(WARN_CFLAGS)					\
+ 	-DFC_CACHEDIR='"$(FC_CACHEDIR)"'                \
+ 	-DCONFIGDIR='"$(CONFIGDIR)"'			\
+-	-DFONTCONFIG_PATH='"$(BASECONFIGDIR)"'		\
++	-DFONTCONFIG_PATH='"$(BASECONFIGDIR_ADMIN):$(BASECONFIGDIR)"'		\
+ 	-DFC_TEMPLATEDIR='"$(TEMPLATEDIR)"'
+ 
+ LDADD = $(LIBINTL)
+@@ -485,7 +489,7 @@
+ 	../fc-case/fccase.h \
+ 	../fc-lang/fclang.h \
+ 	stamp-fcstdint \
+-	$(builddir)/fcobjshash.h \
++	fcobjshash.h \
  	fcobjshash.gperf
  
- all: $(BUILT_SOURCES)
-@@ -912,9 +911,10 @@
+ libfontconfig_la_SOURCES = \
+@@ -541,7 +545,6 @@
+ CLEANFILES = \
+ 	$(ALIAS_FILES)	\
+ 	fontconfig.def	\
+-	$(builddir)/fcobjshash.h
+ 
+ DISTCLEANFILES = \
+ 	stamp-fcstdint	\
+@@ -1026,9 +1029,11 @@
  	' - > $@.tmp && \
  	mv -f $@.tmp fcobjshash.gperf && touch $@ || ( $(RM) $@.tmp && false )
  
--fcobjshash.h: Makefile fcobjshash.gperf
+-$(builddir)/fcobjshash.h: Makefile fcobjshash.gperf
 -	$(AM_V_GEN) $(GPERF) --pic -m 100 fcobjshash.gperf > $@.tmp && \
 -	mv -f $@.tmp $@ || ( $(RM) $@.tmp && false )
-+# PATCH: Sortix doesn't have gperf at the moment.
++# PATCH: Sortix doesn't have gperf at the moment, so this file has been prebuilt
++#        on another operating system.
 +#fcobjshash.h: Makefile fcobjshash.gperf
 +#	$(AM_V_GEN) $(GPERF) --pic -m 100 fcobjshash.gperf > $@.tmp && \
 +#	mv -f $@.tmp $@ || ( $(RM) $@.tmp && false )
  
  @ENABLE_SHARED_TRUE@install-data-local: install-ms-import-lib install-libtool-import-lib
  
-diff -Paur --no-dereference -- libfontconfig.upstream/test/test-migration.c libfontconfig/test/test-migration.c
---- libfontconfig.upstream/test/test-migration.c
-+++ libfontconfig/test/test-migration.c
-@@ -22,6 +22,8 @@
-  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-  * PERFORMANCE OF THIS SOFTWARE.
-  */
-+/* PATCH: Need HAVE_FOO macros.. */
-+#include "../config.h"
- #include <stdio.h>
- #include <stdlib.h>
- #include <string.h>

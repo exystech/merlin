@@ -1,12 +1,13 @@
 NAME=libfontconfig
-BUILD_LIBRARIES='libiconv libexpat libfreetype'
-VERSION=2.12.6
+BUILD_LIBRARIES='libiconv libexpat libfreetype libintl? libjson-c?'
+VERSION=2.14.0
 DISTNAME=fontconfig-$VERSION
-COMPRESSION=tar.bz2
+COMPRESSION=tar.xz
 ARCHIVE=$DISTNAME.$COMPRESSION
-SHA256SUM=cf0c30807d08f6a28ab46c61b8dbd55c97d2f292cf88f3a07d3384687f31f017
+SHA256SUM=dcbeb84c9c74bbfdb133d535fe1c7bedc9f2221a8daf3914b984c44c520e9bac
 UPSTREAM_SITE=https://www.freedesktop.org/software/fontconfig/release
 UPSTREAM_ARCHIVE=$ARCHIVE
+LICENSE=HPND-sell-variant
 BUILD_SYSTEM=configure
 # Documentation requires SGMLSpm and texline, doesn't seem to work?
 CONFIGURE_ARGS=--disable-docs
