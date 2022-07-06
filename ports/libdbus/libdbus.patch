@@ -1,176 +1,169 @@
 diff -Paur --no-dereference -- libdbus.upstream/bus/activation-helper.c libdbus/bus/activation-helper.c
 --- libdbus.upstream/bus/activation-helper.c
 +++ libdbus/bus/activation-helper.c
-@@ -43,6 +43,10 @@
- #include <dbus/dbus-shell.h>
+@@ -46,6 +46,10 @@
  #include <dbus/dbus-marshal-validate.h>
+ #include <dbus/dbus-sysdeps-unix.h>
  
-+#if defined(__sortix__)
++#if defined(__sortix__) && !defined(__SORTIX_HAS_INITGROUPS__)
 +#define initgroups(a, b) 0
 +#endif
 +
  static BusDesktopFile *
  desktop_file_for_name (BusConfigParser *parser,
                         const char *name,
+@@ -318,7 +322,7 @@
+   if (setgid (pw->pw_gid))
+     {
+       dbus_set_error (error, DBUS_ERROR_SPAWN_SETUP_FAILED,
+-                      "cannot setgid group %i", pw->pw_gid);
++                      "cannot setgid group %ju", (uintmax_t)pw->pw_gid);
+       return FALSE;
+     }
+ 
+@@ -326,7 +330,7 @@
+   if (setuid (pw->pw_uid) < 0)
+     {
+       dbus_set_error (error, DBUS_ERROR_SPAWN_SETUP_FAILED,
+-                      "cannot setuid user %i", pw->pw_uid);
++                      "cannot setuid user %ju", (uintmax_t)pw->pw_uid);
+       return FALSE;
+     }
+ #endif
 diff -Paur --no-dereference -- libdbus.upstream/bus/Makefile.in libdbus/bus/Makefile.in
 --- libdbus.upstream/bus/Makefile.in
 +++ libdbus/bus/Makefile.in
-@@ -1510,7 +1510,6 @@
- 	/bin/rm *.bb *.bbg *.da *.gcov || true
- 
+@@ -598,7 +598,8 @@
+ 	systemd-user/dbus.socket.in sysusers.d/dbus.conf.in \
+ 	tmpfiles.d/dbus.conf.in $(NULL)
+ dbusdata_DATA = session.conf $(am__append_1)
+-legacydbusdata_DATA = legacy-config/session.conf $(am__append_2)
++# PATCH: Don't install empty removable configuration files in /etc.
++legacydbusdata_DATA =
+ examplesdir = ${docdir}/examples
+ examples_DATA = \
+ 	example-system-enable-stats.conf	\
+@@ -1463,7 +1464,6 @@
  install-data-hook:
--	$(mkinstalldirs) $(DESTDIR)$(localstatedir)/run/dbus
- 	$(mkinstalldirs) $(DESTDIR)$(configdir)/system.d
- 	$(mkinstalldirs) $(DESTDIR)$(configdir)/session.d
- 	$(mkinstalldirs) $(DESTDIR)$(datadir)/dbus-1/services
-diff -Paur --no-dereference -- libdbus.upstream/config.sub libdbus/config.sub
---- libdbus.upstream/config.sub
-+++ libdbus/config.sub
-@@ -1342,7 +1342,7 @@
- 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
- 	      | -sym* | -kopensolaris* \
- 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
--	      | -aos* | -aros* \
-+	      | -aos* | -aros* | -sortix* \
- 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
- 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
- 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
-diff -Paur --no-dereference -- libdbus.upstream/dbus/dbus-sysdeps.h libdbus/dbus/dbus-sysdeps.h
---- libdbus.upstream/dbus/dbus-sysdeps.h
-+++ libdbus/dbus/dbus-sysdeps.h
-@@ -50,7 +50,7 @@
-  * DBusPollFD
-  */ 
- #ifdef HAVE_POLL
--#include <sys/poll.h>
-+#include <poll.h>
- #endif
- 
- #ifdef DBUS_WINCE
+ 	$(mkinstalldirs) $(DESTDIR)$(dbusdatadir)/session.d
+ 	$(mkinstalldirs) $(DESTDIR)$(dbusdatadir)/services
+-@DBUS_UNIX_TRUE@	$(mkinstalldirs) $(DESTDIR)$(localstatedir)/run/dbus
+ @DBUS_UNIX_TRUE@	$(mkinstalldirs) $(DESTDIR)$(dbusdatadir)/system.d
+ @DBUS_UNIX_TRUE@	$(mkinstalldirs) $(DESTDIR)$(dbusdatadir)/system-services
+ # Install dbus.socket as default implementation of a D-Bus stack.
 diff -Paur --no-dereference -- libdbus.upstream/dbus/dbus-sysdeps-unix.c libdbus/dbus/dbus-sysdeps-unix.c
 --- libdbus.upstream/dbus/dbus-sysdeps-unix.c
 +++ libdbus/dbus/dbus-sysdeps-unix.c
-@@ -63,7 +63,7 @@
- #include <sys/uio.h>
- #endif
- #ifdef HAVE_POLL
--#include <sys/poll.h>
-+#include <poll.h>
- #endif
- #ifdef HAVE_BACKTRACE
- #include <execinfo.h>
-@@ -76,6 +76,8 @@
- #include <bsm/adt.h>
- #endif
+@@ -2210,9 +2210,13 @@
+    * we need these assertions to fail as soon as we're wrong about
+    * it so we can do the porting fixups
+    */
+-  _DBUS_STATIC_ASSERT (sizeof (pid_t) <= sizeof (dbus_pid_t));
+-  _DBUS_STATIC_ASSERT (sizeof (uid_t) <= sizeof (dbus_uid_t));
+-  _DBUS_STATIC_ASSERT (sizeof (gid_t) <= sizeof (dbus_gid_t));
++  // PATCH: 32-bit Sortix has 64-bit pid_t, uid_t, and gid_t. Patching the
++  //        support into libdbus was a bit too non-trivial when I was tired and
++  //        was across the codebase, so for now let's just be buggy on too big
++  //        numbers.
++  //_DBUS_STATIC_ASSERT (sizeof (pid_t) <= sizeof (dbus_pid_t));
++  //_DBUS_STATIC_ASSERT (sizeof (uid_t) <= sizeof (dbus_uid_t));
++  //_DBUS_STATIC_ASSERT (sizeof (gid_t) <= sizeof (dbus_gid_t));
  
-+#include <alloca.h>
-+
- #include "sd-daemon.h"
+   uid_read = DBUS_UID_UNSET;
+   primary_gid_read = DBUS_GID_UNSET;
+@@ -2945,9 +2949,9 @@
+    * we need these assertions to fail as soon as we're wrong about
+    * it so we can do the porting fixups
+    */
+-  _DBUS_STATIC_ASSERT (sizeof (pid_t) <= sizeof (dbus_pid_t));
+-  _DBUS_STATIC_ASSERT (sizeof (uid_t) <= sizeof (dbus_uid_t));
+-  _DBUS_STATIC_ASSERT (sizeof (gid_t) <= sizeof (dbus_gid_t));
++  //_DBUS_STATIC_ASSERT (sizeof (pid_t) <= sizeof (dbus_pid_t));
++  //_DBUS_STATIC_ASSERT (sizeof (uid_t) <= sizeof (dbus_uid_t));
++  //_DBUS_STATIC_ASSERT (sizeof (gid_t) <= sizeof (dbus_gid_t));
  
- #ifndef O_BINARY
-@@ -276,6 +278,11 @@
-   *n_fds = 0;
-   return r;
- 
-+#elif defined(__sortix__)
-+
-+  fprintf(stderr, "%s:%u Warning: Sortix cannot pass fds between processes yet\n", __FILE__, __LINE__);
-+  return errno = ENOTSUP, -1;
-+
- #else
-   int bytes_read;
-   int start;
-@@ -426,6 +433,12 @@
-   return _dbus_write_socket_two(fd,
-                                 buffer1, start1, len1,
-                                 buffer2, start2, len2);
-+
-+#elif defined(__sortix__)
-+
-+  fprintf(stderr, "%s:%u Warning: Sortix cannot pass fds between processes yet\n", __FILE__, __LINE__);
-+  return errno = ENOTSUP, -1;
-+
- #else
- 
-   struct msghdr m;
-@@ -734,6 +747,7 @@
- #else /* HAVE_WRITEV */
-   {
-     int ret1;
-+    int ret2;
- 
-     ret1 = _dbus_write (fd, buffer1, start1, len1);
-     if (ret1 == len1 && buffer2 != NULL)
+   if (!_dbus_credentials_add_pid(credentials, _dbus_getpid()))
+     return FALSE;
 diff -Paur --no-dereference -- libdbus.upstream/dbus/dbus-sysdeps-util-unix.c libdbus/dbus/dbus-sysdeps-util-unix.c
 --- libdbus.upstream/dbus/dbus-sysdeps-util-unix.c
 +++ libdbus/dbus/dbus-sysdeps-util-unix.c
-@@ -59,6 +59,11 @@
+@@ -68,6 +68,10 @@
  #define O_BINARY 0
  #endif
  
-+#if defined(__sortix__)
-+#define setsid() getpid()
++#if defined(__sortix__) && !defined(__SORTIX_HAS_SETGROUPS__)
 +#define setgroups(a, b) 0
 +#endif
 +
  /**
   * @addtogroup DBusInternalsUtils
   * @{
-diff -Paur --no-dereference -- libdbus.upstream/dbus/sd-daemon.c libdbus/dbus/sd-daemon.c
---- libdbus.upstream/dbus/sd-daemon.c
-+++ libdbus/dbus/sd-daemon.c
-@@ -32,7 +32,7 @@
- #include <sys/stat.h>
- #include <sys/socket.h>
- #include <sys/un.h>
--#include <sys/fcntl.h>
-+#include <fcntl.h>
- #include <netinet/in.h>
- #include <stdlib.h>
- #include <errno.h>
+diff -Paur --no-dereference -- libdbus.upstream/test/Makefile.in libdbus/test/Makefile.in
+--- libdbus.upstream/test/Makefile.in
++++ libdbus/test/Makefile.in
+@@ -2971,6 +2971,9 @@
+ 	-rm -f internals/$(DEPDIR)/sysdeps.Po
+ 	-rm -f internals/$(DEPDIR)/syslog.Po
+ 	-rm -f internals/$(DEPDIR)/variant.Po
++	for F in $(in_data); do \
++		rm -f "$${F%.in}"; \
++	done
+ 	-rm -f Makefile
+ distclean-am: clean-am distclean-compile distclean-generic \
+ 	distclean-tags
 diff -Paur --no-dereference -- libdbus.upstream/tools/dbus-launch.c libdbus/tools/dbus-launch.c
 --- libdbus.upstream/tools/dbus-launch.c
 +++ libdbus/tools/dbus-launch.c
-@@ -769,7 +769,7 @@
- 
-      strcpy (envvar, "DBUS_SESSION_BUS_ADDRESS=");
-      strcat (envvar, bus_address);
--     putenv (envvar);
-+     setenv ("DBUS_SESSION_BUS_ADDRESS", bus_address, 1);
- 
-      execvp (runprog, args);
-      fprintf (stderr, "Couldn't exec %s: %s\n", runprog, strerror (errno));
-diff -Paur --no-dereference -- libdbus.upstream/tools/dbus-monitor.c libdbus/tools/dbus-monitor.c
---- libdbus.upstream/tools/dbus-monitor.c
-+++ libdbus/tools/dbus-monitor.c
-@@ -104,11 +104,7 @@
-   return DBUS_HANDLER_RESULT_HANDLED;
- }
- 
--#ifdef __APPLE__
--#define PROFILE_TIMED_FORMAT "%s\t%lu\t%d"
--#else
--#define PROFILE_TIMED_FORMAT "%s\t%lu\t%lu"
--#endif
-+#define PROFILE_TIMED_FORMAT "%s\t%lld\t%lu"
- #define TRAP_NULL_STRING(str) ((str) ? (str) : "<none>")
- 
- typedef enum
-@@ -127,7 +123,7 @@
- profile_print_with_attrs (const char *type, DBusMessage *message,
-   struct timeval *t, ProfileAttributeFlags attrs)
+@@ -756,18 +756,15 @@
+            int binary_syntax,
+            int argc, char **argv, int remaining_args)
  {
--  printf (PROFILE_TIMED_FORMAT, type, t->tv_sec, t->tv_usec);
-+  printf (PROFILE_TIMED_FORMAT, type, (long long)t->tv_sec, t->tv_usec);
+-  char *envvar = NULL;
+   char **args = NULL;
  
-   if (attrs & PROFILE_ATTRIBUTE_FLAG_SERIAL)
-     printf ("\t%u", dbus_message_get_serial (message));
-@@ -197,7 +193,7 @@
- 	  PROFILE_ATTRIBUTE_FLAG_MEMBER);
- 	break;
-       default:
--	printf (PROFILE_TIMED_FORMAT "\n", "tun", t.tv_sec, t.tv_usec);
-+	printf (PROFILE_TIMED_FORMAT "\n", "tun", (long long)t.tv_sec, t.tv_usec);
- 	break;
-     }
- }
+   if (runprog)
+     {
+       int i;
+ 
+-      envvar = malloc (strlen ("DBUS_SESSION_BUS_ADDRESS=") +
+-          strlen (bus_address) + 1);
+       args = malloc (sizeof (char *) * ((argc-remaining_args)+2));
+ 
+-      if (envvar == NULL || args == NULL)
++      if (args == NULL)
+         goto oom;
+ 
+       args[0] = xstrdup (runprog);
+@@ -787,9 +784,7 @@
+         }
+       args[i] = NULL;
+ 
+-      strcpy (envvar, "DBUS_SESSION_BUS_ADDRESS=");
+-      strcat (envvar, bus_address);
+-      putenv (envvar);
++      setenv ("DBUS_SESSION_BUS_ADDRESS", bus_address, 1);
+ 
+       execvp (runprog, args);
+       fprintf (stderr, "Couldn't exec %s: %s\n", runprog, strerror (errno));
+@@ -808,9 +803,6 @@
+   close (2);
+   exit (0);
+ oom:
+-  if (envvar)
+-    free (envvar);
+-
+   if (args)
+     free (args);
+ 
+diff -Paur --no-dereference -- libdbus.upstream/tools/dbus-print-message.c libdbus/tools/dbus-print-message.c
+--- libdbus.upstream/tools/dbus-print-message.c
++++ libdbus/tools/dbus-print-message.c
+@@ -30,7 +30,7 @@
+ #include <sys/un.h>
+ #include <unistd.h>
+ #include <netinet/in.h>
+-#include <netinet/ip.h>
++/* PATCH: <netinet/ip.h> is not needed */
+ #include <arpa/inet.h>
+ #endif
+ 

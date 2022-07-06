@@ -1,0 +1,2 @@
+rm -rf -- 'cmake/DBus1Config.cmake'
+rm -rf -- 'cmake/DBus1ConfigVersion.cmake'

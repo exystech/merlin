@@ -99,4 +99,13 @@
          is updated to not rely on this macro. */
 #undef __SORTIX_HAS_RESTARTABLE_SYSCALLS__
 
+
+/* TODO: Define when initgroups(2) is implemented. Remove when libdbus is
+         updated to not rely on this macro. */
+#undef __SORTIX_HAS_INITGROUPS__
+
+/* TODO: Define when setgroups(2) is implemented. Remove when libdbus is updated
+         to not rely on this macro. */
+#undef __SORTIX_HAS_SETGROUPS__
+
 #endif
