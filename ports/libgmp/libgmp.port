@@ -1,14 +1,13 @@
 NAME=libgmp
 BUILD_LIBRARIES=libstdc++
-VERSION=6.0.0a
+VERSION=6.2.1
 DISTNAME=gmp-$VERSION
 COMPRESSION=tar.xz
 ARCHIVE=$DISTNAME.$COMPRESSION
-SHA256SUM=9156d32edac6955bc53b0218f5f3763facb890b73a835d5e1b901dcf8eb8b764
+SHA256SUM=fd4829912cddd12f84181c3451cc752be224643e87fac497b69edddadc49b4f2
 UPSTREAM_SITE=https://ftp.gnu.org/gnu/gmp
 UPSTREAM_ARCHIVE=$ARCHIVE
+LICENSE='GPL-2.0-or-later OR LGPL-3.0-or-later'
 BUILD_SYSTEM=configure
 CONFIGURE_ARGS=--enable-cxx
 POST_INSTALL=tix-eradicate-libtool-la
-# TODO: Remove after upgrading past 6.0.0a.
-VERSION_REGEX='([0-9]+\.[0-9]+(\.[0-9]+)*a?)'
