@@ -17,8 +17,8 @@
  * Declaration of the itimerspec structure.
  */
 
-#ifndef INCLUDE_SORTIX_ITIMERSPEC_H
-#define INCLUDE_SORTIX_ITIMERSPEC_H
+#ifndef _INCLUDE_SORTIX_ITIMERSPEC_H
+#define _INCLUDE_SORTIX_ITIMERSPEC_H
 
 #include <sys/cdefs.h>
 

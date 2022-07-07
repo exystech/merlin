@@ -17,8 +17,8 @@
  * Executing scheduling.
  */
 
-#ifndef INCLUDE_SCHED_H
-#define INCLUDE_SCHED_H
+#ifndef _INCLUDE_SCHED_H
+#define _INCLUDE_SCHED_H
 
 #include <sys/cdefs.h>
 

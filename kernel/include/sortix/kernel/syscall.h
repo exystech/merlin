@@ -17,8 +17,8 @@
  * Handles system calls from user-space.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_SYSCALL_H
-#define INCLUDE_SORTIX_KERNEL_SYSCALL_H
+#ifndef _INCLUDE_SORTIX_KERNEL_SYSCALL_H
+#define _INCLUDE_SORTIX_KERNEL_SYSCALL_H
 
 #include <sys/dnsconfig.h>
 #include <sys/socket.h>

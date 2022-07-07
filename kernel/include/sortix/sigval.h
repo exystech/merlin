@@ -17,8 +17,8 @@
  * Declares union sigval.
  */
 
-#ifndef INCLUDE_SORTIX_SIGVAL_H
-#define INCLUDE_SORTIX_SIGVAL_H
+#ifndef _INCLUDE_SORTIX_SIGVAL_H
+#define _INCLUDE_SORTIX_SIGVAL_H
 
 #include <sys/cdefs.h>
 

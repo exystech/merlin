@@ -17,8 +17,8 @@
  * Declares various constants related to opening files.
  */
 
-#ifndef INCLUDE_SORTIX_FCNTL_H
-#define INCLUDE_SORTIX_FCNTL_H
+#ifndef _INCLUDE_SORTIX_FCNTL_H
+#define _INCLUDE_SORTIX_FCNTL_H
 
 #include <sys/cdefs.h>
 

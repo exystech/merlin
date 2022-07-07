@@ -17,8 +17,8 @@
  * Cache mechanism for file contents.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_FCACHE_H
-#define INCLUDE_SORTIX_KERNEL_FCACHE_H
+#ifndef _INCLUDE_SORTIX_KERNEL_FCACHE_H
+#define _INCLUDE_SORTIX_KERNEL_FCACHE_H
 
 #include <sys/types.h>
 

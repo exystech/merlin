@@ -17,8 +17,8 @@
  * Defines macros for the PS/2 mouse protocol.
  */
 
-#ifndef INCLUDE_SYS_PS2MOUSE_H
-#define INCLUDE_SYS_PS2MOUSE_H
+#ifndef _INCLUDE_SYS_PS2MOUSE_H
+#define _INCLUDE_SYS_PS2MOUSE_H
 
 #include <sortix/ps2mouse.h>
 

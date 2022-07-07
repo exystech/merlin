@@ -17,8 +17,8 @@
  * Declaration of the timespec structure.
  */
 
-#ifndef INCLUDE_SORTIX_TIMESPEC_H
-#define INCLUDE_SORTIX_TIMESPEC_H
+#ifndef _INCLUDE_SORTIX_TIMESPEC_H
+#define _INCLUDE_SORTIX_TIMESPEC_H
 
 #include <sys/cdefs.h>
 

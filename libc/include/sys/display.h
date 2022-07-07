@@ -17,8 +17,8 @@
  * Display message passing.
  */
 
-#ifndef INCLUDE_SYS_DISPLAY_H
-#define INCLUDE_SYS_DISPLAY_H
+#ifndef _INCLUDE_SYS_DISPLAY_H
+#define _INCLUDE_SYS_DISPLAY_H
 
 #include <sys/cdefs.h>
 

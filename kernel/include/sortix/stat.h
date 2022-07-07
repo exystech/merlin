@@ -18,8 +18,8 @@
  * macros and values relating to values stored in it.
  */
 
-#ifndef INCLUDE_SORTIX_STAT_H
-#define INCLUDE_SORTIX_STAT_H
+#ifndef _INCLUDE_SORTIX_STAT_H
+#define _INCLUDE_SORTIX_STAT_H
 
 #include <sys/cdefs.h>
 

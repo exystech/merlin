@@ -17,8 +17,8 @@
  * What's left of some old pattern matching library.
  */
 
-#ifndef INCLUDE_LIBGEN_H
-#define INCLUDE_LIBGEN_H
+#ifndef _INCLUDE_LIBGEN_H
+#define _INCLUDE_LIBGEN_H
 
 #include <sys/cdefs.h>
 

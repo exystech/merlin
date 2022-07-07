@@ -17,8 +17,8 @@
  * Character types.
  */
 
-#ifndef INCLUDE_CTYPE_H
-#define INCLUDE_CTYPE_H
+#ifndef _INCLUDE_CTYPE_H
+#define _INCLUDE_CTYPE_H
 
 #include <sys/cdefs.h>
 

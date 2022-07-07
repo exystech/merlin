@@ -17,8 +17,8 @@
  * Executable and Linkable Format.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_ELF_H
-#define INCLUDE_SORTIX_KERNEL_ELF_H
+#ifndef _INCLUDE_SORTIX_KERNEL_ELF_H
+#define _INCLUDE_SORTIX_KERNEL_ELF_H
 
 #include <stddef.h>
 #include <stdint.h>

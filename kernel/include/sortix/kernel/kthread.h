@@ -17,8 +17,8 @@
  * Utility and synchronization mechanisms for kernel threads.
  */
 
-#ifndef SORTIX_KTHREAD_H
-#define SORTIX_KTHREAD_H
+#ifndef _INCLUDE_SORTIX_KERNEL_KTHREAD_H
+#define _INCLUDE_SORTIX_KERNEL_KTHREAD_H
 
 #include <stddef.h>
 

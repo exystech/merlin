@@ -17,8 +17,8 @@
  * Declares siginfo_t and associated flags.
  */
 
-#ifndef INCLUDE_SORTIX_SIGINFO_H
-#define INCLUDE_SORTIX_SIGINFO_H
+#ifndef _INCLUDE_SORTIX_SIGINFO_H
+#define _INCLUDE_SORTIX_SIGINFO_H
 
 #include <sys/cdefs.h>
 

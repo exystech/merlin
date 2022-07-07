@@ -17,8 +17,8 @@
  * Declarations related to the fork family of system calls on Sortix.
  */
 
-#ifndef INCLUDE_SORTIX_FORK_H
-#define INCLUDE_SORTIX_FORK_H
+#ifndef _INCLUDE_SORTIX_FORK_H
+#define _INCLUDE_SORTIX_FORK_H
 
 #include <sys/cdefs.h>
 

@@ -17,8 +17,8 @@
  * Numeric constants identifying each system call.
  */
 
-#ifndef INCLUDE_SORTIX_SYSCALLNUM_H
-#define INCLUDE_SORTIX_SYSCALLNUM_H
+#ifndef _INCLUDE_SORTIX_SYSCALL_H
+#define _INCLUDE_SORTIX_SYSCALL_H
 
 #define SYSCALL_BAD_SYSCALL 0
 #define SYSCALL_EXIT 1 /* OBSOLETE */

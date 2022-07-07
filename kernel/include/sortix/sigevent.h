@@ -17,8 +17,8 @@
  * Declares the sigevent structure.
  */
 
-#ifndef INCLUDE_SORTIX_SIGEVENT_H
-#define INCLUDE_SORTIX_SIGEVENT_H
+#ifndef _INCLUDE_SORTIX_SIGEVENT_H
+#define _INCLUDE_SORTIX_SIGEVENT_H
 
 #include <sys/cdefs.h>
 

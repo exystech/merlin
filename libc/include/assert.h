@@ -17,8 +17,8 @@
  * Verify program assertion.
  */
 
-#ifndef INCLUDE_ASSERT_H
-#define INCLUDE_ASSERT_H
+#ifndef _INCLUDE_ASSERT_H
+#define _INCLUDE_ASSERT_H
 
 #include <sys/cdefs.h>
 

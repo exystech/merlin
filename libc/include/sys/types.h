@@ -17,8 +17,8 @@
  * Data types.
  */
 
-#ifndef INCLUDE_SYS_TYPES_H
-#define INCLUDE_SYS_TYPES_H
+#ifndef _INCLUDE_SYS_TYPES_H
+#define _INCLUDE_SYS_TYPES_H
 
 #include <sys/cdefs.h>
 

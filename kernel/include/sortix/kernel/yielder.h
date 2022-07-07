@@ -17,8 +17,8 @@
  * Template that allows creation of easily-iterable sequences.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_YIELDER_H
-#define INCLUDE_SORTIX_KERNEL_YIELDER_H
+#ifndef _INCLUDE_SORTIX_KERNEL_YIELDER_H
+#define _INCLUDE_SORTIX_KERNEL_YIELDER_H
 
 namespace Sortix {
 

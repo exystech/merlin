@@ -17,8 +17,8 @@
  * Command-line parsing facility.
  */
 
-#ifndef INCLUDE_GETOPT_H
-#define INCLUDE_GETOPT_H
+#ifndef _INCLUDE_GETOPT_H
+#define _INCLUDE_GETOPT_H
 
 #include <sys/cdefs.h>
 

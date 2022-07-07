@@ -17,8 +17,8 @@
  * Defines macros for the PS/2 mouse protocol.
  */
 
-#ifndef INCLUDE_SORTIX_PS2MOUSE_H
-#define INCLUDE_SORTIX_PS2MOUSE_H
+#ifndef _INCLUDE_SORTIX_PS2MOUSE_H
+#define _INCLUDE_SORTIX_PS2MOUSE_H
 
 #define MOUSE_PACKET_SIZE 3
 

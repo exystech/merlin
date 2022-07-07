@@ -17,8 +17,8 @@
  * A virtual clock that can be measured and waited upon.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_CLOCK_H
-#define INCLUDE_SORTIX_KERNEL_CLOCK_H
+#ifndef _INCLUDE_SORTIX_KERNEL_CLOCK_H
+#define _INCLUDE_SORTIX_KERNEL_CLOCK_H
 
 #include <sys/types.h>
 

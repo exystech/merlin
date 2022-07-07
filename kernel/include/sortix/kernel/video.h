@@ -17,8 +17,8 @@
  * Framework for Sortix video drivers.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_VIDEO_H
-#define INCLUDE_SORTIX_KERNEL_VIDEO_H
+#ifndef _INCLUDE_SORTIX_KERNEL_VIDEO_H
+#define _INCLUDE_SORTIX_KERNEL_VIDEO_H
 
 #include <sys/types.h>
 

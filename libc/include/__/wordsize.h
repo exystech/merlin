@@ -17,8 +17,8 @@
  * Native machine word size.
  */
 
-#ifndef INCLUDE____WORDSIZE_H
-#define INCLUDE____WORDSIZE_H
+#ifndef _INCLUDE____WORDSIZE_H
+#define _INCLUDE____WORDSIZE_H
 
 #if defined(__x86_64__)
 	#define __WORDSIZE 64

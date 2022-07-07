@@ -17,8 +17,8 @@
  * Internet socket interface.
  */
 
-#ifndef INCLUDE_NETINET_IN_H
-#define INCLUDE_NETINET_IN_H
+#ifndef _INCLUDE_NETINET_IN_H
+#define _INCLUDE_NETINET_IN_H
 
 #include <sys/cdefs.h>
 

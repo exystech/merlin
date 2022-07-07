@@ -17,8 +17,8 @@
  * Defines codes for every logical key on keyboards.
  */
 
-#ifndef INCLUDE_SYS_KEYCODES_H
-#define INCLUDE_SYS_KEYCODES_H
+#ifndef _INCLUDE_SYS_KEYCODES_H
+#define _INCLUDE_SYS_KEYCODES_H
 
 #include <sys/cdefs.h>
 

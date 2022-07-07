@@ -17,8 +17,8 @@
  * Deprecated interface to change the file access and moficiation times.
  */
 
-#ifndef INCLUDE_UTIME_H
-#define INCLUDE_UTIME_H
+#ifndef _INCLUDE_UTIME_H
+#define _INCLUDE_UTIME_H
 
 #include <sys/cdefs.h>
 

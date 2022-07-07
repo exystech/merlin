@@ -17,8 +17,8 @@
  * Psuedoterminals.
  */
 
-#ifndef INCLUDE_PTY_H
-#define INCLUDE_PTY_H
+#ifndef _INCLUDE_PTY_H
+#define _INCLUDE_PTY_H
 
 #include <sys/cdefs.h>
 

@@ -17,8 +17,8 @@
  * Resource limits and operations.
  */
 
-#ifndef INCLUDE_SYS_RESOURCE_H
-#define INCLUDE_SYS_RESOURCE_H
+#ifndef _INCLUDE_SYS_RESOURCE_H
+#define _INCLUDE_SYS_RESOURCE_H
 
 #include <sys/cdefs.h>
 

@@ -17,8 +17,8 @@
  * Constants related to mounting and binding.
  */
 
-#ifndef SORTIX_INCLUDE_MOUNT_H
-#define SORTIX_INCLUDE_MOUNT_H
+#ifndef _INCLUDE_SORTIX_MOUNT_H
+#define _INCLUDE_SORTIX_MOUNT_H
 
 #include <sys/cdefs.h>
 

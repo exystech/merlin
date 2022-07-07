@@ -17,8 +17,8 @@
  * Class to keep track of mount points.
  */
 
-#ifndef SORTIX_MTABLE_H
-#define SORTIX_MTABLE_H
+#ifndef _INCLUDE_SORTIX_KERNEL_MTABLE_H
+#define _INCLUDE_SORTIX_KERNEL_MTABLE_H
 
 #include <sys/types.h>
 

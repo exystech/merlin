@@ -17,8 +17,8 @@
  * Interface for waiting on file descriptor events.
  */
 
-#ifndef INCLUDE_SORTIX_POLL_H
-#define INCLUDE_SORTIX_POLL_H
+#ifndef _INCLUDE_SORTIX_POLL_H
+#define _INCLUDE_SORTIX_POLL_H
 
 #include <sys/cdefs.h>
 

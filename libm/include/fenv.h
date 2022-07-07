@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef INCLUDE_FENV_H
-#define INCLUDE_FENV_H
+#ifndef _INCLUDE_FENV_H
+#define _INCLUDE_FENV_H
 
 #include <sys/cdefs.h>
 
@@ -65,4 +65,4 @@ int fegetexcept(void);
 } /* extern "C" */
 #endif
 
-#endif /* ! INCLUDE_FENV_H */
+#endif /* ! _INCLUDE_FENV_H */

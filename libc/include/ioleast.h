@@ -20,8 +20,8 @@
  * buffer or write it all.
  */
 
-#ifndef INCLUDE_IOLEAST_H
-#define INCLUDE_IOLEAST_H
+#ifndef _INCLUDE_IOLEAST_H
+#define _INCLUDE_IOLEAST_H
 
 #include <sys/cdefs.h>
 

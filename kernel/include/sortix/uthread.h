@@ -17,8 +17,8 @@
  * Header for user-space thread structures.
  */
 
-#ifndef INCLUDE_SORTIX_UTHREAD_H
-#define INCLUDE_SORTIX_UTHREAD_H
+#ifndef _INCLUDE_SORTIX_UTHREAD_H
+#define _INCLUDE_SORTIX_UTHREAD_H
 
 #include <sys/cdefs.h>
 

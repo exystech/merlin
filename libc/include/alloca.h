@@ -17,8 +17,8 @@
  * Stack-based memory allocation.
  */
 
-#ifndef INCLUDE_ALLOCA_H
-#define INCLUDE_ALLOCA_H
+#ifndef _INCLUDE_ALLOCA_H
+#define _INCLUDE_ALLOCA_H
 
 #include <sys/cdefs.h>
 

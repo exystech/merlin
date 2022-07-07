@@ -17,8 +17,8 @@
  * Fixed size integer types.
  */
 
-#ifndef INCLUDE_INTTYPES_H
-#define INCLUDE_INTTYPES_H
+#ifndef _INCLUDE_INTTYPES_H
+#define _INCLUDE_INTTYPES_H
 
 #include <sys/cdefs.h>
 

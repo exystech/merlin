@@ -17,8 +17,8 @@
  * Declarations for the kernel time interfaces.
  */
 
-#ifndef INCLUDE_SORTIX_TIME_H
-#define INCLUDE_SORTIX_TIME_H
+#ifndef _INCLUDE_SORTIX_TIME_H
+#define _INCLUDE_SORTIX_TIME_H
 
 #include <sys/cdefs.h>
 

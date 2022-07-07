@@ -17,8 +17,8 @@
  * Declares stack_t and associated flags.
  */
 
-#ifndef INCLUDE_SORTIX_STACK_H
-#define INCLUDE_SORTIX_STACK_H
+#ifndef _INCLUDE_SORTIX_STACK_H
+#define _INCLUDE_SORTIX_STACK_H
 
 #include <sys/cdefs.h>
 

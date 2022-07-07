@@ -17,8 +17,8 @@
  * A file descriptor.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_DESCRIPTOR_H
-#define INCLUDE_SORTIX_KERNEL_DESCRIPTOR_H
+#ifndef _INCLUDE_SORTIX_KERNEL_DESCRIPTOR_H
+#define _INCLUDE_SORTIX_KERNEL_DESCRIPTOR_H
 
 #include <sys/types.h>
 

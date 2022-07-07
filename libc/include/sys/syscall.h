@@ -17,8 +17,8 @@
  * Functions and macros for declaring system call stubs.
  */
 
-#ifndef INCLUDE_SYS_SYSCALL_H
-#define INCLUDE_SYS_SYSCALL_H
+#ifndef _INCLUDE_SYS_SYSCALL_H
+#define _INCLUDE_SYS_SYSCALL_H
 
 #ifdef __is_sortix_libk
 #error "This file is part of user-space and should not be built into libk"

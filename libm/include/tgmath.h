@@ -27,8 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef INCLUDE_TGMATH_H
-#define INCLUDE_TGMATH_H
+#ifndef _INCLUDE_TGMATH_H
+#define _INCLUDE_TGMATH_H
 
 #include <sys/cdefs.h>
 

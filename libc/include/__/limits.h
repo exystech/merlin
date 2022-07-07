@@ -17,8 +17,8 @@
  * Implementation-defined constants.
  */
 
-#ifndef INCLUDE____LIMITS_H
-#define INCLUDE____LIMITS_H
+#ifndef _INCLUDE____LIMITS_H
+#define _INCLUDE____LIMITS_H
 
 /* char */
 #define __CHAR_BIT __CHAR_BIT__

@@ -17,8 +17,8 @@
  * Main sockets header.
  */
 
-#ifndef _SYS_SOCKET_H
-#define _SYS_SOCKET_H 1
+#ifndef _INCLUDE_SYS_SOCKET_H
+#define _INCLUDE_SYS_SOCKET_H
 
 #include <sys/cdefs.h>
 

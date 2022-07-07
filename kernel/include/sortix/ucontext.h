@@ -17,8 +17,8 @@
  * Declares ucontext_t and associated values.
  */
 
-#ifndef INCLUDE_SORTIX_UCONTEXT_H
-#define INCLUDE_SORTIX_UCONTEXT_H
+#ifndef _INCLUDE_SORTIX_UCONTEXT_H
+#define _INCLUDE_SORTIX_UCONTEXT_H
 
 #include <sys/cdefs.h>
 

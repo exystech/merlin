@@ -17,8 +17,8 @@
  * Process control interface.
  */
 
-#ifndef INCLUDE_PSCTL_H
-#define INCLUDE_PSCTL_H
+#ifndef _INCLUDE_PSCTL_H
+#define _INCLUDE_PSCTL_H
 
 #include <sys/cdefs.h>
 

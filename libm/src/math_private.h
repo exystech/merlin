@@ -173,7 +173,7 @@ do {								\
 } while (/*CONSTCOND*/0)
 #endif
 
-#ifdef	INCLUDE_COMPLEX_H
+#ifdef	_INCLUDE_COMPLEX_H
 
 /*
  * Quoting from ISO/IEC 9899:TC2:
@@ -202,7 +202,7 @@ typedef union {
 #define	REAL_PART(z)	((z).parts[0])
 #define	IMAG_PART(z)	((z).parts[1])
 
-#endif	/* _COMPLEX_H */
+#endif	/* _INCLUDE_COMPLEX_H */
 
 /* ieee style elementary functions */
 extern double __ieee754_sqrt(double);

@@ -17,8 +17,8 @@
  * Data types.
  */
 
-#ifndef INCLUDE_SORTIX_TYPES_H
-#define INCLUDE_SORTIX_TYPES_H
+#ifndef _INCLUDE_SORTIX_TYPES_H
+#define _INCLUDE_SORTIX_TYPES_H
 
 #include <sys/types.h>
 

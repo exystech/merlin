@@ -17,8 +17,8 @@
  * Asynchronous user-space thread interruption.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_SIGNAL_H
-#define INCLUDE_SORTIX_KERNEL_SIGNAL_H
+#ifndef _INCLUDE_SORTIX_KERNEL_SIGNAL_H
+#define _INCLUDE_SORTIX_KERNEL_SIGNAL_H
 
 #include <sortix/signal.h>
 #include <sortix/sigset.h>

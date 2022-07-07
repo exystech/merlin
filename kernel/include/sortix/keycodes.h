@@ -17,8 +17,8 @@
  * Defines codes for every logical key on keyboards.
  */
 
-#ifndef SORTIX_KEYCODES_H
-#define SORTIX_KEYCODES_H
+#ifndef _INCLUDE_SORTIX_KEYCODES_H
+#define _INCLUDE_SORTIX_KEYCODES_H
 
 /* Each of these keycodes corrospond to a logical key on a keyboard. Code
    reading logical keystrokes from the keyboard will receive a code from this

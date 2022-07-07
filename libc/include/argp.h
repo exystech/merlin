@@ -17,8 +17,8 @@
  * Argument parsing facility.
  */
 
-#ifndef INCLUDE_ARGP_H
-#define INCLUDE_ARGP_H
+#ifndef _INCLUDE_ARGP_H
+#define _INCLUDE_ARGP_H
 
 #include <sys/cdefs.h>
 

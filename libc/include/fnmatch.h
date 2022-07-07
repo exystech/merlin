@@ -17,8 +17,8 @@
  * Filename matching.
  */
 
-#ifndef INCLUDE_FNMATCH_H
-#define INCLUDE_FNMATCH_H
+#ifndef _INCLUDE_FNMATCH_H
+#define _INCLUDE_FNMATCH_H
 
 #include <sys/cdefs.h>
 

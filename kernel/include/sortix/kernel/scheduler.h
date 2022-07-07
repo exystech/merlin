@@ -17,8 +17,8 @@
  * Decides the order to execute threads in and switching between them.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_SCHEDULER_H
-#define INCLUDE_SORTIX_KERNEL_SCHEDULER_H
+#ifndef _INCLUDE_SORTIX_KERNEL_SCHEDULER_H
+#define _INCLUDE_SORTIX_KERNEL_SCHEDULER_H
 
 #include <sortix/kernel/decl.h>
 #include <sortix/kernel/registers.h>

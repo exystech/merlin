@@ -17,8 +17,8 @@
  * Utility functions for manipulation of struct timespec.
  */
 
-#ifndef INCLUDE_TIMESPEC_H
-#define INCLUDE_TIMESPEC_H
+#ifndef _INCLUDE_TIMESPEC_H
+#define _INCLUDE_TIMESPEC_H
 
 #include <sys/cdefs.h>
 

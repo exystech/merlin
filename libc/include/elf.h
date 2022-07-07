@@ -1,5 +1,5 @@
-#ifndef _ELF_H
-#define _ELF_H
+#ifndef _INCLUDE_ELF_H
+#define _INCLUDE_ELF_H
 
 #include <sys/cdefs.h>
 

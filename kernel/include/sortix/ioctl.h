@@ -17,8 +17,8 @@
  * Miscellaneous device control interface.
  */
 
-#ifndef INCLUDE_SORTIX_IOCTL_H
-#define INCLUDE_SORTIX_IOCTL_H
+#ifndef _INCLUDE_SORTIX_IOCTL_H
+#define _INCLUDE_SORTIX_IOCTL_H
 
 #define __IOCTL_TYPE_EXP 3 /* 2^3 kinds of argument types supported.*/
 #define __IOCTL_TYPE_MASK ((1 << __IOCTL_TYPE_EXP) - 1)

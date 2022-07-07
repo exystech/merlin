@@ -17,8 +17,8 @@
  * Declarations for waiting.
  */
 
-#ifndef INCLUDE_SYS_WAIT_H
-#define INCLUDE_SYS_WAIT_H 1
+#ifndef _INCLUDE_SYS_WAIT_H
+#define _INCLUDE_SYS_WAIT_H
 
 #include <sys/cdefs.h>
 

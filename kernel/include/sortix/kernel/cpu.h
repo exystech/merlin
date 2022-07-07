@@ -17,8 +17,8 @@
  * CPU-specific declarations.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_CPU_H
-#define INCLUDE_SORTIX_KERNEL_CPU_H
+#ifndef _INCLUDE_SORTIX_KERNEL_CPU_H
+#define _INCLUDE_SORTIX_KERNEL_CPU_H
 
 #include <stddef.h>
 #include <stdint.h>

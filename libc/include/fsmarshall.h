@@ -17,8 +17,8 @@
  * User-space filesystem API.
  */
 
-#ifndef INCLUDE_FSMARSHALL_H
-#define INCLUDE_FSMARSHALL_H
+#ifndef _INCLUDE_FSMARSHALL_H
+#define _INCLUDE_FSMARSHALL_H
 
 #include <sys/cdefs.h>
 

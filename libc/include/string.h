@@ -17,8 +17,8 @@
  * String operations.
  */
 
-#ifndef INCLUDE_STRING_H
-#define INCLUDE_STRING_H
+#ifndef _INCLUDE_STRING_H
+#define _INCLUDE_STRING_H
 
 #include <sys/cdefs.h>
 

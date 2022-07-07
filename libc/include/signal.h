@@ -17,8 +17,8 @@
  * Signal API.
  */
 
-#ifndef INCLUDE_SIGNAL_H
-#define INCLUDE_SIGNAL_H
+#ifndef _INCLUDE_SIGNAL_H
+#define _INCLUDE_SIGNAL_H
 
 #include <sys/cdefs.h>
 

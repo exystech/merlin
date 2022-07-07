@@ -17,8 +17,8 @@
  * Functions for handling PCI devices.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_PCI_MMIO_H
-#define INCLUDE_SORTIX_KERNEL_PCI_MMIO_H
+#ifndef _INCLUDE_SORTIX_KERNEL_PCI_MMIO_H
+#define _INCLUDE_SORTIX_KERNEL_PCI_MMIO_H
 
 #include <sortix/kernel/addralloc.h>
 #include <sortix/kernel/memorymanagement.h>

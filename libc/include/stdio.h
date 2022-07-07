@@ -17,8 +17,8 @@
  * Standard buffered input/output.
  */
 
-#ifndef INCLUDE_STDIO_H
-#define INCLUDE_STDIO_H
+#ifndef _INCLUDE_STDIO_H
+#define _INCLUDE_STDIO_H
 
 #include <sys/cdefs.h>
 

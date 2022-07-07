@@ -17,8 +17,8 @@
  * Language information constants.
  */
 
-#ifndef INCLUDE_LANGINFO_H
-#define INCLUDE_LANGINFO_H
+#ifndef _INCLUDE_LANGINFO_H
+#define _INCLUDE_LANGINFO_H
 
 #ifndef __locale_t_defined
 #define __locale_t_defined

@@ -17,8 +17,8 @@
  * Declares flags for sigprocmask.
  */
 
-#ifndef INCLUDE_SORTIX_SIGPROCMASK_H
-#define INCLUDE_SORTIX_SIGPROCMASK_H
+#ifndef _INCLUDE_SORTIX_SIGPROCMASK_H
+#define _INCLUDE_SORTIX_SIGPROCMASK_H
 
 #include <sys/cdefs.h>
 

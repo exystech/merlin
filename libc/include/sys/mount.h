@@ -17,8 +17,8 @@
  * Filesystem mount functionality.
  */
 
-#ifndef INCLUDE_SYS_MOUNT_H
-#define INCLUDE_SYS_MOUNT_H
+#ifndef _INCLUDE_SYS_MOUNT_H
+#define _INCLUDE_SYS_MOUNT_H
 
 #include <sys/cdefs.h>
 

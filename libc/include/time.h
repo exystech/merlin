@@ -17,8 +17,8 @@
  * Time declarations.
  */
 
-#ifndef INCLUDE_TIME_H
-#define INCLUDE_TIME_H
+#ifndef _INCLUDE_TIME_H
+#define _INCLUDE_TIME_H
 
 #include <sys/cdefs.h>
 

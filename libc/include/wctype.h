@@ -17,8 +17,8 @@
  * Wide-character classification and mapping utilities
  */
 
-#ifndef _WCTYPE_H
-#define _WCTYPE_H 1
+#ifndef _INCLUDE_WCTYPE_H
+#define _INCLUDE_WCTYPE_H
 
 #include <sys/cdefs.h>
 

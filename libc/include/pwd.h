@@ -17,8 +17,8 @@
  * User database.
  */
 
-#ifndef INCLUDE_PWD_H
-#define INCLUDE_PWD_H
+#ifndef _INCLUDE_PWD_H
+#define _INCLUDE_PWD_H
 
 #include <sys/cdefs.h>
 

@@ -17,8 +17,8 @@
  * Memory allocation internals.
  */
 
-#ifndef INCLUDE_MALLOC_H
-#define INCLUDE_MALLOC_H
+#ifndef _INCLUDE_MALLOC_H
+#define _INCLUDE_MALLOC_H
 
 #include <sys/cdefs.h>
 

@@ -17,8 +17,8 @@
  * Memory management declarations.
  */
 
-#ifndef SORTIX_MMAN_H
-#define SORTIX_MMAN_H
+#ifndef _INCLUDE_SORTIX_MMAN_H
+#define _INCLUDE_SORTIX_MMAN_H
 
 /* Note that not all combinations of the following may be possible on all
    architectures. However, you do get at least as much access as you request. */

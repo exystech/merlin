@@ -17,8 +17,8 @@
  * Provides a indexable text buffer for used by text mode terminals.
  */
 
-#ifndef SORTIX_TEXTBUFFER_H
-#define SORTIX_TEXTBUFFER_H
+#ifndef _INCLUDE_SORTIX_KERNEL_TEXTBUFFER_H
+#define _INCLUDE_SORTIX_KERNEL_TEXTBUFFER_H
 
 #include <sys/types.h>
 

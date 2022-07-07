@@ -17,8 +17,8 @@
  * Extensions to stdio.h introduced by Solaris and glibc.
  */
 
-#ifndef _STDIO_EXT_H
-#define _STDIO_EXT_H 1
+#ifndef _INCLUDE_STDIO_EXT_H
+#define _INCLUDE_STDIO_EXT_H
 
 #include <sys/cdefs.h>
 

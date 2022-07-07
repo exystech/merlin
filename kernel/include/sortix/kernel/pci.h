@@ -17,8 +17,8 @@
  * Functions for handling PCI devices.
  */
 
-#ifndef SORTIX_PCI_H
-#define SORTIX_PCI_H
+#ifndef _INCLUDE_SORTIX_KERNEL_PCI_H
+#define _INCLUDE_SORTIX_KERNEL_PCI_H
 
 #include <endian.h>
 #include <stdint.h>

@@ -17,8 +17,8 @@
  * Interface to using the cpuid instruction.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_CPUID_H
-#define INCLUDE_SORTIX_KERNEL_CPUID_H
+#ifndef _INCLUDE_SORTIX_KERNEL_CPUID_H
+#define _INCLUDE_SORTIX_KERNEL_CPUID_H
 
 #include <stdint.h>
 

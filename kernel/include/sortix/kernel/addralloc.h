@@ -17,8 +17,8 @@
  * Class to keep track of mount points.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_ADDRALLOC_H
-#define INCLUDE_SORTIX_KERNEL_ADDRALLOC_H
+#ifndef _INCLUDE_SORTIX_KERNEL_ADDRALLOC_H
+#define _INCLUDE_SORTIX_KERNEL_ADDRALLOC_H
 
 #include <stddef.h>
 

@@ -17,8 +17,8 @@
  * Defines values for termios.
  */
 
-#ifndef INCLUDE_SORTIX_WINSIZE_H
-#define INCLUDE_SORTIX_WINSIZE_H
+#ifndef _INCLUDE_SORTIX_WINSIZE_H
+#define _INCLUDE_SORTIX_WINSIZE_H
 
 #include <sys/cdefs.h>
 

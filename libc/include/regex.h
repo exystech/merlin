@@ -17,8 +17,8 @@
  * Regular expressions.
  */
 
-#ifndef _REGEX_H
-#define _REGEX_H
+#ifndef _INCLUDE_REGEX_H
+#define _INCLUDE_REGEX_H
 
 #include <sys/cdefs.h>
 

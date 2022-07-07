@@ -17,8 +17,8 @@
  * Termios types and constants.
  */
 
-#ifndef INCLUDE_SORTIX_TERMIOS_H
-#define INCLUDE_SORTIX_TERMIOS_H
+#ifndef _INCLUDE_SORTIX_TERMIOS_H
+#define _INCLUDE_SORTIX_TERMIOS_H
 
 #include <sys/cdefs.h>
 

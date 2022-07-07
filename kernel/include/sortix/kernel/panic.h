@@ -17,8 +17,8 @@
  * Displays an error whenever something critical happens.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_PANIC_H
-#define INCLUDE_SORTIX_KERNEL_PANIC_H
+#ifndef _INCLUDE_SORTIX_KERNEL_PANIC_H
+#define _INCLUDE_SORTIX_KERNEL_PANIC_H
 
 namespace Sortix {
 

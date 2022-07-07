@@ -17,8 +17,8 @@
  * Time types.
  */
 
-#ifndef _SYS_TIME_H
-#define _SYS_TIME_H 1
+#ifndef _INCLUDE_SYS_TIME_H
+#define _INCLUDE_SYS_TIME_H
 
 #include <sys/cdefs.h>
 

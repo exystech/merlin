@@ -17,8 +17,8 @@
  * Standard symbolic constants and types for Sortix.
  */
 
-#ifndef INC_SORTIX_VGA_H
-#define INC_SORTIX_VGA_H
+#ifndef _INCLUDE_SORTIX_VGA_H
+#define _INCLUDE_SORTIX_VGA_H
 
 #include <sys/cdefs.h>
 

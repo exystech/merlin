@@ -17,8 +17,8 @@
  * Wide character support.
  */
 
-#ifndef INCLUDE____WCHAR_H
-#define INCLUDE____WCHAR_H
+#ifndef _INCLUDE____WCHAR_H
+#define _INCLUDE____WCHAR_H
 
 #include <sys/cdefs.h>
 

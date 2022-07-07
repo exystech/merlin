@@ -5,8 +5,8 @@
  * Public domain.
  */
 
-#ifndef INCLUDE_IEEEFP_H
-#define INCLUDE_IEEEFP_H
+#ifndef _INCLUDE_IEEEFP_H
+#define _INCLUDE_IEEEFP_H
 
 #include <sys/cdefs.h>
 
@@ -67,4 +67,4 @@ fp_except_t fpresetsticky(fp_except_t);
 } /* extern "C" */
 #endif
 
-#endif /* INCLUDE_IEEEFP_H */
+#endif /* _INCLUDE_IEEEFP_H */

@@ -17,8 +17,8 @@
  * Flags and constants related to process and thread exiting.
  */
 
-#ifndef INCLUDE_SORTIX_EXIT_H
-#define INCLUDE_SORTIX_EXIT_H
+#ifndef _INCLUDE_SORTIX_EXIT_H
+#define _INCLUDE_SORTIX_EXIT_H
 
 #include <sys/cdefs.h>
 

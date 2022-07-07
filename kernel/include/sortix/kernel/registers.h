@@ -17,8 +17,8 @@
  * Register structures and platform-specific bits.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_REGISTERS_H
-#define INCLUDE_SORTIX_KERNEL_REGISTERS_H
+#ifndef _INCLUDE_SORTIX_KERNEL_REGISTERS_H
+#define _INCLUDE_SORTIX_KERNEL_REGISTERS_H
 
 #include <stddef.h>
 #include <stdint.h>

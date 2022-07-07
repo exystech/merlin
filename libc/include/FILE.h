@@ -17,8 +17,8 @@
  * The FILE structure from <stdio.h>
  */
 
-#ifndef INCLUDE_FILE_H
-#define INCLUDE_FILE_H
+#ifndef _INCLUDE_FILE_H
+#define _INCLUDE_FILE_H
 
 #include <sys/cdefs.h>
 

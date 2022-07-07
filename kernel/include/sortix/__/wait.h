@@ -17,8 +17,8 @@
  * Declarations for waiting for the events of children.
  */
 
-#ifndef INCLUDE_SORTIX____WAIT_H
-#define INCLUDE_SORTIX____WAIT_H
+#ifndef _INCLUDE_SORTIX____WAIT_H
+#define _INCLUDE_SORTIX____WAIT_H
 
 #include <sys/cdefs.h>
 

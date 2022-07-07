@@ -17,8 +17,8 @@
  * Binary data format describing the conversion of scancodes into codepoints.
  */
 
-#ifndef INCLUDE_SORTIX_KBLAYOUT_H
-#define INCLUDE_SORTIX_KBLAYOUT_H
+#ifndef _INCLUDE_SORTIX_KBLAYOUT_H
+#define _INCLUDE_SORTIX_KBLAYOUT_H
 
 #include <stdint.h>
 

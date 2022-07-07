@@ -17,8 +17,8 @@
  * Dynamic linking.
  */
 
-#ifndef _DLFCN_H
-#define _DLFCN_H 1
+#ifndef _INCLUDE_DLFCN_H
+#define _INCLUDE_DLFCN_H
 
 #include <sys/cdefs.h>
 

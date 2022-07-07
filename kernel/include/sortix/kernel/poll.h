@@ -17,8 +17,8 @@
  * Kernel declarations for event polling.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_POLL_H
-#define INCLUDE_SORTIX_KERNEL_POLL_H
+#ifndef _INCLUDE_SORTIX_KERNEL_POLL_H
+#define _INCLUDE_SORTIX_KERNEL_POLL_H
 
 #include <sortix/kernel/kthread.h>
 

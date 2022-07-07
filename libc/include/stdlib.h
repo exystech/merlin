@@ -17,8 +17,8 @@
  * Standard library definitions.
  */
 
-#ifndef _STDLIB_H
-#define _STDLIB_H 1
+#ifndef _INCLUDE_STDLIB_H
+#define _INCLUDE_STDLIB_H
 
 #include <sys/cdefs.h>
 

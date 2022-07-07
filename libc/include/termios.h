@@ -19,8 +19,8 @@
 
 /* TODO: POSIX-1.2008 compliance is only partial */
 
-#ifndef INCLUDE_TERMIOS_H
-#define INCLUDE_TERMIOS_H
+#ifndef _INCLUDE_TERMIOS_H
+#define _INCLUDE_TERMIOS_H
 
 #include <sys/cdefs.h>
 

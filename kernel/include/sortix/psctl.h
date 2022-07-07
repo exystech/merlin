@@ -17,8 +17,8 @@
  * Process control interface.
  */
 
-#ifndef INCLUDE_SORTIX_PSCTL_H
-#define INCLUDE_SORTIX_PSCTL_H
+#ifndef _INCLUDE_SORTIX_PSCTL_H
+#define _INCLUDE_SORTIX_PSCTL_H
 
 #include <sys/cdefs.h>
 

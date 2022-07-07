@@ -18,8 +18,8 @@
  */
 
 
-#ifndef _SYS_SELECT_H
-#define _SYS_SELECT_H 1
+#ifndef _INCLUDE_SYS_SELECT_H
+#define _INCLUDE_SYS_SELECT_H
 
 #include <sys/cdefs.h>
 

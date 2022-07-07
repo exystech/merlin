@@ -34,8 +34,8 @@
  * $From: sha2.h,v 1.1 2001/11/08 00:02:01 adg Exp adg $
  */
 
-#ifndef _SHA2_H
-#define _SHA2_H
+#ifndef _INCLUDE_SHA2_H
+#define _INCLUDE_SHA2_H
 
 #include <sys/cdefs.h>
 #include <sys/types.h>
@@ -128,4 +128,4 @@ char *SHA512_256Data(const uint8_t *, size_t, char *);
 } /* extern "C" */
 #endif
 
-#endif /* _SHA2_H */
+#endif /* _INCLUDE_SHA2_H */

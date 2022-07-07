@@ -17,8 +17,8 @@
  * Nodes in the virtual filesystem.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_VNODE_H
-#define INCLUDE_SORTIX_KERNEL_VNODE_H
+#ifndef _INCLUDE_SORTIX_KERNEL_VNODE_H
+#define _INCLUDE_SORTIX_KERNEL_VNODE_H
 
 #include <sys/types.h>
 

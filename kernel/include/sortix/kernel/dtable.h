@@ -17,8 +17,8 @@
  * Table of file descriptors.
  */
 
-#ifndef SORTIX_DTABLE_H
-#define SORTIX_DTABLE_H
+#ifndef _INCLUDE_SORTIX_KERNEL_DTABLE_H
+#define _INCLUDE_SORTIX_KERNEL_DTABLE_H
 
 #include <sortix/kernel/refcount.h>
 

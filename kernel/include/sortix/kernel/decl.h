@@ -18,8 +18,8 @@
  * standard headers or at least one with a less generic name than decl.h.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_DECL_H
-#define INCLUDE_SORTIX_KERNEL_DECL_H
+#ifndef _INCLUDE_SORTIX_KERNEL_DECL_H
+#define _INCLUDE_SORTIX_KERNEL_DECL_H
 
 #include <stdint.h>
 

@@ -17,8 +17,8 @@
  * Timer facility provided to user-space.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_USER_TIMER_H
-#define INCLUDE_SORTIX_KERNEL_USER_TIMER_H
+#ifndef _INCLUDE_SORTIX_KERNEL_USER_TIMER_H
+#define _INCLUDE_SORTIX_KERNEL_USER_TIMER_H
 
 #include <sys/types.h>
 

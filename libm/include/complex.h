@@ -5,8 +5,8 @@
  * Public domain.
  */
 
-#ifndef INCLUDE_COMPLEX_H
-#define INCLUDE_COMPLEX_H
+#ifndef _INCLUDE_COMPLEX_H
+#define _INCLUDE_COMPLEX_H
 
 #include <sys/cdefs.h>
 
@@ -123,4 +123,4 @@ long double creall(long double complex);
 } /* extern "C" */
 #endif
 
-#endif /* !INCLUDE_COMPLEX_H */
+#endif /* !_INCLUDE_COMPLEX_H */

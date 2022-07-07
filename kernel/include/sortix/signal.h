@@ -17,8 +17,8 @@
  * Defines the numeric values for the various supported signals.
  */
 
-#ifndef SORTIX_INCLUDE_SIGNAL_H
-#define SORTIX_INCLUDE_SIGNAL_H
+#ifndef _INCLUDE_SORTIX_SIGNAL_H
+#define _INCLUDE_SORTIX_SIGNAL_H
 
 #include <sys/cdefs.h>
 

@@ -17,8 +17,8 @@
  * getsockopt() and setsockopt() utility functions.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_SOCKOPT_H
-#define INCLUDE_SORTIX_KERNEL_SOCKOPT_H
+#ifndef _INCLUDE_SORTIX_KERNEL_SOCKOPT_H
+#define _INCLUDE_SORTIX_KERNEL_SOCKOPT_H
 
 #include <stddef.h>
 #include <stdint.h>

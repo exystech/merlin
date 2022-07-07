@@ -17,8 +17,8 @@
  * File control options.
  */
 
-#ifndef INCLUDE_FCNTL_H
-#define INCLUDE_FCNTL_H
+#ifndef _INCLUDE_FCNTL_H
+#define _INCLUDE_FCNTL_H
 
 #include <sys/cdefs.h>
 

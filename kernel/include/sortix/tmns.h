@@ -17,8 +17,8 @@
  * Declarations for the kernel time interfaces.
  */
 
-#ifndef INCLUDE_SORTIX_TMNS_H
-#define INCLUDE_SORTIX_TMNS_H
+#ifndef _INCLUDE_SORTIX_TMNS_H
+#define _INCLUDE_SORTIX_TMNS_H
 
 #include <sys/cdefs.h>
 

@@ -17,8 +17,8 @@
  * Convert byte ordering of integers.
  */
 
-#ifndef _ENDIAN_H
-#define _ENDIAN_H 1
+#ifndef _INCLUDE_ENDIAN_H
+#define _INCLUDE_ENDIAN_H
 
 #include <sys/cdefs.h>
 

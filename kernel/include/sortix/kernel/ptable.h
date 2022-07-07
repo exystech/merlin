@@ -17,8 +17,8 @@
  * Process table.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEl_PTABLE_H
-#define INCLUDE_SORTIX_KERNEl_PTABLE_H
+#ifndef _INCLUDE_SORTIX_KERNEL_PTABLE_H
+#define _INCLUDE_SORTIX_KERNEL_PTABLE_H
 
 #include <sys/types.h>
 

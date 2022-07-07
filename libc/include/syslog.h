@@ -17,8 +17,8 @@
  * System error logging facility.
  */
 
-#ifndef INCLUDE_SYSLOG_H
-#define INCLUDE_SYSLOG_H
+#ifndef _INCLUDE_SYSLOG_H
+#define _INCLUDE_SYSLOG_H
 
 #include <sys/cdefs.h>
 

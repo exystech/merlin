@@ -17,8 +17,8 @@
  * Input/output multiplexing.
  */
 
-#ifndef _POLL_H
-#define _POLL_H 1
+#ifndef _INCLUDE_POLL_H
+#define _INCLUDE_POLL_H
 
 #include <sys/cdefs.h>
 

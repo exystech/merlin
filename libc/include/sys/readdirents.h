@@ -17,8 +17,8 @@
  * Allows reading directory entries directly from a file descriptor.
  */
 
-#ifndef _SYS_READDIRENTS_H
-#define _SYS_READDIRENTS_H 1
+#ifndef _INCLUDE_SYS_READDIRENTS_H
+#define _INCLUDE_SYS_READDIRENTS_H
 
 #include <sys/cdefs.h>
 

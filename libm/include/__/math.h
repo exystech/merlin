@@ -23,8 +23,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef INCLUDE____MATH_H
-#define INCLUDE____MATH_H
+#ifndef _INCLUDE____MATH_H
+#define _INCLUDE____MATH_H
 
 #include <sys/cdefs.h>
 

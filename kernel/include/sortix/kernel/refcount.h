@@ -17,8 +17,8 @@
  * A class that implements reference counting.
  */
 
-#ifndef SORTIX_REFCOUNT_H
-#define SORTIX_REFCOUNT_H
+#ifndef _INCLUDE_SORTIX_KERNEL_REFCOUNT_H
+#define _INCLUDE_SORTIX_KERNEL_REFCOUNT_H
 
 #include <sortix/kernel/kthread.h>
 

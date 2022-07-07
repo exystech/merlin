@@ -17,8 +17,8 @@
  * The DIR structure from <dirent.h>
  */
 
-#ifndef INCLUDE_DIR_H
-#define INCLUDE_DIR_H
+#ifndef _INCLUDE_DIR_H
+#define _INCLUDE_DIR_H
 
 #include <sys/cdefs.h>
 

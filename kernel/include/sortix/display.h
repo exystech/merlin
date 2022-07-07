@@ -17,8 +17,8 @@
  * Display message declarations.
  */
 
-#ifndef SORTIX_INCLUDE_DISPLAY_H
-#define SORTIX_INCLUDE_DISPLAY_H
+#ifndef _INCLUDE_SORTIX_DISPLAY_H
+#define _INCLUDE_SORTIX_DISPLAY_H
 
 #include <sys/cdefs.h>
 

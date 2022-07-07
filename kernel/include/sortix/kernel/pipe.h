@@ -17,8 +17,8 @@
  * Embeddedable one-way data stream.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_PIPE_H
-#define INCLUDE_SORTIX_KERNEL_PIPE_H
+#ifndef _INCLUDE_SORTIX_KERNEL_PIPE_H
+#define _INCLUDE_SORTIX_KERNEL_PIPE_H
 
 #include <sys/types.h>
 

@@ -17,8 +17,8 @@
  * Macros expanding to the name of the operating system and distribution.
  */
 
-#ifndef INCLUDE_BRAND_H
-#define INCLUDE_BRAND_H
+#ifndef _INCLUDE_BRAND_H
+#define _INCLUDE_BRAND_H
 
 /*
  * The name 'Sortix' and the Sortix Logo are reserved for use by the official

@@ -17,8 +17,8 @@
  * Kernel worker thread.
  */
 
-#ifndef SORTIX_WORKER_H
-#define SORTIX_WORKER_H
+#ifndef _INCLUDE_SORTIX_KERNEL_WORKER_H
+#define _INCLUDE_SORTIX_KERNEL_WORKER_H
 
 #include <stddef.h>
 

@@ -17,8 +17,8 @@
  * Standalone C library hooks.
  */
 
-#ifndef INCLUDE_LIBK_H
-#define INCLUDE_LIBK_H
+#ifndef _INCLUDE_LIBK_H
+#define _INCLUDE_LIBK_H
 
 #include <sys/cdefs.h>
 #include <sys/types.h>

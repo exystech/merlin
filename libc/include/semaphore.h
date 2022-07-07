@@ -17,8 +17,8 @@
  * Semaphore API.
  */
 
-#ifndef INCLUDE_SEMAPHORE_H
-#define INCLUDE_SEMAPHORE_H
+#ifndef _INCLUDE_SEMAPHORE_H
+#define _INCLUDE_SEMAPHORE_H
 
 #include <sys/cdefs.h>
 

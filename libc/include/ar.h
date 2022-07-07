@@ -17,8 +17,8 @@
  * Header describing the `ar' archive file format.
  */
 
-#ifndef INCLUDE_AR_H
-#define INCLUDE_AR_H
+#ifndef _INCLUDE_AR_H
+#define _INCLUDE_AR_H
 
 #include <sys/cdefs.h>
 

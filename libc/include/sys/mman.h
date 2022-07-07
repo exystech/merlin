@@ -17,8 +17,8 @@
  * Memory management declarations.
  */
 
-#ifndef INCLUDE_SYS_MMAN_H
-#define INCLUDE_SYS_MMAN_H
+#ifndef _INCLUDE_SYS_MMAN_H
+#define _INCLUDE_SYS_MMAN_H
 
 #include <sys/cdefs.h>
 

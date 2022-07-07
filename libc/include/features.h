@@ -17,8 +17,8 @@
  * Detects the appropriate standard that this translation unit uses.
  */
 
-#ifndef INCLUDE_FEATURES_H
-#define INCLUDE_FEATURES_H
+#ifndef _INCLUDE_FEATURES_H
+#define _INCLUDE_FEATURES_H
 
 #define __sortix_libc__ 1
 

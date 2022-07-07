@@ -17,8 +17,8 @@
  * Defines the symbolic constants for use in mode_t.
  */
 
-#ifndef INCLUDE_SORTIX_MODE_H
-#define INCLUDE_SORTIX_MODE_H
+#ifndef _INCLUDE_SORTIX_MODE_H
+#define _INCLUDE_SORTIX_MODE_H
 
 #include <sys/cdefs.h>
 

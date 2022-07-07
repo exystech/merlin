@@ -17,8 +17,8 @@
  * Functions that allow modification of virtual memory.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_MEMORYMANAGEMENT_H
-#define INCLUDE_SORTIX_KERNEL_MEMORYMANAGEMENT_H
+#ifndef _INCLUDE_SORTIX_KERNEL_MEMORYMANAGEMENT_H
+#define _INCLUDE_SORTIX_KERNEL_MEMORYMANAGEMENT_H
 
 #include <stddef.h>
 #include <stdint.h>

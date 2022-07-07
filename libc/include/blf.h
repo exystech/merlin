@@ -31,8 +31,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _BLF_H_
-#define _BLF_H_
+#ifndef _INCLUDE_BLF_H
+#define _INCLUDE_BLF_H
 
 #include <sys/cdefs.h>
 

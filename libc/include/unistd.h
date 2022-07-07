@@ -17,8 +17,8 @@
  * Standard symbolic constants and types.
  */
 
-#ifndef INCLUDE_UNISTD_H
-#define INCLUDE_UNISTD_H
+#ifndef _INCLUDE_UNISTD_H
+#define _INCLUDE_UNISTD_H
 
 #include <sys/cdefs.h>
 

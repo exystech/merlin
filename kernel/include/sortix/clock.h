@@ -17,8 +17,8 @@
  * Supported logical clock devices.
  */
 
-#ifndef INCLUDE_SORTIX_CLOCK_H
-#define INCLUDE_SORTIX_CLOCK_H
+#ifndef _INCLUDE_SORTIX_CLOCK_H
+#define _INCLUDE_SORTIX_CLOCK_H
 
 #include <sys/cdefs.h>
 

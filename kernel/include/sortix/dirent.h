@@ -17,8 +17,8 @@
  * Format of directory entries.
  */
 
-#ifndef INCLUDE_SORTIX_DIRENT_H
-#define INCLUDE_SORTIX_DIRENT_H
+#ifndef _INCLUDE_SORTIX_DIRENT_H
+#define _INCLUDE_SORTIX_DIRENT_H
 
 #include <sys/cdefs.h>
 

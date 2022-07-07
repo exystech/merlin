@@ -17,8 +17,8 @@
  * Thread API.
  */
 
-#ifndef INCLUDE_PTHREAD_H
-#define INCLUDE_PTHREAD_H
+#ifndef _INCLUDE_PTHREAD_H
+#define _INCLUDE_PTHREAD_H
 
 #include <sys/cdefs.h>
 

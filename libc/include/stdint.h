@@ -17,8 +17,8 @@
  * Integer types.
  */
 
-#ifndef INCLUDE_STDINT_H
-#define INCLUDE_STDINT_H
+#ifndef _INCLUDE_STDINT_H
+#define _INCLUDE_STDINT_H
 
 #include <sys/cdefs.h>
 

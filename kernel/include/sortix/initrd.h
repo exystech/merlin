@@ -17,8 +17,8 @@
  * The Sortix init ramdisk filesystem format.
  */
 
-#ifndef INCLUDE_SORTIX_INITRD_H
-#define INCLUDE_SORTIX_INITRD_H
+#ifndef _INCLUDE_SORTIX_INITRD_H
+#define _INCLUDE_SORTIX_INITRD_H
 
 #include <stdint.h>
 

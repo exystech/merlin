@@ -17,8 +17,8 @@
  * Retrieving the current time.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_TIME_H
-#define INCLUDE_SORTIX_KERNEL_TIME_H
+#ifndef _INCLUDE_SORTIX_KERNEL_TIME_H
+#define _INCLUDE_SORTIX_KERNEL_TIME_H
 
 #include <sys/cdefs.h>
 #include <sys/types.h>

@@ -18,8 +18,8 @@
  * accessed. It also provides binary search.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_SORTEDLIST_H
-#define INCLUDE_SORTIX_KERNEL_SORTEDLIST_H
+#ifndef _INCLUDE_SORTIX_KERNEL_SORTEDLIST_H
+#define _INCLUDE_SORTIX_KERNEL_SORTEDLIST_H
 
 #include <assert.h>
 #include <stddef.h>

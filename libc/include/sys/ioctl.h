@@ -17,8 +17,8 @@
  * Miscellaneous device control interface.
  */
 
-#ifndef INCLUDE_SYS_IOCTL_H
-#define INCLUDE_SYS_IOCTL_H
+#ifndef _INCLUDE_SYS_IOCTL_H
+#define _INCLUDE_SYS_IOCTL_H
 
 #include <sys/cdefs.h>
 

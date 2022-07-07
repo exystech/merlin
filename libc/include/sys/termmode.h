@@ -17,8 +17,8 @@
  * Provides access to the various modes Sortix terminals can operate in.
  */
 
-#ifndef INCLUDE_SYS_TERMMODE_H
-#define INCLUDE_SYS_TERMMODE_H
+#ifndef _INCLUDE_SYS_TERMMODE_H
+#define _INCLUDE_SYS_TERMMODE_H
 
 #include <sys/cdefs.h>
 

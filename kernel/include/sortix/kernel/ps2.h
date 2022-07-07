@@ -17,8 +17,8 @@
  * Various interfaces for keyboard devices and layouts.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_PS2_H
-#define INCLUDE_SORTIX_KERNEL_PS2_H
+#ifndef _INCLUDE_SORTIX_KERNEL_PS2_H
+#define _INCLUDE_SORTIX_KERNEL_PS2_H
 
 #include <stdint.h>
 

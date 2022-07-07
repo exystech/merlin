@@ -18,8 +18,8 @@
  * modifying machine specific registers.
  */
 
-#ifndef INCLUDE_MSR_H
-#define INCLUDE_MSR_H
+#ifndef _INCLUDE_MSR_H
+#define _INCLUDE_MSR_H
 
 #include <sys/cdefs.h>
 

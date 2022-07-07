@@ -17,8 +17,8 @@
  * Emergency process shutdown.
  */
 
-#ifndef _SCRAM_H
-#define _SCRAM_H
+#ifndef _INCLUDE_SCRAM_H
+#define _INCLUDE_SCRAM_H
 
 #include <sys/cdefs.h>
 

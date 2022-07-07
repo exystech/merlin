@@ -17,8 +17,8 @@
  * Interfaces and utility classes for implementing inodes.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_INODE_H
-#define INCLUDE_SORTIX_KERNEL_INODE_H
+#ifndef _INCLUDE_SORTIX_KERNEL_INODE_H
+#define _INCLUDE_SORTIX_KERNEL_INODE_H
 
 #include <sys/types.h>
 

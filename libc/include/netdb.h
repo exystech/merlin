@@ -17,8 +17,8 @@
  * Definitions for network database operations.
  */
 
-#ifndef _NETDB_H
-#define _NETDB_H 1
+#ifndef _INCLUDE_NETDB_H
+#define _INCLUDE_NETDB_H
 
 #include <sys/cdefs.h>
 

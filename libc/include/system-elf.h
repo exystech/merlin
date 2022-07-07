@@ -17,8 +17,8 @@
  * Executable and Linkable Format for the local system.
  */
 
-#ifndef INCLUDE_SYSTEM_ELF_H
-#define INCLUDE_SYSTEM_ELF_H
+#ifndef _INCLUDE_SYSTEM_ELF_H
+#define _INCLUDE_SYSTEM_ELF_H
 
 #include <sys/cdefs.h>
 

@@ -17,8 +17,8 @@
  * The context for io operations: who made it, how should data be copied, etc.
  */
 
-#ifndef SORTIX_COPY_H
-#define SORTIX_COPY_H
+#ifndef _INCLUDE_SORTIX_KERNEL_COPY_H
+#define _INCLUDE_SORTIX_KERNEL_COPY_H
 
 #include <stddef.h>
 

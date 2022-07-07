@@ -17,8 +17,8 @@
  * Useful functions for manipulating strings that don't belong in libc.
  */
 
-#ifndef SORTIX_STRING_H
-#define SORTIX_STRING_H
+#ifndef _INCLUDE_SORTIX_KERNEL_STRING_H
+#define _INCLUDE_SORTIX_KERNEL_STRING_H
 
 #include <stddef.h>
 

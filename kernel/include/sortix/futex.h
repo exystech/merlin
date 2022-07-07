@@ -17,8 +17,8 @@
  * Fast userspace mutexes.
  */
 
-#ifndef INCLUDE_SORTIX_FUTEX_H
-#define INCLUDE_SORTIX_FUTEX_H
+#ifndef _INCLUDE_SORTIX_FUTEX_H
+#define _INCLUDE_SORTIX_FUTEX_H
 
 #include <sys/cdefs.h>
 

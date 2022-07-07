@@ -17,8 +17,8 @@
  * Structure representing a segment in a process.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_SEGMENT_H
-#define INCLUDE_SORTIX_KERNEL_SEGMENT_H
+#ifndef _INCLUDE_SORTIX_KERNEL_SEGMENT_H
+#define _INCLUDE_SORTIX_KERNEL_SEGMENT_H
 
 #include <stddef.h>
 #include <stdint.h>

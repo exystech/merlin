@@ -17,8 +17,8 @@
  * Error reporting functions.
  */
 
-#ifndef INCLUDE_ERROR_H
-#define INCLUDE_ERROR_H
+#ifndef _INCLUDE_ERROR_H
+#define _INCLUDE_ERROR_H
 
 #include <sys/cdefs.h>
 

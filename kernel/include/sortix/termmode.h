@@ -17,8 +17,8 @@
  * Defines constants for various terminal modes.
  */
 
-#ifndef SORTIX_TERMMODE_H
-#define SORTIX_TERMMODE_H
+#ifndef _INCLUDE_SORTIX_TERMMODE_H
+#define _INCLUDE_SORTIX_TERMMODE_H
 
 #define TERMMODE_KBKEY (1U << 0) /* ISORTIX_ENABLE_KBKEY */
 #define TERMMODE_UNICODE (1U << 1) /* !ISORTIX_DISABLE_CHARS */

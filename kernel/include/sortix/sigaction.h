@@ -17,8 +17,8 @@
  * Declares struct sigaction and associated flags.
  */
 
-#ifndef INCLUDE_SORTIX_SIGACTION_H
-#define INCLUDE_SORTIX_SIGACTION_H
+#ifndef _INCLUDE_SORTIX_SIGACTION_H
+#define _INCLUDE_SORTIX_SIGACTION_H
 
 #include <sys/cdefs.h>
 

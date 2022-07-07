@@ -17,8 +17,8 @@
  * Data returned by the stat() function.
  */
 
-#ifndef INCLUDE_SYS_STAT_H
-#define INCLUDE_SYS_STAT_H
+#ifndef _INCLUDE_SYS_STAT_H
+#define _INCLUDE_SYS_STAT_H
 
 #include <sys/cdefs.h>
 

@@ -17,8 +17,8 @@
  * Group database.
  */
 
-#ifndef INCLUDE_GRP_H
-#define INCLUDE_GRP_H
+#ifndef _INCLUDE_GRP_H
+#define _INCLUDE_GRP_H
 
 #include <sys/cdefs.h>
 

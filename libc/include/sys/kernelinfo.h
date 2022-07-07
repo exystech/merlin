@@ -17,8 +17,8 @@
  * Queries information about the kernel.
  */
 
-#ifndef _SYS_KERNELINFO_H
-#define _SYS_KERNELINFO_H 1
+#ifndef _INCLUDE_SYS_KERNELINFO_H
+#define _INCLUDE_SYS_KERNELINFO_H
 
 #include <sys/cdefs.h>
 

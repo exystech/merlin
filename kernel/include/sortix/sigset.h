@@ -17,8 +17,8 @@
  * Declaration of the sigset_t structure.
  */
 
-#ifndef INCLUDE_SORTIX_SIGSET_H
-#define INCLUDE_SORTIX_SIGSET_H
+#ifndef _INCLUDE_SORTIX_SIGSET_H
+#define _INCLUDE_SORTIX_SIGSET_H
 
 #include <sys/cdefs.h>
 

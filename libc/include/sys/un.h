@@ -17,8 +17,8 @@
  * Unix domain socket definitions.
  */
 
-#ifndef _SYS_UN_H
-#define _SYS_UN_H 1
+#ifndef _INCLUDE_SYS_UN_H
+#define _INCLUDE_SYS_UN_H
 
 #include <sys/cdefs.h>
 

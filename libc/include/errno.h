@@ -17,8 +17,8 @@
  * System error numbers.
  */
 
-#ifndef INCLUDE_ERRNO_H
-#define INCLUDE_ERRNO_H
+#ifndef _INCLUDE_ERRNO_H
+#define _INCLUDE_ERRNO_H
 
 #include <sys/cdefs.h>
 

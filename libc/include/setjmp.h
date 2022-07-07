@@ -17,8 +17,8 @@
  * Stack environment declarations.
  */
 
-#ifndef _SETJMP_H
-#define _SETJMP_H 1
+#ifndef _INCLUDE_SETJMP_H
+#define _INCLUDE_SETJMP_H
 
 #include <sys/cdefs.h>
 

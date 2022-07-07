@@ -17,8 +17,8 @@
  * Virtual filesystem information structure.
  */
 
-#ifndef INCLUDE_SORTIX_STATVFS_H
-#define INCLUDE_SORTIX_STATVFS_H
+#ifndef _INCLUDE_SORTIX_STATVFS_H
+#define _INCLUDE_SORTIX_STATVFS_H
 
 #include <sys/cdefs.h>
 

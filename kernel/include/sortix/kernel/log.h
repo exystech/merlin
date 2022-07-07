@@ -17,8 +17,8 @@
  * A system for logging various messages to the kernel log.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_LOG_H
-#define INCLUDE_SORTIX_KERNEL_LOG_H
+#ifndef _INCLUDE_SORTIX_KERNEL_LOG_H
+#define _INCLUDE_SORTIX_KERNEL_LOG_H
 
 #include <stdarg.h>
 #include <stddef.h>

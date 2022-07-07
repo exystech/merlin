@@ -17,8 +17,8 @@
  * Vector IO operations.
  */
 
-#ifndef INCLUDE_SORTIX_UIO_H
-#define INCLUDE_SORTIX_UIO_H
+#ifndef _INCLUDE_SORTIX_UIO_H
+#define _INCLUDE_SORTIX_UIO_H
 
 #include <sys/cdefs.h>
 

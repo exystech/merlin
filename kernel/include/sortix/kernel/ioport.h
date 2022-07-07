@@ -17,8 +17,8 @@
  * IO ports.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_IOPORT_H
-#define INCLUDE_SORTIX_KERNEL_IOPORT_H
+#ifndef _INCLUDE_SORTIX_KERNEL_IOPORT_H
+#define _INCLUDE_SORTIX_KERNEL_IOPORT_H
 
 #if !(defined(__i386__) || defined(__x86_64__))
 #error "This hardware platform doesn't have IO ports"

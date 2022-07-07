@@ -17,8 +17,8 @@
  * tar archieve format.
  */
 
-#ifndef INCLUDE_SORTIX_TAR_H
-#define INCLUDE_SORTIX_TAR_H
+#ifndef _INCLUDE_SORTIX_TAR_H
+#define _INCLUDE_SORTIX_TAR_H
 
 struct tar
 {

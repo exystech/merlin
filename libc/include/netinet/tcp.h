@@ -17,8 +17,8 @@
  * Definitions for the Internet Transmission Control Protocol.
  */
 
-#ifndef INCLUDE_NETINET_TCP_H
-#define INCLUDE_NETINET_TCP_H
+#ifndef _INCLUDE_NETINET_TCP_H
+#define _INCLUDE_NETINET_TCP_H
 
 #include <sys/cdefs.h>
 

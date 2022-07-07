@@ -17,8 +17,8 @@
  * Standard symbolic constants and types for Sortix.
  */
 
-#ifndef SORTIX_UNISTD_H
-#define SORTIX_UNISTD_H
+#ifndef _INCLUDE_SORTIX_UNISTD_H
+#define _INCLUDE_SORTIX_UNISTD_H
 
 #include <sys/cdefs.h>
 

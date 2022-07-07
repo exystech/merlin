@@ -17,8 +17,8 @@
  * Convert byte ordering of integers.
  */
 
-#ifndef INCLUDE____BYTESWAP_H
-#define INCLUDE____BYTESWAP_H
+#ifndef _INCLUDE____BYTESWAP_H
+#define _INCLUDE____BYTESWAP_H
 
 #include <sys/cdefs.h>
 

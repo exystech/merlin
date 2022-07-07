@@ -17,8 +17,8 @@
  * Various interfaces for keyboard devices and layouts.
  */
 
-#ifndef SORTIX_KEYBOARD_H
-#define SORTIX_KEYBOARD_H
+#ifndef _INCLUDE_SORTIX_KERNEL_KEYBOARD_H
+#define _INCLUDE_SORTIX_KERNEL_KEYBOARD_H
 
 #include <stddef.h>
 #include <stdint.h>

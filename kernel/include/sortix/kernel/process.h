@@ -17,8 +17,8 @@
  * A named collection of threads.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_PROCESS_H
-#define INCLUDE_SORTIX_KERNEL_PROCESS_H
+#ifndef _INCLUDE_SORTIX_KERNEL_PROCESS_H
+#define _INCLUDE_SORTIX_KERNEL_PROCESS_H
 
 #include <sortix/fork.h>
 #include <sortix/resource.h>

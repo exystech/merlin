@@ -17,8 +17,8 @@
  * Declarations for socket types and other flags.
  */
 
-#ifndef SORTIX_INCLUDE_SOCKET_H
-#define SORTIX_INCLUDE_SOCKET_H
+#ifndef _INCLUDE_SORTIX_SOCKET_H
+#define _INCLUDE_SORTIX_SOCKET_H
 
 #include <sys/cdefs.h>
 

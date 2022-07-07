@@ -17,8 +17,8 @@
  * Filesystem table.
  */
 
-#ifndef INCLUDE_FSTAB_H
-#define INCLUDE_FSTAB_H
+#ifndef _INCLUDE_FSTAB_H
+#define _INCLUDE_FSTAB_H
 
 #include <sys/cdefs.h>
 

@@ -17,8 +17,8 @@
  * Filesystem related utility functions.
  */
 
-#ifndef SORTIX_FSFUNC_H
-#define SORTIX_FSFUNC_H
+#ifndef _INCLUDE_SORTIX_KERNEL_FSFUNC_H
+#define _INCLUDE_SORTIX_KERNEL_FSFUNC_H
 
 #include <sys/types.h>
 

@@ -17,8 +17,8 @@
  * Defines the SEEK_CUR, SEEK_SET, and SEEK_END values.
  */
 
-#ifndef SORTIX_SEEK_H
-#define SORTIX_SEEK_H
+#ifndef _INCLUDE_SORTIX_SEEK_H
+#define _INCLUDE_SORTIX_SEEK_H
 
 #include <sys/cdefs.h>
 

@@ -18,8 +18,8 @@
  * either been obsoleted or merged into string.h.
  */
 
-#ifndef INCLUDE_STRINGS_H
-#define INCLUDE_STRINGS_H
+#ifndef _INCLUDE_STRINGS_H
+#define _INCLUDE_STRINGS_H
 
 /* Simply include the standard header that will provide the functions. */
 #include <string.h>

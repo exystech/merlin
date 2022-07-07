@@ -17,8 +17,8 @@
  * Harddisk interface.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_HARDDISK_H
-#define INCLUDE_SORTIX_KERNEL_HARDDISK_H
+#ifndef _INCLUDE_SORTIX_KERNEL_HARDDISK_H
+#define _INCLUDE_SORTIX_KERNEL_HARDDISK_H
 
 #include <sys/types.h>
 

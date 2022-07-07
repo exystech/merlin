@@ -17,8 +17,8 @@
  * System name structure.
  */
 
-#ifndef INCLUDE_SYS_UTSNAME_H
-#define INCLUDE_SYS_UTSNAME_H
+#ifndef _INCLUDE_SYS_UTSNAME_H
+#define _INCLUDE_SYS_UTSNAME_H
 
 #include <sys/cdefs.h>
 

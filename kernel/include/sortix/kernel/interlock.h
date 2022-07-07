@@ -17,8 +17,8 @@
  * Functions that perform non-atomic operations in an atomic manner.
  */
 
-#ifndef SORTIX_INTERLOCK_H
-#define SORTIX_INTERLOCK_H
+#ifndef _INCLUDE_SORTIX_KERNEL_INTERLOCK_H
+#define _INCLUDE_SORTIX_KERNEL_INTERLOCK_H
 
 namespace Sortix {
 

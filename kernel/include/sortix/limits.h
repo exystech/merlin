@@ -17,8 +17,8 @@
  * System limits.
  */
 
-#ifndef INCLUDE_SORTIX_LIMITS_H
-#define INCLUDE_SORTIX_LIMITS_H
+#ifndef _INCLUDE_SORTIX_LIMITS_H
+#define _INCLUDE_SORTIX_LIMITS_H
 
 #include <sys/cdefs.h>
 

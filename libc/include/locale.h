@@ -17,8 +17,8 @@
  * Category macros.
  */
 
-#ifndef _LOCALE_H
-#define _LOCALE_H 1
+#ifndef _INCLUDE_LOCALE_H
+#define _INCLUDE_LOCALE_H
 
 #include <sys/cdefs.h>
 

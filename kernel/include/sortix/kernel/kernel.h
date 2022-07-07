@@ -17,8 +17,8 @@
  * Base header for the Sortix kernel that includes common stuff.
  */
 
-#ifndef SORTIX_KERNEL_H
-#define SORTIX_KERNEL_H
+#ifndef _INCLUDE_SORTIX_KERNEL_KERNEL_H
+#define _INCLUDE_SORTIX_KERNEL_KERNEL_H
 
 #include <sortix/kernel/decl.h>
 #include <sortix/kernel/log.h>

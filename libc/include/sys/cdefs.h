@@ -17,8 +17,8 @@
  * Declares internal macros for the C programming language.
  */
 
-#ifndef INCLUDE_SYS_CDEFS_H
-#define INCLUDE_SYS_CDEFS_H
+#ifndef _INCLUDE_SYS_CDEFS_H
+#define _INCLUDE_SYS_CDEFS_H
 
 #include <features.h>
 

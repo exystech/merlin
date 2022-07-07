@@ -17,8 +17,8 @@
  * High level interrupt services.
  */
 
-#ifndef INCLUDE_SORTIX_KERNEL_INTERRUPT_H
-#define INCLUDE_SORTIX_KERNEL_INTERRUPT_H
+#ifndef _INCLUDE_SORTIX_KERNEL_INTERRUPT_H
+#define _INCLUDE_SORTIX_KERNEL_INTERRUPT_H
 
 #include <stddef.h>
 

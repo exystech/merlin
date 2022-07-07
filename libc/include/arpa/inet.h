@@ -17,8 +17,8 @@
  * Definitions for internet operations.
  */
 
-#ifndef INCLUDE_ARPA_INET_H
-#define INCLUDE_ARPA_INET_H
+#ifndef _INCLUDE_ARPA_INET_H
+#define _INCLUDE_ARPA_INET_H
 
 #include <sys/cdefs.h>
 
