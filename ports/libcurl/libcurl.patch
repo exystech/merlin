@@ -1,9 +1,9 @@
 diff -Paur --no-dereference -- libcurl.upstream/configure libcurl/configure
 --- libcurl.upstream/configure
 +++ libcurl/configure
-@@ -20065,9 +20065,7 @@
- fi
+@@ -22313,9 +22313,7 @@
  
+ fi
  
 -if test "$HAVE_GETHOSTBYNAME" != "1"; then
 -  as_fn_error $? "couldn't find libraries for gethostbyname()" "$LINENO" 5
@@ -12,7 +12,7 @@ diff -Paur --no-dereference -- libcurl.upstream/configure libcurl/configure
  
  
  curl_includes_winsock2="\
-@@ -33676,11 +33674,8 @@
+@@ -37552,11 +37550,8 @@
  
  int main (void)
  {
@@ -25,7 +25,7 @@ diff -Paur --no-dereference -- libcurl.upstream/configure libcurl/configure
  }
  
  
-@@ -45798,107 +45793,9 @@
+@@ -49364,107 +49359,9 @@
  
  
  
@@ -51,8 +51,8 @@ diff -Paur --no-dereference -- libcurl.upstream/configure libcurl/configure
 -
 -if test $xc_cnt_words -gt 0; then
 -
--{ $as_echo "$as_me:${as_lineno-$LINENO}: amending $xc_subdir/Makefile" >&5
--$as_echo "$as_me: amending $xc_subdir/Makefile" >&6;}
+-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: amending $xc_subdir/Makefile" >&5
+-printf "%s\n" "$as_me: amending $xc_subdir/Makefile" >&6;}
 -
 -# Build Makefile specific patch hunk.
 -
@@ -139,7 +139,7 @@ diff -Paur --no-dereference -- libcurl.upstream/configure libcurl/configure
 diff -Paur --no-dereference -- libcurl.upstream/docs/Makefile.in libcurl/docs/Makefile.in
 --- libcurl.upstream/docs/Makefile.in
 +++ libcurl/docs/Makefile.in
-@@ -461,10 +461,10 @@
+@@ -479,10 +479,10 @@
  # but distribute it (using the relative file name) in the next variable
  man_MANS = $(abs_builddir)/curl.1
  noinst_man_MANS = curl.1 mk-ca-bundle.1
@@ -151,13 +151,13 @@ diff -Paur --no-dereference -- libcurl.upstream/docs/Makefile.in libcurl/docs/Ma
 +GENHTMLPAGES = curl.html mk-ca-bundle.html
 +PDFPAGES = curl.pdf mk-ca-bundle.pdf
 +MANDISTPAGES = curl.1.dist
- HTMLPAGES = $(GENHTMLPAGES) index.html
+ HTMLPAGES = $(GENHTMLPAGES)
  
  # Build targets in this file (.) before cmdline-opts to ensure that
 diff -Paur --no-dereference -- libcurl.upstream/include/curl/curl.h libcurl/include/curl/curl.h
 --- libcurl.upstream/include/curl/curl.h
 +++ libcurl/include/curl/curl.h
-@@ -68,16 +68,7 @@
+@@ -67,17 +67,7 @@
  #endif
  #endif
  
@@ -167,8 +167,9 @@ diff -Paur --no-dereference -- libcurl.upstream/include/curl/curl.h libcurl/incl
 -#if defined(_AIX) || defined(__NOVELL_LIBC__) || defined(__NetBSD__) || \
 -    defined(__minix) || defined(__SYMBIAN32__) || defined(__INTEGRITY) || \
 -    defined(ANDROID) || defined(__ANDROID__) || defined(__OpenBSD__) || \
--    defined(__CYGWIN__) || \
--   (defined(__FreeBSD_version) && (__FreeBSD_version < 800000))
+-    defined(__CYGWIN__) || defined(AMIGA) || defined(__NuttX__) || \
+-   (defined(__FreeBSD_version) && (__FreeBSD_version < 800000)) || \
+-   (defined(__MidnightBSD_version) && (__MidnightBSD_version < 100000))
  #include <sys/select.h>
 -#endif
  
@@ -178,7 +179,7 @@ diff -Paur --no-dereference -- libcurl.upstream/lib/curl_addrinfo.h libcurl/lib/
 --- libcurl.upstream/lib/curl_addrinfo.h
 +++ libcurl/lib/curl_addrinfo.h
 @@ -71,6 +71,16 @@
-                     Curl_addrinfo **result);
+                     struct Curl_addrinfo **result);
  #endif
  
 +#if defined(__sortix__)
@@ -191,34 +192,22 @@ diff -Paur --no-dereference -- libcurl.upstream/lib/curl_addrinfo.h libcurl/lib/
 +   char** h_addr_list;
 +};
 +#endif
- Curl_addrinfo *
+ struct Curl_addrinfo *
  Curl_he2ai(const struct hostent *he, int port);
  
-diff -Paur --no-dereference -- libcurl.upstream/lib/mprintf.c libcurl/lib/mprintf.c
---- libcurl.upstream/lib/mprintf.c
-+++ libcurl/lib/mprintf.c
-@@ -946,7 +946,7 @@
- 
-         /* NOTE NOTE NOTE!! Not all sprintf implementations return number of
-            output characters */
--        (sprintf)(work, formatbuf, p->data.dnum);
-+        (snprintf)(work, sizeof(work), formatbuf, p->data.dnum);
-         DEBUGASSERT(strlen(work) <= sizeof(work));
-         for(fptr = work; *fptr; fptr++)
-           OUTCHAR(*fptr);
 diff -Paur --no-dereference -- libcurl.upstream/Makefile.in libcurl/Makefile.in
 --- libcurl.upstream/Makefile.in
 +++ libcurl/Makefile.in
-@@ -652,7 +652,7 @@
-  $(VC11_LIBVCXPROJ) $(VC11_SRCVCXPROJ) $(VC12_LIBVCXPROJ) $(VC12_SRCVCXPROJ) \
-  $(VC14_LIBVCXPROJ) $(VC14_SRCVCXPROJ) $(VC15_LIBVCXPROJ) $(VC15_SRCVCXPROJ)
+@@ -676,7 +676,7 @@
+  $(VC14_SRCVCXPROJ) $(VC14_10_LIBVCXPROJ) $(VC14_10_SRCVCXPROJ)              \
+  $(VC14_30_LIBVCXPROJ) $(VC14_30_SRCVCXPROJ)
  
 -bin_SCRIPTS = curl-config
 +bin_SCRIPTS =
  SUBDIRS = lib src
  DIST_SUBDIRS = $(SUBDIRS) tests packages scripts include docs
  pkgconfigdir = $(libdir)/pkgconfig
-@@ -1285,6 +1285,12 @@
+@@ -1581,6 +1581,12 @@
  distclean: distclean-recursive
  	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
  	-rm -f Makefile

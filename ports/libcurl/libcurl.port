@@ -1,13 +1,14 @@
 NAME=libcurl
-BUILD_LIBRARIES='libz? libssl? libidn? libssh2? librtmp? libmetalink? libpsl?'
-VERSION=7.69.0
+BUILD_LIBRARIES='libssl libidn? libz? libbrotli? libssh2? librtmp? libmetalink? libpsl? libzstd?'
+VERSION=7.84.0
 DISTNAME=curl-$VERSION
 COMPRESSION=tar.xz
 ARCHIVE=$DISTNAME.$COMPRESSION
-SHA256SUM=9fadf2f082c127757808a28ddd5ab9d1bc2c7061ca7ddaf85814285e15e3271f
+SHA256SUM=2d118b43f547bfe5bae806d8d47b4e596ea5b25a6c1f080aef49fbcd817c5db8
 UPSTREAM_SITE=https://curl.se/download
 UPSTREAM_ARCHIVE=$ARCHIVE
 BUILD_SYSTEM=configure
-CONFIGURE_ARGS='--with-ca-bundle=/etc/ssl/cert.pem --with-ca-path=/etc/ssl/certs'
+LICENSE=ISC
+CONFIGURE_ARGS='--with-openssl --with-ca-bundle=/etc/ssl/cert.pem --with-ca-path=/etc/ssl/certs'
 MAKE_VARS='V=1'
 POST_INSTALL=tix-eradicate-libtool-la
