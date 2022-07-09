@@ -16,7 +16,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
    --shlibdir=DIR           install shared libs in DIR [LIBDIR]
    --incdir=DIR             install includes in DIR [PREFIX/include]
    --mandir=DIR             install man page in DIR [PREFIX/share/man]
-@@ -770,7 +772,9 @@
+@@ -780,7 +782,9 @@
  
  set_default(){
      for opt; do
@@ -27,7 +27,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
      done
  }
  
-@@ -2444,6 +2448,8 @@
+@@ -2528,6 +2532,8 @@
  "
  
  PATHS_LIST="
@@ -36,7 +36,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
      bindir
      datadir
      docdir
-@@ -2462,6 +2468,7 @@
+@@ -2546,6 +2552,7 @@
      arch
      as
      assert_level
@@ -44,7 +44,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
      build_suffix
      cc
      objcc
-@@ -2474,6 +2481,7 @@
+@@ -2558,6 +2565,7 @@
      env
      extra_version
      gas
@@ -52,7 +52,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
      host_cc
      host_cflags
      host_extralibs
-@@ -2500,6 +2508,7 @@
+@@ -2586,6 +2594,7 @@
      sws_max_filter_size
      sysinclude
      sysroot
@@ -60,7 +60,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
      target_exec
      target_os
      target_path
-@@ -3714,11 +3723,12 @@
+@@ -3836,11 +3845,12 @@
  
  # installation paths
  prefix_default="/usr/local"
@@ -75,7 +75,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
  mandir_default='${prefix}/share/man'
  
  # toolchain
-@@ -4075,8 +4085,10 @@
+@@ -4200,8 +4210,10 @@
              optname="${opt%%=*}"
              optname="${optname#--}"
              optname=$(echo "$optname" | sed 's/-/_/g')
@@ -86,7 +86,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
              elif is_in $optname $CMDLINE_APPEND; then
                  append $optname "$optval"
              else
-@@ -4279,6 +4291,16 @@
+@@ -4404,6 +4416,16 @@
      ;;
  esac
  
@@ -103,7 +103,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
  if test -n "$cross_prefix"; then
      test -n "$arch" && test -n "$target_os" ||
          die "Must specify target arch (--arch) and OS (--target-os) when cross-compiling"
-@@ -5541,6 +5563,9 @@
+@@ -5702,6 +5724,9 @@
          ;;
      minix)
          ;;
@@ -113,7 +113,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
      none)
          ;;
      *)
-@@ -7214,6 +7239,7 @@
+@@ -7457,6 +7482,7 @@
  if test "$quiet" != "yes"; then
  
  echo "install prefix            $prefix"
@@ -121,7 +121,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
  echo "source path               $source_path"
  echo "C compiler                $cc"
  echo "C library                 $libc_type"
-@@ -7367,6 +7393,7 @@
+@@ -7614,6 +7640,7 @@
  FFMPEG_CONFIG_MAK=1
  FFMPEG_CONFIGURATION=$FFMPEG_CONFIGURATION
  prefix=$prefix
@@ -129,7 +129,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
  LIBDIR=\$(DESTDIR)$libdir
  SHLIBDIR=\$(DESTDIR)$shlibdir
  INCDIR=\$(DESTDIR)$incdir
-@@ -7628,6 +7655,7 @@
+@@ -7883,6 +7910,7 @@
  shared=$shared
  build_suffix=$build_suffix
  prefix=$prefix
@@ -152,7 +152,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/ffbuild/pkgconfig_generate.sh ffm
 diff -Paur --no-dereference -- ffmpeg.upstream/fftools/Makefile ffmpeg/fftools/Makefile
 --- ffmpeg.upstream/fftools/Makefile
 +++ ffmpeg/fftools/Makefile
-@@ -30,6 +30,8 @@
+@@ -25,6 +25,8 @@
  
  all: $(AVPROGS)
  
@@ -170,8 +170,8 @@ diff -Paur --no-dereference -- ffmpeg.upstream/libavformat/codec2.c ffmpeg/libav
  
 -#include <memory.h>
  #include "libavcodec/codec2utils.h"
+ #include "libavutil/channel_layout.h"
  #include "libavutil/intreadwrite.h"
- #include "avio_internal.h"
 diff -Paur --no-dereference -- ffmpeg.upstream/libavformat/udp.c ffmpeg/libavformat/udp.c
 --- ffmpeg.upstream/libavformat/udp.c
 +++ ffmpeg/libavformat/udp.c
@@ -185,13 +185,15 @@ diff -Paur --no-dereference -- ffmpeg.upstream/libavformat/udp.c ffmpeg/libavfor
      if (addr->sa_family != AF_INET) {
  #if HAVE_STRUCT_GROUP_SOURCE_REQ && defined(MCAST_BLOCK_SOURCE)
          /* For IPv4 prefer the old approach, as that alone works reliably on
-@@ -791,8 +793,10 @@
+@@ -796,10 +798,12 @@
  
      if (dscp >= 0) {
          dscp <<= 2;
 +#ifdef IP_TOS
-         if (setsockopt (udp_fd, IPPROTO_IP, IP_TOS, &dscp, sizeof(dscp)) != 0)
+         if (setsockopt (udp_fd, IPPROTO_IP, IP_TOS, &dscp, sizeof(dscp)) != 0) {
+             ret = ff_neterrno();
              goto fail;
+         }
 +#endif
      }
  

@@ -41,7 +41,7 @@ diff -Paur --no-dereference -- video-player.upstream/Makefile video-player/Makef
 diff -Paur --no-dereference -- video-player.upstream/video-player.cpp video-player/video-player.cpp
 --- video-player.upstream/video-player.cpp
 +++ video-player/video-player.cpp
-@@ -0,0 +1,313 @@
+@@ -0,0 +1,302 @@
 +#define __STDC_CONSTANT_MACROS
 +#define __STDC_LIMIT_MACROS
 +
@@ -166,8 +166,8 @@ diff -Paur --no-dereference -- video-player.upstream/video-player.cpp video-play
 +	int audio_stream_id;
 +	AVStream* video_stream = NULL;
 +	AVStream* audio_stream = NULL;
-+	AVCodec* video_codec = NULL;
-+	AVCodec* audio_codec = NULL;
++	const AVCodec* video_codec = NULL;
++	const AVCodec* audio_codec = NULL;
 +	AVCodecContext* video_codec_ctx = NULL;
 +	AVCodecContext* audio_codec_ctx = NULL;
 +	AVFrame* video_frame = NULL;
@@ -207,17 +207,14 @@ diff -Paur --no-dereference -- video-player.upstream/video-player.cpp video-play
 +	if ( audio_codec && !(audio_codec_ctx = avcodec_alloc_context3(audio_codec)))
 +		goto cleanup_video_codec_ctx;
 +
++
 +	if ( video_codec_ctx )
 +	{
-+		video_codec_ctx->extradata = video_stream->codec->extradata;
-+		video_codec_ctx->extradata_size = video_stream->codec->extradata_size;
 +		if ( (av_error = avcodec_open2(video_codec_ctx, NULL, NULL)) < 0 )
 +			goto cleanup_audio_codec_ctx;
 +	}
 +	if ( audio_codec_ctx )
 +	{
-+		audio_codec_ctx->extradata = audio_stream->codec->extradata;
-+		audio_codec_ctx->extradata_size = audio_stream->codec->extradata_size;
 +		if ( (av_error = avcodec_open2(audio_codec_ctx, NULL, NULL)) < 0 )
 +			goto cleanup_audio_codec_ctx;
 +	}
@@ -233,41 +230,36 @@ diff -Paur --no-dereference -- video-player.upstream/video-player.cpp video-play
 +	while ( !need_exit && 0 <= (av_error = av_read_frame(format_ctx, &packet)) )
 +	{
 +		int stream_index = packet.stream_index;
-+		int packet_off = 0;
-+		while ( stream_index == video_stream->index && packet_off < packet.size )
++		if ( stream_index == video_stream->index )
 +		{
-+			packet.data += packet_off; packet.size -= packet_off;
-+			int got_frame;
-+			int bytes_used = avcodec_decode_video2(video_codec_ctx, video_frame,
-+			                                       &got_frame, &packet);
-+			packet.data -= packet_off; packet.size += packet_off;
-+
-+			if ( (av_error = bytes_used) < 0 )
++			if ( (av_error = avcodec_send_packet(video_codec_ctx,
++			                                     &packet)) < 0 )
 +				goto break_decode_loop;
-+			if ( !got_frame )
-+				break;
-+			packet_off += bytes_used;
-+
-+			struct timespec now;
-+			clock_gettime(CLOCK_MONOTONIC, &now);
-+			while ( timespec_le(now, next_frame_at) )
++			while ( !(av_error = avcodec_receive_frame(video_codec_ctx,
++			                                           video_frame)) )
 +			{
-+				struct timespec left = timespec_sub(next_frame_at, now);
-+				clock_nanosleep(CLOCK_MONOTONIC, 0, &left, NULL);
++				struct timespec now;
 +				clock_gettime(CLOCK_MONOTONIC, &now);
++				while ( timespec_le(now, next_frame_at) )
++				{
++					struct timespec left = timespec_sub(next_frame_at, now);
++					clock_nanosleep(CLOCK_MONOTONIC, 0, &left, NULL);
++					clock_gettime(CLOCK_MONOTONIC, &now);
++				}
++
++				DisplayVideoFrame(video_frame, connection);
++
++				uintmax_t usecs = video_codec_ctx->ticks_per_frame * 1000000 *
++					              video_codec_ctx->time_base.num /
++					              video_codec_ctx->time_base.den;
++				next_frame_at = timespec_add(next_frame_at, timespec_make(0, usecs * 1000));
 +			}
-+
-+			DisplayVideoFrame(video_frame, connection);
-+
-+			uintmax_t usecs = video_codec_ctx->ticks_per_frame * 1000000 *
-+			                  video_codec_ctx->time_base.num /
-+			                  video_codec_ctx->time_base.den;
-+			next_frame_at = timespec_add(next_frame_at, timespec_make(0, usecs * 1000));
++			if ( av_error != AVERROR(EAGAIN) && av_error != AVERROR_EOF )
++				goto break_decode_loop;
 +		}
-+		while ( stream_index == audio_stream->index && packet_off < packet.size )
++		if ( stream_index == audio_stream->index )
 +		{
 +			// TODO: Add sound support when an backend is available.
-+			packet_off = packet.size;
 +		}
 +	}
 +break_decode_loop:
@@ -288,14 +280,12 @@ diff -Paur --no-dereference -- video-player.upstream/video-player.cpp video-play
 +cleanup_audio_codec_ctx:
 +	if ( audio_codec_ctx )
 +	{
-+		audio_codec_ctx->extradata = NULL;
 +		avcodec_close(audio_codec_ctx);
 +		av_free(audio_codec_ctx);
 +	}
 +cleanup_video_codec_ctx:
 +	if ( video_codec_ctx )
 +	{
-+		video_codec_ctx->extradata = NULL;
 +		avcodec_close(video_codec_ctx);
 +		av_free(video_codec_ctx);
 +	}
@@ -326,7 +316,6 @@ diff -Paur --no-dereference -- video-player.upstream/video-player.cpp video-play
 +		error(1, 0, "couldn't create dispd rgba window");
 +	struct dispd_window* connection = window;
 +#endif
-+	av_register_all();
 +
 +#ifdef DISPLAY
 +	WINDOW_WIDTH = 800;
