@@ -585,6 +585,7 @@ release: release-arch release-shared
 # Presubmit checks
 
 presubmit:
+	$(MAKE) verify-ports
 	$(MAKE) verify-coding-style
 	$(MAKE) verify-manual
 	$(MAKE) verify-build-tools
@@ -597,6 +598,9 @@ else
 endif
 	$(MAKE) verify-headers
 	@echo ok
+
+verify-ports:
+	build-aux/verify-ports.sh
 
 verify-coding-style:
 	build-aux/verify-coding-style.sh
