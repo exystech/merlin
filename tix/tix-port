@@ -203,7 +203,7 @@ download_archive_from_url() {(
   url="$4"
   sha256sum="$5"
   if [ -z "$mirror_directory" ]; then
-    mirror_directory="$port.mirror/$name"
+    mirror_directory="$port.mirror"
   fi
   mirror_directory="$mirror_directory/$name"
   mkdir -p -- "$mirror_directory"
