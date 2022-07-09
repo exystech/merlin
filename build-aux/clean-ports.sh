@@ -29,7 +29,7 @@ for PACKAGE in $("$(dirname -- "$0")"/list-packages.sh 'all!'); do
     DEVELOPMENT=$(tix-vars -d false $SORTIX_PORTS_DIR/$PACKAGE/$PACKAGE.port \
                            DEVELOPMENT)
     if [ "$DEVELOPMENT" = true ]; then
-      case "$SORTIX_PORTS_DIR/$PACKAGE/$PACKAGE.version" in
+      case "$(cat "$SORTIX_PORTS_DIR/$PACKAGE/$PACKAGE.version")" in
       *.development)
         echo "Port is in development: '$SORTIX_PORTS_DIR/$PACKAGE/$PACKAGE'"
         continue
