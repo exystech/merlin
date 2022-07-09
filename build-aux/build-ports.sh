@@ -49,8 +49,10 @@ fi
 mkdir -p "$SORTIX_MIRROR_DIR"
 
 # Add the platform triplet to the binary repository path.
-SORTIX_REPOSITORY_DIR="$SORTIX_REPOSITORY_DIR/$HOST"
-mkdir -p "$SORTIX_REPOSITORY_DIR"
+if [ "$OPERATION" = build ]; then
+  SORTIX_REPOSITORY_DIR="$SORTIX_REPOSITORY_DIR/$HOST"
+  mkdir -p "$SORTIX_REPOSITORY_DIR"
+fi
 
 # Create the system root if absent.
 if [ "$OPERATION" = build ]; then
@@ -58,12 +60,12 @@ if [ "$OPERATION" = build ]; then
 fi
 
 # Make paths absolute for later use.
-if [ "$OPERATION" = build ]; then
-  SYSROOT=$(make_dir_path_absolute "$SYSROOT")
-fi
 SORTIX_MIRROR_DIR=$(make_dir_path_absolute "$SORTIX_MIRROR_DIR")
 SORTIX_PORTS_DIR=$(make_dir_path_absolute "$SORTIX_PORTS_DIR")
-SORTIX_REPOSITORY_DIR=$(make_dir_path_absolute "$SORTIX_REPOSITORY_DIR")
+if [ "$OPERATION" = build ]; then
+  SYSROOT=$(make_dir_path_absolute "$SYSROOT")
+  SORTIX_REPOSITORY_DIR=$(make_dir_path_absolute "$SORTIX_REPOSITORY_DIR")
+fi
 
 # Decide the optimization options with which the ports will be built.
 if [ -z "${OPTLEVEL+x}" ]; then OPTLEVEL="-Os -s"; fi
