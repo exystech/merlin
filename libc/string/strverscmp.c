@@ -41,7 +41,12 @@ int strverscmp(const char* a, const char* b)
 			continue;
 
 		// Be a regular strcmp if no digits are involed when they differ.
-		bool version_string = is_number(a[i]) && is_number(b[i]);
+		// Note: This implementation uses version number comparison if *either*
+		//       of the first differing characters are digits, unlike glibc
+		//       which is documented to require *both*. This behavior matches
+		//       GNU sort -V and musl. It's also useful as "1.2.txt" compares
+		//       before "1.2.3.txt".
+		bool version_string = is_number(a[i]) || is_number(b[i]);
 		if ( !version_string && a[i] < b[i] )
 			return -1;
 		if ( !version_string && a[i] > b[i] )
