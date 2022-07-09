@@ -8,6 +8,7 @@ SHA256SUM=09e4215a0f8ecad45a36aee04f97bfb662cf9578e3bee55dbd3750a9dd021b12
 UPSTREAM_SITE=https://pub.sortix.org/fork/libSDL
 UPSTREAM_ARCHIVE=$ARCHIVE
 BUILD_SYSTEM=configure
+LICENSE=LGPL-2.1-or-later
 CONFIGURE_ARGS='--without-x --disable-pulseaudio --enable-video-dispd --disable-pthreads'
 MAKE=./make.sortix
 POST_INSTALL=tix-eradicate-libtool-la
