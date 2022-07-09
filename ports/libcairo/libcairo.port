@@ -1,12 +1,13 @@
 NAME=libcairo
 BUILD_LIBRARIES='libz libbz2 libpng libfreetype libfontconfig? librsvg? libexpat? libpixman libglib?'
-VERSION=1.12.14
+VERSION=1.16.0
 DISTNAME=cairo-$VERSION
 COMPRESSION=tar.xz
 ARCHIVE=$DISTNAME.$COMPRESSION
-SHA256SUM=96d0d1e3f9b74d2ca3469ff187c5e5f25649b1ad35cf06f4f3a83847dff4ac13
+SHA256SUM=5e7b29b3f113ef870d1e3ecf8adf21f923396401604bda16d44be45e66052331
 UPSTREAM_SITE=https://www.cairographics.org/releases
 UPSTREAM_ARCHIVE=$ARCHIVE
+LICENSE='LGPL-2.1-only OR MPL-1.1'
 BUILD_SYSTEM=configure
 CONFIGURE_ARGS='--without-x --disable-valgrind --disable-xlib --enable-xlib=no --enable-xcb=no --enable-xlib-xcb=no --enable-xcb-shm=no --enable-glx=no'
 MAKE_VARS='V=1'

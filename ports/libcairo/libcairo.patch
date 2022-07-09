@@ -1,73 +1,7 @@
-diff -Paur --no-dereference -- libcairo.upstream/build/config.sub libcairo/build/config.sub
---- libcairo.upstream/build/config.sub
-+++ libcairo/build/config.sub
-@@ -1348,7 +1348,7 @@
- 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
- 	      | -sym* | -kopensolaris* \
- 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
--	      | -aos* | -aros* \
-+	      | -aos* | -aros* | -sortix* \
- 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
- 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
- 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
-diff -Paur --no-dereference -- libcairo.upstream/build/configure.ac.warnings libcairo/build/configure.ac.warnings
---- libcairo.upstream/build/configure.ac.warnings
-+++ libcairo/build/configure.ac.warnings
-@@ -36,16 +36,6 @@
- dnl We also abuse the warning-flag facility to enable other compiler
- dnl options.  Namely, the following:
- 
--dnl -flto working really needs a test link, not just a compile
--
--safe_MAYBE_WARN="$MAYBE_WARN"
--MAYBE_WARN="$MAYBE_WARN -flto"
--AC_TRY_LINK([],[
--	int main(int argc, char **argv) { return 0; }
--],[],[
--	MAYBE_WARN="$safe_MAYBE_WARN"
--])
--
- MAYBE_WARN="$MAYBE_WARN -fno-strict-aliasing -fno-common"
- 
- dnl Also to turn various gcc/glibc-specific preprocessor checks
 diff -Paur --no-dereference -- libcairo.upstream/configure libcairo/configure
 --- libcairo.upstream/configure
 +++ libcairo/configure
-@@ -18159,33 +18159,6 @@
- MAYBE_WARN="$MAYBE_WARN -erroff=E_ENUM_TYPE_MISMATCH_ARG \
- 			-erroff=E_ENUM_TYPE_MISMATCH_OP"
- 
--
--
--safe_MAYBE_WARN="$MAYBE_WARN"
--MAYBE_WARN="$MAYBE_WARN -flto"
--cat confdefs.h - <<_ACEOF >conftest.$ac_ext
--/* end confdefs.h.  */
--
--int
--main ()
--{
--
--	int main(int argc, char **argv) { return 0; }
--
--  ;
--  return 0;
--}
--_ACEOF
--if ac_fn_c_try_link "$LINENO"; then :
--
--else
--
--	MAYBE_WARN="$safe_MAYBE_WARN"
--
--fi
--rm -f core conftest.err conftest.$ac_objext \
--    conftest$ac_exeext conftest.$ac_ext
--
- MAYBE_WARN="$MAYBE_WARN -fno-strict-aliasing -fno-common"
- 
- MAYBE_WARN="$MAYBE_WARN -Wp,-D_FORTIFY_SOURCE=2"
-@@ -31800,7 +31773,7 @@
+@@ -33026,7 +33026,7 @@
  
  
  
@@ -75,16 +9,4 @@ diff -Paur --no-dereference -- libcairo.upstream/configure libcairo/configure
 +if ${PKG_CONFIG:-pkg-config} --exists 'pixman-1 >= 0.27.1'; then
  
  $as_echo "#define HAS_PIXMAN_GLYPHS 1" >>confdefs.h
- 
-diff -Paur --no-dereference -- libcairo.upstream/configure.ac libcairo/configure.ac
---- libcairo.upstream/configure.ac
-+++ libcairo/configure.ac
-@@ -662,7 +662,7 @@
-   image_LIBS=$pixman_LIBS
- ])
- 
--if pkg-config --exists 'pixman-1 >= 0.27.1'; then
-+if ${PKG_CONFIG:-pkg-config} --exists 'pixman-1 >= 0.27.1'; then
-     AC_DEFINE([HAS_PIXMAN_GLYPHS], 1, [Enable pixman glyph cache])
- fi
  
