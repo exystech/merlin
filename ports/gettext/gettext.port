@@ -7,7 +7,7 @@ ARCHIVE=$DISTNAME.$COMPRESSION
 SHA256SUM=d20fcbb537e02dcf1383197ba05bd0734ef7bf5db06bdb241eb69b7d16b73192
 UPSTREAM_SITE=https://ftp.gnu.org/gnu/gettext
 UPSTREAM_ARCHIVE=$ARCHIVE
-LICENSE=GPL-3-or-later
+LICENSE=GPL-3.0-or-later
 # TODO: libcroco and libunistring are bundled and are only marked as optional
 #       here as there's no official port yet. Finish those and then remove
 #       them as optional.
