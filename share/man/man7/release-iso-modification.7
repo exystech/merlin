@@ -214,11 +214,9 @@ tix-iso-add sortix.iso bootconfig
 .Ss Load Only Basic Ports by Default
 To customize a release to only loads basic ports by default:
 .Bd -literal
-mkdir -p bootconfig/grub
-cat > bootconfig/grub/hooks.cfg << EOF
-function hook_init {
-  select_ports_set_basic
-}
+mkdir -p bootconfig/boot/grub
+cat > bootconfig/boot/grub/hooks.cfg << EOF
+select_ports_set_basic
 EOF
 tix-iso-add sortix.iso bootconfig
 .Ed
