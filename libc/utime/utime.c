@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,6 +29,8 @@
 //       nice to remove this at some point.
 int utime(const char* filepath, const struct utimbuf* times)
 {
+	if ( !times )
+		return utimens(filepath, NULL);
 	struct timespec ts_times[2];
 	ts_times[0] = timespec_make(times->actime, 0);
 	ts_times[1] = timespec_make(times->modtime, 0);
