@@ -1,0 +1,51 @@
+.Dd September 18, 2022
+.Dt SESSION 5
+.Os
+.Sh NAME
+.Nm session
+.Nd user login ession
+.Sh SYNOPSIS
+.Nm ~/.session
+.Nm /etc/session
+.Sh DESCRIPTION
+.Xr login 8
+creates the user's session by running the user's
+.Nm
+script, which normally
+executes a command line or graphical user environment.
+The session concludes once the session script exits and
+.Xr login 8
+reclaims control.
+.Pp
+The session script is found by searching for an executable script in the
+following paths:
+.Bl -bullet -compact
+.It
+.Pa ~/.session
+.It
+.Pa /etc/session
+.El
+.Pp
+The user's shell from
+.Xr passwd 5
+is used as a fallback session.
+.Sh EXAMPLES
+The user's
+.Pa ~/.session
+file can be created in any text editor and then made executable:
+.Bd -literal -offset indent
+editor ~/.session
+chmod +x ~/.session
+.Ed
+.Ss Trianglix
+.Xr trianglix 1
+can be selected as the user's triangle environment with this executable
+.Pa ~/.session
+script:
+.Bd -literal -offset indent
+#!/bin/sh
+exec trianglix
+.Ed
+.Sh SEE ALSO
+.Xr passwd 5 ,
+.Xr login 8

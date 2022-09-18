@@ -26,6 +26,15 @@ exists.
 The process remains running in the background and takes over again when the user
 session exits.
 .Pp
+The user's
+.Xr session 5
+is created upon login by running the user's
+.Pa ~/.session
+script if it exists and is executable, otherwise attempting
+.Pa /etc/session ,
+and ultimately falling back on the user's shell from
+.Xr passwd 5 .
+.Pp
 Type a special username to perform special options:
 .Pp
 .Bl -tag -width "poweroff" -compact -offset indent
@@ -57,12 +66,18 @@ shell
 username
 .El
 .Sh FILES
-.Bl -tag -width "/etc/passwd" -compact
+.Bl -tag -width "/etc/login.conf.textual" -compact
+.It Pa ~/.session
+user session script run upon login (see
+.Xr session 5 )
+.It Pa /etc/login.conf.textual
+textual interface is forced if this file exists
 .It Pa /etc/passwd
 user database (see
 .Xr passwd 5 )
-.It Pa /etc/login.conf.textual
-textual interface is forced if this file exists
+.It Pa /etc/session
+fallback session script run upon login (see
+.Xr session 5 )
 .El
 .Sh EXIT STATUS
 .Nm login
@@ -72,6 +87,7 @@ reboot, or exits 2 on fatal failure and the boot should halt.
 .Xr passwd 1 ,
 .Xr crypt_checkpass 3 ,
 .Xr passwd 5 ,
+.Xr session 5 ,
 .Xr init 8 ,
 .Xr login 8
 .Sh BUGS

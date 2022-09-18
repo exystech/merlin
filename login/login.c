@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2018, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -249,6 +249,10 @@ bool login(const char* username)
 		tcsetpgrp(0, getpgid(0)) ||
 		sigprocmask(SIG_SETMASK, &oldset, NULL) < 0 ||
 		settermmode(0, TERMMODE_NORMAL) < 0 ||
+		(execlp("./.session", "./.session", (const char*) NULL) < 0 &&
+		 errno != ENOENT && errno != EACCES) ||
+		(execlp("/etc/session", "/etc/session", (const char*) NULL) < 0 &&
+		 errno != ENOENT && errno != EACCES) ||
 		execlp(pwd->pw_shell, pwd->pw_shell, (const char*) NULL));
 		write(pipe_fds[1], &errno, sizeof(errno));
 		_exit(127);
