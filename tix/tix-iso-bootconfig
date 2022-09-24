@@ -23,6 +23,7 @@ default=
 directory=
 enable_append_title=true
 enable_src=
+init_target=
 liveconfig=
 operand=1
 random_seed=false
@@ -53,6 +54,8 @@ for argument do
   --disable-src) enable_src=false ;;
   --enable-append-title) enable_append_title=true ;;
   --enable-src) enable_src=true ;;
+  --init-target=*) init_target=$parameter ;;
+  --init-target) previous_option=init_target ;;
   --liveconfig=*) liveconfig=$parameter ;;
   --liveconfig) previous_option=liveconfig ;;
   --random-seed) random_seed=true ;;
@@ -136,6 +139,13 @@ mkdir -p -- "$directory/boot/grub"
  if $enable_append_title; then
    printf "base_menu_title=\"\$base_menu_title - \"'%s'\n" \
           "$(printf '%s\n' "$append_title" | sed "s/'/'\\\\''/g")"
+ fi
+ if [ -n "$init_target" ]; then
+   printf 'function hook_menu_pre {\n'
+   printf '  menuentry "Sortix (%s)" {\n' "$init_target"
+   printf '    load_sortix -- /sbin/init --target=%s\n' "$init_target"
+   printf '  }\n'
+   printf '}\n'
  fi
  if [ -e "$directory/boot/liveconfig.tar.xz" ]; then
    printf 'function hook_initrd_post {\n'

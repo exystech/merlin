@@ -1,0 +1,113 @@
+.Dd September 19, 2022
+.Dt DAEMON 7
+.Os
+.Sh NAME
+.Nm daemon
+.Nd system background process
+.Sh DESCRIPTION
+A daemon is a system background process that performs a task or continuously
+provides a service.
+.Xr init 8
+starts daemons on system startup per the
+.Xr init 5
+configuration and stops them on system shutdown.
+.Pp
+Conventions for daemons have varied between traditional init systems and this
+document describes the modern design of daemons suitable for this operating
+system.
+Daemons should default to the behavior described below, or offer the behavior
+through options if they need to be compatible with historic default behavior.
+.Pp
+A daemon is implemented as a system program, usually in
+.Pa /sbin
+inside the appropriate prefix,
+whose name conventionally is the name of the service it implements plus the
+letter d (as opposed to a client program).
+Its runtime dependencies on other daemons are declared ahead of time in the
+init system's configuration, so the daemons can be started in the right order.
+.Pp
+The process will be started per the init system's configuration with the
+appropriate command line arguments, environment variables, working directory,
+user, group, and so on.
+.Pp
+The process must remain in the foreground such that
+.Xr init 8
+can manage its lifetime.
+It must not
+.Xr fork 2
+to become a background process and escape
+the init system.
+The process should have no need to escape the controlling terminal by starting a
+new session using
+.Xr setsid 2 .
+Daemons should not write a pid file but instead be administered through the init
+system.
+.Pp
+Logs should be written to the standard error as it is non-buffered and is meant
+to contain messages that are not process output.
+Alternatively logs may be written to the standard output.
+The standard output may be the same file description as the standard error.
+The standard input should not be used and will be
+.Pa /dev/null .
+The log entries should be formatted as plain line; or if the program wants to
+supply additional meta data, one of the log formats described in
+.Xr init 5
+or the syslog format.
+.Xr syslog 3
+is discouraged but may be used if the program has additional meta data.
+On this operating system,
+.Xr syslog 3
+will write the log entry to the standard error instead of sending it to a
+centralized log service, which is unreliable on other operating systems.
+Daemons should prefer letting the init system manage the log files but may
+provide their own logging as appropriate.
+.Pp
+The process may be executed as root per the init system configuration.
+Privileges should be dropped after acquiring the needed protected resources.
+The main loop should run with the least privileges required, ideally as another
+user, potentially in a
+.Xr chroot 2
+or sandboxed environment.
+.Pp
+Continuous daemons providing a service should signal their readiness once the
+main loop is serving requests, such that the init system will start dependent
+daemons.
+Unfortunately there is no portable convention and this operating system uses the
+.Ev READYFD
+environment variable containing a file descriptor pointing to a writing pipe,
+where the daemon must write a newline upon readiness.
+Alternatively closing the pipe is considered readiness as a discouraged
+fallback.
+.Pp
+The process must exit 0 if the daemon has concluded its work and exit non-zero
+in the case of errors.
+The daemon may be restarted by the init system
+upon error per the configuration.
+.Pp
+The process must exit unconditionally when sent
+.Dv SIGTERM
+and should gracefully conclude its work immediately and recursively terminate
+any child processes.
+In this case, dying by the
+.Dv SIGTERM
+signal is considered a successful exit.
+The process is killed with
+.Dv SIGKILL
+if it does not gracefully terminate within a high system-specific timeout.
+.Sh EXAMPLES
+A daemon can signal readiness using this utility function:
+.Bd -literal -offset indent
+static void ready(void) {
+	const char *readyfd_env = getenv("READYFD");
+	if ( !readyfd_env )
+		return;
+	int readyfd = atoi(readyfd_env);
+	char c = '\n';
+	write(readyfd, &c, 1);
+	close(readyfd);
+	unsetenv("READYFD");
+}
+.Ed
+.Sh SEE ALSO
+.Xr init 5 ,
+.Xr init 8

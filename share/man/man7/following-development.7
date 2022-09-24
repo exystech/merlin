@@ -69,6 +69,21 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Add daemon support to init(8)
+.Xr init 8
+has gained
+.Xr daemon 7
+support with the new
+.Xr init 5
+configuration format.
+.Pp
+The old
+.Pa /etc/init/target
+configuration file is replaced by the
+.Sy default
+daemon in
+.Pa /etc/init/default .
+An upgrade hook will migrate the configuration.
 .Ss Add ports to the Sortix repository
 The ports have been moved from the porttix/srctix repositories into the
 .Pa ports/

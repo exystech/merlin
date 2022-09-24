@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2021, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -198,25 +198,29 @@ bool fsck(struct filesystem* fs)
 	const char* bdev_path = path_of_blockdevice(fs->bdev);
 	printf("%s: Repairing filesystem due to inconsistency...\n", bdev_path);
 	assert(fs->fsck);
-	pid_t child_pid = fork();
-	if ( child_pid < 0 )
+	pid_t pid = fork();
+	if ( pid < 0 )
 	{
 		warn("%s: Mandatory repair failed: fork", bdev_path);
 		return false;
 	}
-	if ( child_pid == 0 )
+	if ( pid == 0 )
 	{
 		execlp(fs->fsck, fs->fsck, "-fp", "--", bdev_path, (const char*) NULL);
 		warn("%s: Failed to load filesystem checker: %s", bdev_path, fs->fsck);
 		_Exit(127);
 	}
 	int code;
-	if ( waitpid(child_pid, &code, 0) < 0 )
-	{
+	if ( waitpid(pid, &code, 0) < 0 )
 		warn("waitpid");
-		return false;
+	else if ( WIFEXITED(code) &&
+	          (WEXITSTATUS(code) == 0 || WEXITSTATUS(code) == 1) )
+	{
+		// Successfully checked filesystem.
+		fs->flags &= ~(FILESYSTEM_FLAG_FSCK_SHOULD | FILESYSTEM_FLAG_FSCK_MUST);
+		return true;
 	}
-	if ( WIFSIGNALED(code) )
+	else if ( WIFSIGNALED(code) )
 		warnx("%s: Mandatory repair failed: %s: %s", bdev_path,
 		      fs->fsck, strsignal(WTERMSIG(code)));
 	else if ( !WIFEXITED(code) )
@@ -228,14 +232,9 @@ bool fsck(struct filesystem* fs)
 	else if ( WEXITSTATUS(code) & 2 )
 		warnx("%s: Mandatory repair: %s: %s", bdev_path,
 		      fs->fsck, "System reboot is necessary");
-	else if ( WEXITSTATUS(code) != 0 && WEXITSTATUS(code) != 1 )
+	else
 		warnx("%s: Mandatory repair failed: %s: %s", bdev_path,
 		      fs->fsck, "Filesystem checker was unsuccessful");
-	else
-	{
-		fs->flags &= ~(FILESYSTEM_FLAG_FSCK_SHOULD | FILESYSTEM_FLAG_FSCK_MUST);
-		return true;
-	}
 	return false;
 }
 
@@ -338,82 +337,106 @@ bool mountpoint_mount(struct mountpoint* mountpoint)
 		warnx("Failed to fsck %s", bdev_path);
 		return false;
 	}
-	if ( !fs->driver )
-	{
-		warnx("%s: Don't know how to mount a %s filesystem",
-		      bdev_path, fs->fstype_name);
-		return false;
-	}
 	const char* pretend_where = mountpoint->entry.fs_file;
 	const char* where = mountpoint->absolute;
+	if ( !fs->driver )
+	{
+		warnx("Failed mounting %s on %s: "
+		      "Don't know how to mount a %s filesystem",
+		      bdev_path, pretend_where, fs->fstype_name);
+		return false;
+	}
 	struct stat st;
 	if ( stat(where, &st) < 0 )
 	{
-		warn("stat: %s", where);
+		warn("Failed mounting %s on %s: stat: %s",
+		     bdev_path, pretend_where, where);
+		return false;
+	}
+	int readyfds[2];
+	if ( pipe(readyfds) < 0 )
+	{
+		warn("Failed mounting %s on %s: pipe", bdev_path, pretend_where);
 		return false;
 	}
 	if ( (mountpoint->pid = fork()) < 0 )
 	{
-		warn("%s: Unable to mount: fork", bdev_path);
+		warn("Failed mounting %s on %s: fork", bdev_path, pretend_where);
+		close(readyfds[0]);
+		close(readyfds[1]);
 		return false;
 	}
-	// TODO: This design is broken. The filesystem should tell us when it is
-	//       ready instead of having to poll like this.
 	if ( mountpoint->pid == 0 )
 	{
+		close(readyfds[0]);
+		char readyfdstr[sizeof(int) * 3];
+		snprintf(readyfdstr, sizeof(readyfdstr), "%d", readyfds[1]);
+		if ( setenv("READYFD", readyfdstr, 1) < 0 )
+		{
+			warn("Failed mounting %s on %s: setenv",
+			     bdev_path, pretend_where);
+			_exit(127);
+		}
 		execlp(fs->driver, fs->driver, "--foreground", bdev_path, where,
 		       "--pretend-mount-path", pretend_where, (const char*) NULL);
-		warn("%s: Failed to load filesystem driver: %s", bdev_path, fs->driver);
+		warn("Failed mount %s on %s: execvp: %s",
+		     bdev_path, pretend_where, fs->driver);
 		_exit(127);
 	}
-	while ( true )
+	close(readyfds[1]);
+	char c;
+	struct stat newst;
+	ssize_t amount = read(readyfds[0], &c, 1);
+	close(readyfds[0]);
+	if ( 0 <= amount )
 	{
-		struct stat newst;
-		if ( stat(where, &newst) < 0 )
+		if ( !stat(where, &newst) )
 		{
-			warn("stat: %s", where);
-			if ( unmount(where, 0) < 0 && errno != ENOMOUNT )
-				warn("unmount: %s", where);
-			else if ( errno == ENOMOUNT )
-				kill(mountpoint->pid, SIGQUIT);
-			int code;
-			waitpid(mountpoint->pid, &code, 0);
-			mountpoint->pid = -1;
-			return false;
-		}
-		if ( newst.st_dev != st.st_dev || newst.st_ino != st.st_ino )
-			break;
-		int code;
-		pid_t child = waitpid(mountpoint->pid, &code, WNOHANG);
-		if ( child < 0 )
-		{
-			warn("waitpid");
-			return false;
-		}
-		if ( child != 0 )
-		{
-			mountpoint->pid = -1;
-			if ( WIFSIGNALED(code) )
-				warnx("%s: Mount failed: %s: %s", bdev_path, fs->driver,
-				      strsignal(WTERMSIG(code)));
-			else if ( !WIFEXITED(code) )
-				warnx("%s: Mount failed: %s: %s", bdev_path, fs->driver,
-				      "Unexpected unusual termination");
-			else if ( WEXITSTATUS(code) == 127 )
-				warnx("%s: Mount failed: %s: %s", bdev_path, fs->driver,
-				      "Filesystem driver is absent");
-			else if ( WEXITSTATUS(code) == 0 )
-				warnx("%s: Mount failed: %s: Unexpected successful exit",
-				      bdev_path, fs->driver);
+			if ( newst.st_dev != st.st_dev || newst.st_ino != st.st_ino )
+				return true;
 			else
-				warnx("%s: Mount failed: %s: Exited with status %i", bdev_path,
-				      fs->driver, WEXITSTATUS(code));
-			return false;
+				warnx("Failed mount %s on %s: %s: "
+				      "No mounted filesystem appeared: %s",
+				      bdev_path, pretend_where, fs->driver, where);
 		}
-		struct timespec delay = timespec_make(0, 50L * 1000L * 1000L);
-		nanosleep(&delay, NULL);
+		else
+			warn("Failed mounting %s on %s: %s, stat: %s",
+				 bdev_path, pretend_where, fs->driver, where);
 	}
-	return true;
+	else
+		warn("Failed mounting %s on %s: %s, Failed to read readiness",
+			 bdev_path, pretend_where, fs->driver);
+	if ( unmount(where, 0) < 0 )
+	{
+		if ( errno != ENOMOUNT )
+			warn("Failed mounting %s on %s: unmount: %s",
+			     bdev_path, pretend_where, where);
+		kill(mountpoint->pid, SIGQUIT);
+	}
+	int code;
+	pid_t child = waitpid(mountpoint->pid, &code, 0);
+	mountpoint->pid = -1;
+	if ( child < 0 )
+		warn("Failed mounting %s on %s: %s: waitpid",
+		     bdev_path, pretend_where, fs->driver);
+	else if ( WIFSIGNALED(code) )
+		warnx("Failed mounting %s on %s: %s: %s",
+		      bdev_path, pretend_where, fs->driver,
+		      strsignal(WTERMSIG(code)));
+	else if ( !WIFEXITED(code) )
+		warnx("Failed mounting %s on %s: %s: Unexpected unusual termination",
+		      bdev_path, pretend_where, fs->driver);
+	else if ( WEXITSTATUS(code) == 127 )
+		warnx("Failed mounting %s on %s: %s: "
+		      "Filesystem driver could not be executed",
+		      bdev_path, pretend_where, fs->driver);
+	else if ( WEXITSTATUS(code) == 0 )
+		warnx("Failed mounting %s on %s: %s: Unexpected successful exit",
+		      bdev_path, pretend_where, fs->driver);
+	else
+		warnx("Failed mounting %s on %s: %s: Exited with status %i",
+		      bdev_path, pretend_where, fs->driver, WEXITSTATUS(code));
+	return false;
 }
 
 void mountpoint_unmount(struct mountpoint* mountpoint)

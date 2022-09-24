@@ -46,7 +46,9 @@ is the modern replacement with nanosecond precision.
 is the standard replacement.
 .Ss daemon
 Daemons should not background by double forking but rather stay in the
-foreground and be managed by
+foreground as described in
+.Xr daemon 7
+and be managed by
 .Xr init 8 .
 .Ss __dead
 .Dv noreturn

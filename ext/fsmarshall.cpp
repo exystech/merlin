@@ -720,6 +720,18 @@ void TerminationHandler(int)
 	should_terminate = true;
 }
 
+static void ready(void)
+{
+	const char* readyfd_env = getenv("READYFD");
+	if ( !readyfd_env )
+		return;
+	int readyfd = atoi(readyfd_env);
+	char c = '\n';
+	write(readyfd, &c, 1);
+	close(readyfd);
+	unsetenv("READYFD");
+}
+
 int fsmarshall_main(const char* argv0,
                     const char* mount_path,
                     bool foreground,
@@ -756,6 +768,8 @@ int fsmarshall_main(const char* argv0,
 			exit(0);
 		setpgid(0, 0);
 	}
+	else
+		ready();
 
 	dev->SpawnSyncThread();
 

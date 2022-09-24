@@ -12,6 +12,7 @@
 .Op Fl \-disable-src
 .Op Fl \-enable-append-title
 .Op Fl \-enable-src
+.Op Fl \-init-target Ns = Ns Ar target
 .Op Fl \-liveconfig Ns = Ns Ar liveconfig-directory
 .Op Fl \-random-seed
 .Op Fl \-timeout Ns = Ns Ar boot-menu-timeout
@@ -110,6 +111,12 @@ by setting
 .Sy enable_src
 GRUB variable to
 .Sy true .
+.It Fl \-init-target Ns = Ns Ar target
+Add a new first menu entry that boots the
+.Ar target
+daemon as the
+.Xr init 8
+target.
 .It Fl \-liveconfig Ns = Ns Ar liveconfig-directory
 Overlay the
 .Ar liveconfig-directory
@@ -222,6 +229,16 @@ bootloader menu timeout to 2 seconds:
 tix-iso-bootconfig --default=1 --timeout=2 bootconfig
 tix-iso-add sortix.iso bootconfig
 .Ed
+.Ss Non-interactive Live Environment
+The interactive user environment can be disabled by setting the default
+.Xr init 8
+.Fl \-target
+to
+.Sy no-user :
+.Bd -literal
+tix-iso-bootconfig --init-target=no-user bootconfig
+tix-iso-add sortix.iso bootconfig
+.Ed
 .Ss Add to Bootloader Menu Title
 To customize a release so the bootloader menu title is appended with a message
 of your choice:
@@ -234,5 +251,6 @@ tix-iso-add sortix.iso bootconfig
 .Xr kernel 7 ,
 .Xr release-iso-bootconfig 7 ,
 .Xr release-iso-modification 7 ,
+.Xr init 8 ,
 .Xr tix-iso-add 8 ,
 .Xr tix-iso-liveconfig 8
