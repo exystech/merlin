@@ -102,7 +102,7 @@ static void ready(void) {
 	if ( !readyfd_env )
 		return;
 	int readyfd = atoi(readyfd_env);
-	char c = '\n';
+	char c = '\\n';
 	write(readyfd, &c, 1);
 	close(readyfd);
 	unsetenv("READYFD");
