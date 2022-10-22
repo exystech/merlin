@@ -38,6 +38,7 @@
 #include <ioleast.h>
 #include <limits.h>
 #include <locale.h>
+#include <net/if.h>
 #include <poll.h>
 #include <psctl.h>
 #include <pwd.h>
@@ -242,6 +243,7 @@ struct daemon_config
 	int argc;
 	char** argv;
 	enum exit_code_meaning exit_code_meaning;
+	bool per_if;
 	bool need_tty;
 	enum log_method log_method;
 	enum log_format log_format;
@@ -1197,6 +1199,14 @@ static bool daemon_process_command(struct daemon_config* daemon_config,
 		else
 			daemon_config->log_size = (off_t) value;
 	}
+	else if ( !strcmp(argv[0], "per") )
+	{
+		if ( !strcmp(argv[1], "if") )
+			daemon_config->per_if = true;
+		else
+			warning("%s:%ji: unknown %s: %s",
+			        path, (intmax_t) line_number, argv[0], argv[1]);
+	}
 	else if ( !strcmp(argv[0], "need") )
 	{
 		if ( !strcmp(argv[1], "tty") )
@@ -1310,6 +1320,17 @@ static bool daemon_process_command(struct daemon_config* daemon_config,
 				default_config.log_rotate_on_start;
 		else if ( !strcmp(argv[1], "log-size") )
 			daemon_config->log_line_size = default_config.log_line_size;
+		else if ( !strcmp(argv[1], "per") )
+		{
+			if ( argc < 3 )
+				warning("%s:%ji: expected parameter: %s: %s",
+					    path, (intmax_t) line_number, argv[0], argv[1]);
+			else if ( !strcmp(argv[2], "if") )
+				daemon_config->per_if = false;
+			else
+				warning("%s:%ji: %s %s: unknown: %s", path,
+				        (intmax_t) line_number, argv[0], argv[1], argv[2]);
+		}
 		else if ( !strcmp(argv[1], "need") )
 		{
 			if ( argc < 3 )
@@ -1734,8 +1755,36 @@ static void daemon_configure_sub(struct daemon* daemon,
 static void daemon_configure(struct daemon* daemon,
                              struct daemon_config* daemon_config)
 {
-	// Parameterized daemons will be instatiated here later on.
-	daemon_configure_sub(daemon, daemon_config, NULL);
+	if ( daemon_config->per_if )
+	{
+		struct if_nameindex* ifs = if_nameindex();
+		if ( !ifs )
+			fatal("if_nameindex: %m");
+		for ( size_t i = 0; ifs[i].if_name; i++ )
+		{
+			const char* netif = ifs[i].if_name;
+			char* parameterized_name;
+			if ( asprintf(&parameterized_name, "%s.%s",
+			              daemon_config->name, netif) < 0 )
+				fatal("malloc: %m");
+			struct daemon* parameterized =
+				daemon_create_unconfigured(parameterized_name);
+			free(parameterized_name);
+			if ( !(parameterized->netif = strdup(netif)) )
+				fatal("malloc: %m");
+			char* name_clone = strdup(parameterized->name);
+			if ( !name_clone )
+				fatal("malloc: %m");
+			int flags = DEPENDENCY_FLAG_REQUIRE | DEPENDENCY_FLAG_AWAIT;
+			if ( !daemon_add_dependency(daemon, parameterized, flags) )
+				fatal("malloc: %m");
+			daemon_configure_sub(parameterized, daemon_config, netif);
+		}
+		if_freenameindex(ifs);
+		daemon->configured = true;
+	}
+	else
+		daemon_configure_sub(daemon, daemon_config, NULL);
 }
 
 static struct daemon* daemon_create(struct daemon_config* daemon_config)
