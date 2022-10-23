@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -60,7 +60,7 @@ int sys_sethostname(const char* src_name, size_t src_name_size)
 		return errno = EINVAL, -1;
 	if ( !CopyFromUser(new_hostname, src_name, src_name_size) )
 		return -1;
-	size_t new_hostname_length = strnlen(new_hostname, sizeof(new_hostname));
+	size_t new_hostname_length = strnlen(new_hostname, src_name_size);
 	if ( HOST_NAME_MAX < new_hostname_length )
 		return errno = EINVAL, -1;
 	new_hostname[new_hostname_length] = '\0';
