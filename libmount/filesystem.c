@@ -32,6 +32,7 @@
 #include <mount/ext2.h>
 #include <mount/extended.h>
 #include <mount/filesystem.h>
+#include <mount/iso9660.h>
 #include <mount/partition.h>
 
 const char* filesystem_error_string(enum filesystem_error error)
@@ -55,6 +56,7 @@ static const struct filesystem_handler* filesystem_handlers[] =
 	&biosboot_handler,
 	&extended_handler,
 	&ext2_handler,
+	&iso9660_handler,
 	NULL,
 };
 
