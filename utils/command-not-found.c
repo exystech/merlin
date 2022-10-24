@@ -80,6 +80,7 @@ struct command commands[] =
 	{LOGOUT, "logout", NULL, suggest_logout},
 
 	{MOUNT, "extfs", "system", NULL},
+	{MOUNT, "iso9660fs", "system", NULL},
 	{MOUNT, "mount", NULL, NULL},
 
 	{PAGER, "less", NULL, NULL},

@@ -163,6 +163,9 @@ bool blockdevice_probe_partition_table_type(enum partition_table_type* result_ou
 		memcpy(&mbr, leading, sizeof(mbr));
 		if ( mbr.signature[0] != 0x55 && mbr.signature[1] != 0xAA )
 			break;
+		// Ignore the partition table on live cdrom images.
+		if ( mbr.partitions[0][4 /*system_id*/] == 0xCD )
+			break;
 		result = PARTITION_TABLE_TYPE_MBR;
 		goto out;
 	} while ( 0 );
