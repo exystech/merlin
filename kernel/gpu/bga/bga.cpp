@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2016, 2017, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -238,6 +238,7 @@ bool BGADevice::Initialize()
 	Video::ConfigureDevice(this);
 
 #if defined(__i386__) || defined(__x86_64__)
+
 	if ( guest_additions )
 		guest_additions->ReadyVideoDevice(device_index);
 #endif
@@ -609,24 +610,24 @@ static void TryInitializeDevice(uint32_t devaddr)
 	}
 }
 
+static bool OnDevice(uint32_t devaddr, const pciid_t*, const pcitype_t*, void*,
+                     void*)
+{
+	TryInitializeDevice(devaddr);
+	return true;
+}
+
 void Init()
 {
-	pcifind_t bga_pcifind;
-	memset(&bga_pcifind, 255, sizeof(bga_pcifind));
-	bga_pcifind.vendorid = 0x1234;
-	bga_pcifind.deviceid = 0x1111;
+	pcifind_t patterns[2];
+	memset(&patterns[0], 255, sizeof(patterns[0]));
+	patterns[0].vendorid = 0x1234;
+	patterns[0].deviceid = 0x1111;
+	memset(&patterns[1], 255, sizeof(patterns[1]));
+	patterns[1].vendorid = 0x80EE;
+	patterns[1].deviceid = 0xBEEF;
 
-	uint32_t devaddr = 0;
-	while ( (devaddr = PCI::SearchForDevices(bga_pcifind, devaddr)) )
-		TryInitializeDevice(devaddr);
-
-	memset(&bga_pcifind, 255, sizeof(bga_pcifind));
-	bga_pcifind.vendorid = 0x80EE;
-	bga_pcifind.deviceid = 0xBEEF;
-
-	devaddr = 0;
-	while ( (devaddr = PCI::SearchForDevices(bga_pcifind, devaddr)) )
-		TryInitializeDevice(devaddr);
+	PCI::Search(OnDevice, NULL, patterns, 2);
 }
 
 } // namespace BGA
