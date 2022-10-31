@@ -440,7 +440,8 @@ static bool log_open(struct log* log)
 	log->fd = open(log->path, logflags, log->file_mode);
 	if ( log->fd < 0 )
 	{
-		log_error(log, "", NULL);
+		if ( errno != EROFS )
+			log_error(log, "", NULL);
 		// Don't block daemon startup on read-only filesystems.
 		return errno == EROFS;
 	}
