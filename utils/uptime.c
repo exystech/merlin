@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,8 +17,9 @@
  * Tell how long the system has been running.
  */
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <unistd.h>
@@ -53,19 +54,40 @@ void PrintElement(size_t num, const char* single, const char* multiple)
 	prefix = ", ";
 }
 
-int main(void)
+int main(int argc, char* argv[])
 {
-	struct timespec uptime;
-	if ( clock_gettime(CLOCK_BOOTTIME, &uptime) < 0 )
-		error(1, errno, "clock_gettime(CLOCK_BOOTTIME)");
+	bool raw = false;
+	bool pretty = false;
 
-	uintmax_t usecssinceboot = uptime.tv_sec * 1000000ULL +
-	                           uptime.tv_nsec / 1000ULL;
-	PrintElement(Days(usecssinceboot), "day", "days");
-	PrintElement(Hours(usecssinceboot), "hour", "hours");
-	PrintElement(Minutes(usecssinceboot), "min", "mins");
-	PrintElement(Seconds(usecssinceboot), "sec", "secs");
-	printf("\n");
+	int opt;
+	while ( (opt = getopt(argc, argv, "pr")) != -1 )
+	{
+		switch ( opt )
+		{
+		case 'p': pretty = true; raw = false; break;
+		case 'r': raw = true; pretty = false; break;
+		default: return 1;
+		}
+	}
+
+
+	struct timespec uptime;
+	clock_gettime(CLOCK_BOOTTIME, &uptime);
+
+	if ( raw )
+		printf("%ji.%09li\n", (intmax_t) uptime.tv_sec, uptime.tv_nsec);
+	else if ( pretty )
+	{
+		uintmax_t usecssinceboot = uptime.tv_sec * 1000000ULL +
+			                       uptime.tv_nsec / 1000ULL;
+		PrintElement(Days(usecssinceboot), "day", "days");
+		PrintElement(Hours(usecssinceboot), "hour", "hours");
+		PrintElement(Minutes(usecssinceboot), "min", "mins");
+		PrintElement(Seconds(usecssinceboot), "sec", "secs");
+		printf("\n");
+	}
+	else
+		printf("up %ji.%09li s\n", (intmax_t) uptime.tv_sec, uptime.tv_nsec);
 
 	return 0;
 }
