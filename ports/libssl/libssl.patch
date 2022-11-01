@@ -26,7 +26,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
  			unix_dg_tmp_socket = unix_dg_tmp_socket_buf;
  		}
  	}
-@@ -1405,7 +1412,8 @@
+@@ -1403,7 +1410,8 @@
  	memset(&cmsgbuf, 0, sizeof(cmsgbuf));
  	memset(&iov, 0, sizeof(iov));
  
@@ -36,7 +36,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
  	mh.msg_controllen = sizeof(cmsgbuf.buf);
  	cmsg = CMSG_FIRSTHDR(&mh);
  	cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-@@ -1442,6 +1450,7 @@
+@@ -1440,6 +1448,7 @@
  void
  atelnet(int nfd, unsigned char *buf, unsigned int size)
  {
@@ -44,7 +44,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
  	unsigned char *p, *end;
  	unsigned char obuf[4];
  
-@@ -1467,6 +1476,9 @@
+@@ -1465,6 +1474,9 @@
  		if (atomicio(vwrite, nfd, obuf, 3) != 3)
  			warn("Write Error!");
  	}
@@ -53,8 +53,8 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
 +#endif
  }
  
- 
-@@ -1581,16 +1593,20 @@
+ int
+@@ -1578,16 +1590,20 @@
  			err(1, NULL);
  	}
  	if (Tflag != -1) {
@@ -77,7 +77,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
  			errno = ENOPROTOOPT;
  			err(1, "set IPv6 traffic class not supported");
  		}
-@@ -1608,13 +1624,16 @@
+@@ -1605,13 +1621,16 @@
  	}
  
  	if (ttl != -1) {
@@ -96,7 +96,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
  	}
  
  	if (minttl != -1) {
-@@ -1652,7 +1671,9 @@
+@@ -1649,7 +1668,9 @@
  		{ "af41",		IPTOS_DSCP_AF41 },
  		{ "af42",		IPTOS_DSCP_AF42 },
  		{ "af43",		IPTOS_DSCP_AF43 },
@@ -106,7 +106,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
  		{ "cs0",		IPTOS_DSCP_CS0 },
  		{ "cs1",		IPTOS_DSCP_CS1 },
  		{ "cs2",		IPTOS_DSCP_CS2 },
-@@ -1662,11 +1683,21 @@
+@@ -1659,11 +1680,21 @@
  		{ "cs6",		IPTOS_DSCP_CS6 },
  		{ "cs7",		IPTOS_DSCP_CS7 },
  		{ "ef",			IPTOS_DSCP_EF },
