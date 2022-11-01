@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2017, 2020, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017, 2020, 2021, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -220,4 +220,18 @@ char** read_lines_file(const char* path, size_t* out_count)
 	fclose(fp);
 	*out_count = count;
 	return lines;
+}
+
+// TODO: Hack to support installing from a read-only root filesystem.
+#undef mkdtemp
+char* mkdtemp_hack(char* templ)
+{
+	if ( mkdtemp(templ) )
+		return templ;
+	if ( errno != EROFS )
+		return NULL;
+	memcpy(templ + 1, "dev", 3);
+	mkdir("/dev/tmp", 01777);
+	setenv("TMPDIR", "/dev/tmp", 1);
+	return mkdtemp(templ);
 }

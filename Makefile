@@ -72,10 +72,13 @@ else
   SORTIX_INCLUDE_SOURCE?=yes
 endif
 
+ISO_MOUNT?=no
+
 include build-aux/dirs.mak
 
 BUILD_NAME:=sortix-$(RELEASE)-$(MACHINE)
 
+CHAIN_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).chain.initrd
 LIVE_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).live.initrd
 OVERLAY_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).overlay.initrd
 SRC_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).src.initrd
@@ -450,6 +453,24 @@ release-all-archs:
 
 # Initial ramdisk
 
+$(CHAIN_INITRD).uuid:
+	mkdir -p `dirname $@`
+	uuidgen > $@
+
+$(CHAIN_INITRD): $(CHAIN_INITRD).uuid sysroot
+	mkdir -p `dirname $(CHAIN_INITRD)`
+	rm -rf $(CHAIN_INITRD).d
+	mkdir -p $(CHAIN_INITRD).d
+	mkdir -p $(CHAIN_INITRD).d/etc
+	echo "UUID=`cat $(CHAIN_INITRD).uuid` / iso9660 ro 0 1" > $(CHAIN_INITRD).d/etc/fstab
+	mkdir -p $(CHAIN_INITRD).d/etc/init
+	echo require chain exit-code > $(CHAIN_INITRD).d/etc/init/default
+	mkdir -p $(CHAIN_INITRD).d/sbin
+	cp "$(SYSROOT)/sbin/init" $(CHAIN_INITRD).d/sbin
+	cp "$(SYSROOT)/sbin/iso9660fs" $(CHAIN_INITRD).d/sbin
+	mkinitrd --format=sortix-initrd-2 $(CHAIN_INITRD).d -o $(CHAIN_INITRD)
+	rm -rf $(CHAIN_INITRD).d
+
 $(LIVE_INITRD): sysroot
 	mkdir -p `dirname $(LIVE_INITRD)`
 	rm -rf $(LIVE_INITRD).d
@@ -496,6 +517,42 @@ $(SORTIX_BUILDS_DIR):
 
 # Bootable images
 
+ifeq ($(ISO_MOUNT),yes)
+
+$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso: sysroot $(CHAIN_INITRD) $(CHAIN_INITRD).uuid $(SORTIX_BUILDS_DIR)
+	rm -rf $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
+	mkdir -p $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
+	mkdir -p $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot
+	cp "$(SYSROOT)/boot/sortix.bin" $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix.bin
+	cp $(CHAIN_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix.initrd
+	mkdir -p $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/etc
+	echo "UUID=`cat $(CHAIN_INITRD).uuid` / iso9660 ro 0 1" > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/etc/fstab
+	mkdir -p $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/etc/init
+	echo require single-user exit-code > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/etc/init/default
+	echo "root::0:0:root:/root:sh" > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/etc/passwd
+	echo "include /etc/default/passwd.d/*" >> $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/etc/passwd
+	echo "root::0:root" > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/etc/group
+	echo "include /etc/default/group.d/*" >> $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/etc/group
+	(echo 'channel = $(CHANNEL)' && \
+	 echo 'release_key = $(RELEASE_KEY)' && \
+	 echo 'release_sig_url = $(RELEASE_SIG_URL)') > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/etc/upgrade.conf
+	mkdir -p $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/home
+	mkdir -p $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/root -m 700
+	cp -RT "$(SYSROOT)/etc/skel" $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/root
+	(echo "You can view the documentation for new users by typing:" && \
+	 echo && \
+	 echo "  man user-guide" && \
+	 echo && \
+	 echo "You can view the installation instructions by typing:" && \
+	 echo && \
+	 echo "  man installation") > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/root/welcome
+	mkdir -p $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/grub
+	build-aux/iso-grub-cfg.sh --platform $(HOST) --version $(VERSION) --mount $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
+	grub-mkrescue -o $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso sysroot $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso -- -volid Sortix -volset_id `cat $(CHAIN_INITRD).uuid`
+	rm -rf $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
+
+else
+
 $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso: sysroot $(LIVE_INITRD) $(OVERLAY_INITRD) $(SRC_INITRD) $(SYSTEM_INITRD) $(SORTIX_BUILDS_DIR)
 	rm -rf $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 	mkdir -p $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
@@ -535,6 +592,8 @@ else # none
 	grub-mkrescue -o $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 endif
 	rm -rf $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
+
+endif
 
 .PHONY: iso
 iso: $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso
