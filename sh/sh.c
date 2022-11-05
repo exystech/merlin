@@ -58,6 +58,7 @@ static const char* builtin_commands[] =
 	"exit",
 	"unset",
 	"clearenv",
+	"history",
 	(const char*) NULL,
 };
 
@@ -1339,6 +1340,19 @@ struct execute_result execute(char** tokens,
 			error(0, errno, "setenv");
 			status = 1;
 		}
+	}
+
+	if ( strcmp(argv[0], "history") == 0 )
+	{
+		for ( size_t i = 0; i < edit_state.history_used; i++ )
+		{
+			const char* line = edit_state.history[i];
+			if ( fprintf(stdout, "%5zu  %s\n", i + 1, line) < 0 )
+				err(1, "stdout");
+		}
+		if ( fflush(stdout) == EOF )
+			err(1, "stdout");
+		exit(0);
 	}
 
 	execvp(argv[0], argv);
