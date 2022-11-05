@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,6 +18,9 @@
  */
 
 #include <assert.h>
+#include <ctype.h>
+#include <err.h>
+#include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -493,6 +496,161 @@ void edit_line_type_complete(struct edit_line* edit_state)
 	free(completions);
 
 	free(partial);
+}
+
+static size_t get_histsize(void)
+{
+	const char* histfile = getenv("HISTSIZE");
+	if ( histfile && isdigit(*histfile) )
+	{
+		errno = 0;
+		char* end;
+		size_t value = strtoul(histfile, &end, 10);
+		// Enforce a reasonable upper limit to avoid OOM on misconfigurations,
+		// when users try to have unlimited history size, but the below saving
+		// will allocate an array of this size.
+		if ( 1048576 <= value )
+			value = 1048576;
+		if ( !errno && !*end )
+			return value;
+	}
+	return 500;
+}
+
+bool edit_line_history_load(struct edit_line* edit_state, const char* path)
+{
+	if ( !path )
+		return true;
+	FILE* fp = fopen(path, "r");
+	if ( !fp )
+	{
+		if ( errno == ENOENT )
+			return true;
+		warn("%s", path);
+		return false;
+	}
+	char* line = NULL;
+	size_t line_size;
+	ssize_t line_length;
+	while ( 0 < (line_length = getline(&line, &line_size, fp)) )
+	{
+		if ( line[line_length - 1] == '\n' )
+			line[--line_length] = '\0';
+		edit_line_append_history(edit_state, line);
+	}
+	edit_state->history_begun = edit_state->history_used;
+	if ( ferror(fp) )
+		warn("read: %s", path);
+	free(line);
+	fclose(fp);
+	return true;
+}
+
+bool edit_line_history_save(struct edit_line* edit_state, const char* path)
+{
+	size_t histsize = get_histsize();
+	if ( !path || !histsize )
+		return true;
+	// Avoid replacing the null device if used to disable the history.
+	if ( !strcmp(path, "/dev/null") )
+		return true;
+	// TODO: File locking is a better alternative to replacing the actual file.
+	//       A temporary file rename is used to atomically replace the contents
+	//       but may lose the race with other processes.
+	char* tmp;
+	if ( asprintf(&tmp, "%s.XXXXXXXXX", path) < 0 )
+	{
+		warn("malloc");
+		return false;
+	}
+	int fd = mkstemp(tmp);
+	if ( fd < 0 )
+	{
+		if ( errno == EROFS )
+			return true;
+		warn("%s", path);
+		return false;
+	}
+	FILE* fpout = fdopen(fd, "w");
+	if ( !fpout )
+	{
+		warn("%s", path);
+		close(fd);
+		unlink(tmp);
+		free(tmp);
+		return false;
+	}
+	// Merge with any updated history.
+	bool success = true;
+	char** history = calloc(sizeof(char*), histsize);
+	if ( !history )
+		warn("malloc"), success = false;
+	size_t first = 0;
+	size_t used = 0;
+	FILE* fpin;
+	if ( success && (fpin = fopen(path, "r")) )
+	{
+		char* line = NULL;
+		size_t line_size;
+		ssize_t line_length;
+		while ( 0 < (line_length = getline(&line, &line_size, fpin)) )
+		{
+			if ( line[line_length - 1] == '\n' )
+				line[--line_length] = '\0';
+			size_t n = (first + used) % histsize;
+			if ( history[n] )
+				free(history[n]);
+			history[n] = line;
+			if ( used == histsize )
+				first = (first + 1) % histsize;
+			else
+				used++;
+			line = NULL;
+		}
+		if ( ferror(fpin) )
+			warn("read: %s", path), success = false;
+		fclose(fpin);
+	}
+	else if ( errno != ENOENT )
+		warn("%s", path);
+	for ( size_t i = edit_state->history_begun;
+	      success && i < edit_state->history_used;
+	      i++ )
+	{
+		char* line = strdup(edit_state->history[i]);
+		if ( !line )
+		{
+			warn("malloc");
+			success = false;
+			break;
+		}
+		size_t n = (first + used) % histsize;
+		if ( history[n] )
+			free(history[n]);
+		history[n] = line;
+		if ( used == histsize )
+			first = (first + 1) % histsize;
+		else
+			used++;
+		line = NULL;
+	}
+	for ( size_t i = 0; i < used; i++ )
+	{
+		size_t n = (first + i) % histsize;
+		char* line = history[n];
+		if ( success && fprintf(fpout, "%s\n", line) < 0 )
+			warn("%s", tmp), success = false;
+		free(line);
+	}
+	int ret = fclose(fpout);
+	if ( success && ret == EOF )
+		warn("%s", path), success = false;
+	if ( success && rename(tmp, path) < 0 )
+		warn("rename: %s -> %s", tmp, path), success = false;
+	if ( !success )
+		unlink(tmp);
+	free(tmp);
+	return success;
 }
 
 #define SORTIX_LFLAGS (ISORTIX_KBKEY | ISORTIX_CHARS_DISABLE | ISORTIX_32BIT | \

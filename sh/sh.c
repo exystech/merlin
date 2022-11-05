@@ -23,6 +23,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
+#include <err.h>
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
@@ -51,7 +52,7 @@
 #include "showline.h"
 #include "util.h"
 
-const char* builtin_commands[] =
+static const char* builtin_commands[] =
 {
 	"cd",
 	"exit",
@@ -60,8 +61,9 @@ const char* builtin_commands[] =
 	(const char*) NULL,
 };
 
-int status = 0;
-bool foreground_shell;
+static bool foreground_shell;
+static int status = 0;
+static struct edit_line edit_state;
 
 static bool is_proper_absolute_path(const char* path)
 {
@@ -1852,7 +1854,6 @@ void read_command_interactive(struct sh_read_command* sh_read_command)
 {
 	update_env();
 
-	static struct edit_line edit_state; // static to preserve command history.
 	edit_state.in_fd = 0;
 	edit_state.out_fd = 1;
 	edit_state.check_input_incomplete_context = NULL;
@@ -2010,12 +2011,12 @@ void read_command_non_interactive(struct sh_read_command* sh_read_command,
 	sh_read_command->command = command;
 }
 
-int run(FILE* fp,
-        const char* fp_name,
-        bool interactive,
-        bool exit_on_error,
-        bool* script_exited,
-        int status)
+static int run(FILE* fp,
+               const char* fp_name,
+               bool interactive,
+               bool exit_on_error,
+               bool* script_exited,
+               int status)
 {
 	// TODO: The interactive read code should cope when the input is not a
 	//       terminal; it should print the prompt and then read normally without
@@ -2062,6 +2063,38 @@ int run(FILE* fp,
 	}
 
 	return status;
+}
+
+static int top(FILE* fp,
+               const char* fp_name,
+               bool interactive,
+               bool exit_on_error,
+               bool* script_exited,
+               int status)
+{
+	if ( interactive )
+	{
+		const char* home;
+		const char* histfile = getenv("HISTFILE");
+		if ( !histfile && (home = getenv("HOME")) )
+		{
+			char* path;
+			if ( asprintf(&path, "%s/.sh_history", home) < 0 ||
+			     setenv("HISTFILE", path, 1) < 0 )
+				err(1, "malloc");
+			free(path);
+			histfile = getenv("HISTFILE");
+		}
+
+		edit_line_history_load(&edit_state, histfile);
+	}
+
+	int r = run(fp, fp_name, interactive, exit_on_error, script_exited, status);
+
+	if ( interactive )
+		edit_line_history_save(&edit_state, getenv("HISTFILE"));
+
+	return r;
 }
 
 static void compact_arguments(int* argc, char*** argv)
@@ -2243,7 +2276,7 @@ int main(int argc, char* argv[])
 		if ( !fp )
 			error(2, errno, "fmemopen");
 
-		status = run(fp, "<command-line>", false, flag_e_exit_on_error,
+		status = top(fp, "<command-line>", false, flag_e_exit_on_error,
 		             &script_exited, status);
 
 		fclose(fp);
@@ -2254,7 +2287,7 @@ int main(int argc, char* argv[])
 		if ( flag_s_stdin )
 		{
 			bool is_interactive = flag_i_interactive || isatty(fileno(stdin));
-			status = run(stdin, "<stdin>", is_interactive, flag_e_exit_on_error,
+			status = top(stdin, "<stdin>", is_interactive, flag_e_exit_on_error,
 			             &script_exited, status);
 			if ( script_exited || (status != 0 && flag_e_exit_on_error) )
 				exit(status);
@@ -2270,7 +2303,7 @@ int main(int argc, char* argv[])
 		}
 
 		bool is_interactive = flag_i_interactive || isatty(fileno(stdin));
-		status = run(stdin, "<stdin>", is_interactive, flag_e_exit_on_error,
+		status = top(stdin, "<stdin>", is_interactive, flag_e_exit_on_error,
 		             &script_exited, status);
 		if ( script_exited || (status != 0 && flag_e_exit_on_error) )
 			exit(status);
@@ -2288,7 +2321,7 @@ int main(int argc, char* argv[])
 		FILE* fp = fopen(path, "r");
 		if ( !fp )
 			error(127, errno, "%s", path);
-		status = run(fp, path, false, flag_e_exit_on_error, &script_exited,
+		status = top(fp, path, false, flag_e_exit_on_error, &script_exited,
 		             status);
 		fclose(fp);
 		if ( script_exited || (status != 0 && flag_e_exit_on_error) )
@@ -2297,7 +2330,7 @@ int main(int argc, char* argv[])
 	else
 	{
 		bool is_interactive = flag_i_interactive || isatty(fileno(stdin));
-		status = run(stdin, "<stdin>", is_interactive, flag_e_exit_on_error,
+		status = top(stdin, "<stdin>", is_interactive, flag_e_exit_on_error,
 		             &script_exited, status);
 		if ( script_exited || (status != 0 && flag_e_exit_on_error) )
 			exit(status);

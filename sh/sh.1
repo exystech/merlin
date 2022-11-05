@@ -61,7 +61,14 @@ argument before reading normally from the standard input
 .Sh ENVIRONMENT
 .Nm
 uses environment these variables:
-.Bl -tag -width "SHLVL"
+.Bl -tag -width "HISTFILE"
+.It Ev HISTFILE
+Save the shell history in this file.
+The default is
+.Pa ~/.sh_history .
+.It Ev HISTSIZE
+Maximum number of commands in the saved shell history.
+The default is 500.
 .It Ev HOME
 The user's home directory
 .Sq ( ~ ) .
@@ -94,6 +101,11 @@ The
 environment variable takes precedence over this file if set.
 .Xr dash 1
 is used by default if it is installed.
+.It Pa ~/.sh_history
+The saved shell history.
+This location is controlled by the
+.Ev HISTFILE
+environment variable.
 .El
 .Sh EXIT STATUS
 .Nm

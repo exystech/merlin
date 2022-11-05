@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -38,6 +38,7 @@ struct edit_line
 	size_t history_used;
 	size_t history_length;
 	size_t history_target;
+	size_t history_begun;
 	void* check_input_incomplete_context;
 	bool (*check_input_incomplete)(void*, const char*);
 	void* trap_eof_opportunity_context;
@@ -81,6 +82,8 @@ void edit_line_type_clear(struct edit_line* edit_state);
 void edit_line_type_delete_word_before(struct edit_line* edit_state);
 int edit_line_completion_sort(const void* a_ptr, const void* b_ptr);
 void edit_line_type_complete(struct edit_line* edit_state);
+bool edit_line_history_load(struct edit_line* edit_state, const char* path);
+bool edit_line_history_save(struct edit_line* edit_state, const char* path);
 void edit_line(struct edit_line* edit_state);
 
 #endif
