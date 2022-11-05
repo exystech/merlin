@@ -214,13 +214,16 @@ bool login(const char* username)
 	int pipe_fds[2];
 	if ( pipe2(pipe_fds, O_CLOEXEC) < 0 )
 		return false;
+	char* login_shell;
+	if ( asprintf(&login_shell, "-%s", pwd->pw_shell) < 0 )
+		return close(pipe_fds[0]), close(pipe_fds[1]), false;
 	sigset_t oldset, sigttou;
 	sigemptyset(&sigttou);
 	sigaddset(&sigttou, SIGTTOU);
 	sigprocmask(SIG_BLOCK, &sigttou, &oldset);
 	pid_t child_pid = fork();
 	if ( child_pid < 0 )
-		return close(pipe_fds[0]), close(pipe_fds[1]), false;
+		return free(login_shell), close(pipe_fds[0]), close(pipe_fds[1]), false;
 	if ( child_pid == 0 )
 	{
 		sigdelset(&oldset, SIGINT);
@@ -253,10 +256,11 @@ bool login(const char* username)
 		 errno != ENOENT && errno != EACCES) ||
 		(execlp("/etc/session", "/etc/session", (const char*) NULL) < 0 &&
 		 errno != ENOENT && errno != EACCES) ||
-		execlp(pwd->pw_shell, pwd->pw_shell, (const char*) NULL));
+		execlp(pwd->pw_shell, login_shell, (const char*) NULL));
 		write(pipe_fds[1], &errno, sizeof(errno));
 		_exit(127);
 	}
+	free(login_shell);
 	close(pipe_fds[1]);
 	int errnum;
 	if ( readall(pipe_fds[0], &errnum, sizeof(errnum)) < (ssize_t) sizeof(errnum) )

@@ -6,10 +6,10 @@
 .Nd shell command interpreter
 .Sh SYNOPSIS
 .Nm sh
-.Op Fl ceis
+.Op Fl ceils
 .Op Ar script Oo argument ... Oc
 .Nm sortix-sh
-.Op Fl ceis
+.Op Fl ceils
 .Op Ar script Oo argument ... Oc
 .Sh DESCRIPTION
 .Nm
@@ -50,6 +50,15 @@ argument contains the script's text instead of a path to the script file.
 Exit if any command exit non-zero.
 .It Fl i
 Interactively read and execute commands.
+.It Fl l
+The shell is a login shell.
+Interactive shells run the
+.Xr profile 5
+script on startup instead of the
+.Xr shrc
+script.
+This option is set if the shell is invoked by a name starting with a dash
+.Sq - .
 .It Fl s
 Read commands from the standard input (the default).
 This option can be combined with the
@@ -62,6 +71,12 @@ argument before reading normally from the standard input
 .Nm
 uses environment these variables:
 .Bl -tag -width "HISTFILE"
+.It Ev ENV
+File to execute on non-login interactive startup instead of
+.Pa ~/.shrc
+per
+.Xr shrc 5 .
+This variable is subject to path expansion.
 .It Ev HISTFILE
 Save the shell history in this file.
 The default is
@@ -93,6 +108,9 @@ This variable takes precedence over
 .El
 .Sh FILES
 .Bl -tag -width "/etc/proper-sh" -compact
+.It Pa ~/.profile , /etc/profile , /etc/default/profile
+.Xr profile 5
+script whose commands are run on non-login interactive shell startup.
 .It Pa /etc/proper-sh
 Name of a better shell to use for non-interactive use per
 .Xr proper-sh 5 .
@@ -106,6 +124,12 @@ The saved shell history.
 This location is controlled by the
 .Ev HISTFILE
 environment variable.
+.It Pa ~/.shrc , /etc/shrc , /etc/default/shrc
+.Xr shrc 5
+script whose commands are run on login interactive shell startup.
+The
+.Ev ENV
+environment variable overrides the search for the script if set.
 .El
 .Sh EXIT STATUS
 .Nm
@@ -113,6 +137,8 @@ exits with the same exit status as the last run command, or 0 if no command has
 been run.
 .Sh SEE ALSO
 .Xr dash 1 ,
+.Xr profile 5 ,
 .Xr proper-sh 5 ,
 .Xr session 5 ,
+.Xr shrc 5 ,
 .Xr login 8

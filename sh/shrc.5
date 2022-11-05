@@ -1,0 +1,81 @@
+.Dd November 9, 2022
+.Dt SHRC 5
+.Os
+.Sh NAME
+.Nm shrc
+.Nd login shell startup
+.Sh SYNOPSIS
+.Nm $ENV
+.Nm ~/.shrc
+.Nm /etc/shrc
+.Nm /etc/default/shrc
+.Sh DESCRIPTION
+Interactive non-login shell sessions in
+.Xr sh 1
+execute the commands in the
+.Nm
+script upon startup, using the
+.Pa ENV
+environment variable with path expansion if set, and otherwise searching for the
+user's script at
+.Pa ~/.shrc ,
+any system administrator provided script at
+.Pa /etc/shrc ,
+or any operating system provided script at
+.Pa /etc/default/shrc ,
+whichever exists first.
+.Pp
+The
+.Xr profile 5
+script is run instead in interactive login shell sessions.
+.Sh ENVIRONMENT
+.Bl -tag -width "ENV"
+.It Ev ENV
+File to execute on non-login interactive startup instead of searching the
+standard paths for the
+.Nm
+script.
+This variable is subject to path expansion.
+.El
+.Sh FILES
+.Bl -tag -width "/etc/default/shrc" -compact
+.It Pa ~/.shrc
+The user's
+.Nm
+script.
+.It Pa /etc/shrc
+The system administor provided
+.Nm
+script.
+.It Pa /etc/default/shrc
+The operating system provided
+.Nm
+script.
+.El
+.Sh SEE ALSO
+.Xr dash 1 ,
+.Xr sh 1 ,
+.Xr shrc 5
+.Sh CAVEATS
+.Xr dash
+does not use the
+.Nm
+script, but instead only uses the
+.Ev ENV
+environment variable.
+To invoke the
+.Nm
+script portably across all standard shells upon startup of non-interactive login
+sells, set the
+.Ev ENV
+variable to the user's
+.Nm
+script per the example in
+.Xr profile 5 .
+.Sh BUGS
+.Xr sh 1
+is currently primitive and cannot execute most scripts.
+Beware of sharing the
+.Nm
+script between it and other shells such as
+.Xr dash 1 .

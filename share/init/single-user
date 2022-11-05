@@ -6,4 +6,4 @@ need tty
 
 cd "$HOME"
 exit-code-meaning poweroff-reboot
-exec "$SHELL"
+exec "$SHELL" -l

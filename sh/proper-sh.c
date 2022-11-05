@@ -42,6 +42,7 @@ static bool is_supported(int argc, char* argv[])
 			{
 			case 'e': break;
 			case 'i': break;
+			case 'l': break;
 			case 's': break;
 			default: return false;
 			}

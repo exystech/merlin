@@ -2079,36 +2079,81 @@ static int run(FILE* fp,
 	return status;
 }
 
+static char* find_rc(bool login)
+{
+	const char* env = getenv("ENV");
+	if ( !login && env )
+	{
+		// TODO: Path expansion.
+		char* result = strdup(env);
+		if ( !result )
+			err(1, "malloc");
+		return result;
+	}
+	const char* home = getenv("HOME");
+	const char* rcname = login ? "profile" : "shrc";
+	const char* dirs[] = { home, "/etc", "/etc/default" };
+	bool found = false;
+	for ( size_t i = 0; !found && i < sizeof(dirs) / sizeof(dirs[0]); i++ )
+	{
+		char* rc;
+		if ( asprintf(&rc, "%s%s%s", dirs[i], i ? "/" : "/.", rcname) < 0 )
+			err(1, "malloc");
+		if ( (found = !access(rc, F_OK)) )
+			return rc;
+	}
+	return NULL;
+}
+
 static int top(FILE* fp,
                const char* fp_name,
                bool interactive,
                bool exit_on_error,
+               bool login,
                bool* script_exited,
                int status)
 {
 	if ( interactive )
 	{
-		const char* home;
+		const char* home = getenv("HOME");
 		const char* histfile = getenv("HISTFILE");
-		if ( !histfile && (home = getenv("HOME")) )
+		if ( !histfile && home )
 		{
 			char* path;
 			if ( asprintf(&path, "%s/.sh_history", home) < 0 ||
 			     setenv("HISTFILE", path, 1) < 0 )
 				err(1, "malloc");
 			free(path);
-			histfile = getenv("HISTFILE");
 		}
 
-		edit_line_history_load(&edit_state, histfile);
+		char* rc = find_rc(login);
+		if ( rc )
+		{
+			FILE* rcfp = fopen(rc, "r");
+			if ( !rcfp )
+				warn("%s", rc);
+			else
+			{
+				status = run(rcfp, rc, false, exit_on_error, script_exited,
+				             status);
+				fclose(rcfp);
+			}
+			free(rc);
+		}
+
+		if ( *script_exited || (status != 0 && exit_on_error) )
+			return status;
+
+		edit_line_history_load(&edit_state, getenv("HISTFILE"));
 	}
 
-	int r = run(fp, fp_name, interactive, exit_on_error, script_exited, status);
+	status = run(fp, fp_name, interactive, exit_on_error, script_exited,
+	             status);
 
 	if ( interactive )
 		edit_line_history_save(&edit_state, getenv("HISTFILE"));
 
-	return r;
+	return status;
 }
 
 static void compact_arguments(int* argc, char*** argv)
@@ -2186,8 +2231,10 @@ int main(int argc, char* argv[])
 	bool flag_c_first_operand_is_command = false;
 	bool flag_e_exit_on_error = false;
 	bool flag_i_interactive = false;
+	bool flag_l_login = argv[0][0] == '-';
 	bool flag_s_stdin = false;
 
+	// The well implemented options are recognized in proper-sh.c.
 	const char* argv0 = argv[0];
 	for ( int i = 1; i < argc; i++ )
 	{
@@ -2205,6 +2252,7 @@ int main(int argc, char* argv[])
 			case 'c': flag_c_first_operand_is_command = false; break;
 			case 'e': flag_e_exit_on_error = false; break;
 			case 'i': flag_i_interactive = false; break;
+			case 'l': flag_l_login = false; break;
 			case 's': flag_s_stdin = false; break;
 			default:
 				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
@@ -2220,6 +2268,7 @@ int main(int argc, char* argv[])
 			case 'c': flag_c_first_operand_is_command = true; break;
 			case 'e': flag_e_exit_on_error = true; break;
 			case 'i': flag_i_interactive = true; break;
+			case 'l': flag_l_login = true; break;
 			case 's': flag_s_stdin = true; break;
 			default:
 				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
@@ -2261,7 +2310,7 @@ int main(int argc, char* argv[])
 	char ppidstr[3 * sizeof(pid_t)];
 	snprintf(pidstr, sizeof(pidstr), "%ji", (intmax_t) getpid());
 	snprintf(ppidstr, sizeof(ppidstr), "%ji", (intmax_t) getppid());
-	setenv("SHELL", argv[0], 1);
+	setenv("SHELL", argv[0] + (argv[0][0] == '-'), 1);
 	setenv("$", pidstr, 1);
 	setenv("PPID", ppidstr, 1);
 	setenv("?", "0", 1);
@@ -2291,7 +2340,7 @@ int main(int argc, char* argv[])
 			error(2, errno, "fmemopen");
 
 		status = top(fp, "<command-line>", false, flag_e_exit_on_error,
-		             &script_exited, status);
+		             flag_l_login, &script_exited, status);
 
 		fclose(fp);
 
@@ -2302,7 +2351,7 @@ int main(int argc, char* argv[])
 		{
 			bool is_interactive = flag_i_interactive || isatty(fileno(stdin));
 			status = top(stdin, "<stdin>", is_interactive, flag_e_exit_on_error,
-			             &script_exited, status);
+			             flag_l_login, &script_exited, status);
 			if ( script_exited || (status != 0 && flag_e_exit_on_error) )
 				exit(status);
 		}
@@ -2318,7 +2367,7 @@ int main(int argc, char* argv[])
 
 		bool is_interactive = flag_i_interactive || isatty(fileno(stdin));
 		status = top(stdin, "<stdin>", is_interactive, flag_e_exit_on_error,
-		             &script_exited, status);
+		             flag_l_login, &script_exited, status);
 		if ( script_exited || (status != 0 && flag_e_exit_on_error) )
 			exit(status);
 	}
@@ -2335,8 +2384,8 @@ int main(int argc, char* argv[])
 		FILE* fp = fopen(path, "r");
 		if ( !fp )
 			error(127, errno, "%s", path);
-		status = top(fp, path, false, flag_e_exit_on_error, &script_exited,
-		             status);
+		status = top(fp, path, false, flag_e_exit_on_error, flag_l_login,
+		             &script_exited, status);
 		fclose(fp);
 		if ( script_exited || (status != 0 && flag_e_exit_on_error) )
 			exit(status);
@@ -2345,7 +2394,7 @@ int main(int argc, char* argv[])
 	{
 		bool is_interactive = flag_i_interactive || isatty(fileno(stdin));
 		status = top(stdin, "<stdin>", is_interactive, flag_e_exit_on_error,
-		             &script_exited, status);
+		             flag_l_login, &script_exited, status);
 		if ( script_exited || (status != 0 && flag_e_exit_on_error) )
 			exit(status);
 	}

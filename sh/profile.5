@@ -1,0 +1,59 @@
+.Dd November 9, 2022
+.Dt PROFILE 5
+.Os
+.Sh NAME
+.Nm profile
+.Nd login shell startup
+.Sh SYNOPSIS
+.Nm ~/.profile
+.Nm /etc/profile
+.Nm /etc/default/profile
+.Sh DESCRIPTION
+Interactive login shell sessions in
+.Xr sh 1
+execute the commands in the
+.Nm
+script upon startup, searching for the user's script at
+.Pa ~/.profile ,
+any system administrator provided script at
+.Pa /etc/profile ,
+or any operating system provided script at
+.Pa /etc/default/profile ,
+whichever exists first.
+.Pp
+The
+.Xr shrc 5
+script is run instead in interactive non-login shell sessions.
+.Sh FILES
+.Bl -tag -width "/etc/default/profile" -compact
+.It Pa ~/.profile
+The user's
+.Nm
+script.
+.It Pa /etc/profile
+The system administor provided
+.Nm
+script.
+.It Pa /etc/default/profile
+The operating system provided
+.Nm
+script.
+.El
+.Sh EXAMPLES
+To portably run the
+.Xr shrc 5
+script upon startup of non-login interactive shells in all shells:
+.Bd -literal -offset indent
+export ENV="$HOME/.shrc"
+.Ed
+.Sh SEE ALSO
+.Xr dash 1 ,
+.Xr sh 1 ,
+.Xr shrc 5
+.Sh BUGS
+.Xr sh 1
+is currently primitive and cannot execute most scripts.
+Beware of sharing the
+.Nm
+script between it and other shells such as
+.Xr dash 1 .
