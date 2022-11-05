@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1295,7 +1295,7 @@ struct execute_result execute(char** tokens,
 		//       foreground process group, but bar dies prior to foo's tcsetpgrp
 		//       call, because then the shell would run tcsetpgrp to take back
 		//       control, and only then would foo do its tcsetpgrp call.
-		while ( foreground_shell && pgid == -1 && tcgetpgrp(0) != childpid )
+		while ( interactive && pgid == -1 && tcgetpgrp(0) != childpid )
 			sched_yield();
 
 		struct execute_result result;
@@ -1306,7 +1306,7 @@ struct execute_result execute(char** tokens,
 	}
 
 	setpgid(0, pgid != -1 ? pgid : 0);
-	if ( foreground_shell && pgid == -1 )
+	if ( interactive && pgid == -1 )
 	{
 		sigset_t oldset, sigttou;
 		sigemptyset(&sigttou);
@@ -1491,12 +1491,15 @@ readcmd:
 		//       as that may have side effects if a process checks for this
 		//       behavior and then unexpectedly the shell takes back support
 		//       without the usual ^Z mechanism.
-		sigset_t oldset, sigttou;
-		sigemptyset(&sigttou);
-		sigaddset(&sigttou, SIGTTOU);
-		sigprocmask(SIG_BLOCK, &sigttou, &oldset);
-		tcsetpgrp(0, getpgid(0));
-		sigprocmask(SIG_SETMASK, &oldset, NULL);
+		if ( interactive )
+		{
+			sigset_t oldset, sigttou;
+			sigemptyset(&sigttou);
+			sigaddset(&sigttou, SIGTTOU);
+			sigprocmask(SIG_BLOCK, &sigttou, &oldset);
+			tcsetpgrp(0, getpgid(0));
+			sigprocmask(SIG_SETMASK, &oldset, NULL);
+		}
 		pgid = -1;
 		status = 0;
 		goto readcmd;
@@ -1520,12 +1523,15 @@ readcmd:
 			status = 1;
 			return status;
 		}
-		sigset_t oldset, sigttou;
-		sigemptyset(&sigttou);
-		sigaddset(&sigttou, SIGTTOU);
-		sigprocmask(SIG_BLOCK, &sigttou, &oldset);
-		tcsetpgrp(0, getpgid(0));
-		sigprocmask(SIG_SETMASK, &oldset, NULL);
+		if ( interactive )
+		{
+			sigset_t oldset, sigttou;
+			sigemptyset(&sigttou);
+			sigaddset(&sigttou, SIGTTOU);
+			sigprocmask(SIG_BLOCK, &sigttou, &oldset);
+			tcsetpgrp(0, getpgid(0));
+			sigprocmask(SIG_SETMASK, &oldset, NULL);
+		}
 		if ( WIFSIGNALED(exitstatus) && WTERMSIG(exitstatus) == SIGINT )
 			printf("^C\n");
 		else if ( WIFSIGNALED(exitstatus) && WTERMSIG(exitstatus) != SIGPIPE )
