@@ -39,6 +39,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 #include <wchar.h>
 #include <wctype.h>
@@ -1856,6 +1857,152 @@ size_t do_complete(char*** completions_ptr,
 	return *completions_ptr = completions, completions_count;
 }
 
+static void eval_ps_append_c(struct stringbuf* buf, char c)
+{
+	if ( c == '\\' || c == '\'' || c == '"' || c == '$' || c == '`' )
+		stringbuf_append_c(buf, '\\');
+	stringbuf_append_c(buf, c);
+}
+
+static void eval_ps_append(struct stringbuf* buf, const char* str)
+{
+	for ( size_t i = 0; str[i]; i++ )
+		eval_ps_append_c(buf, str[i]);
+}
+
+static char* eval_ps(const char* ps)
+{
+	struct stringbuf buf;
+	stringbuf_begin(&buf);
+	bool escaped = false;
+	while ( *ps )
+	{
+		char c = *ps++;
+		if ( !escaped && c == '\\' )
+		{
+			escaped = true;
+			continue;
+		}
+		else if ( escaped && '0' <= c && c <= '7' )
+		{
+			unsigned char byte = c - '0';
+			if ( '0' <= *ps && *ps <= '7' )
+			{
+				byte = byte * 8 + *ps++ - '0';
+				if ( byte <= 037 && '0' <= *ps && *ps <= '7' )
+					byte = byte * 8 + *ps++ - '0';
+			}
+			eval_ps_append_c(&buf, byte);
+		}
+		else if ( escaped && c == 'a' )
+			eval_ps_append_c(&buf, '\a');
+		else if ( escaped && c == 'e' )
+			eval_ps_append_c(&buf, '\e');
+		else if ( escaped && (c == 'h' || c == 'H') )
+		{
+			char hostname[HOST_NAME_MAX + 1] = "?";
+			gethostname(hostname, sizeof(hostname));
+			if ( c == 'h' )
+				hostname[strcspn(hostname, ".")] = '\0';
+			eval_ps_append(&buf, hostname);
+		}
+		else if ( escaped && c == 'l' )
+		{
+			char* tty = ttyname(0);
+			if ( tty )
+				eval_ps_append(&buf, basename(tty));
+			else
+				eval_ps_append_c(&buf, '?');
+		}
+		else if ( escaped && c == 'n' )
+			eval_ps_append_c(&buf, '\n');
+		else if ( escaped && c == 'r' )
+			eval_ps_append_c(&buf, '\r');
+		else if ( escaped && c == 's' )
+		{
+			const char* argv0 = getenv("0");
+			if ( !argv0 )
+				argv0 = program_invocation_short_name;
+			char* base = strdup(argv0);
+			if ( !base )
+				eval_ps_append_c(&buf, '?');
+			else
+			{
+				eval_ps_append(&buf, basename(base));
+				free(base);
+			}
+		}
+		else if ( escaped && (c == 't' || c == 'T' || c == '@' || c == 'A') )
+		{
+			const char* format = "";
+			switch ( c )
+			{
+			case 't': format = "%H:%M:%S"; break;
+			case 'T': format = "%I:%M:%S"; break;
+			case '@': format = "%I:%M %p"; break;
+			case 'A': format = "%H:%M"; break;
+			}
+			time_t now = time(NULL);
+			struct tm tm;
+			localtime_r(&now, &tm);
+			char buffer[16] = "";
+			strftime(buffer, sizeof(buffer), format, &tm);
+			eval_ps_append(&buf, buffer);
+		}
+		else if ( escaped && c == 'u' )
+		{
+			char* user = getlogin();
+			eval_ps_append(&buf, user ? user : "?");
+		}
+		else if ( escaped && (c == 'w' || c == 'W') )
+		{
+			char* dir = get_current_dir_name();
+			const char* home = getenv("HOME");
+			if ( !dir )
+				eval_ps_append_c(&buf, '?');
+			else if ( c == 'w' )
+			{
+				size_t home_len = home ? strlen(home) : 0;
+				if ( home_len && !strncmp(dir, home, home_len) )
+				{
+					eval_ps_append_c(&buf, '~');
+					eval_ps_append(&buf, dir + home_len);
+				}
+				else
+					eval_ps_append(&buf, dir);
+			}
+			else if ( home && !strcmp(dir, home) )
+				eval_ps_append_c(&buf, '~');
+			else
+				eval_ps_append(&buf, basename(dir));
+			free(dir);
+		}
+		else if ( escaped && c == '$' )
+			eval_ps_append_c(&buf, getuid() == 0 ? '#' : '$');
+		else if ( escaped && (c == '[' || c == ']') )
+		{
+			// TODO: Ignoring this sequence when predicting cursor position.
+		}
+		else
+		{
+			if ( escaped || c == '\'' || c == '"' )
+				stringbuf_append_c(&buf, '\\');
+			stringbuf_append_c(&buf, c);
+		}
+		escaped = false;
+	}
+	char* string = stringbuf_finish(&buf);
+	if ( !string )
+		return NULL;
+	char* expanded = token_expand_variables(string);
+	free(string);
+	if ( !expanded )
+		return NULL;
+	char* finalized = token_finalize(expanded);
+	free(expanded);
+	return finalized;
+}
+
 struct sh_read_command
 {
 	char* command;
@@ -1877,45 +2024,15 @@ void read_command_interactive(struct sh_read_command* sh_read_command)
 	edit_state.complete_context = NULL;
 	edit_state.complete = do_complete;
 
-	char* current_dir = get_current_dir_name();
-
-	const char* print_username = getlogin();
-	if ( !print_username )
-		print_username = getuid() == 0 ? "root" : "?";
-	char hostname[HOST_NAME_MAX + 1];
-	if ( gethostname(hostname, sizeof(hostname)) < 0 )
-		strlcpy(hostname, "(none)", sizeof(hostname));
-	const char* print_hostname = hostname;
-	const char* print_dir = current_dir ? current_dir : "?";
-	const char* home_dir = getenv_safe("HOME");
-
-	const char* print_dir_1 = print_dir;
-	const char* print_dir_2 = "";
-	char prompt_char = getuid() == 0 ? '#' : '$';
-
-	size_t home_dir_len = strlen(home_dir);
-	if ( home_dir_len && strncmp(print_dir, home_dir, home_dir_len) == 0 )
-	{
-		print_dir_1 = "~";
-		print_dir_2 = print_dir + home_dir_len;
-	}
-
-	char* ps1;
-	asprintf(&ps1, "\e[;1;32m%s@%s \e[1;34m%s%s %c\e[m ",
-		print_username,
-		print_hostname,
-		print_dir_1,
-		print_dir_2,
-		prompt_char);
-
-	free(current_dir);
-
-	edit_state.ps1 = ps1;
-	edit_state.ps2 = "> ";
+	const char* def_ps1 = "\\033[;1;32m\\u@\\H \\033[1;34m\\w \\$\\033[m ";
+	const char* def_ps2 = "> ";
+	edit_state.ps1 = eval_ps(getenv_safe_def("PS1", def_ps1));
+	edit_state.ps2 = eval_ps(getenv_safe_def("PS2", def_ps2));
 
 	edit_line(&edit_state);
 
-	free(ps1);
+	free((char*) edit_state.ps1);
+	free((char*) edit_state.ps2);
 
 	if ( edit_state.abort_editing )
 	{
