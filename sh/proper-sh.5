@@ -1,0 +1,49 @@
+.Dd November 16, 2022
+.Dt PROPER-SH 5
+.Os
+.Sh NAME
+.Nm proper-sh
+.Nd name of a better non-interactive shell
+.Sh SYNOPSIS
+.Nm /etc/proper-sh
+.Sh DESCRIPTION
+The
+.Xr sh 1
+program is a thin wrapper that invokes
+.Xr sortix-sh 1
+on interactive use, but this shell is primitive and cannot execute most scripts,
+so non-interactive uses of
+.Xr sh 1
+instead searches for the name of a better shell to execute in this order:
+.Pp
+.Bl -bullet -compact
+.It
+The shell named in the
+.Ev SORTIX_SH_BACKEND
+environment variable.
+.It
+The shell named in the
+.Pa /etc/proper-sh
+file.
+.It
+.Xr dash 1 ,
+if installed.
+.It
+.Sy sortix-sh ,
+if no better shell was found.
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width "SORTIX_SH_BACKEND"
+.It Ev SORTIX_SH_BACKEND
+The name of a better non-interactive shell, taking precedence if set over the
+.Pa /etc/proper-sh
+file.
+.El
+.Sh FILES
+.Bl -tag -width "/etc/proper-sh" -compact
+.It Pa /etc/proper-sh
+File containing the name of a better non-interactive shell.
+.El
+.Sh SEE ALSO
+.Xr dash 1 ,
+.Xr sh 1

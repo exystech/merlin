@@ -1,0 +1,106 @@
+.Dd November 9, 2022
+.Dt SH 1
+.Os
+.Sh NAME
+.Nm sh
+.Nd shell command interpreter
+.Sh SYNOPSIS
+.Nm sh
+.Op Fl ceis
+.Op Ar script Oo argument ... Oc
+.Nm sortix-sh
+.Op Fl ceis
+.Op Ar script Oo argument ... Oc
+.Sh DESCRIPTION
+.Nm
+is the command line interpreter for the shell language.
+It reads and executes commands from the standard input or the
+.Ar script
+file if specified.
+.Nm
+is interactive if the standard input is a terminal and no
+.Ar script
+file was specified.
+.Pp
+The standard shell
+.Nm sortix-sh
+is currently primitive and cannot execute most scripts.
+.Nm sh
+is currently a thin wrapper that detects non-interactive use and invokes a
+better shell instead, named in the
+.Ev SORTIX_SH_BACKEND
+environment variable if set, or named in
+.Xr proper-sh 5
+if it exists, and otherwise
+.Xr dash 1
+is invoked.
+.Pp
+The options can be unset by prefixing them with a plus
+.Sq +
+instead of a dash
+.Sq - .
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl c
+The
+.Ar script
+argument contains the script's text instead of a path to the script file.
+.It Fl e
+Exit if any command exit non-zero.
+.It Fl i
+Interactively read and execute commands.
+.It Fl s
+Read commands from the standard input (the default).
+This option can be combined with the
+.Fl c
+option to execute the script text in the
+.Ar script
+argument before reading normally from the standard input
+.El
+.Sh ENVIRONMENT
+.Nm
+uses environment these variables:
+.Bl -tag -width "SHLVL"
+.It Ev HOME
+The user's home directory
+.Sq ( ~ ) .
+.It Ev PATH
+The colon-separated list of directory paths to search for programs.
+.It Ev PWD
+Set to the current working directory.
+.It Ev SHELL
+Set to
+.Nm .
+.It Ev SHLVL
+Depth of recursive shell sessions.
+The outermost interactive shell (depth 1) will currently refuse to exit on an
+end-of-file condition (^D) when on the
+.Pa /dev/tty1
+terminal to avoid accidentally powering off the machine.
+.It Ev SORTIX_SH_BACKEND
+Name of a better shell to use for non-interactive use per
+.Xr proper-sh 5 .
+This variable takes precedence over
+.Pa /etc/proper-sh .
+.El
+.Sh FILES
+.Bl -tag -width "/etc/proper-sh" -compact
+.It Pa /etc/proper-sh
+Name of a better shell to use for non-interactive use per
+.Xr proper-sh 5 .
+The
+.Ev SORTIX_SH_BACKEND
+environment variable takes precedence over this file if set.
+.Xr dash 1
+is used by default if it is installed.
+.El
+.Sh EXIT STATUS
+.Nm
+exits with the same exit status as the last run command, or 0 if no command has
+been run.
+.Sh SEE ALSO
+.Xr dash 1 ,
+.Xr proper-sh 5 ,
+.Xr session 5 ,
+.Xr login 8
