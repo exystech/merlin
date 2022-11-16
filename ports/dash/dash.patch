@@ -157,19 +157,6 @@ diff -Paur --no-dereference -- dash.upstream/src/Makefile.in dash/src/Makefile.i
  	-rm -f ./$(DEPDIR)/system.Po
  	-rm -f ./$(DEPDIR)/trap.Po
  	-rm -f ./$(DEPDIR)/var.Po
-@@ -709,7 +714,11 @@
- 
- info-am:
- 
--install-data-am: install-man
-+install-data-am: install-man install-proper-shells
-+
-+install-proper-shells:
-+	mkdir -p "$(DESTDIR)$(sysconfdir)/proper-shells"
-+	echo dash > "$(DESTDIR)$(sysconfdir)/proper-shells/dash"
- 
- install-dvi: install-dvi-am
- 
 diff -Paur --no-dereference -- dash.upstream/src/miscbltin.c dash/src/miscbltin.c
 --- dash.upstream/src/miscbltin.c
 +++ dash/src/miscbltin.c

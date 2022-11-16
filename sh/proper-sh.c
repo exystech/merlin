@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,114 +17,84 @@
  * Forward execution to the best shell.
  */
 
-#include <sys/wait.h>
-
-#include <dirent.h>
-#include <fcntl.h>
+#include <err.h>
+#include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-const char* getenv_safe(const char* name, const char* def)
+static bool is_supported(int argc, char* argv[])
 {
-	const char* ret = getenv(name);
-	return ret ? ret : def;
-}
-
-bool is_existing_shell(const char* candidate)
-{
-	pid_t child_pid = fork();
-	if ( child_pid < 0 )
-		return false;
-	if ( !child_pid )
+	int i;
+	for ( i = 1; i < argc; i++ )
 	{
-		close(0);
-		close(1);
-		close(2);
-		open("/dev/null", O_RDONLY);
-		open("/dev/null", O_WRONLY);
-		open("/dev/null", O_WRONLY);
-		execlp("which", "which", "--", candidate, (const char*) NULL);
-		exit(127);
-	}
-	int status;
-	waitpid(child_pid, &status, 0);
-	return WIFEXITED(status) && WEXITSTATUS(status) == 0;
-}
-
-char* search_for_proper_shell(void)
-{
-	if ( getenv("SORTIX_SH_BACKEND") )
-	{
-		if ( !getenv("SORTIX_SH_BACKEND")[0] )
-			return NULL;
-		if ( is_existing_shell(getenv("SORTIX_SH_BACKEND")) )
-			return strdup(getenv("SORTIX_SH_BACKEND"));
-	}
-
-	const char* backends_dir_path =
-		getenv_safe("SORTIX_SH_BACKENDS_DIR", "/etc/proper-shells");
-
-	struct dirent** shell_entries;
-	int num_shell_entries = scandir(backends_dir_path, &shell_entries, NULL, alphasort);
-	if ( 0 <= num_shell_entries )
-	{
-		char* result = NULL;
-		for ( int i = 0; i < num_shell_entries; i++ )
-		{
-			struct dirent* entry = shell_entries[i];
-			const char* name = entry->d_name;
-			if ( !strcmp(name, ".") || !strcmp(name, "..") )
-				continue;
-			size_t path_length = strlen(backends_dir_path) + 1 + strlen(name);
-			char* path = (char*) malloc(path_length + 1);
-			if ( !path )
-				continue;
-			stpcpy(stpcpy(stpcpy(path, backends_dir_path), "/"), name);
-			FILE* fp = fopen(path, "r");
-			free(path);
-			if ( !fp )
-				continue;
-			size_t result_size = 0;
-			ssize_t result_length = getline(&result, &result_size, fp);
-			fclose(fp);
-			if ( result_length < 0 )
-			{
-				free(result);
-				continue;
-			}
-			if ( result[result_length-1] == '\n' )
-				result[--result_length] = '\0';
-			if ( !is_existing_shell(result) )
-			{
-				free(result);
-				result = NULL;
-				continue;
-			}
+		const char* arg = argv[i];
+		if ( (arg[0] != '-' && arg[0] != '+') || !arg[1] )
+			break;  // Intentionally not continue and note '+' support.
+		if ( !strcmp(arg, "--") )
 			break;
+		if ( arg[0] == '+' || arg[1] != '-' )
+		{
+			char c;
+			while ( (c = *++arg) ) switch ( c )
+			{
+			case 'e': break;
+			case 'i': break;
+			case 's': break;
+			default: return false;
+			}
 		}
-		for ( int i = 0; i < num_shell_entries; i++ )
-			free(shell_entries[i]);
-		free(shell_entries);
-		if ( result )
-			return result;
+		else if ( !strcmp(arg, "--help") )
+			;
+		else if ( !strcmp(arg, "--version") )
+			;
+		else
+			return false;
 	}
-
-	return NULL;
+	return i == argc;
 }
 
 int main(int argc, char* argv[])
 {
-	if ( argc == 1 && isatty(0) && isatty(1) )
-		execvp("sortix-sh", argv);
+	if ( !isatty(0) || !isatty(1) || !is_supported(argc, argv) )
+	{
+		const char* env = getenv("SORTIX_SH_BACKEND");
+		if ( env && env[0] )
+		{
+			execvp(env, argv);
+			if ( errno != ENOENT )
+				err(127, "%s", env);
+		}
 
-	char* proper_shell = search_for_proper_shell();
-	if ( proper_shell )
-		execvp(proper_shell, argv);
-	free(proper_shell);
+		FILE* fp = fopen("/etc/proper-sh", "r");
+		if ( !fp && errno != ENOENT )
+			err(127, "/etc/proper-sh");
+		if ( fp )
+		{
+			char* proper_sh = NULL;
+			size_t proper_sh_size = 0;
+			ssize_t proper_sh_length = getline(&proper_sh, &proper_sh_size, fp);
+			if ( proper_sh_length < 0 )
+				err(127, "/etc/proper-sh");
+			if ( proper_sh_length && proper_sh[proper_sh_length - 1] == '\n' )
+				proper_sh[--proper_sh_length] = '\0';
+			if ( proper_sh[0] )
+			{
+				execvp(proper_sh, argv);
+				if ( errno != ENOENT )
+					err(127, "%s", proper_sh);
+			}
+			free(proper_sh);
+			fclose(fp);
+		}
+
+		execvp("dash", argv);
+		if ( errno != ENOENT )
+			err(127, "dash");
+	}
 
 	execvp("sortix-sh", argv);
-	return 127;
+	err(127, "sortix-sh");
 }

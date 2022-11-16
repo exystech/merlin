@@ -2155,7 +2155,10 @@ int main(int argc, char* argv[])
 			char c;
 			while ( (c = *++arg) ) switch ( c )
 			{
+			case 'c': flag_c_first_operand_is_command = false; break;
 			case 'e': flag_e_exit_on_error = false; break;
+			case 'i': flag_i_interactive = false; break;
+			case 's': flag_s_stdin = false; break;
 			default:
 				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
 				help(stderr, argv0);
