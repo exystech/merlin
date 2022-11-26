@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2021, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -517,7 +517,8 @@ ssize_t PTY::master_read(ioctx_t* ctx, uint8_t* buf, size_t count)
 	{
 		size_t limit = output_size - output_offset;
 		size_t possible = limit < output_used ? limit : output_used;
-		size_t amount = count < possible ? count : possible;
+		size_t left = count - sofar;
+		size_t amount = left < possible ? left : possible;
 		if ( !ctx->copy_to_dest(buf + sofar, output + output_offset, amount) )
 			return sofar ? (ssize_t) sofar : -1;
 		output_used -= amount;
@@ -525,7 +526,7 @@ ssize_t PTY::master_read(ioctx_t* ctx, uint8_t* buf, size_t count)
 		if ( output_offset == output_size )
 			output_offset = 0;
 		sofar += amount;
-		kthread_cond_signal(&output_possible_cond);
+		kthread_cond_broadcast(&output_possible_cond);
 	}
 	return (ssize_t) sofar;
 }
@@ -541,7 +542,8 @@ ssize_t PTY::master_write(ioctx_t* ctx, const uint8_t* buf, size_t count)
 	while ( sofar < count )
 	{
 		uint8_t input[1024];
-		size_t amount = count < sizeof(input) ? count : sizeof(input);
+		size_t left = count - sofar;
+		size_t amount = left < sizeof(input) ? left : sizeof(input);
 		if ( !ctx->copy_from_src(input, buf + sofar, amount) )
 			return sofar ? (ssize_t) sofar : -1;
 		for ( size_t i = 0; i < amount; i++ )
@@ -587,7 +589,7 @@ void PTY::tty_output(const unsigned char* buffer, size_t length) // termlock hel
 		buffer += amount;
 		length -= amount;
 		output_used += amount;
-		kthread_cond_signal(&output_ready_cond);
+		kthread_cond_broadcast(&output_ready_cond);
 		master_poll_channel.Signal(POLLIN | POLLRDNORM);
 	}
 }
