@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2016, 2017, 2018, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016, 2017, 2018, 2021, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -155,7 +155,8 @@ void Clock::RegisterAbsolute(Timer* timer) // Lock acquired.
 	for ( Timer* iter = absolute_timer; iter; iter = iter->next_timer )
 	{
 		if ( timespec_lt(timer->value.it_value, iter->value.it_value) )
-			before = iter;
+			break;
+		before = iter;
 	}
 
 	timer->prev_timer = before;
@@ -180,12 +181,8 @@ void Clock::RegisterDelay(Timer* timer) // Lock acquired.
 
 	timer->prev_timer = before;
 	timer->next_timer = before ? before->next_timer : delay_timer;
-	if ( timer->next_timer )
-		timer->next_timer->prev_timer = timer;
-	if ( before )
-		before->next_timer = timer;
-	else
-		delay_timer = timer;
+	if ( timer->next_timer ) timer->next_timer->prev_timer = timer;
+	(before ? before->next_timer : delay_timer) = timer;
 
 	if ( timer->next_timer )
 		timer->next_timer->value.it_value =
