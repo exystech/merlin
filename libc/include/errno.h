@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2020 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2020-2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -108,6 +108,7 @@
 #define ETXTBSY 98
 #define ENOMOUNT 99
 #define ENOMEDIUM 100
+#define EHOSTDOWN 101
 
 #define EOPNOTSUPP ENOTSUP
 #define EWOULDBLOCK EAGAIN

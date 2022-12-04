@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2020-2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -111,6 +111,7 @@ const char* sortix_strerror(int errnum)
 	case ETXTBSY: return "Text file busy";
 	case ENOMOUNT: return "No such mountpoint";
 	case ENOMEDIUM: return "No medium found";
+	case EHOSTDOWN: return "Host is down";
 	default: return "Unknown error condition";
 	}
 }
