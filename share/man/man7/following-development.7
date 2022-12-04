@@ -69,6 +69,18 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Add networking stack
+The network stack has been implemented in the kernel and exposed through
+additions to the system call interface.
+.Pp
+This is a compatible ABI change that adds features to
+.Xr socket 2
+.Sy ( AF_INET , IPPROTO_TCP , IPPROTO_UDP , IPPROTO_PING ) ,
+the ioctls for
+.Xr if 4 ,
+socket options, and the
+.Xr lo 4
+loopback interface.
 .Ss Add daemon support to init(8)
 .Xr init 8
 has gained

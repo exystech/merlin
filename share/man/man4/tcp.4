@@ -1,0 +1,382 @@
+.Dd June 3, 2017
+.Dt TCP 4
+.Os
+.Sh NAME
+.Nm tcp
+.Nd transmission control protocol
+.Sh SYNOPSIS
+.In sys/socket.h
+.In netinet/in.h
+.In netinet/tcp.h
+.Ft int
+.Fn socket AF_INET SOCK_STREAM IPPROTO_TCP
+.Sh DESCRIPTION
+The Transmission Control Protocol (TCP) is a connection-oriented transport layer
+for the Internet Protocol
+.Xr ip 4
+that provides a reliable byte stream connection between two hosts.
+It is designed for packet-switched networks and provides sequenced data,
+retransmissions on packet loss, handling of duplicated packets, flow control,
+basic data integrity checks, multiplexing with a 16-bit port number, support for
+out-of-band urgent data, and detection of lost connection.
+TCP provides the
+.Dv SOCK_STREAM
+abstraction for the
+.Xr inet 4
+protocol family.
+.Pp
+TCP sockets are made with
+.Xr socket 2
+by passing an appropriate
+.Fa domain
+.Dv ( AF_INET ) ,
+.Dv SOCK_STREAM
+as the
+.Fa type ,
+and 0 or
+.Dv IPPROTO_TCP
+as the
+.Fa protocol .
+Newly created TCP sockets are not bound to a local address nor connected to a
+remote socket.
+.Pp
+Port numbers are 16-bit and range from 1 to 65535.
+Port 0 is not valid.
+Binding to port 0 will assign an available port on the requested address.
+Connecting to port 0 will fail with
+.Er EADDRNOTAVAIL .
+Received packets whose source or destination address is port 0 will be silently
+dropped.
+TCP ports are distinct from ports in other transport layer protocols.
+.Pp
+Packets contain a 16-bit ones' complement checksum.
+Received packets will be silently discarded if their checksum does not match
+the contents.
+.Pp
+Sockets can be bound to a local address and port with
+.Xr bind 2
+(if not already bound),
+or an local address and port will be automatically assigned when connected.
+The local address and port can be read with
+.Xr getsockname 2 .
+If the socket hasn't been bound, the local address and port is reported as the
+any address on port 0.
+Binding to a well-known port (port 1 through port 1023) requires superuser
+privileges.
+.Pp
+Sockets can be bound to the any address, the broadcast address, the address of
+a network interface, or the broadcast address of a network interface.
+Binding to port 0 will automatically assign an available port on the requested
+local address or fail with
+.Er EAGAIN
+if no port is available.
+No two sockets can bind to the same local address and port.
+No two sockets can be bound such that one is bound to the any address and a
+port, and the other socket is bound to another address and the same port; unless
+both sockets had the
+.Dv SO_REUSEADDR
+socket option set when the second socket was bound, and the current user is the
+same that bound the first socket or the current user has superuser privileges.
+.Pp
+A connection to a remote TCP socket can be established with
+.Xr connect 2 .
+Connections can be established when both sides calls
+.Xr connect 2
+on each other.
+If the socket is not bound,
+.Xr connect 2
+will determine which network interface will be used to send to the remote
+address, and then bind to the address of that network interface together with an
+available port.
+.Xr connect 2
+will fail if there is no route from the local address to the requested remote
+address.
+.Pp
+Incoming connections can be received by binding to a local address with
+.Xr bind 2
+and listening for connections with
+.Xr listen 2 ,
+after which incoming connections can be retrieved with
+.Xr accept 2 .
+.Pp
+Bytes can be received from the remote TCP socket with
+.Xr recv 2 ,
+.Xr recvmsg 2 ,
+.Xr recvfrom 2 ,
+.Xr read 2 ,
+or
+.Xr readv 2 .
+Bytes can be transmitted to the remote TCP socket with
+.Xr send 2 ,
+.Xr sendmsg 2 ,
+.Xr sendto 2 ,
+.Xr write 2 ,
+or
+.Xr writev 2 .
+Transmitting when the connection has broken will result in the process being
+sent the
+.Dv SIGPIPE
+signal and fail with
+.Er EPIPE .
+.Pp
+The receiving socket will acknowledge any received data.
+If no acknowledgement is received in a timely manner, the transmitting socket
+will transmit the data again.
+If a acknowledgement still isn't received after a while, the connection is
+considered broken and no further receipt or transmission is possible.
+.Pp
+The condition of the socket can be tested with
+.Xr poll 2
+where
+.Dv POLLIN
+signifies new data been received or the remote socket has shut down for writing
+or an incoming connection can be retrieved with
+.Xr accept 2 ,
+.Dv POLLOUT
+signifies new data can be sent now (and the socket is not shut down for
+writing),
+.Dv POLLHUP
+signifies the socket is shut down for writing, and
+.Dv POLLERR
+signifies an asynchronous error is pending.
+.Pp
+The connection can be shut down with
+.Xr shutdown 2
+in either the reading direction (discarding further received data) or the
+writing direction (which sends the finish control flag).
+The connection is closed when both sockets have sent and acknowledged the finish
+control flag.
+Upon the
+.Xr close 2
+of the last file descriptor for a connected socket, the socket is shut down in
+both directions.
+.Pp
+Socket options can be set with
+.Xr setsockopt 2
+and read with
+.Xr getsockopt 2
+and exist on the
+.Dv IPPROTO_TCP
+level as well as applicable underlying protocol levels.
+.Sh SOCKET OPTIONS
+TCP sockets support these
+.Xr setsockopt 2 /
+.Xr getsockopt 2
+options at level
+.Dv SOL_SOCKET :
+.Bl -tag -width "12345678"
+.It Dv SO_BINDTODEVICE Fa "char[]"
+Bind to a network interface by its name.
+(Described in
+.Xr if 4 )
+.It Dv SO_BINDTOINDEX Fa "unsigned int"
+Bind to a network interface by its index number.
+(Described in
+.Xr if 4 )
+.It Dv SO_DEBUG Fa "int"
+Whether the socket is in debug mode.
+This option is not implemented and is initially 0.
+Attempting to set it to non-zero will fail with
+.Er EPERM .
+(Described in
+.Xr if 4 )
+.It Dv SO_DOMAIN Fa "sa_family_t"
+The socket
+.Fa domain
+(the address family).
+This option can only be read.
+(Described in
+.Xr if 4 )
+.It Dv SO_ERROR Fa "int"
+The asynchronous pending error
+(an
+.Xr errno 3
+value).
+Errors are permanent.
+This option can only be read.
+(Described in
+.Xr if 4 )
+.It Dv SO_PROTOCOL Fa "int"
+The socket protocol
+.Dv ( IPPROTO_TCP ) .
+This option can only be read.
+(Described in
+.Xr if 4 )
+.It Dv SO_RCVBUF Fa "int"
+How many bytes the receive queue can use (default is 64 KiB).
+(Described in
+.Xr if 4 )
+.It Dv SO_REUSEADDR Fa "int"
+Whether binding to the any address on a port doesn't conflict with binding to
+another address and the same port, if both sockets have this option set and the
+user binding the second socket is the same that bound the first socket or the
+user binding the second socket has superuser privileges.
+(Described in
+.Xr if 4 )
+.It Dv SO_SNDBUF Fa "int"
+How many bytes the send queue can use (default is 64 KiB).
+(Described in
+.Xr if 4 )
+.It Dv SO_TYPE Fa "int"
+The socket type
+.Dv ( SOCK_STREAM ) .
+This option can only be read.
+(Described in
+.Xr if 4 )
+.El
+.Pp
+TCP sockets currently implement no
+.Xr setsockopt 2 /
+.Xr getsockopt 2
+options at level
+.Dv IPPROTO_TCP .
+.Sh IMPLEMENTATION NOTES
+Connections time out when a segment has not been acknowledged by the remote
+socket after 6 attempts to deliver the segment.
+Each retransmission happens after 1 second plus 1 second per failed
+transmissions so far.
+Successful delivery of any segment resets the retransmission count to 0.
+.Pp
+The receive and transmission buffers are both 64 KiB by default.
+.Pp
+If no specific port is requested, one is randomly selected in the dynamic port
+range 32768 (inclusive) through 61000 (exclusive).
+.Pp
+The Maximum Segment Lifetime (MSL) is set to 30 seconds and the quiet time of
+two MSLs before reusing sockets is 60 seconds.
+.Sh ERRORS
+Socket operations can fail due to these error conditions, in addition to the
+error conditions of the network and link layer, and the error conditions of the
+invoked function.
+.Bl -tag -width [EADDRNOTAVAIL]
+.It Bq Er EADDRINUSE
+The socket cannot be bound to the requested address and port because another
+socket was already bound to 1) the same address and port 2) the any address
+and the same port (and
+.Dv SO_REUSEADDR
+was not set on both sockets), or 3) some address and the same port but the
+requested address was the any address (and
+.Dv SO_REUSEADDR
+was not set on both sockets).
+.It Bq Er EADDRNOTAVAIL
+The socket cannot be bound to the requested address because no network interface
+had that address or broadcast address.
+.It Bq Er EADDRNOTAVAIL
+The socket was connected to port 0.
+.It Bq Er EAGAIN
+A port could not be assigned because each port in the dynamic port range had
+already been bound to a socket in a conflicting manner.
+.It Bq Er ECONNREFUSED
+The destination host refused the connection.
+.It Bq Er ECONNRESET
+The connection was reset by the remote socket.
+.It Bq Er EHOSTDOWN
+The destination host is not up.
+This error can happen asynchronously.
+.It Bq Er EHOSTUNREACH
+The destination host was unreachable.
+This error can happen asynchronously.
+.It Bq Er ENETDOWN
+The network interface isn't up.
+This error can happen asynchronously.
+.It Bq Er ENETUNREACH
+The destination network was unreachable.
+This error can happen asynchronously.
+.It Bq Er ENETUNREACH
+The remote address could not be connected because there was no route from the
+local address to the remote address.
+.It Bq Er ENOBUFS
+There was not enough memory available for network packets.
+.It Bq Er EPERM
+The unimplemented
+.Dv SO_DEBUG
+socket options was attempted to be set to a non-zero value.
+.It Bq Er EPIPE
+The transmission failed because the connetion is broken.
+The
+.Dv SIGPIPE
+signal is sent as well unless disabled.
+.It Bq Er ETIMEDOUT
+The connection timed out delivering a segment.
+This error can happen asynchronously.
+.El
+.Sh SEE ALSO
+.Xr accept 2 ,
+.Xr bind 2 ,
+.Xr connect 2 ,
+.Xr getpeername 2 ,
+.Xr getsockname 2 ,
+.Xr getsockopt 2 ,
+.Xr poll 2 ,
+.Xr recv 2 ,
+.Xr recvfrom 2 ,
+.Xr recvmsg 2 ,
+.Xr send 2 ,
+.Xr sendmsg 2 ,
+.Xr sendto 2 ,
+.Xr setsockopt 2 ,
+.Xr shutdown 2 ,
+.Xr socket 2 ,
+.Xr if 4 ,
+.Xr inet 4 ,
+.Xr ip 4 ,
+.Xr kernel 7
+.Sh STANDARDS
+.Rs
+.%A J. Postel (ed.)
+.%D September 1981
+.%R STD 7
+.%R RFC 793
+.%T Transmission Control Protocol
+.%Q USC/Information Sciences Institute
+.Re
+.Pp
+.Rs
+.%A Internet Engineering Task Force
+.%A R. Braden (ed.)
+.%D October 1989
+.%R STD 3
+.%R RFC 1122
+.%T Requirements for Internet Hosts -- Communication Layers
+.%Q USC/Information Sciences Institute
+.Re
+.Pp
+.St -p1003.1-2008 specifies the TCP socket programming interface.
+.Sh BUGS
+The implementation is incomplete and has known bugs.
+.Pp
+Out-of-band data is not yet supported and is ignored on receipt.
+.Pp
+The round trip time is not estimated which prevents efficient retransmission
+when data is lost
+Retransmissions happen after a second, which means unnecessary retransmissions
+happen if the round trip time is more than a second.
+.Pp
+Options are not supported and are ignored on receipt.
+.Pp
+No extensions are implemented yet that improve efficiency for long fast networks
+with large bandwidth * delay products.
+.Pp
+There is not yet any support for sending keep-alive packets.
+.Pp
+There is not yet any support for respecting
+.Xr icmp 4
+condition such as destination unreachable or source quench.
+.Pp
+Half-open connections use memory, but until the handshake is complete, it is not
+confirmed whether the remote is actually able to transmit from the source
+qaddress.
+An attacker may be able to transmit many packets from forged addresses,
+reaching the limit on pending TCP sockets in the listen queue and thus deny
+service to further legitimate connections.
+A SYN queue or SYN cookies would mitigate this problem, but neither is yet
+implemented.
+.Pp
+.Xr bind 2
+does not yet enforce that binding to a well-known port (port 1 through port
+1023) requires superuser privileges.
+.Pp
+The automatic assignment of ports is random, but is statistically biased.
+A random port is picked, and if it is taken, the search sequentially iterates
+ports in ascending order until an available port is found or the search
+terminates.
