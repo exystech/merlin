@@ -33,6 +33,10 @@
 
 namespace Sortix {
 
+static kthread_mutex_t kutex_lock = KTHREAD_MUTEX_INITIALIZER;
+static Thread* kutex_first_waiting;
+static Thread* kutex_last_waiting;
+
 void kthread_yield()
 {
 	Thread* thread = CurrentThread();
@@ -66,6 +70,28 @@ void kthread_wait_futex_signal()
 #endif
 }
 
+static void kthread_wait_kutex()
+{
+	Thread* thread = CurrentThread();
+	thread->yield_operation = YIELD_OPERATION_WAIT_KUTEX;
+#if defined(__i386__) || defined(__x86_64__)
+	asm volatile ("int $129");
+#else
+#error "kthread_wait_kutex needs to be implemented"
+#endif
+}
+
+static void kthread_wait_kutex_signal()
+{
+	Thread* thread = CurrentThread();
+	thread->yield_operation = YIELD_OPERATION_WAIT_KUTEX_SIGNAL;
+#if defined(__i386__) || defined(__x86_64__)
+	asm volatile ("int $129");
+#else
+#error "kthread_wait_kutex needs to be implemented"
+#endif
+}
+
 void kthread_wake_futex(Thread* thread)
 {
 	Scheduler::SetThreadState(thread, ThreadState::RUNNABLE, true);
@@ -96,68 +122,61 @@ static bool kutex_wait(int* address, int value, bool signal)
 {
 	// TODO: Use a per-mutex wait queue instead.
 	Thread* thread = CurrentThread();
-	Process* kernel_process = Scheduler::GetKernelProcess();
 	bool was_enabled = Interrupt::SetEnabled(false);
-	kthread_spinlock_lock(&kernel_process->futex_lock);
-	thread->futex_address = (uintptr_t) address;
-	thread->futex_woken = false;
-	thread->futex_prev_waiting = kernel_process->futex_last_waiting;
-	thread->futex_next_waiting = NULL;
-	(kernel_process->futex_last_waiting ?
-	 kernel_process->futex_last_waiting->futex_next_waiting :
-	 kernel_process->futex_first_waiting) = thread;
-	kernel_process->futex_last_waiting = thread;
-	kthread_spinlock_unlock(&kernel_process->futex_lock);
+	kthread_spinlock_lock(&kutex_lock);
+	thread->kutex_address = (uintptr_t) address;
+	thread->kutex_woken = false;
+	thread->kutex_prev_waiting = kutex_last_waiting;
+	thread->kutex_next_waiting = NULL;
+	(kutex_last_waiting ?
+	 kutex_last_waiting->kutex_next_waiting :
+	 kutex_first_waiting) = thread;
+	kutex_last_waiting = thread;
+	kthread_spinlock_unlock(&kutex_lock);
 	Interrupt::SetEnabled(was_enabled);
 	thread->timer_woken = false;
-	bool result = true;
 	if ( __atomic_load_n(address, __ATOMIC_SEQ_CST) == value )
 	{
 		if ( signal )
-			kthread_wait_futex();
+			kthread_wait_kutex_signal();
 		else
-			kthread_wait_futex_signal();
+			kthread_wait_kutex();
 	}
 	Interrupt::SetEnabled(false);
-	kthread_spinlock_lock(&kernel_process->futex_lock);
-	if ( result && !thread->futex_woken )
-	{
-		if ( signal && Signal::IsPending() )
-			result = false;
-	}
-	thread->futex_address = 0;
-	thread->futex_woken = false;
-	(thread->futex_prev_waiting ?
-	 thread->futex_prev_waiting->futex_next_waiting :
-	 kernel_process->futex_first_waiting) = thread->futex_next_waiting;
-	(thread->futex_next_waiting ?
-	 thread->futex_next_waiting->futex_prev_waiting :
-	 kernel_process->futex_last_waiting) = thread->futex_prev_waiting;
-	thread->futex_prev_waiting = NULL;
-	thread->futex_next_waiting = NULL;
-	kthread_spinlock_unlock(&kernel_process->futex_lock);
+	kthread_spinlock_lock(&kutex_lock);
+	bool result = thread->kutex_woken || !signal || !Signal::IsPending();
+	thread->kutex_address = 0;
+	thread->kutex_woken = false;
+	(thread->kutex_prev_waiting ?
+	 thread->kutex_prev_waiting->kutex_next_waiting :
+	 kutex_first_waiting) = thread->kutex_next_waiting;
+	(thread->kutex_next_waiting ?
+	 thread->kutex_next_waiting->kutex_prev_waiting :
+	 kutex_last_waiting) = thread->kutex_prev_waiting;
+	thread->kutex_prev_waiting = NULL;
+	thread->kutex_next_waiting = NULL;
+	kthread_spinlock_unlock(&kutex_lock);
 	Interrupt::SetEnabled(was_enabled);
 	return result;
 }
 
 static void kutex_wake(int* address, int count)
 {
-	Process* kernel_process = Scheduler::GetKernelProcess();
 	bool was_enabled = Interrupt::SetEnabled(false);
-	kthread_spinlock_lock(&kernel_process->futex_lock);
-	for ( Thread* waiter = kernel_process->futex_first_waiting;
+	kthread_spinlock_lock(&kutex_lock);
+	for ( Thread* waiter = kutex_first_waiting;
 	      0 < count && waiter;
-	      waiter = waiter->futex_next_waiting )
+	      waiter = waiter->kutex_next_waiting )
 	{
-		if ( waiter->futex_address == (uintptr_t) address )
+		if ( waiter->kutex_address == (uintptr_t) address )
 		{
-			waiter->futex_woken = true;
+			waiter->kutex_woken = true;
 			kthread_wake_futex(waiter);
 			if ( count != INT_MAX )
 				count--;
 		}
 	}
-	kthread_spinlock_unlock(&kernel_process->futex_lock);
+	kthread_spinlock_unlock(&kutex_lock);
 	Interrupt::SetEnabled(was_enabled);
 }
 
@@ -214,8 +233,13 @@ bool kthread_mutex_lock_signal(kthread_mutex_t* mutex)
 
 void kthread_mutex_unlock(kthread_mutex_t* mutex)
 {
+	// TODO: Multiple threads could have caused the contention and this wakes
+	//       only one such thread, but then the mutex returns to normal and the
+	//       subsequent unlocks doesn't wake the other contended threads. Work
+	//       around this bug by waking all of them instead, but it's better to
+	//       instead count the number of waiting threads.
 	if ( __atomic_exchange_n(mutex, UNLOCKED, __ATOMIC_SEQ_CST) == CONTENDED )
-		kutex_wake(mutex, 1);
+		kutex_wake(mutex, INT_MAX);
 }
 
 // The kernel thread needs another stack to delete its own stack.
@@ -271,8 +295,8 @@ void kthread_cond_wait(kthread_cond_t* cond, kthread_mutex_t* mutex)
 		cond->first = &elem;
 	cond->last = &elem;
 	kthread_mutex_unlock(mutex);
-	while ( !__atomic_load_n(&elem.woken, __ATOMIC_SEQ_CST) &&
-	        kutex_wait(&elem.woken, 0, false) < 0 );
+	while ( !__atomic_load_n(&elem.woken, __ATOMIC_SEQ_CST) )
+	        kutex_wait(&elem.woken, 0, false);
 	kthread_mutex_lock(mutex);
 	if ( !__atomic_load_n(&elem.woken, __ATOMIC_SEQ_CST) )
 	{
@@ -302,10 +326,9 @@ bool kthread_cond_wait_signal(kthread_cond_t* cond, kthread_mutex_t* mutex)
 	cond->last = &elem;
 	kthread_mutex_unlock(mutex);
 	bool result = true;
-	while ( !__atomic_load_n(&elem.woken, __ATOMIC_SEQ_CST) &&
-	        kutex_wait(&elem.woken, 0, false) < 0 )
+	while ( !__atomic_load_n(&elem.woken, __ATOMIC_SEQ_CST) )
 	{
-		if ( Signal::IsPending() )
+		if ( !kutex_wait(&elem.woken, 0, true) )
 		{
 			result = false;
 			break;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2021, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,6 +19,7 @@
 
 #include <sys/futex.h>
 
+#include <limits.h>
 #include <pthread.h>
 #include <stdbool.h>
 
@@ -33,8 +34,13 @@ int pthread_mutex_unlock(pthread_mutex_t* mutex)
 		return 0;
 	}
 	mutex->owner = 0;
+	// TODO: Multiple threads could have caused the contention and this wakes
+	//       only one such thread, but then the mutex returns to normal and the
+	//       subsequent unlocks doesn't wake the other contended threads. Work
+	//       around this bug by waking all of them instead, but it's better to
+	//       instead count the number of waiting threads.
 	if ( __atomic_exchange_n(&mutex->lock, UNLOCKED,
 	                         __ATOMIC_SEQ_CST) == CONTENDED )
-		futex(&mutex->lock, FUTEX_WAKE, 1, NULL);
+		futex(&mutex->lock, FUTEX_WAKE, INT_MAX, NULL);
 	return 0;
 }

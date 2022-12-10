@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2015, 2021-2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -364,27 +364,29 @@ void Switch(struct interrupt_context* intctx)
 
 void InterruptYieldCPU(struct interrupt_context* intctx, void* /*user*/)
 {
-	if ( current_thread->yield_operation == YIELD_OPERATION_NONE )
-		RealSwitch(intctx, true);
-	else if ( current_thread->yield_operation == YIELD_OPERATION_WAIT_FUTEX )
+	bool wait = false;
+	switch ( current_thread->yield_operation )
 	{
-		if ( !current_thread->futex_woken &&
-		     !current_thread->timer_woken &&
-		     !asm_signal_is_pending )
-		{
-			SetThreadState(current_thread, ThreadState::FUTEX_WAITING);
-			RealSwitch(intctx, false);
-		}
+	case YIELD_OPERATION_NONE: RealSwitch(intctx, true); return;
+	case YIELD_OPERATION_WAIT_FUTEX:
+		wait = !current_thread->futex_woken && !current_thread->timer_woken;
+		break;
+	case YIELD_OPERATION_WAIT_FUTEX_SIGNAL:
+		wait = !current_thread->futex_woken && !current_thread->timer_woken &&
+		       !asm_signal_is_pending;
+		break;
+	case YIELD_OPERATION_WAIT_KUTEX:
+		wait = !current_thread->kutex_woken && !current_thread->timer_woken;
+		break;
+	case YIELD_OPERATION_WAIT_KUTEX_SIGNAL:
+		wait = !current_thread->kutex_woken && !current_thread->timer_woken &&
+		       !asm_signal_is_pending;
+		break;
 	}
-	else if ( current_thread->yield_operation ==
-	          YIELD_OPERATION_WAIT_FUTEX_SIGNAL )
+	if ( wait )
 	{
-		if ( !current_thread->futex_woken &&
-		     !current_thread->timer_woken )
-		{
-			SetThreadState(current_thread, ThreadState::FUTEX_WAITING);
-			RealSwitch(intctx, false);
-		}
+		SetThreadState(current_thread, ThreadState::FUTEX_WAITING);
+		RealSwitch(intctx, false);
 	}
 }
 

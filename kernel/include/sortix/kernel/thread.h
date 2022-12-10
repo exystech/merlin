@@ -62,6 +62,8 @@ enum yield_operation
 	YIELD_OPERATION_NONE,
 	YIELD_OPERATION_WAIT_FUTEX,
 	YIELD_OPERATION_WAIT_FUTEX_SIGNAL,
+	YIELD_OPERATION_WAIT_KUTEX,
+	YIELD_OPERATION_WAIT_KUTEX_SIGNAL,
 };
 
 class Thread
@@ -99,10 +101,14 @@ public:
 	Clock execute_clock;
 	Clock system_clock;
 	uintptr_t futex_address;
+	uintptr_t kutex_address;
 	bool futex_woken;
+	bool kutex_woken;
 	bool timer_woken;
 	Thread* futex_prev_waiting;
 	Thread* futex_next_waiting;
+	Thread* kutex_prev_waiting;
+	Thread* kutex_next_waiting;
 	enum yield_operation yield_operation;
 
 public:

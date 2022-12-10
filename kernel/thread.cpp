@@ -84,9 +84,13 @@ Thread::Thread()
 	// system_clock initialized in member constructor.
 	Time::InitializeThreadClocks(this);
 	futex_address = 0;
+	kutex_address = 0;
 	futex_woken = false;
+	kutex_woken = false;
 	futex_prev_waiting = NULL;
 	futex_next_waiting = NULL;
+	kutex_prev_waiting = NULL;
+	kutex_next_waiting = NULL;
 	yield_operation = YIELD_OPERATION_NONE;
 }
 
