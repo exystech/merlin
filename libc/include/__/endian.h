@@ -128,7 +128,12 @@ public:
 	__endian_base() { }
 	__endian_base(const T& t) : representation(swap(t)) { }
 	operator T() const { return swap(representation); }
-	operator T() const volatile { return swap((const T) representation); }
+	operator T() const volatile
+	{
+		T value = representation;
+		__endian_base<T, endianness> wrapper(value);
+		return wrapper.representation;
+	}
 
 	__endian_base& operator=(const T& rhs)
 	{
