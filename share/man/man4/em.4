@@ -1,0 +1,26 @@
+.Dd Jan 9, 2023
+.Dt EM 4
+.Os
+.Sh NAME
+.Nm em
+.Nd intel 825xx ethernet controller driver
+.Sh SYNOPSIS
+.Nm /dev/em Ns Ar X
+.Sh DESCRIPTION
+.Nm
+is a network interface driver for the Intel 825xx family of ethernet
+controllers.
+.Sh SEE ALSO
+.Xr if 4 ,
+.Xr kernel 7
+.Sh BUGS
+The
+.Nm
+driver is incomplete and does not work yet on all the ethernet controllers in
+the Intel 825xx family.
+The 82579LM fails to establish the link when the PHY does not respond to MDIO
+requests.
+The driver can be disabled using the
+.Fl \-disable-em
+.Xr kernel 7
+option.
