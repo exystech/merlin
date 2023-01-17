@@ -396,7 +396,7 @@ bool Send(Ref<Packet> pktin,
 	else if ( (dst_ip & subnet_ip) == (address_ip & subnet_ip) &&
 	          dst_ip != address_ip )
 		memcpy(&route, dst, sizeof(route));
-	// Route to the the default route if any.
+	// Route to the default route if any.
 	else if ( router_ip != htobe32(INADDR_ANY) )
 		memcpy(&route, &router_ip, sizeof(route));
 	// Otherwise the network is unreachable.

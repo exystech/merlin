@@ -1204,7 +1204,7 @@ bool PipeChannel::WriteResize(size_t new_size)
 	if ( new_size < min_pipe_size )
 		new_size = min_pipe_size;
 
-	// Refuse to lose data if the the new size would cause truncation.
+	// Refuse to lose data if the new size would cause truncation.
 	if ( new_size < buffer_used )
 		new_size = buffer_used;
 

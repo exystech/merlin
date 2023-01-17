@@ -58,7 +58,7 @@ messages are not passively added to the cache.
 .Pp
 The ARP cache uses a hash table with 256 entries, using a linked list in case
 of hash collisions.
-The hash is the the bytewise xor (exclusive or) of every byte in the network
+The hash is the bytewise xor (exclusive or) of every byte in the network
 address.
 This hash is perfect if the subnet contains no more than 256 addresses, and
 degrades in quality for larger subnets, at worst needing to linearly scan the

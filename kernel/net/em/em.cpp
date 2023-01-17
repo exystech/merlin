@@ -663,7 +663,7 @@ void EM::InterruptWork()
 				Ref<Packet> buf = GetPacket();
 				// TODO: Design a solution that handles when there's no more
 				//       packets available, but later adds packets when they
-				//       become available, otherwise the the receive queue might
+				//       become available, otherwise the receive queue might
 				//       deadlock with no available packets.
 				if ( buf )
 					AddReceiveDescriptor(buf);
