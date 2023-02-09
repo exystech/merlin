@@ -1793,7 +1793,8 @@ int TCPSocket::listen(ioctx_t* /*ctx*/, int backlog)
 	if ( !bound )
 		return errno = EDESTADDRREQ, -1;
 	// TODO: os-test a regular connection, close, and then try to listen.
-	if ( state != TCP_STATE_CLOSED )
+	// TODO: os-test listen twice.
+	if ( state != TCP_STATE_CLOSED && state != TCP_STATE_LISTEN )
 		return errno = EINVAL, -1;
 	backlog_max = backlog;
 	memset(&remote, 0, sizeof(remote));
