@@ -1,0 +1,1125 @@
+diff -Paur --no-dereference -- nginx.upstream/auto/feature nginx/auto/feature
+--- nginx.upstream/auto/feature
++++ nginx/auto/feature
+@@ -53,8 +53,13 @@
+ 
+         yes)
+             # /bin/sh is used to intercept "Killed" or "Abort trap" messages
+-            if /bin/sh -c $NGX_AUTOTEST >> $NGX_AUTOCONF_ERR 2>&1; then
+-                echo " found"
++            if [ $CROSS_COMPILING = true ] ||
++               /bin/sh -c $NGX_AUTOTEST >> $NGX_AUTOCONF_ERR 2>&1; then
++                if [ $CROSS_COMPILING = true ]; then
++                  echo " cross-compiling (assuming found)"
++                else
++                  echo " found"
++                fi
+                 ngx_found=yes
+ 
+                 if test -n "$ngx_feature_name"; then
+@@ -68,8 +73,13 @@
+ 
+         value)
+             # /bin/sh is used to intercept "Killed" or "Abort trap" messages
+-            if /bin/sh -c $NGX_AUTOTEST >> $NGX_AUTOCONF_ERR 2>&1; then
+-                echo " found"
++            if [ $CROSS_COMPILING = true ] ||
++               /bin/sh -c $NGX_AUTOTEST >> $NGX_AUTOCONF_ERR 2>&1; then
++                if [ $CROSS_COMPILING = true ]; then
++                  echo " cross-compiling (assuming found)"
++                else
++                  echo " found"
++                fi
+                 ngx_found=yes
+ 
+                 cat << END >> $NGX_AUTO_CONFIG_H
+diff -Paur --no-dereference -- nginx.upstream/auto/install nginx/auto/install
+--- nginx.upstream/auto/install
++++ nginx/auto/install
+@@ -49,6 +49,8 @@
+ 
+ 
+ NGX_CONF_PREFIX=`dirname $NGX_CONF_PATH`
++NGX_SYSCONFDIR=`dirname $NGX_CONF_PREFIX`
++NGX_DEFAULT_CONF_PREFIX=$NGX_SYSCONFDIR/default/`basename $NGX_CONF_PREFIX`
+ 
+ 
+ case ".$NGX_PID_PATH" in
+@@ -114,39 +116,27 @@
+ 			'\$(DESTDIR)$NGX_SBIN_PATH.old'
+ 	cp $NGX_OBJS/nginx '\$(DESTDIR)$NGX_SBIN_PATH'
+ 
+-	test -d '\$(DESTDIR)$NGX_CONF_PREFIX' \\
+-		|| mkdir -p '\$(DESTDIR)$NGX_CONF_PREFIX'
++	test -d '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX' \\
++		|| mkdir -p '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX'
+ 
+-	cp conf/koi-win '\$(DESTDIR)$NGX_CONF_PREFIX'
+-	cp conf/koi-utf '\$(DESTDIR)$NGX_CONF_PREFIX'
+-	cp conf/win-utf '\$(DESTDIR)$NGX_CONF_PREFIX'
+-
+-	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/mime.types' \\
+-		|| cp conf/mime.types '\$(DESTDIR)$NGX_CONF_PREFIX'
+-	cp conf/mime.types '\$(DESTDIR)$NGX_CONF_PREFIX/mime.types.default'
+-
+-	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/fastcgi_params' \\
+-		|| cp conf/fastcgi_params '\$(DESTDIR)$NGX_CONF_PREFIX'
+-	cp conf/fastcgi_params \\
+-		'\$(DESTDIR)$NGX_CONF_PREFIX/fastcgi_params.default'
+-
+-	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/fastcgi.conf' \\
+-		|| cp conf/fastcgi.conf '\$(DESTDIR)$NGX_CONF_PREFIX'
+-	cp conf/fastcgi.conf '\$(DESTDIR)$NGX_CONF_PREFIX/fastcgi.conf.default'
+-
+-	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/uwsgi_params' \\
+-		|| cp conf/uwsgi_params '\$(DESTDIR)$NGX_CONF_PREFIX'
+-	cp conf/uwsgi_params \\
+-		'\$(DESTDIR)$NGX_CONF_PREFIX/uwsgi_params.default'
+-
+-	test -f '\$(DESTDIR)$NGX_CONF_PREFIX/scgi_params' \\
+-		|| cp conf/scgi_params '\$(DESTDIR)$NGX_CONF_PREFIX'
+-	cp conf/scgi_params \\
+-		'\$(DESTDIR)$NGX_CONF_PREFIX/scgi_params.default'
+-
+-	test -f '\$(DESTDIR)$NGX_CONF_PATH' \\
+-		|| cp conf/nginx.conf '\$(DESTDIR)$NGX_CONF_PATH'
+-	cp conf/nginx.conf '\$(DESTDIR)$NGX_CONF_PREFIX/nginx.conf.default'
++	cp conf/koi-win '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX'
++	cp conf/koi-utf '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX'
++	cp conf/win-utf '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX'
++
++	test -d '\$(DESTDIR)/share/man/man8' || mkdir -p '\$(DESTDIR)/share/man/man8'
++	cp objs/nginx.8 '\$(DESTDIR)/share/man/man8'
++
++	cp conf/mime.types '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/mime.types'
++
++	cp conf/fastcgi_params '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/fastcgi_params'
++
++	cp conf/fastcgi.conf '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/fastcgi.conf'
++
++	cp conf/uwsgi_params '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/uwsgi_params'
++
++	cp conf/scgi_params '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/scgi_params'
++
++	cp conf/nginx.conf '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/nginx.conf'
+ 
+ 	test -d '\$(DESTDIR)`dirname "$NGX_PID_PATH"`' \\
+ 		|| mkdir -p '\$(DESTDIR)`dirname "$NGX_PID_PATH"`'
+@@ -156,6 +146,28 @@
+ 
+ 	test -d '\$(DESTDIR)$NGX_PREFIX/html' \\
+ 		|| cp -R $NGX_HTML '\$(DESTDIR)$NGX_PREFIX'
++
++	test -d '\$(DESTDIR)/var/lib/nginx' || mkdir -p '\$(DESTDIR)/var/lib/nginx'
++
++	test -d '\$(DESTDIR)/share/init' || mkdir -p '\$(DESTDIR)/share/init'
++	cp init/nginx '\$(DESTDIR)/share/init'
++
++	mkdir -p '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/modules-available'
++	mkdir -p '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/modules-enabled'
++	mkdir -p '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/sites-available'
++	mkdir -p '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/sites-enabled'
++
++	cp sites-available/default \\
++		'\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/sites-available'
++	ln -s ../sites-available/default \\
++		'\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/sites-enabled'
++
++	mkdir -p '\$(DESTDIR)$NGX_SYSCONFDIR/default/passwd.d'
++	mkdir -p '\$(DESTDIR)$NGX_SYSCONFDIR/default/group.d'
++	echo "_nginx:x:101:101:_nginx:/var/empty:sh" \\
++		> '\$(DESTDIR)$NGX_SYSCONFDIR/default/passwd.d/nginx'
++	echo "_nginx::101:_nginx" \\
++		> '\$(DESTDIR)$NGX_SYSCONFDIR/default/group.d/nginx'
+ END
+ 
+ 
+diff -Paur --no-dereference -- nginx.upstream/auto/lib/pcre/conf nginx/auto/lib/pcre/conf
+--- nginx.upstream/auto/lib/pcre/conf
++++ nginx/auto/lib/pcre/conf
+@@ -86,21 +86,6 @@
+                           if (re == NULL) return 1"
+         . auto/feature
+ 
+-        if [ $ngx_found = no ]; then
+-
+-            # pcre2-config
+-
+-            ngx_pcre2_prefix=`pcre2-config --prefix 2>/dev/null`
+-
+-            if [ -n "$ngx_pcre2_prefix" ]; then
+-                ngx_feature="PCRE2 library in $ngx_pcre2_prefix"
+-                ngx_feature_path=`pcre2-config --cflags \
+-                                  | sed -n -e 's/.*-I *\([^ ][^ ]*\).*/\1/p'`
+-                ngx_feature_libs=`pcre2-config --libs8`
+-                . auto/feature
+-            fi
+-        fi
+-
+         if [ $ngx_found = yes ]; then
+             have=NGX_PCRE . auto/have
+             CORE_INCS="$CORE_INCS $ngx_feature_path"
+diff -Paur --no-dereference -- nginx.upstream/auto/options nginx/auto/options
+--- nginx.upstream/auto/options
++++ nginx/auto/options
+@@ -17,6 +17,12 @@
+ NGX_GROUP=
+ NGX_BUILD=
+ 
++NGX_BUILD_TRIPLET=
++NGX_HOST_TRIPLET=
++NGX_TARGET_TRIPLET=
++
++CROSS_COMPILING=false
++
+ CC=${CC:-cc}
+ CPP=
+ NGX_OBJS=objs
+@@ -188,6 +194,8 @@
+ 
+         --prefix=)                       NGX_PREFIX="!"             ;;
+         --prefix=*)                      NGX_PREFIX="$value"        ;;
++        --exec-prefix=)                                             ;;
++        --exec-prefix=*)                                            ;;
+         --sbin-path=*)                   NGX_SBIN_PATH="$value"     ;;
+         --modules-path=*)                NGX_MODULES_PATH="$value"  ;;
+         --conf-path=*)                   NGX_CONF_PATH="$value"     ;;
+@@ -199,9 +207,13 @@
+ 
+         --crossbuild=*)                  NGX_PLATFORM="$value"      ;;
+ 
+-        --build=*)                       NGX_BUILD="$value"         ;;
++        --buildname=*)                   NGX_BUILD="$value"         ;;
+         --builddir=*)                    NGX_OBJS="$value"          ;;
+ 
++        --build=*)                       NGX_BUILD_TRIPLET="$value" ;;
++        --host=*)                        NGX_HOST_TRIPLET="$value"  ;;
++        --target=*)                      NGX_TARGET_TRIPLET="$value";;
++
+         --with-select_module)            EVENT_SELECT=YES           ;;
+         --without-select_module)         EVENT_SELECT=NONE          ;;
+         --with-poll_module)              EVENT_POLL=YES             ;;
+@@ -596,6 +608,12 @@
+     exit 1
+ fi
+ 
++if [ "$NGX_BUILD_TRIPLET" != "$NGX_HOST_TRIPLET" ]; then
++  CROSS_COMPILING=true
++else
++  CROSS_COMPILING=false
++fi
++
+ 
+ if [ ".$NGX_PLATFORM" = ".win32" ]; then
+     NGX_WINE=$WINE
+@@ -606,6 +624,8 @@
+ NGX_MODULES_PATH=${NGX_MODULES_PATH:-modules}
+ NGX_CONF_PATH=${NGX_CONF_PATH:-conf/nginx.conf}
+ NGX_CONF_PREFIX=`dirname $NGX_CONF_PATH`
++NGX_SYSCONFDIR=`dirname $NGX_CONF_PREFIX`
++NGX_DEFAULT_CONF_PREFIX=$NGX_SYSCONFDIR/default/`basename $NGX_CONF_PREFIX`
+ NGX_PID_PATH=${NGX_PID_PATH:-logs/nginx.pid}
+ NGX_LOCK_PATH=${NGX_LOCK_PATH:-logs/nginx.lock}
+ 
+diff -Paur --no-dereference -- nginx.upstream/auto/types/sizeof nginx/auto/types/sizeof
+--- nginx.upstream/auto/types/sizeof
++++ nginx/auto/types/sizeof
+@@ -16,6 +16,7 @@
+ 
+ cat << END > $NGX_AUTOTEST.c
+ 
++#include <assert.h>
+ #include <sys/types.h>
+ #include <sys/time.h>
+ $NGX_INCLUDE_UNISTD_H
+@@ -26,7 +27,7 @@
+ $NGX_INCLUDE_AUTO_CONFIG_H
+ 
+ int main(void) {
+-    printf("%d", (int) sizeof($ngx_type));
++    static_assert(sizeof($ngx_type) == GUESS, "sizeof($ngx_type) == GUESS");
+     return 0;
+ }
+ 
+@@ -36,13 +37,16 @@
+ ngx_test="$CC $CC_TEST_FLAGS $CC_AUX_FLAGS \
+           -o $NGX_AUTOTEST $NGX_AUTOTEST.c $NGX_LD_OPT $ngx_feature_libs"
+ 
+-eval "$ngx_test >> $NGX_AUTOCONF_ERR 2>&1"
++for ngx_size in 4 8; do
++    eval "$ngx_test -DGUESS=$ngx_size >> $NGX_AUTOCONF_ERR 2>&1"
+ 
++    if [ -x $NGX_AUTOTEST ]; then
++        echo " $ngx_size bytes"
++        break
++    fi
+ 
+-if [ -x $NGX_AUTOTEST ]; then
+-    ngx_size=`$NGX_AUTOTEST`
+-    echo " $ngx_size bytes"
+-fi
++    ngx_size=failed
++done
+ 
+ 
+ case $ngx_size in
+diff -Paur --no-dereference -- nginx.upstream/auto/unix nginx/auto/unix
+--- nginx.upstream/auto/unix
++++ nginx/auto/unix
+@@ -803,15 +803,15 @@
+ . auto/feature
+ 
+ 
+-ngx_feature="mmap(MAP_ANON|MAP_SHARED)"
+-ngx_feature_name="NGX_HAVE_MAP_ANON"
++ngx_feature="mmap(MAP_ANONYMOUS|MAP_PRIVATE)"
++ngx_feature_name="NGX_HAVE_MAP_ANONYMOUS"
+ ngx_feature_run=yes
+ ngx_feature_incs="#include <sys/mman.h>"
+ ngx_feature_path=
+ ngx_feature_libs=
+ ngx_feature_test="void *p;
+                   p = mmap(NULL, 4096, PROT_READ|PROT_WRITE,
+-                           MAP_ANON|MAP_SHARED, -1, 0);
++                           MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
+                   if (p == MAP_FAILED) return 1;"
+ . auto/feature
+ 
+diff -Paur --no-dereference -- nginx.upstream/conf/nginx.conf nginx/conf/nginx.conf
+--- nginx.upstream/conf/nginx.conf
++++ nginx/conf/nginx.conf
+@@ -8,6 +8,7 @@
+ 
+ #pid        logs/nginx.pid;
+ 
++include modules-enabled/*.conf;
+ 
+ events {
+     worker_connections  1024;
+@@ -18,6 +19,9 @@
+     include       mime.types;
+     default_type  application/octet-stream;
+ 
++    ssl_protocols TLSv1.2 TLSv1.3;
++    ssl_prefer_server_ciphers on;
++
+     #log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+     #                  '$status $body_bytes_sent "$http_referer" '
+     #                  '"$http_user_agent" "$http_x_forwarded_for"';
+@@ -32,86 +36,6 @@
+ 
+     #gzip  on;
+ 
+-    server {
+-        listen       80;
+-        server_name  localhost;
+-
+-        #charset koi8-r;
+-
+-        #access_log  logs/host.access.log  main;
+-
+-        location / {
+-            root   html;
+-            index  index.html index.htm;
+-        }
+-
+-        #error_page  404              /404.html;
+-
+-        # redirect server error pages to the static page /50x.html
+-        #
+-        error_page   500 502 503 504  /50x.html;
+-        location = /50x.html {
+-            root   html;
+-        }
+-
+-        # proxy the PHP scripts to Apache listening on 127.0.0.1:80
+-        #
+-        #location ~ \.php$ {
+-        #    proxy_pass   http://127.0.0.1;
+-        #}
+-
+-        # pass the PHP scripts to FastCGI server listening on 127.0.0.1:9000
+-        #
+-        #location ~ \.php$ {
+-        #    root           html;
+-        #    fastcgi_pass   127.0.0.1:9000;
+-        #    fastcgi_index  index.php;
+-        #    fastcgi_param  SCRIPT_FILENAME  /scripts$fastcgi_script_name;
+-        #    include        fastcgi_params;
+-        #}
+-
+-        # deny access to .htaccess files, if Apache's document root
+-        # concurs with nginx's one
+-        #
+-        #location ~ /\.ht {
+-        #    deny  all;
+-        #}
+-    }
+-
+-
+-    # another virtual host using mix of IP-, name-, and port-based configuration
+-    #
+-    #server {
+-    #    listen       8000;
+-    #    listen       somename:8080;
+-    #    server_name  somename  alias  another.alias;
+-
+-    #    location / {
+-    #        root   html;
+-    #        index  index.html index.htm;
+-    #    }
+-    #}
+-
+-
+-    # HTTPS server
+-    #
+-    #server {
+-    #    listen       443 ssl;
+-    #    server_name  localhost;
+-
+-    #    ssl_certificate      cert.pem;
+-    #    ssl_certificate_key  cert.key;
+-
+-    #    ssl_session_cache    shared:SSL:1m;
+-    #    ssl_session_timeout  5m;
+-
+-    #    ssl_ciphers  HIGH:!aNULL:!MD5;
+-    #    ssl_prefer_server_ciphers  on;
+-
+-    #    location / {
+-    #        root   html;
+-    #        index  index.html index.htm;
+-    #    }
+-    #}
+-
++    include conf.d/*.conf;
++    include sites-enabled/*;
+ }
+diff -Paur --no-dereference -- nginx.upstream/configure nginx/configure
+--- nginx.upstream/configure
++++ nginx/configure
+@@ -27,9 +27,16 @@
+ if test -z "$NGX_PLATFORM"; then
+     echo "checking for OS"
+ 
+-    NGX_SYSTEM=`uname -s 2>/dev/null`
+-    NGX_RELEASE=`uname -r 2>/dev/null`
+-    NGX_MACHINE=`uname -m 2>/dev/null`
++    if [ -z "$NGX_HOST_TRIPLET" ]; then
++      NGX_SYSTEM=`uname -s 2>/dev/null`
++      NGX_RELEASE=`uname -r 2>/dev/null`
++      NGX_MACHINE=`uname -m 2>/dev/null`
++    else
++      NGX_SYSTEM=`echo "$NGX_HOST_TRIPLET" | sed -E 's/^.*-([^-]+)[0-9]*$/\1/'`
++      NGX_RELEASE=`echo "$NGX_HOST_TRIPLET" | sed -E 's/^.*-[^-]+([0-9]*)$/\1/'`
++      if [ -z $NGX_RELEASE ]; then NGX_RELEASE=1; fi
++      NGX_MACHINE=`echo "$NGX_HOST_TRIPLET" | sed -E 's/^([^-]+)-.*$/\1/'`
++    fi
+ 
+     echo " + $NGX_SYSTEM $NGX_RELEASE $NGX_MACHINE"
+ 
+@@ -83,6 +90,7 @@
+ 
+ have=NGX_SBIN_PATH value="\"$NGX_SBIN_PATH\"" . auto/define
+ have=NGX_CONF_PATH value="\"$NGX_CONF_PATH\"" . auto/define
++have=NGX_DEFAULT_CONF_PREFIX value="\"$NGX_DEFAULT_CONF_PREFIX\"" . auto/define
+ have=NGX_PID_PATH value="\"$NGX_PID_PATH\"" . auto/define
+ have=NGX_LOCK_PATH value="\"$NGX_LOCK_PATH\"" . auto/define
+ have=NGX_ERROR_LOG_PATH value="\"$NGX_ERROR_LOG_PATH\"" . auto/define
+diff -Paur --no-dereference -- nginx.upstream/init/nginx nginx/init/nginx
+--- nginx.upstream/init/nginx
++++ nginx/init/nginx
+@@ -0,0 +1,2 @@
++require network
++exec nginx
+diff -Paur --no-dereference -- nginx.upstream/sites-available/default nginx/sites-available/default
+--- nginx.upstream/sites-available/default
++++ nginx/sites-available/default
+@@ -0,0 +1,81 @@
++server {
++    listen       80;
++    server_name  localhost;
++
++    #charset koi8-r;
++
++    #access_log  logs/host.access.log  main;
++
++    location / {
++        root   html;
++        index  index.html index.htm;
++    }
++
++    #error_page  404              /404.html;
++
++    # redirect server error pages to the static page /50x.html
++    #
++    error_page   500 502 503 504  /50x.html;
++    location = /50x.html {
++        root   html;
++    }
++
++    # proxy the PHP scripts to Apache listening on 127.0.0.1:80
++    #
++    #location ~ \.php$ {
++    #    proxy_pass   http://127.0.0.1;
++    #}
++
++    # pass the PHP scripts to FastCGI server listening on 127.0.0.1:9000
++    #
++    #location ~ \.php$ {
++    #    root           html;
++    #    fastcgi_pass   127.0.0.1:9000;
++    #    fastcgi_index  index.php;
++    #    fastcgi_param  SCRIPT_FILENAME  /scripts$fastcgi_script_name;
++    #    include        fastcgi_params;
++    #}
++
++    # deny access to .htaccess files, if Apache's document root
++    # concurs with nginx's one
++    #
++    #location ~ /\.ht {
++    #    deny  all;
++    #}
++}
++
++
++# another virtual host using mix of IP-, name-, and port-based configuration
++#
++#server {
++#    listen       8000;
++#    listen       somename:8080;
++#    server_name  somename  alias  another.alias;
++
++#    location / {
++#        root   html;
++#        index  index.html index.htm;
++#    }
++#}
++
++
++# HTTPS server
++#
++#server {
++#    listen       443 ssl;
++#    server_name  localhost;
++
++#    ssl_certificate      cert.pem;
++#    ssl_certificate_key  cert.key;
++
++#    ssl_session_cache    shared:SSL:1m;
++#    ssl_session_timeout  5m;
++
++#    ssl_ciphers  HIGH:!aNULL:!MD5;
++#    ssl_prefer_server_ciphers  on;
++
++#    location / {
++#        root   html;
++#        index  index.html index.htm;
++#    }
++#}
+diff -Paur --no-dereference -- nginx.upstream/src/core/nginx.c nginx/src/core/nginx.c
+--- nginx.upstream/src/core/nginx.c
++++ nginx/src/core/nginx.c
+@@ -359,7 +359,7 @@
+ 
+ #endif
+ 
+-    if (ngx_create_pidfile(&ccf->pid, cycle->log) != NGX_OK) {
++    if (ccf->daemon && ngx_create_pidfile(&ccf->pid, cycle->log) != NGX_OK) {
+         return 1;
+     }
+ 
+@@ -939,6 +939,7 @@
+ {
+     u_char  *p;
+     size_t   len;
++    int      is_default = 0;
+ 
+     if (ngx_prefix) {
+         len = ngx_strlen(ngx_prefix);
+@@ -999,14 +1000,18 @@
+         cycle->conf_file.data = ngx_conf_file;
+ 
+     } else {
+-        ngx_str_set(&cycle->conf_file, NGX_CONF_PATH);
++        ngx_str_set(&cycle->conf_file, "nginx.conf");
+     }
+ 
+-    if (ngx_conf_full_name(cycle, &cycle->conf_file, 0) != NGX_OK) {
++    is_default = !ngx_strcmp(cycle->conf_prefix.data, NGX_CONF_PREFIX) &&
++                 !ngx_strcmp(cycle->conf_file.data, "nginx.conf");
++
++    if (ngx_conf_full_name(cycle, &cycle->conf_file, 1) != NGX_OK) {
+         return NGX_ERROR;
+     }
+ 
+     for (p = cycle->conf_file.data + cycle->conf_file.len - 1;
++         !is_default &&
+          p > cycle->conf_file.data;
+          p--)
+     {
+@@ -1088,7 +1093,7 @@
+ {
+     ngx_core_conf_t  *ccf = conf;
+ 
+-    ngx_conf_init_value(ccf->daemon, 1);
++    ngx_conf_init_value(ccf->daemon, 0);
+     ngx_conf_init_value(ccf->master, 1);
+     ngx_conf_init_msec_value(ccf->timer_resolution, 0);
+     ngx_conf_init_msec_value(ccf->shutdown_timeout, 0);
+diff -Paur --no-dereference -- nginx.upstream/src/core/ngx_conf_file.c nginx/src/core/ngx_conf_file.c
+--- nginx.upstream/src/core/ngx_conf_file.c
++++ nginx/src/core/ngx_conf_file.c
+@@ -882,13 +882,73 @@
+     return rv;
+ }
+ 
++static void
++ngx_truncate_glob(char *path)
++{
++    size_t last_slash = 0;
++    for (size_t i = 0; path[i]; i++) {
++       if (path[i] == '/') {
++           last_slash = i;
++       } else if (path[i] == '*' || path[i] == '?' || path[i] == '[') {
++           path[last_slash + 1] = '\0';
++           return;
++       }
++    }
++}
++
++
++static ngx_int_t
++ngx_conf_is_default(ngx_cycle_t *cycle, ngx_str_t *str)
++{
++    char *prefix = NULL;
++    char *conf_path = NULL;
++    char *def_path = NULL;
++    const char *name = (const char *)str->data;
++    ngx_int_t result = NGX_ERROR;
++
++    if (!(prefix = strndup((const char *)cycle->conf_prefix.data,
++                           cycle->conf_prefix.len))) {
++       return NGX_ERROR;
++    }
++
++    if (name[0] == '/' || ngx_strcmp(prefix, NGX_CONF_PREFIX) != 0) {
++        free(prefix);
++        return 0;
++    }
++
++    if (0 <= asprintf(&conf_path, "%s%s", prefix, name) &&
++        0 <= asprintf(&def_path, "%s%s", NGX_DEFAULT_CONF_PREFIX "/", name)) {
++        ngx_truncate_glob(conf_path);
++        ngx_truncate_glob(def_path);
++        result = access(conf_path, F_OK) < 0 && errno == ENOENT &&
++                 !access(def_path, F_OK);
++    }
++
++    free(conf_path);
++    free(def_path);
++    free(prefix);
++
++    return result;
++}
++
+ 
+ ngx_int_t
+ ngx_conf_full_name(ngx_cycle_t *cycle, ngx_str_t *name, ngx_uint_t conf_prefix)
+ {
+-    ngx_str_t  *prefix;
++    ngx_str_t *prefix = &cycle->prefix;
++    ngx_str_t default_prefix;
+ 
+-    prefix = conf_prefix ? &cycle->conf_prefix : &cycle->prefix;
++    ngx_str_set(&default_prefix, NGX_DEFAULT_CONF_PREFIX "/");
++
++    if (conf_prefix) {
++      int is_default = ngx_conf_is_default(cycle, name);
++
++      if (is_default == NGX_ERROR) {
++        return NGX_ERROR;
++      }
++
++      prefix = is_default ? &default_prefix : &cycle->conf_prefix;
++    }
+ 
+     return ngx_get_full_name(cycle->pool, prefix, name);
+ }
+@@ -1484,3 +1544,4 @@
+ 
+     return NGX_CONF_ERROR;
+ }
++
+diff -Paur --no-dereference -- nginx.upstream/src/core/ngx_config.h nginx/src/core/ngx_config.h
+--- nginx.upstream/src/core/ngx_config.h
++++ nginx/src/core/ngx_config.h
+@@ -54,7 +54,8 @@
+ #define ngx_signal_helper(n)     SIG##n
+ #define ngx_signal_value(n)      ngx_signal_helper(n)
+ 
+-#define ngx_random               random
++#define ngx_random               arc4random
++#define srandom(seed)            ((void) (seed))
+ 
+ /* TODO: #ifndef */
+ #define NGX_SHUTDOWN_SIGNAL      QUIT
+@@ -79,6 +80,11 @@
+ typedef uintptr_t       ngx_uint_t;
+ typedef intptr_t        ngx_flag_t;
+ 
++typedef unsigned char   u_char;
++typedef unsigned short  u_short;
++typedef unsigned int    u_int;
++typedef unsigned long   u_long;
++
+ 
+ #define NGX_INT32_LEN   (sizeof("-2147483648") - 1)
+ #define NGX_INT64_LEN   (sizeof("-9223372036854775808") - 1)
+diff -Paur --no-dereference -- nginx.upstream/src/core/ngx_cycle.h nginx/src/core/ngx_cycle.h
+--- nginx.upstream/src/core/ngx_cycle.h
++++ nginx/src/core/ngx_cycle.h
+@@ -79,6 +79,7 @@
+     ngx_str_t                 conf_file;
+     ngx_str_t                 conf_param;
+     ngx_str_t                 conf_prefix;
++    ngx_str_t                 conf_default_prefix;
+     ngx_str_t                 prefix;
+     ngx_str_t                 error_log;
+     ngx_str_t                 lock_file;
+diff -Paur --no-dereference -- nginx.upstream/src/event/ngx_event.c nginx/src/event/ngx_event.c
+--- nginx.upstream/src/event/ngx_event.c
++++ nginx/src/event/ngx_event.c
+@@ -681,7 +681,8 @@
+ 
+     if (ngx_timer_resolution && !(ngx_event_flags & NGX_USE_TIMER_EVENT)) {
+         struct sigaction  sa;
+-        struct itimerval  itv;
++        struct itimerspec its;
++        timer_t timer;
+ 
+         ngx_memzero(&sa, sizeof(struct sigaction));
+         sa.sa_handler = ngx_timer_signal_handler;
+@@ -693,15 +694,16 @@
+             return NGX_ERROR;
+         }
+ 
+-        itv.it_interval.tv_sec = ngx_timer_resolution / 1000;
+-        itv.it_interval.tv_usec = (ngx_timer_resolution % 1000) * 1000;
+-        itv.it_value.tv_sec = ngx_timer_resolution / 1000;
+-        itv.it_value.tv_usec = (ngx_timer_resolution % 1000 ) * 1000;
++        its.it_interval.tv_sec = ngx_timer_resolution / 1000;
++        its.it_interval.tv_nsec = (ngx_timer_resolution % 1000) * 1000000;
++        its.it_value.tv_sec = ngx_timer_resolution / 1000;
++        its.it_value.tv_nsec = (ngx_timer_resolution % 1000 ) * 1000000;
+ 
+-        if (setitimer(ITIMER_REAL, &itv, NULL) == -1) {
++        if (timer_create(CLOCK_REALTIME, NULL, &timer) == -1) {
+             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+-                          "setitimer() failed");
++                          "timer_create() failed");
+         }
++        timer_settime(timer, 0, &its, NULL);
+     }
+ 
+     if (ngx_event_flags & NGX_USE_FD_EVENT) {
+@@ -713,6 +715,11 @@
+             return NGX_ERROR;
+         }
+ 
++        /* PATCH: Bad code assuming there is a low fd limit. */
++        if (INT_MAX <= rlmt.rlim_cur) {
++            rlmt.rlim_cur = 65536;
++        }
++
+         cycle->files_n = (ngx_uint_t) rlmt.rlim_cur;
+ 
+         cycle->files = ngx_calloc(sizeof(ngx_connection_t *) * cycle->files_n,
+diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_channel.c nginx/src/os/unix/ngx_channel.c
+--- nginx.upstream/src/os/unix/ngx_channel.c
++++ nginx/src/os/unix/ngx_channel.c
+@@ -31,7 +31,7 @@
+         msg.msg_controllen = 0;
+ 
+     } else {
+-        msg.msg_control = (caddr_t) &cmsg;
++        msg.msg_control = &cmsg;
+         msg.msg_controllen = sizeof(cmsg);
+ 
+         ngx_memzero(&cmsg, sizeof(cmsg));
+@@ -62,7 +62,7 @@
+         msg.msg_accrightslen = 0;
+ 
+     } else {
+-        msg.msg_accrights = (caddr_t) &ch->fd;
++        msg.msg_accrights = &ch->fd;
+         msg.msg_accrightslen = sizeof(int);
+     }
+ 
+@@ -118,10 +118,10 @@
+     msg.msg_iovlen = 1;
+ 
+ #if (NGX_HAVE_MSGHDR_MSG_CONTROL)
+-    msg.msg_control = (caddr_t) &cmsg;
++    msg.msg_control = &cmsg;
+     msg.msg_controllen = sizeof(cmsg);
+ #else
+-    msg.msg_accrights = (caddr_t) &fd;
++    msg.msg_accrights = &fd;
+     msg.msg_accrightslen = sizeof(int);
+ #endif
+ 
+diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_files.c nginx/src/os/unix/ngx_files.c
+--- nginx.upstream/src/os/unix/ngx_files.c
++++ nginx/src/os/unix/ngx_files.c
+@@ -600,14 +600,14 @@
+ ngx_int_t
+ ngx_set_file_time(u_char *name, ngx_fd_t fd, time_t s)
+ {
+-    struct timeval  tv[2];
++    struct timespec  tv[2];
+ 
+     tv[0].tv_sec = ngx_time();
+-    tv[0].tv_usec = 0;
++    tv[0].tv_nsec = 0;
+     tv[1].tv_sec = s;
+-    tv[1].tv_usec = 0;
++    tv[1].tv_nsec = 0;
+ 
+-    if (utimes((char *) name, tv) != -1) {
++    if (utimens((char *) name, tv) != -1) {
+         return NGX_OK;
+     }
+ 
+@@ -758,6 +758,9 @@
+ ngx_err_t
+ ngx_trylock_fd(ngx_fd_t fd)
+ {
++#ifdef __sortix__
++    (void) fd;
++#else
+     struct flock  fl;
+ 
+     ngx_memzero(&fl, sizeof(struct flock));
+@@ -767,7 +770,7 @@
+     if (fcntl(fd, F_SETLK, &fl) == -1) {
+         return ngx_errno;
+     }
+-
++#endif
+     return 0;
+ }
+ 
+@@ -775,6 +778,9 @@
+ ngx_err_t
+ ngx_lock_fd(ngx_fd_t fd)
+ {
++#ifdef __sortix__
++    (void) fd;
++#else
+     struct flock  fl;
+ 
+     ngx_memzero(&fl, sizeof(struct flock));
+@@ -784,7 +790,7 @@
+     if (fcntl(fd, F_SETLKW, &fl) == -1) {
+         return ngx_errno;
+     }
+-
++#endif
+     return 0;
+ }
+ 
+@@ -792,6 +798,9 @@
+ ngx_err_t
+ ngx_unlock_fd(ngx_fd_t fd)
+ {
++#ifdef __sortix__
++    (void) fd;
++#else
+     struct flock  fl;
+ 
+     ngx_memzero(&fl, sizeof(struct flock));
+@@ -801,7 +810,7 @@
+     if (fcntl(fd, F_SETLK, &fl) == -1) {
+         return  ngx_errno;
+     }
+-
++#endif
+     return 0;
+ }
+ 
+diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_posix_config.h nginx/src/os/unix/ngx_posix_config.h
+--- nginx.upstream/src/os/unix/ngx_posix_config.h
++++ nginx/src/os/unix/ngx_posix_config.h
+@@ -37,6 +37,7 @@
+ 
+ #include <sys/types.h>
+ #include <sys/time.h>
++#include <sys/select.h>
+ #if (NGX_HAVE_UNISTD_H)
+ #include <unistd.h>
+ #endif
+diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_process.c nginx/src/os/unix/ngx_process.c
+--- nginx.upstream/src/os/unix/ngx_process.c
++++ nginx/src/os/unix/ngx_process.c
+@@ -71,7 +71,9 @@
+ 
+     { SIGINT, "SIGINT", "", ngx_signal_handler },
+ 
++#ifdef SIGIO
+     { SIGIO, "SIGIO", "", ngx_signal_handler },
++#endif
+ 
+     { SIGCHLD, "SIGCHLD", "", ngx_signal_handler },
+ 
+@@ -87,7 +89,9 @@
+ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
+     char *name, ngx_int_t respawn)
+ {
++#ifdef FIOASYNC
+     u_long     on;
++#endif
+     ngx_pid_t  pid;
+     ngx_int_t  s;
+ 
+@@ -142,6 +146,7 @@
+             return NGX_INVALID_PID;
+         }
+ 
++#ifdef FIOASYNC
+         on = 1;
+         if (ioctl(ngx_processes[s].channel[0], FIOASYNC, &on) == -1) {
+             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+@@ -149,13 +154,16 @@
+             ngx_close_channel(ngx_processes[s].channel, cycle->log);
+             return NGX_INVALID_PID;
+         }
++#endif
+ 
++#ifdef F_SETOWN
+         if (fcntl(ngx_processes[s].channel[0], F_SETOWN, ngx_pid) == -1) {
+             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                           "fcntl(F_SETOWN) failed while spawning \"%s\"", name);
+             ngx_close_channel(ngx_processes[s].channel, cycle->log);
+             return NGX_INVALID_PID;
+         }
++#endif
+ 
+         if (fcntl(ngx_processes[s].channel[0], F_SETFD, FD_CLOEXEC) == -1) {
+             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+@@ -394,9 +402,11 @@
+             ngx_sigalrm = 1;
+             break;
+ 
++#ifdef SIGIO
+         case SIGIO:
+             ngx_sigio = 1;
+             break;
++#endif
+ 
+         case SIGCHLD:
+             ngx_reap = 1;
+@@ -433,7 +443,9 @@
+ 
+         case ngx_signal_value(NGX_RECONFIGURE_SIGNAL):
+         case ngx_signal_value(NGX_CHANGEBIN_SIGNAL):
++#ifdef SIGIO
+         case SIGIO:
++#endif
+             action = ", ignoring";
+             break;
+         }
+diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_process_cycle.c nginx/src/os/unix/ngx_process_cycle.c
+--- nginx.upstream/src/os/unix/ngx_process_cycle.c
++++ nginx/src/os/unix/ngx_process_cycle.c
+@@ -69,6 +69,19 @@
+ static ngx_log_t        ngx_exit_log;
+ static ngx_open_file_t  ngx_exit_log_file;
+ 
++static void
++ready(void)
++{
++	const char *readyfd_env = getenv("READYFD"); 
++	if ( !readyfd_env ) 
++		return; 
++	int readyfd = atoi(readyfd_env); 
++	char c = '\n'; 
++	write(readyfd, &c, 1); 
++	close(readyfd); 
++	unsetenv("READYFD"); 
++}
++
+ 
+ void
+ ngx_master_process_cycle(ngx_cycle_t *cycle)
+@@ -79,7 +92,7 @@
+     ngx_int_t          i;
+     ngx_uint_t         sigio;
+     sigset_t           set;
+-    struct itimerval   itv;
++    struct itimerspec  its;
+     ngx_uint_t         live;
+     ngx_msec_t         delay;
+     ngx_core_conf_t   *ccf;
+@@ -87,7 +100,9 @@
+     sigemptyset(&set);
+     sigaddset(&set, SIGCHLD);
+     sigaddset(&set, SIGALRM);
++#ifdef SIGIO
+     sigaddset(&set, SIGIO);
++#endif
+     sigaddset(&set, SIGINT);
+     sigaddset(&set, ngx_signal_value(NGX_RECONFIGURE_SIGNAL));
+     sigaddset(&set, ngx_signal_value(NGX_REOPEN_SIGNAL));
+@@ -136,8 +151,12 @@
+     sigio = 0;
+     live = 1;
+ 
++	ready();
++
+     for ( ;; ) {
+         if (delay) {
++            timer_t timer;
++
+             if (ngx_sigalrm) {
+                 sigio = 0;
+                 delay *= 2;
+@@ -147,15 +166,16 @@
+             ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+                            "termination cycle: %M", delay);
+ 
+-            itv.it_interval.tv_sec = 0;
+-            itv.it_interval.tv_usec = 0;
+-            itv.it_value.tv_sec = delay / 1000;
+-            itv.it_value.tv_usec = (delay % 1000 ) * 1000;
++            its.it_interval.tv_sec = 0;
++            its.it_interval.tv_nsec = 0;
++            its.it_value.tv_sec = delay / 1000000;
++            its.it_value.tv_nsec = (delay % 1000 ) * 1000000;
+ 
+-            if (setitimer(ITIMER_REAL, &itv, NULL) == -1) {
++            if (timer_create(CLOCK_REALTIME, NULL, &timer) == -1) {
+                 ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+-                              "setitimer() failed");
++                              "timer_create() failed");
+             }
++            timer_settime(timer, 0, &its, NULL);
+         }
+ 
+         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "sigsuspend");
+@@ -294,6 +314,8 @@
+         }
+     }
+ 
++	ready();
++
+     for ( ;; ) {
+         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "worker cycle");
+ 
+@@ -804,11 +826,13 @@
+             exit(2);
+         }
+ 
++#ifndef __sortix__
+         if (initgroups(ccf->username, ccf->group) == -1) {
+             ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                           "initgroups(%s, %d) failed",
+                           ccf->username, ccf->group);
+         }
++#endif
+ 
+ #if (NGX_HAVE_PR_SET_KEEPCAPS && NGX_HAVE_CAPABILITIES)
+         if (ccf->transparent && ccf->user) {
+diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_shmem.c nginx/src/os/unix/ngx_shmem.c
+--- nginx.upstream/src/os/unix/ngx_shmem.c
++++ nginx/src/os/unix/ngx_shmem.c
+@@ -9,18 +9,18 @@
+ #include <ngx_core.h>
+ 
+ 
+-#if (NGX_HAVE_MAP_ANON)
++#if (NGX_HAVE_MAP_ANONYMOUS)
+ 
+ ngx_int_t
+ ngx_shm_alloc(ngx_shm_t *shm)
+ {
+     shm->addr = (u_char *) mmap(NULL, shm->size,
+                                 PROT_READ|PROT_WRITE,
+-                                MAP_ANON|MAP_SHARED, -1, 0);
++                                MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
+ 
+     if (shm->addr == MAP_FAILED) {
+         ngx_log_error(NGX_LOG_ALERT, shm->log, ngx_errno,
+-                      "mmap(MAP_ANON|MAP_SHARED, %uz) failed", shm->size);
++                      "mmap(MAP_ANONYMOUS|MAP_PRIVATE, %uz) failed", shm->size);
+         return NGX_ERROR;
+     }
+ 
+@@ -53,11 +53,11 @@
+     }
+ 
+     shm->addr = (u_char *) mmap(NULL, shm->size, PROT_READ|PROT_WRITE,
+-                                MAP_SHARED, fd, 0);
++                                MAP_PRIVATE, fd, 0);
+ 
+     if (shm->addr == MAP_FAILED) {
+         ngx_log_error(NGX_LOG_ALERT, shm->log, ngx_errno,
+-                      "mmap(/dev/zero, MAP_SHARED, %uz) failed", shm->size);
++                      "mmap(/dev/zero, MAP_PRIVATE, %uz) failed", shm->size);
+     }
+ 
+     if (close(fd) == -1) {
+diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_thread_mutex.c nginx/src/os/unix/ngx_thread_mutex.c
+--- nginx.upstream/src/os/unix/ngx_thread_mutex.c
++++ nginx/src/os/unix/ngx_thread_mutex.c
+@@ -87,6 +87,7 @@
+         return NGX_ERROR;
+     }
+ 
++#ifdef PTHREAD_MUTEX_ERRORCHECK
+     err = pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
+     if (err != 0) {
+         ngx_log_error(NGX_LOG_EMERG, log, err,
+@@ -94,6 +95,7 @@
+                       "(PTHREAD_MUTEX_ERRORCHECK) failed");
+         return NGX_ERROR;
+     }
++#endif
+ 
+     err = pthread_mutex_init(mtx, &attr);
+     if (err != 0) {
+diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_time.h nginx/src/os/unix/ngx_time.h
+--- nginx.upstream/src/os/unix/ngx_time.h
++++ nginx/src/os/unix/ngx_time.h
+@@ -41,6 +41,10 @@
+ #define ngx_tm_zone           tm_zone
+ #endif
+ 
++#ifdef __sortix__
++#define timezone 0
++#endif
++
+ 
+ #if (NGX_SOLARIS)
+ 
+diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_user.c nginx/src/os/unix/ngx_user.c
+--- nginx.upstream/src/os/unix/ngx_user.c
++++ nginx/src/os/unix/ngx_user.c
+@@ -46,6 +46,7 @@
+ ngx_int_t
+ ngx_libc_crypt(ngx_pool_t *pool, u_char *key, u_char *salt, u_char **encrypted)
+ {
++#ifndef __sortix__
+     char       *value;
+     size_t      len;
+     ngx_err_t   err;
+@@ -65,6 +66,9 @@
+     }
+ 
+     err = ngx_errno;
++#else
++    ngx_err_t   err = errno = ENOTSUP;
++#endif
+ 
+     ngx_log_error(NGX_LOG_CRIT, pool->log, err, "crypt() failed");
+ 
