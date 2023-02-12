@@ -327,7 +327,7 @@ diff_package() {(
     tix-rmdiff -- "$base.upstream" "$base" |
     LC_ALL=C sort > "$base.rmpatch"
     if [ ! -s "$base.rmpatch" ]; then rm "$base.rmpatch"; fi
-    desired_version "$port" > "$base.version"
+    desired_version "$base" > "$base.version"
   fi
 )}
 
