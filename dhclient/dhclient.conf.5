@@ -1,0 +1,183 @@
+.Dd January 16, 2023
+.Dt DHCLIENT.CONF 5
+.Os
+.Sh NAME
+.Nm dhclient.conf
+.Nd dhcp client configuration
+.Sh SYNOPSIS
+.Nm /etc/dhclient.${mac}.conf
+.Nm /etc/dhclient.${if}.conf
+.Nm /etc/dhclient.conf
+.Sh DESCRIPTION
+.Xr dhclient 8
+configures the network interface according to its
+.Nm
+configuration file, searching for the first file path to exist:
+.Pp
+.Bl -bullet -compact
+.It
+.Pa /etc/dhclient.${mac}.conf
+- where
+.Ar mac
+is the network interface's hardware address.
+(Example:
+.Pa dhclient.00:00:5e:00:53:00.conf )
+.It
+.Pa /etc/dhclient.${if}.conf
+- where
+.Ar if
+is the network interface's name.
+(Example:
+.Pa dhclient.if0.conf )
+.It
+.Pa /etc/dhclient.conf
+- the shared configuration file.
+.El
+.Pp
+Network interface names are not guaranteed to be stable and it's recommended to
+use the hardware address in the file name or in the
+.Sy if
+statement in the shared file.
+.Sh FORMAT
+.Nm
+contains a series of whitespace delimited tokens akin to an
+.Xr ifconfig 8
+invocation.
+The
+.Sq #
+character begins a comment and the rest of the line is ignored.
+If a token names a protocol, then that protocol is selected.
+If a token names a configuration inside the current protocol or a top level
+statement, then that configuration is set to the value of the subsequent
+token.
+.Pp
+Configurations can be generally be set to either a manual value, or
+.Sy auto
+to obtain the value from the DHCP server, or
+.Sy none
+to disable setting the configuration and retain the currently set value.
+If
+.Sy auto
+or
+.Sy none
+follows a protocol name, then all the configurations inside the protocol is set
+to that value.
+.Pp
+The top level statements are:
+.Bl -tag -width "12345678"
+.It Sy if Oo Ar name "|" Sy etherhw: Ns Ar mac "|" Sy id: Ns Ar linkid Oc
+The following configurations only applies to the network interface if it
+matches by its
+.Ar name ,
+its hardware address
+.Ar mac ,
+or its unstable index number
+.Ar linkid .
+The
+.Sy if
+statement can only be used in the shared
+.Pa /etc/dhclient.conf
+file and allows defining a section for each network interface.
+Configurations are applied to all network interfaces until the
+.Sy if
+statement appears.
+.El
+.Pp
+The
+.Sy inet
+protocol contains the following configurations:
+.Bl -tag -width "12345678"
+.It Sy address Oo Ar ip "|" Sy auto "|" Sy none Oc
+The local address in
+.Xr inet 4
+address notation.
+(Default:
+.Sy auto )
+.It Sy router Oo Ar ip "|" Sy auto "|" Sy none Oc
+The default route in
+.Xr inet 4
+address notation.
+(Default:
+.Sy auto )
+.It Sy subnet Oo Ar ip "|" Sy auto "|" Sy none Oc
+The subnet mask in
+.Xr inet 4
+address notation.
+(Default:
+.Sy auto )
+.El
+.Pp
+The
+.Sy dns
+protocol contains the following configurations:
+.Bl -tag -width "12345678"
+.It Sy servers Oo Ar ip1,ip2,... "|" Sy auto "|" Sy none Oc
+The comma separated list of DNS servers in
+.Xr inet 4
+address notation.
+A singular comma means the empty list.
+(Default:
+.Sy auto )
+.El
+.Pp
+The
+.Sy ether
+protocol contains the following configurations:
+.Bl -tag -width "12345678"
+.It Sy address Oo Ar mac "|" Sy auto "|" Sy none Oc
+The local address in
+.Xr ether 4
+address notation.
+.Sy auto
+sets it to the hardware address.
+(Default:
+.Sy auto )
+.El
+.Sh EXAMPLES
+.Ss Manually configuring an interface
+To fully manually configure the network interface
+.Pa if0 ,
+even if the network interface's device name changes over time, first first look
+up its ethernet hardware address:
+.Bd -literal -offset indent
+$ ifconfig -l if0 ether hwaddress
+00:00:5e:00:53:00
+.Ed
+.Pp
+Then write an
+.Pa /etc/dhclient.conf
+section using the
+.Sy if
+statement:
+.Bd -literal -offset indent
+if etherhw:00:00:5e:00:53:00
+inet address 192.0.2.4 router 192.0.2.1 subnet 255.255.255.0
+dns servers 192.0.2.2 192.0.2.3
+.Ed
+.Ss Obtaining the DNS servers on only one interface
+The DNS server list is global and a system with multiple network interfaces can
+obtain the list on only the preferred interface by disabling DNS configuration
+and enabling it on the desired interface:
+.Bd -literal -offset indent
+dns none
+if etherhw:00:00:5e:00:53:00
+dns auto
+.Ed
+.Ss Disabling dhclient
+.Xr dhclient 8
+can be disabled on an interface by disabling configuration of the inet and dns
+protocols:
+.Bd -literal -offset indent
+inet none
+dns none
+.Ed
+.Sh SEE ALSO
+.Xr ether 4 ,
+.Xr if 4 ,
+.Xr inet 4 ,
+.Xr dhclient 8 ,
+.Xr dnsconfig 8 ,
+.Xr ifconfig 8
+.Sh CAVEATS
+The list of DNS servers is global and should only be obtained on one network
+interface to avoid interference.

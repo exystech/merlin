@@ -153,6 +153,11 @@ It depends on the
 and
 .Sy time
 daemons.
+.It Sy dhclient
+Daemon that starts
+.Xr dhclient 8
+on each network interface and becomes ready when each network interface has
+been attempted configured.
 .It Sy local
 Virtual daemon that starts daemons pertinent to the local system.
 The system provides a default implementation that does nothing.
@@ -163,6 +168,9 @@ system.
 .It Sy network
 Virtual daemon that becomes ready when an attempt has been made to establish
 network connectivity.
+It depends on the
+.Sy dhclient
+deamon.
 Daemons can depend on this daemon if they need the network to have been
 established before they start.
 .It Sy time
@@ -525,6 +533,23 @@ The
 .Sy optional
 flag should only be omitted if a local daemon is critical and the boot should
 fail if the daemon fails.
+.Ss Disable network auto-configuration (DHCP)
+The
+.Sy network
+daemon depends by default on
+.Sy dhclient ,
+which does DHCP configuration of the network.
+This dependency can be removed by creating
+.Pa /etc/init/network
+with the following contents:
+.Bd -literal
+furthermore
+unset require dhclient
+.Ed
+.Pp
+This example extends the existing configuration in
+.Pa /share/init/network
+by removing a dependency.
 .Ss Creating a new daemon
 The
 .Sy exampled

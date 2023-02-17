@@ -215,4 +215,19 @@ if0
 .Xr if 4 ,
 .Xr inet 4 ,
 .Xr lo 4 ,
+.Xr dhclient 8 ,
 .Xr dnsconfig 8
+.Sh CAVEATS
+.Xr ether 4
+network interfaces with the
+.Xr inet 4
+protocol are commonly automatically configured by
+.Xr dhclient 8 .
+Disable
+.Xr dhclient 8
+before manually configuring
+.Xr inet 4
+on such interfaces to avoid the manual configuration being overwritten, or
+configure
+.Xr dhclient 8
+to set your desired network interface configuration in the first place.

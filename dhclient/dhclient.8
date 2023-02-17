@@ -1,0 +1,165 @@
+.Dd January 15, 2023
+.Dt DHCLIENT 8
+.Os
+.Sh NAME
+.Nm dhclient
+.Nd dynamic host configuration protocol client
+.Sh SYNOPSIS
+.Nm
+.Op Fl f Ar config
+.Op Fl t
+.Ar interface
+.Sh DESCRIPTION
+.Nm
+dynamically configures the specified network
+.Ar interface
+.Xr ( if 4 )
+and the Domain Name System (DNS) server list
+via the Dynamic Host Configuration Protocol (DHCP) with settings obtained from
+the local network's DHCP server.
+.Pp
+.Nm
+is configured in
+.Xr dhclient.conf 5 .
+Each network setting can be configured to be automatically obtained from the
+network (default), set manually, or not set at all.
+If the interface is fully manually configured,
+.Nm
+sets the configuration and exits immediately.
+.Pp
+.Nm
+broadcasts a request and selects a DHCP server to obtain the network
+configuration from.
+.Nm
+leases an internet address as needed and remains running to occasionally renew
+the release.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl f Ar config
+Load the configuration from the
+.Ar config
+file instead as a shared configuration file instead of searching for it.
+.It Fl t
+Test the configuration is valid without configuring the network interface.
+The
+.Ar interface
+can optionally be specified to search for its configuration file.
+Exit 0 if the configuration is valid and non-zero otherwise.
+.El
+.Pp
+Port 68 on the network interface is bound to send and receive DHCP messages.
+.Nm
+exits 0 immediately if the port is already bound to avoid interfering with other
+.Nm
+processes.
+.Pp
+.Nm
+supports the Ethernet link layer
+.Xr ether 4
+with the Internet Protocol network layer
+.Xr ip 4 .
+The loopback interface
+.Xr lo 4
+does not need to be configured and
+.Nm
+immediately exits successfully.
+.Pp
+Network interfaces can be manually configured using
+.Xr ifconfig 8
+and the DNS servers using
+.Xr dnsconfig 8 .
+.Nm
+will occasionally reset the configuration when the internet address lease is
+renewed unless disabled.
+.Pp
+.Nm
+is typically automatically started as the
+.Sy dhclient
+daemon, which is depended on by the
+.Sy network
+daemon per the
+.Xr init 5
+configuration.
+.Sh IMPLEMENTATION NOTES
+.Nm
+signals readiness when it has attempted to configure the network interface and
+continues retrying afterwards.
+The first attempt fails if the network interface's link doesn't come up within
+10 seconds.
+Packets are transmitted 6 times with an exponential backoff before giving up
+and the configuration restarts.
+.Sh FILES
+.Bl -tag -width "/etc/dhclient.${mac}.conf" -compact
+.It Pa /etc/dhclient.${mac}.conf
+The preferred
+.Xr dhclient.conf 5
+file for the interface with the hardware address
+.Ar mac .
+.It Pa /etc/dhclient.${if}.conf
+The second priority
+.Xr dhclient.conf 5
+file for the interface with the device name
+.Ar if .
+.It Pa /etc/dhclient.conf
+The lowest priority
+.Xr dhclient.conf 5
+file shared across all network interfaces.
+.El
+.Sh ASYNCHRONOUS EVENTS
+.Bl -tag -width "SIGUSR1"
+.It Dv SIGTERM
+Request daemon termination.
+.El
+.Sh EXIT STATUS
+.Nm
+runs as a
+.Xr daemon 7
+until stopped by
+.Dv SIGTERM .
+.Nm
+signals readiness on the
+.Ev READYFD
+file descriptor when the interface is configured, when waiting for the link to
+come up times out, or when the DHCP server doesn't respond in time or
+configuration fails.
+.Nm
+will exit 0 if the network interface doesn't need to be configured or is fully
+manually configured and will exit non-zero on any fatal startup error.
+.Sh EXAMPLES
+See
+.Xr dhclient.conf 5
+for example configurations.
+.Pp
+See
+.Xr init 5
+for an example disabling the
+.Sy dhclient
+daemon by removing the
+.Sy network
+daemon's dependency on it.
+.Sh SEE ALSO
+.Xr ether 4 ,
+.Xr if 4 ,
+.Xr inet 4 ,
+.Xr ip 4 ,
+.Xr dnsconfig 8 ,
+.Xr ifconfig 8 ,
+.Xr init 8
+.Sh STANDARDS
+.Rs
+.%A R. Droms
+.%D March 1997
+.%R RFC 2131
+.%T Dynamic Host Configuration Protocol
+.%Q Network Working Group
+.Re
+.Pp
+.Rs
+.%A S. Alexander
+.%A R. Droms
+.%D March 1997
+.%R RFC 2132
+.%T DHCP Options and BOOTP Vendor Extensions
+.%Q Network Working Group
+.Re
