@@ -37,8 +37,8 @@ int ttyname_r(int fd, char* path, size_t path_size)
 	name[3] = 'v';
 	name[4] = '/';
 	if ( ioctl(fd, TIOCGNAME, name + 5) < 0 )
-		return -1;
+		return errno;
 	if ( path_size <= strlcpy(path, name, path_size) )
-		return errno = ERANGE, -1;
+		return ERANGE;
 	return 0;
 }
