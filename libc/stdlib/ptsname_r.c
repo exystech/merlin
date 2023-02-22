@@ -23,7 +23,5 @@
 
 int ptsname_r(int fd, char* path, size_t path_size)
 {
-	if ( ttyname_r(fd, path, path_size) < 0 )
-		return errno;
-	return 0;
+	return ttyname_r(fd, path, path_size);
 }
