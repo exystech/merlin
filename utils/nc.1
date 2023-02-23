@@ -1,0 +1,66 @@
+.Dd February 23, 2023
+.Dt PING 1
+.Os
+.Sh NAME
+.Nm nc
+.Nd network client and server
+.Sh SYNOPSIS
+.Nm
+.Op Fl 46luv
+.Ar host
+.Ar service
+.Sh DESCRIPTION
+.Nm
+is a simple network client that connects to the
+.Ar host
+and
+.Ar service
+and transmits its standard input and receives to its standard output.
+.Nm
+exits when the connection has been closed.
+.Nm
+closes the connection for writing upon the end of input and continues to read
+until the remote closes for writing.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl 4
+Use Internet Prototocol version 4
+.Xr ( ip 4 ) .
+.It Fl 6
+Use Internet Prototocol version 6
+.Xr ( ip6 4 ) .
+.It Fl l
+Accept a singular connection as a network server instead of connecting as a
+client.
+.Nm
+binds locally to the
+.Ar host
+and
+.Ar service
+and accepts a singular connection.
+.It Fl u
+Send and receive datagrams instead of using a streaming connection.
+For the Internet Protocol,
+.Xr udp 4
+is used instead of
+.Xr tcp 4 .
+.It Fl v
+Write a diagnostic to the standard error whenever a connection has been
+established or accepted.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr cat 1 ,
+.Xr ssh 1 ,
+.Xr accept 2 ,
+.Xr bind 2 ,
+.Xr connect 2 ,
+.Xr listen 2 ,
+.Xr socket 2 ,
+.Xr ip 4 ,
+.Xr ip6 4 ,
+.Xr tcp 4 ,
+.Xr udp 4
