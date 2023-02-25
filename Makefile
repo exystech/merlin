@@ -251,6 +251,7 @@ sysroot-source: sysroot-fsh
 ifeq ($(SORTIX_INCLUDE_SOURCE),git)
 	rm -rf "$(SYSROOT)/src"
 	git clone --no-hardlinks $(SORTIX_INCLUDE_SOURCE_GIT_CLONE_OPTIONS) -- "$(SORTIX_INCLUDE_SOURCE_GIT_REPO)" "$(SYSROOT)/src"
+	(cd "$(SYSROOT)/src" && git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*')
 	-cd "$(SYSROOT)/src" && for BRANCH in $(SORTIX_INCLUDE_SOURCE_GIT_BRANCHES); do \
 	  git fetch origin $$BRANCH:refs/remotes/origin/$$BRANCH && \
 	  (git branch -f $$BRANCH origin/$$BRANCH || true) ; \
