@@ -116,6 +116,7 @@ LogTerminal::LogTerminal(dev_t dev, mode_t mode, uid_t owner, gid_t group,
 	this->keyboard = keyboard;
 	this->kblayout = kblayout;
 	this->modifiers = 0;
+	this->report_cursor_offset = 0;
 	keyboard->SetOwner(this, NULL);
 }
 
@@ -127,7 +128,33 @@ LogTerminal::~LogTerminal()
 
 void LogTerminal::tty_output(const unsigned char* buffer, size_t length)
 {
-	Log::PrintData(buffer, length);
+	const char* report_cursor = "\e[6n";
+	while ( length )
+	{
+		size_t amount = 0;
+		bool found_report_cursor = false;
+		while ( !found_report_cursor && amount < length )
+		{
+			if ( buffer[amount++] == report_cursor[report_cursor_offset++] )
+				found_report_cursor = !report_cursor[report_cursor_offset];
+			else
+				report_cursor_offset = 0;
+		}
+		Log::PrintData(buffer, amount);
+		buffer += amount;
+		length -= amount;
+		if ( found_report_cursor )
+		{
+			size_t column, row;
+			Log::GetCursor(&column, &row);
+			char buf[64];
+			snprintf(buf, sizeof(buf), "\e[%zu;%zuR", row + 1, column + 1);
+			for ( size_t n = 0; buf[n]; n++ )
+				if ( !linebuffer.Push(buf[n]) )
+					break;
+			CommitLineBuffer();
+		}
+	}
 }
 
 int LogTerminal::sync(ioctx_t* /*ctx*/)

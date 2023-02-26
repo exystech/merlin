@@ -52,6 +52,7 @@ private:
 	Keyboard* keyboard;
 	KeyboardLayoutExecutor* kblayout;
 	int modifiers;
+	size_t report_cursor_offset;
 
 };
 
