@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2020, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2020, 2021, 2022, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -439,6 +439,14 @@ int main(void)
 	     "impatient. Take the time to read the documentation and be patient "
 	     "while you learn the new system. This is a very good time to start an "
 	     "external music player that plays soothing classical music on loop.\n\n");
+
+	if ( !access_or_die("/tix/tixinfo/ssh", F_OK) &&
+	     access_or_die("/root/.ssh/authorized_keys", F_OK) < 0 )
+		text("If you wish to ssh into your new installation, it's recommended "
+		     "to first add your public keys to the .iso and obtain "
+		     "fingerprints per release-iso-modification(7) before installing."
+		     "\n\n");
+
 	const char* readies[] =
 	{
 		"Ready",
@@ -1026,6 +1034,56 @@ int main(void)
 		textf("Group '%s' added to /etc/group.\n", "root");
 		break;
 	}
+
+	struct ssh_file
+	{
+		const char* key;
+		const char* path;
+		const char* pub;
+	};
+	const struct ssh_file ssh_files[] =
+	{
+		{"copy_ssh_authorized_keys_root", "/root/.ssh/authorized_keys", NULL},
+		{"copy_ssh_config_root", "/root/.ssh/config", NULL},
+		{"copy_ssh_id_rsa_root", "/root/.ssh/id_rsa", "/root/.ssh/id_rsa.pub"},
+		{"copy_ssh_known_hosts_root", "/root/.ssh/known_hosts", NULL},
+	};
+	size_t ssh_files_count = sizeof(ssh_files) / sizeof(ssh_files[0]);
+	bool any_ssh_keys = false;
+	for ( size_t i = 0; i < ssh_files_count; i++ )
+	{
+		const struct ssh_file* file = &ssh_files[i];
+		if ( access_or_die(file->path, F_OK) < 0 )
+			continue;
+		text("\n");
+		textf("Found %s\n", file->path);
+		if ( file->pub && !access_or_die(file->pub, F_OK) )
+			textf("Found %s\n", file->pub);
+		while ( true )
+		{
+			char question[256];
+			snprintf(question, sizeof(question),
+			         "Copy %s from installer environment? (yes/no)",
+			         file->path);
+			prompt(input, sizeof(input), file->key, question, "yes");
+			if ( strcasecmp(input, "no") == 0 )
+				break;
+			if ( strcasecmp(input, "yes") != 0 )
+				continue;
+			mkdir_or_chmod_or_die("root/.ssh", 0700);
+			textf("Copying %s -> %s\n", file->path, file->path + 1);
+			execute((const char*[])
+				{"cp", file->path, file->path+ 1, NULL }, "f");
+			if ( file->pub )
+			{
+				textf("Copying %s -> %s\n", file->pub, file->pub + 1);
+				execute((const char*[])
+					{"cp", file->pub, file->pub + 1, NULL }, "f");
+			}
+			any_ssh_keys = true;
+			break;
+		}
+	}
 	text("\n");
 
 	if ( mkdir("etc/init", 0755) < 0 )
@@ -1130,6 +1188,171 @@ int main(void)
 	text("\n");
 
 	// TODO: Ask if networking should be disabled / enabled.
+
+	struct sshd_key_file
+	{
+		const char* pri;
+		const char* pub;
+	};
+	const struct sshd_key_file sshd_key_files[] =
+	{
+		{"/etc/ssh_host_ecdsa_key", "/etc/ssh_host_ecdsa_key.pub"},
+		{"/etc/ssh_host_ed25519_key", "/etc/ssh_host_ed25519_key.pub"},
+		{"/etc/ssh_host_rsa_key", "/etc/ssh_host_rsa_key.pub"},
+	};
+	size_t sshd_key_files_count
+		= sizeof(sshd_key_files) / sizeof(sshd_key_files[0]);
+	bool any_sshd_keys = false;
+	for ( size_t i = 0; i < sshd_key_files_count; i++ )
+	{
+		if ( !access_or_die(sshd_key_files[i].pri, F_OK) )
+		{
+			textf("Found %s\n", sshd_key_files[i].pri);
+			any_sshd_keys = true;
+		}
+	}
+
+	bool enabled_sshd = false;
+	if ( !access_or_die("/tix/tixinfo/ssh", F_OK) )
+	{
+		text("A ssh server has been installed. You have the option of starting "
+		     "it on boot to allow remote login over a cryptographically secure "
+		     "channel. Answer no if you don't know what ssh is.\n\n");
+		if ( !any_sshd_keys )
+			text("Warning: " BRAND_DISTRIBUTION_NAME " does not yet collect "
+			     "entropy for secure random numbers. Unless you type '!' and "
+			     "escape to a shell and put 256 bytes of actual randomness "
+			     "into boot/random.seed, the first boot will use the "
+			     "randomness of this installer environment to generate ssh "
+			     "keys. This initial randomness may be as weak as the wall "
+			     "time when you booted the installer, which is easily guessed "
+			     "by an attacker. The same warning applies to outgoing secure "
+			     "connections as well.\n\n");
+		bool might_want_sshd =
+			any_ssh_keys ||
+		    any_sshd_keys ||
+			!access_or_die("/etc/sshd_config", F_OK);
+		while ( true )
+		{
+			prompt(input, sizeof(input), "enable_ssh",
+			       "Enable ssh server? (yes/no)",
+			       might_want_sshd ? "yes" : "no");
+			if ( strcasecmp(input, "no") == 0 )
+				break;
+			if ( strcasecmp(input, "yes") != 0 )
+				continue;
+			if ( !install_configurationf("etc/init/local", "a",
+			                             "require sshd optional\n") )
+			{
+				warn("etc/init/local");
+				continue;
+			}
+			enabled_sshd = true;
+			text("Added 'require sshd optional' to /etc/init/local\n");
+			text("The ssh server will be started when the system boots.\n");
+			break;
+		}
+		text("\n");
+	}
+
+	bool has_sshd_config = false;
+	if ( !access_or_die("/etc/sshd_config", F_OK) )
+	{
+		while ( true )
+		{
+			prompt(input, sizeof(input), "copy_sshd_config",
+			       "Copy /etc/sshd_config from installer environment? (yes/no)",
+			       "yes");
+			if ( strcasecmp(input, "no") == 0 )
+				break;
+			if ( strcasecmp(input, "yes") != 0 )
+				continue;
+			const char* file =  "/etc/sshd_config";
+			textf("Copying %s -> %s\n", file, file + 1);
+			execute((const char*[]) {"cp", file, file + 1}, "f");
+			has_sshd_config = true;
+			break;
+		}
+		text("\n");
+	}
+
+	if ( enabled_sshd && !has_sshd_config )
+	{
+		text("Password authentication has been disabled by default in sshd to "
+		     "prevent remotely guessing insecure passwords. The recommended "
+		     "approach is to put your public key in the installation .iso and "
+		     "generate the sshd credentials ahead of time as documented in "
+		     "release-iso-modification(7). However, you could enable password "
+		     "authentication if you picked a very strong password.\n\n");
+		bool enable_sshd_password = false;
+		while ( true )
+		{
+			prompt(input, sizeof(input), "enable_ssh_password",
+				   "Enable sshd password authentication? (yes/no)", "no");
+			if ( strcasecmp(input, "no") == 0 )
+				break;
+			if ( strcasecmp(input, "yes") != 0 )
+				continue;
+			if ( !install_configurationf("etc/sshd_config", "a",
+			                             "PasswordAuthentication yes\n") )
+			{
+				warn("etc/sshd_config");
+				continue;
+			}
+			enable_sshd_password = true;
+			text("Added 'PasswordAuthentication yes' to /etc/sshd_config\n");
+			break;
+		}
+		while ( enable_sshd_password )
+		{
+			prompt(input, sizeof(input), "enable_ssh_root_password",
+				   "Enable sshd password authentication for root? (yes/no)",
+			       "no");
+			if ( strcasecmp(input, "no") == 0 )
+				break;
+			if ( strcasecmp(input, "yes") != 0 )
+				continue;
+			if ( !install_configurationf("etc/sshd_config", "a",
+			                             "PermitRootLogin yes\n") )
+			{
+				warn("etc/sshd_config");
+				continue;
+			}
+			text("Added 'PermitRootLogin yes' to /etc/sshd_config\n");
+			break;
+		}
+		text("\n");
+	}
+
+	if ( any_sshd_keys )
+	{
+		while ( true )
+		{
+			const char* question =
+				"Copy sshd private keys from installer environment? (yes/no)";
+			prompt(input, sizeof(input), "copy_sshd_private_keys",
+			       question,
+			       "yes");
+			if ( strcasecmp(input, "no") == 0 )
+				break;
+			if ( strcasecmp(input, "yes") != 0 )
+				continue;
+			for ( size_t i = 0; i < sshd_key_files_count; i++ )
+			{
+				const struct sshd_key_file* file = &sshd_key_files[i];
+				if ( access_or_die(file->pri, F_OK) < 0 )
+					continue;
+				textf("Copying %s -> %s\n", file->pri, file->pri + 1);
+				execute((const char*[])
+					{"cp", file->pri, file->pri + 1, NULL }, "f");
+				textf("Copying %s -> %s\n", file->pub, file->pub + 1);
+				execute((const char*[])
+					{"cp", file->pub, file->pub + 1, NULL }, "f");
+			}
+			break;
+		}
+		text("\n");
+	}
 
 	text("It's time to boot into the newly installed system.\n\n");
 

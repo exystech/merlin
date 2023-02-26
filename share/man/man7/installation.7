@@ -79,11 +79,16 @@ Optionally, you might want to modify a release .iso to meet your custom needs
 per the instructions in
 .Xr release-iso-modification 7 .
 .Pp
+If you want to ssh into your installation, it's recommended to amend the
+installation .iso with your public key, pregenerated the server keys and obtain
+fingerprints, and seed randomness using this procedure.
+.Pp
 The release modification procedure lets you customize aspects such as the
 default bootloader menu option and timeout, the default hostname, the default
 keyboard layout, the default graphics resolution, adding files of your choice to
 the live environment, control which drivers are loaded by default, control which
-live environment daemons are started by default, and so on.
+live environment daemons are started by default, deploy ssh keys so secure shell
+connections are trusted on the first connection, and so on.
 .Pp
 Warning: The live environment does not come with any random entropy and entropy
 gathering is not yet implemented.
@@ -358,6 +363,8 @@ A root account is made in
 and
 .Xr group 5 .
 This question is skipped if the root account already exists.
+If the live environment's root user has ssh keys and configuration, you will be
+asked whether you'd like to copy the files to the new installation.
 .Ss Users
 You will be asked in a loop if you wish to make another user.
 Answer
@@ -378,6 +385,25 @@ and
 .Pp
 Please note that Sortix is not currently secure as a multi-user system and
 filesystem permissions are not enforced.
+.Ss SSH Server
+You will be asked if you want to enable a
+.Xr sshd 8
+server for remotely logging into this machine over a secure cryptographic
+channel.
+Answer no if in doubt as anyone who obtains your credentials will be able to
+connect to your computer and log in as you.
+Password authentication is disabled by default as public key cryptography should
+be used for security, but if you have a very strong password, you could enable
+it when asked.
+It's recommended to securely bootstrap ssh authentication using the
+.Xr release-iso-modification 7
+procedure to amend the installation medium with your public key, pregenerated
+server private keys, and a random seed.
+You are using a bad workflow if you encounter a ssh server fingerprint check.
+If the installer environment contains a
+.Xr sshd_config
+or private sshd keys, then you will be asked if you want to copy the files into
+the new installation.
 .Ss Completion
 This will complete the operating system installation.
 Upon reboot, the new system will start normally.
