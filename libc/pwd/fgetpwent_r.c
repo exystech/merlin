@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -58,7 +58,7 @@ static bool next_field_uintmax(char** current, uintmax_t* result)
 	return true;
 }
 
-static gid_t next_field_gid(char** current, gid_t* result)
+static bool next_field_gid(char** current, gid_t* result)
 {
 	uintmax_t id_umax;
 	if ( !next_field_uintmax(current, &id_umax) )
@@ -70,7 +70,7 @@ static gid_t next_field_gid(char** current, gid_t* result)
 	return true;
 }
 
-static uid_t next_field_uid(char** current, uid_t* result)
+static bool next_field_uid(char** current, uid_t* result)
 {
 	uintmax_t id_umax;
 	if ( !next_field_uintmax(current, &id_umax) )

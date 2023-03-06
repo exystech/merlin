@@ -59,7 +59,7 @@ static bool next_field_uintmax(char** current, uintmax_t* result)
 	return true;
 }
 
-static gid_t next_field_gid(char** current, gid_t* result)
+static bool next_field_gid(char** current, gid_t* result)
 {
 	uintmax_t id_umax;
 	if ( !next_field_uintmax(current, &id_umax) )
