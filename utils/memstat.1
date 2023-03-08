@@ -1,19 +1,94 @@
-.Dd October 6, 2016
+.Dd March 8, 2023
 .Dt MEMSTAT 1
 .Os
 .Sh NAME
 .Nm memstat
-.Nd print system memory usage information
+.Nd system memory statistics
 .Sh SYNOPSIS
 .Nm
+.Op Fl abegkmprt
+.Op Ar statistic ...
 .Sh DESCRIPTION
 .Nm
-prints the amount of memory in use, the total amount of memory, and the
-percentage of memory used.
+writes the requested system memory
+.Ar statistics ,
+or the
+.Sy total
+system memory and
+.Sy used
+system memory by default.
+Each statistic is written as a line with three columns aligned with spaces,
+where the first column is the human readable value, the second column is the
+name of the statistic, and the third column is how many percent the value is out
+of total system memory.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl a
+Write all statistics.
+.It Fl b
+Format values as bytes.
+.It Fl e
+Format values as exabytes (1024^6 bytes).
+.It Fl g
+Format values as gigabytes (1024^3 bytes).
+.It Fl k
+Format values as kilobytes (1024 bytes).
+.It Fl m
+Format values as megabytes (1024^2 bytes).
+.It Fl p
+Format values as petabytes (1024^5 bytes).
+.It Fl r
+Write statistics in the raw machine readable format consisting of the value in
+the requested unit (bytes by default) with no unit suffix followed by a space
+and then the statistic name.
+.It Fl t
+Format values as terabytes (1024^4 bytes).
+.El
+.Pp
+The statistics are as follows:
+.Pp
+.Bl -tag -width filesystem -compact
+.It Sy total
+amount of total memory.
+.It Sy used
+amount of memory currently used for any purpose.
+.It Sy userspace
+amount of memory purposed for normal user-space pages.
+.It Sy kernel
+amount of memory purposed for normal kernel-space pages.
+.It Sy filesystem
+amount of memory purposed for kernel filesystem buffers.
+.It Sy network
+amount of memory purposed for kernel network buffers.
+.It Sy paging
+amount of memory purposed for paging overhead.
+.It Sy driver
+amount of memory purposed for kernel driver buffers.
+.It Sy physical
+amount of memory purposed for keep track of unused physical memory.
+.It Sy execve
+amount of memory purposed for the
+.Xr execve 2
+system call.
+.El
+.Pp
+.Nm
+measures an instantaneous consistent snapshot of all the system memory
+statistics using
+.Xr memusage 2 .
+Each page of memory is used for exactly one purpose and the purpose statistics
+add up to the
+.Sy used
+statistic.
 .Sh EXIT STATUS
 .Nm
 will exit 0 on success and non-zero otherwise.
 .Sh SEE ALSO
 .Xr ps 1 ,
 .Xr pstree 1 ,
-.Xr memstat 2
+.Xr memusage 2
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 0.5.
+The output was changed to the current table format in Sortix 1.1.

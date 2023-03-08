@@ -1,6 +1,60 @@
 diff -Paur --no-dereference -- xz.upstream/configure xz/configure
 --- xz.upstream/configure
 +++ xz/configure
+@@ -16829,7 +16829,7 @@
+                   done
+                   if test -z "$haveit"; then
+                     if test -d "$additional_includedir"; then
+-                                            INCICONV="${INCICONV}${INCICONV:+ }-I$additional_includedir"
++                                            INCICONV="${INCICONV}${INCICONV:+ }"
+                     fi
+                   fi
+                 fi
+@@ -16876,7 +16876,7 @@
+                         done
+                         if test -z "$haveit"; then
+                           if test -d "$additional_libdir"; then
+-                                                        LIBICONV="${LIBICONV}${LIBICONV:+ }-L$additional_libdir"
++                                                        LIBICONV="${LIBICONV}${LIBICONV:+ }"
+                           fi
+                         fi
+                         haveit=
+@@ -16897,7 +16897,7 @@
+                         done
+                         if test -z "$haveit"; then
+                           if test -d "$additional_libdir"; then
+-                                                        LTLIBICONV="${LTLIBICONV}${LTLIBICONV:+ }-L$additional_libdir"
++                                                        LTLIBICONV="${LTLIBICONV}${LTLIBICONV:+ }"
+                           fi
+                         fi
+                       fi
+@@ -17772,7 +17772,7 @@
+                   done
+                   if test -z "$haveit"; then
+                     if test -d "$additional_includedir"; then
+-                                            INCINTL="${INCINTL}${INCINTL:+ }-I$additional_includedir"
++                                            INCINTL="${INCINTL}${INCINTL:+ }"
+                     fi
+                   fi
+                 fi
+@@ -17819,7 +17819,7 @@
+                         done
+                         if test -z "$haveit"; then
+                           if test -d "$additional_libdir"; then
+-                                                        LIBINTL="${LIBINTL}${LIBINTL:+ }-L$additional_libdir"
++                                                        LIBINTL="${LIBINTL}${LIBINTL:+ }"
+                           fi
+                         fi
+                         haveit=
+@@ -17840,7 +17840,7 @@
+                         done
+                         if test -z "$haveit"; then
+                           if test -d "$additional_libdir"; then
+-                                                        LTLIBINTL="${LTLIBINTL}${LTLIBINTL:+ }-L$additional_libdir"
++                                                        LTLIBINTL="${LTLIBINTL}${LTLIBINTL:+ }"
+                           fi
+                         fi
+                       fi
 @@ -19269,6 +19269,7 @@
  
  #if defined(_WIN32) || defined(__CYGWIN__) || defined(__OS2__) \
@@ -19,7 +73,7 @@ diff -Paur --no-dereference -- xz.upstream/src/common/tuklib_physmem.c xz/src/co
 +
 +// Sortix
 +#elif defined(__sortix__)
-+#	include <unistd.h>
++#	include <memusage.h>
 +
  #endif
  
@@ -29,9 +83,9 @@ diff -Paur --no-dereference -- xz.upstream/src/common/tuklib_physmem.c xz/src/co
  	if (sysinfo(&si) == 0)
  		ret = (uint64_t)si.totalram * si.mem_unit;
 +#elif defined(__sortix__)
-+	size_t ret_size_t;
-+	memstat(NULL, &ret_size_t);
-+	ret = ret_size_t;
++	size_t statistic = MEMUSAGE_TOTAL;
++	memusage(&statistic, &statistic, 1);
++	ret = statistic;
  #endif
  
  	return ret;

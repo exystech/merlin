@@ -69,6 +69,11 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Add memusage(2)
+The
+.Xr memusage 2
+system call has been added, which provides detailed system memory statistics.
+This is a minor compatible ABI change.
 .Ss Add networking stack
 The network stack has been implemented in the kernel and exposed through
 additions to the system call interface.
