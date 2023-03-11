@@ -27,6 +27,7 @@
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
+#include <glob.h>
 #include <inttypes.h>
 #include <ioleast.h>
 #include <libgen.h>
@@ -104,21 +105,6 @@ void update_env(void)
 		snprintf(str, sizeof(str), "%zu", (size_t) ws.ws_row);
 		setenv("LINES", str, 1);
 	}
-}
-
-bool matches_simple_pattern(const char* string, const char* pattern)
-{
-	size_t wildcard_index = strcspn(pattern, "*");
-	if ( !pattern[wildcard_index] )
-		return strcmp(string, pattern) == 0;
-	if ( pattern[0] == '*' && string[0] == '.' )
-		return false;
-	size_t string_length = strlen(string);
-	size_t pattern_length = strlen(pattern);
-	size_t pattern_last = pattern_length - (wildcard_index + 1);
-	return strncmp(string, pattern, wildcard_index) == 0 &&
-	       strcmp(string + string_length - pattern_last,
-	              pattern + wildcard_index + 1) == 0;
 }
 
 void array_shrink_free(void*** array_ptr,
@@ -347,13 +333,6 @@ bool token_expand_variables_split(void*** out,
 	return result;
 }
 
-static int strcoll_indirect(const void* a_ptr, const void* b_ptr)
-{
-	const char* a = *(const char* const*) a_ptr;
-	const char* b = *(const char* const*) b_ptr;
-	return strcoll(a, b);
-}
-
 bool token_expand_wildcards(void*** out,
                             size_t* out_used,
                             size_t* out_length,
@@ -361,217 +340,112 @@ bool token_expand_wildcards(void*** out,
 {
 	size_t old_used = *out_used;
 
-	size_t index = 0;
-	size_t num_escaped_wildcards = 0; // We don't properly support them yet.
-
 	struct stringbuf buf;
 	stringbuf_begin(&buf);
 
+	// First check if the token contains any wildcards at all.
 	bool escape = false;
 	bool single_quote = false;
 	bool double_quote = false;
-	for ( ; token[index]; index++ )
+	bool any_wildcards = false;
+	for ( size_t i = 0; token[i]; i++ )
 	{
-		if ( !escape && !single_quote && token[index] == '\\' )
-		{
+		char c = token[i];
+		if ( !escape && !single_quote && c == '\\' )
 			escape = true;
-		}
-		else if ( !escape && !double_quote && token[index] == '\'' )
-		{
+		else if ( !escape && !double_quote && c == '\'' )
 			single_quote = !single_quote;
-		}
-		else if ( !escape && !single_quote && token[index] == '"' )
-		{
+		else if ( !escape && !single_quote && c == '"' )
 			double_quote = !double_quote;
-		}
 		else if ( !(escape || single_quote || double_quote) &&
-		          token[index] == '*' )
+		          (c == '?' || c == '*' || c == '[') )
 		{
-			break;
+			any_wildcards = true;
+			stringbuf_append_c(&buf, c);
 		}
 		else
 		{
 			if ( escape && double_quote &&
-			     token[index] != '$' && token[index] != '`' &&
-			     token[index] != '"' && token[index] != '\\' )
+			     c != '$' && c != '`' && c != '"' && c != '\\' )
 				stringbuf_append_c(&buf, '\\');
-			if ( token[index] == '*' )
-				num_escaped_wildcards++;
-			stringbuf_append_c(&buf, token[index]);
+			else if ( (escape || single_quote || double_quote) &&
+			          (c == '?' || c == '*' || c == '[') )
+				stringbuf_append_c(&buf, '\\');
+			stringbuf_append_c(&buf, c);
 			escape = false;
 		}
 	}
 
-	if ( token[index] != '*' || num_escaped_wildcards )
+	char* pattern = stringbuf_finish(&buf);
+	if ( !pattern )
+		return false;
+
+	// If the token didn't contain any wildcards, just return it.
+	if ( !any_wildcards )
 	{
-		char* value;
-		free(stringbuf_finish(&buf));
+		free(pattern);
 	just_return_input:
-		value = strdup(token);
-		if ( !value )
+		pattern = strdup(token);
+		if ( !pattern )
 			return false;
-		if ( !array_add(out, out_used, out_length, value) )
-			return free(value), false;
+		if ( !array_add(out, out_used, out_length, pattern) )
+			return free(pattern), false;
 		return true;
 	}
 
-	char* before = stringbuf_finish(&buf);
-	if ( !before )
-		return false;
-	stringbuf_begin(&buf);
-
-	index++;
-
-	for ( ; token[index]; index++ )
-	{
-		if ( !escape && !single_quote && token[index] == '\\' )
-		{
-			escape = true;
-		}
-		else if ( !escape && !double_quote && token[index] == '\'' )
-		{
-			single_quote = !single_quote;
-		}
-		else if ( !escape && !single_quote && token[index] == '"' )
-		{
-			double_quote = !double_quote;
-		}
-		else if ( !(escape || single_quote || double_quote) &&
-		          token[index] == '*' )
-		{
-			break;
-		}
-		else
-		{
-			if ( escape && double_quote &&
-			     token[index] != '$' && token[index] != '`' &&
-			     token[index] != '"' && token[index] != '\\' )
-				stringbuf_append_c(&buf, '\\');
-			if ( token[index] == '*' )
-				num_escaped_wildcards++;
-			stringbuf_append_c(&buf, token[index]);
-			escape = false;
-		}
-	}
-
-	if ( token[index] == '*' )
-	{
-		// TODO: We don't support double use of wildcards yet.
-		free(stringbuf_finish(&buf));
-		free(before);
-		goto just_return_input;
-	}
-
-	char* after = stringbuf_finish(&buf);
-	if ( !after )
-		return free(before), false;
-
-	char* pattern;
-	if ( asprintf(&pattern, "%s*%s", before, after) < 0 )
-		return free(after), free(before), false;
-	free(after);
-	free(before);
-
-	size_t wildcard_pos = strcspn(pattern, "*");
-	bool found_slash = false;
-	size_t last_slash = 0;
-	for ( size_t n = 0; n < wildcard_pos; n++ )
-		if ( pattern[n] == '/' )
-			last_slash = n, found_slash = true;
-	size_t match_from = found_slash ? last_slash + 1 : 0;
-
-	size_t pattern_prefix = 0;
-	DIR* dir = NULL;
-	if ( !found_slash )
-	{
-		if ( !(dir = opendir(".")) )
-		{
-			free(pattern);
-			goto just_return_input;
-		}
-	}
-	else
-	{
-		char* dirpath = strdup(pattern);
-		if ( !dirpath )
-		{
-			free(pattern);
-			goto just_return_input;
-		}
-		dirpath[last_slash] = '\0';
-		pattern_prefix = last_slash + 1;
-		dir = opendir(dirpath);
-		free(dirpath);
-		if ( !dir )
-		{
-			free(pattern);
-			goto just_return_input;
-		}
-	}
-	size_t num_inserted = 0;
-	struct dirent* entry;
-	while ( (entry = readdir(dir)) )
-	{
-		if ( !matches_simple_pattern(entry->d_name, pattern + match_from) )
-			continue;
-		stringbuf_begin(&buf);
-		for ( size_t i = 0; i < pattern_prefix; i++ )
-		{
-			if ( pattern[i] == '\n' )
-			{
-				stringbuf_append_c(&buf, '\'');
-				stringbuf_append_c(&buf, '\n');
-				stringbuf_append_c(&buf, '\'');
-			}
-			else
-			{
-				if ( might_need_shell_quote(pattern[i]) )
-					stringbuf_append_c(&buf, '\\');
-				stringbuf_append_c(&buf, pattern[i]);
-			}
-		}
-		for ( size_t i = 0; entry->d_name[i]; i++ )
-		{
-			if ( entry->d_name[i] == '\n' )
-			{
-				stringbuf_append_c(&buf, '\'');
-				stringbuf_append_c(&buf, '\n');
-				stringbuf_append_c(&buf, '\'');
-			}
-			else
-			{
-				if ( might_need_shell_quote(entry->d_name[i]) )
-					stringbuf_append_c(&buf, '\\');
-				stringbuf_append_c(&buf, entry->d_name[i]);
-			}
-		}
-		char* name = stringbuf_finish(&buf);
-		if ( !name )
-		{
-			free(pattern);
-			closedir(dir);
-			array_shrink_free(out, out_used, out_length, old_used);
-			return false;
-		}
-		if ( !array_add(out, out_used, out_length, name) )
-		{
-			free(name);
-			free(pattern);
-			closedir(dir);
-			array_shrink_free(out, out_used, out_length, old_used);
-			return false;
-		}
-		num_inserted++;
-	}
-	closedir(dir);
+	// Search the filesystem for paths matching the pattern.
+	glob_t gl;
+	int globerr = glob(pattern, 0, NULL, &gl);
 	free(pattern);
-	if ( num_inserted == 0 )
-		goto just_return_input;
-	char** out_tokens;
-	memcpy(&out_tokens, out, sizeof(out_tokens));
-	char** sort_from = out_tokens + old_used;
-	size_t sort_count = *out_used - old_used;
-	qsort(sort_from, sort_count, sizeof(char*), strcoll_indirect);
+	if ( globerr )
+	{
+		globfree(&gl);
+		// GLOB_NOCHECK is not used since we don't want the escaped pattern back
+		// since it would contain e.g. \* which is difficult to discern from a
+		// real file actually called \* and the original token is escaped in the
+		// correct fashion.
+		if ( globerr == GLOB_NOMATCH )
+			goto just_return_input;
+		return false;
+	}
+
+	// Escape the paths as tokens.
+	for ( size_t n = 0; n < gl.gl_pathc; n++ )
+	{
+		const char* path = gl.gl_pathv[n];
+		stringbuf_begin(&buf);
+		for ( size_t i = 0; path[i]; i++ )
+		{
+			if ( path[i] == '\n' )
+			{
+				stringbuf_append_c(&buf, '\'');
+				stringbuf_append_c(&buf, '\n');
+				stringbuf_append_c(&buf, '\'');
+			}
+			else
+			{
+				if ( might_need_shell_quote(path[i]) )
+					stringbuf_append_c(&buf, '\\');
+				stringbuf_append_c(&buf, path[i]);
+			}
+		}
+		char* new_token = stringbuf_finish(&buf);
+		if ( !new_token )
+		{
+			globfree(&gl);
+			array_shrink_free(out, out_used, out_length, old_used);
+			return false;
+		}
+		if ( !array_add(out, out_used, out_length, new_token) )
+		{
+			free(new_token);
+			globfree(&gl);
+			array_shrink_free(out, out_used, out_length, old_used);
+			return false;
+		}
+	}
+	globfree(&gl);
+
 	return true;
 }
 

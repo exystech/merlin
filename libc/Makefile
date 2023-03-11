@@ -367,6 +367,8 @@ fstab/scanfsent.o \
 fstab/setfsent.o \
 getopt/getopt_long.o \
 getopt/getopt.o \
+glob/glob.o \
+glob/globfree.o \
 grp/endgrent.o \
 grp/fgetgrent.o \
 grp/fgetgrent_r.o \

@@ -313,7 +313,7 @@ diff -Paur --no-dereference -- mdocml.upstream/eqn.c mdocml/eqn.c
 diff -Paur --no-dereference -- mdocml.upstream/main.c mdocml/main.c
 --- mdocml.upstream/main.c
 +++ mdocml/main.c
-@@ -19,14 +19,16 @@
+@@ -19,7 +19,6 @@
  #include "config.h"
  
  #include <sys/types.h>
@@ -321,50 +321,7 @@ diff -Paur --no-dereference -- mdocml.upstream/main.c mdocml/main.c
  #include <sys/wait.h>
  
  #include <assert.h>
- #include <ctype.h>
- #include <errno.h>
- #include <fcntl.h>
-+/* PATCH: Sortix doesn't have glob.h at this time. */
-+#if defined(__has_include) && __has_include(<glob.h>)
- #include <glob.h>
-+#endif
- #include <stdio.h>
- #include <stdint.h>
- #include <stdlib.h>
-@@ -531,10 +533,16 @@
- 	const char *sec, const char *arch, const char *name,
- 	struct manpage **res, size_t *ressz)
- {
-+#if defined(__has_include) && __has_include(<glob.h>)
- 	glob_t		 globinfo;
-+#endif
- 	struct manpage	*page;
- 	char		*file;
-+#if defined(__has_include) && __has_include(<glob.h>)
- 	int		 form, globres;
-+#else
-+	int		 form;
-+#endif
- 
- 	form = FORM_SRC;
- 	mandoc_asprintf(&file, "%s/man%s/%s.%s",
-@@ -559,6 +567,7 @@
- 		free(file);
- 	}
- 
-+#if defined(__has_include) && __has_include(<glob.h>)
- 	mandoc_asprintf(&file, "%s/man%s/%s.*",
- 	    paths->paths[ipath], sec, name);
- 	globres = glob(file, 0, NULL, &globinfo);
-@@ -570,6 +579,7 @@
- 		file = mandoc_strdup(*globinfo.gl_pathv);
- 	globfree(&globinfo);
- 	if (globres != 0)
-+#endif
- 		return(0);
- 
- found:
-@@ -606,7 +616,38 @@
+@@ -606,7 +605,38 @@
  	*res = NULL;
  	*ressz = lastsz = 0;
  	while (argc) {
@@ -404,7 +361,7 @@ diff -Paur --no-dereference -- mdocml.upstream/main.c mdocml/main.c
  			if (cfg->sec != NULL) {
  				if (fs_lookup(paths, ipath, cfg->sec,
  				    cfg->arch, *argv, res, ressz) &&
-@@ -989,7 +1030,7 @@
+@@ -989,7 +1019,7 @@
  	if (pager == NULL || *pager == '\0')
  		pager = getenv("PAGER");
  	if (pager == NULL || *pager == '\0')
@@ -413,7 +370,7 @@ diff -Paur --no-dereference -- mdocml.upstream/main.c mdocml/main.c
  	cp = mandoc_strdup(pager);
  
  	/*
-@@ -1014,7 +1055,7 @@
+@@ -1014,7 +1044,7 @@
  	/* Hand over to the pager. */
  
  	execvp(argv[0], argv);

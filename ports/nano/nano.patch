@@ -48,17 +48,7 @@ diff -Paur --no-dereference -- nano.upstream/src/nano.c nano/src/nano.c
 diff -Paur --no-dereference -- nano.upstream/src/rcfile.c nano/src/rcfile.c
 --- nano.upstream/src/rcfile.c
 +++ nano/src/rcfile.c
-@@ -27,7 +27,9 @@
- 
- #include <ctype.h>
- #include <errno.h>
-+#if __has_include(<glob.h>)
- #include <glob.h>
-+#endif
- #include <string.h>
- #include <unistd.h>
- 
-@@ -577,6 +579,11 @@
+@@ -577,6 +577,11 @@
   * null-terminate it, and return a pointer to the succeeding text. */
  char *parse_next_regex(char *ptr)
  {
@@ -70,7 +60,7 @@ diff -Paur --no-dereference -- nano.upstream/src/rcfile.c nano/src/rcfile.c
  	char *starting_point = ptr;
  
  	if (*(ptr - 1) != '"') {
-@@ -584,11 +591,28 @@
+@@ -584,11 +589,28 @@
  		return NULL;
  	}
  
@@ -103,7 +93,7 @@ diff -Paur --no-dereference -- nano.upstream/src/rcfile.c nano/src/rcfile.c
  
  	if (*ptr == '\0') {
  		jot_error(N_("Regex strings must begin and end with a \" character"));
-@@ -601,7 +625,8 @@
+@@ -601,7 +623,8 @@
  	}
  
  	/* Null-terminate the regex and skip until the next non-blank. */
@@ -113,32 +103,3 @@ diff -Paur --no-dereference -- nano.upstream/src/rcfile.c nano/src/rcfile.c
  
  	while (isblank((unsigned char)*ptr))
  		ptr++;
-@@ -966,8 +991,10 @@
- void parse_includes(char *ptr)
- {
- 	char *pattern, *expanded;
-+#if __has_include(<glob.h>)
- 	glob_t files;
- 	int result;
-+#endif
- 
- 	check_for_nonempty_syntax();
- 
-@@ -978,6 +1005,7 @@
- 
- 	/* Expand a tilde first, then try to match the globbing pattern. */
- 	expanded = real_dir_from_tilde(pattern);
-+#if __has_include(<glob.h>)
- 	result = glob(expanded, GLOB_ERR, NULL, &files);
- 
- 	/* If there are matches, process each of them.  Otherwise, only
-@@ -989,6 +1017,9 @@
- 		jot_error(N_("Error expanding %s: %s"), pattern, strerror(errno));
- 
- 	globfree(&files);
-+#else
-+	parse_one_include(expanded);
-+#endif
- 	free(expanded);
- }
- 
