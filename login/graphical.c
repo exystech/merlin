@@ -198,12 +198,62 @@ void render_right_text_if_needed(struct framebuffer fb, const char* str, uint32_
 		render_right_text(fb, str, color);
 }
 
+union c { struct { uint8_t b; uint8_t g; uint8_t r; }; uint32_t v; };
+
 static void render_background(struct framebuffer fb)
 {
+#if 0
 	uint32_t bg_color = make_color(0x89 * 2/3, 0xc7 * 2/3, 0xff * 2/3);
 	for ( size_t y = 0; y < fb.yres; y++ )
 		for ( size_t x = 0; x < fb.xres; x++ )
 			framebuffer_set_pixel(fb, x, y, bg_color);
+#endif
+	static uint32_t s;
+	static uint32_t t;
+	static bool seeded = false;
+	if ( !seeded )
+	{
+		s = arc4random();
+		t = arc4random();
+		seeded = true;
+	}
+	for ( size_t y = 0; y < fb.yres; y++ )
+	{
+		for ( size_t x = 0; x < fb.xres; x++ )
+		{
+			uint32_t r = 3793 * x + 6959 * y + 1889 * t + 7901 * s;
+			r ^= (5717 * x * 2953 * y) ^ s ^ t;
+			r = (r >> 24) ^ (r >> 16) ^ (r >> 8) ^ r;
+			union c c;
+			if ( x && (r & 0x3) == 2 )
+				c.v = framebuffer_get_pixel(fb, x - 1, y);
+			else if ( y && (r & 0x3) == 1 )
+				c.v = framebuffer_get_pixel(fb, x, y - 1);
+			else if ( x && y )
+				c.v = framebuffer_get_pixel(fb, x - 1, y - 1);
+			else
+			{
+				c.v = t;
+				c.r = (c.r & 0xc0) | (r >> 0 & 0x3f);
+				c.g = (c.g & 0xc0) | (r >> 4 & 0x3f);
+				c.b = (c.b & 0xc0) | (r >> 8 & 0x3f);
+			}
+			if ( (r & 0xf0) == 0x10 && c.r ) c.r--;
+			if ( (r & 0xf0) == 0x20 && c.g ) c.g--;
+			if ( (r & 0xf0) == 0x30 && c.b ) c.b--;
+			if ( (r & 0xf0) == 0x40 && c.r != 255 ) c.r++;
+			if ( (r & 0xf0) == 0x50 && c.g != 255 ) c.g++;
+			if ( (r & 0xf0) == 0x60 && c.b != 255 ) c.b++;
+			union c tc = {.v = t};
+			if ( c.r && c.r - tc.r > (int8_t) (r >> 0) + 64 ) c.r--;
+			if ( c.r != 255 && tc.r - c.r > (int8_t) (r >> 4) + 240 ) c.r++;
+			if ( c.g && c.g - tc.g > (int8_t) (r >> 8) + 64) c.g--;
+			if ( c.g != 255 && tc.g - c.g > (int8_t) (r >> 12) + 240 ) c.g++;
+			if ( c.b && c.b - tc.b > (int8_t) (r >> 16) + 64 ) c.b--;
+			if ( c.b != 255 && tc.b - c.b > (int8_t) (r >> 20) + 240 ) c.b++;
+			framebuffer_set_pixel(fb, x, y, c.v);
+		}
+	}
 }
 
 static void render_pointer(struct framebuffer fb)

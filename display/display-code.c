@@ -218,6 +218,58 @@ void display_remove_window(struct display* display, struct window* window)
 	assert(!display->top_window || display->active_window);
 }
 
+union c { struct { uint8_t b; uint8_t g; uint8_t r; }; uint32_t v; };
+
+static void wallpaper(struct framebuffer fb)
+{
+	static uint32_t s;
+	static uint32_t t;
+	static bool seeded = false;
+	if ( !seeded )
+	{
+		s = arc4random();
+		t = arc4random();
+		seeded = true;
+	}
+	for ( size_t y = 0; y < fb.yres; y++ )
+	{
+		for ( size_t x = 0; x < fb.xres; x++ )
+		{
+			uint32_t r = 3793 * x + 6959 * y + 1889 * t + 7901 * s;
+			r ^= (5717 * x * 2953 * y) ^ s ^ t;
+			r = (r >> 24) ^ (r >> 16) ^ (r >> 8) ^ r;
+			union c c;
+			if ( x && (r & 0x3) == 2 )
+				c.v = framebuffer_get_pixel(fb, x - 1, y);
+			else if ( y && (r & 0x3) == 1 )
+				c.v = framebuffer_get_pixel(fb, x, y - 1);
+			else if ( x && y )
+				c.v = framebuffer_get_pixel(fb, x - 1, y - 1);
+			else
+			{
+				c.v = t;
+				c.r = (c.r & 0xc0) | (r >> 0 & 0x3f);
+				c.g = (c.g & 0xc0) | (r >> 4 & 0x3f);
+				c.b = (c.b & 0xc0) | (r >> 8 & 0x3f);
+			}
+			if ( (r & 0xf0) == 0x10 && c.r ) c.r--;
+			if ( (r & 0xf0) == 0x20 && c.g ) c.g--;
+			if ( (r & 0xf0) == 0x30 && c.b ) c.b--;
+			if ( (r & 0xf0) == 0x40 && c.r != 255 ) c.r++;
+			if ( (r & 0xf0) == 0x50 && c.g != 255 ) c.g++;
+			if ( (r & 0xf0) == 0x60 && c.b != 255 ) c.b++;
+			union c tc = {.v = t};
+			if ( c.r && c.r - tc.r > (int8_t) (r >> 0) + 64 ) c.r--;
+			if ( c.r != 255 && tc.r - c.r > (int8_t) (r >> 4) + 240 ) c.r++;
+			if ( c.g && c.g - tc.g > (int8_t) (r >> 8) + 64) c.g--;
+			if ( c.g != 255 && tc.g - c.g > (int8_t) (r >> 12) + 240 ) c.g++;
+			if ( c.b && c.b - tc.b > (int8_t) (r >> 16) + 64 ) c.b--;
+			if ( c.b != 255 && tc.b - c.b > (int8_t) (r >> 20) + 240 ) c.b++;
+			framebuffer_set_pixel(fb, x, y, c.v);
+		}
+	}
+}
+
 void display_composit(struct display* display, struct framebuffer fb)
 {
 	struct damage_rect damage_rect = display->damage_rect;
@@ -228,10 +280,14 @@ void display_composit(struct display* display, struct framebuffer fb)
 	if ( !damage_rect.width || !damage_rect.height )
 		return;
 
+#if 0
 	uint32_t bg_color = make_color(0x89 * 2/3, 0xc7 * 2/3, 0xff * 2/3);
 	for ( size_t y = 0; y < damage_rect.height; y++ )
 		for ( size_t x = 0; x < damage_rect.width; x++ )
 			framebuffer_set_pixel(fb, damage_rect.left + x, damage_rect.top + y, bg_color);
+#endif
+
+	framebuffer_copy_to_framebuffer(fb, display->wallpaper);
 
 	for ( struct window* window = display->bottom_window;
 	      window;
@@ -343,17 +399,31 @@ void display_render(struct display* display)
 	if ( mode.fb_format != 32 )
 		errx(1, "A 32-bit video mode wasn't set");
 
-	struct framebuffer fb;
-	fb.xres = mode.view_xres;
-	fb.yres = mode.view_yres;
-	fb.pitch = mode.view_xres;
-	size_t framebuffer_length = fb.xres * fb.yres;
-	fb.buffer = (uint32_t*) malloc(sizeof(uint32_t) * framebuffer_length);
-	size_t framebuffer_size = framebuffer_length * sizeof(fb.buffer[0]);
+	size_t framebuffer_length = mode.view_xres * mode.view_yres;
+	size_t framebuffer_size = sizeof(uint32_t) * framebuffer_length;
+
+	if ( display->fb_size != framebuffer_size )
+	{
+		display->fb.buffer = realloc(display->fb.buffer, framebuffer_size);
+		display->fb.xres = mode.view_xres;
+		display->fb.yres = mode.view_yres;
+		display->fb.pitch = mode.view_xres;
+		display->fb_size = framebuffer_size;
+	}
+
+	if ( display->wallpaper_size != framebuffer_size )
+	{
+		display->wallpaper.buffer =
+			realloc(display->wallpaper.buffer, framebuffer_size);
+		display->wallpaper.xres = mode.view_xres;
+		display->wallpaper.yres = mode.view_yres;
+		display->wallpaper.pitch = mode.view_xres;
+		display->wallpaper_size = framebuffer_size;
+	}
 
 	display_on_resolution_change(display, mode.view_xres, mode.view_yres);
 
-	display_composit(display, fb);
+	display_composit(display, display->fb);
 
 	{
 		struct dispmsg_write_memory msg;
@@ -362,14 +432,11 @@ void display_render(struct display* display)
 		msg.device = 0; // TODO: Multi-screen support!
 		msg.offset = 0; // TODO: mode.fb_location!
 		msg.size = framebuffer_size;
-		msg.src = (uint8_t*) fb.buffer;
+		msg.src = (uint8_t*) display->fb.buffer;
 
 		if ( dispmsg_issue(&msg, sizeof(msg)) != 0 )
 			err(1, "dispmsg_issue: dispmsg_write_memory");
 	}
-
-	// TODO: This could be recycled if the resolution did not change.
-	free(fb.buffer);
 }
 
 void display_keyboard_event(struct display* display, uint32_t codepoint)
@@ -677,4 +744,5 @@ void display_on_resolution_change(struct display* display, size_t width, size_t 
 	display->pointer_y = height / 2;
 	for ( struct window* window = display->bottom_window; window; window = window->above_window )
 		window_on_display_resolution_change(window, display);
+	wallpaper(display->wallpaper);
 }
