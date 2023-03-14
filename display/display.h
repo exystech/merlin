@@ -46,6 +46,10 @@ struct window;
 
 struct display
 {
+	struct framebuffer fb;
+	struct framebuffer wallpaper;
+	size_t fb_size;
+	size_t wallpaper_size;
 	struct damage_rect damage_rect;
 	struct window* top_window;
 	struct window* bottom_window;
