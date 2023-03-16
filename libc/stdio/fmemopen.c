@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -114,7 +114,7 @@ static off_t fmemopen_seek(void* state_ptr, off_t offset, int whence)
 	case SEEK_END: base = (off_t) state->buffer_used; break;
 	default: return errno = EINVAL, -1;
 	}
-	if ( offset < -base || base - (off_t) state->buffer_size < offset )
+	if ( offset < -base || (off_t) state->buffer_size - base < offset )
 		return errno = EOVERFLOW, -1;
 	return (off_t) (state->buffer_offset = (size_t) (base + offset));
 }
