@@ -55,6 +55,8 @@ install: all
 	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-tix-manifest-mode
 	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-leaked-files
 	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-init
+	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-passwd
+	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-group
 
 sysinstall: $(SYSINSTALL_OBJS)
 	$(CC) $(SYSINSTALL_OBJS) -o $@ -lmount

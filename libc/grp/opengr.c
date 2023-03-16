@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,9 +18,10 @@
  */
 
 #include <grp.h>
+#include <pwd.h>
 #include <stdio.h>
 
 FILE* opengr(void)
 {
-	return fopen("/etc/group", "r");
+	return __openent("/etc/group");
 }

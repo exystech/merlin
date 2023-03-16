@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,8 +24,9 @@ FILE* __grp_file = NULL;
 
 void setgrent(void)
 {
-	if ( __grp_file )
+	FILE* new_file = opengr();
+	if ( !new_file && __grp_file )
 		rewind(__grp_file);
 	else
-		__grp_file = opengr();
+		__grp_file = new_file;
 }

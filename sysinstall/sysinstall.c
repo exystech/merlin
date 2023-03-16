@@ -220,16 +220,23 @@ static bool passwd_check(const char* passwd_path,
 			warn("%s", passwd_path);
 		return false;
 	}
-	struct passwd* pwd;
-	while ( (errno = 0, pwd = fgetpwent(passwd)) )
+	char* line = NULL;
+	size_t size = 0;
+	ssize_t length;
+	while ( 0 < (length = getline(&line, &size, passwd) ) )
 	{
-		if ( check(pwd, check_ctx) )
+		if ( line[size - 1] == '\n' )
+			line[--size] = '\0';
+		struct passwd pwd;
+		if ( scanpwent(line, &pwd) && check(&pwd, check_ctx) )
 		{
+			free(line);
 			fclose(passwd);
 			return true;
 		}
 	}
-	if ( errno != 0 )
+	free(line);
+	if ( ferror(passwd) )
 		warn("%s", passwd_path);
 	fclose(passwd);
 	return false;
@@ -1025,10 +1032,13 @@ int main(void)
 		}
 		explicit_bzero(first, sizeof(first));
 		if ( !install_configurationf("etc/passwd", "a",
-				"root:%s:0:0:root:/root:sh\n", hash) )
+			"root:%s:0:0:root:/root:sh\n"
+			"include /etc/default/passwd.d/*\n", hash) )
 			continue;
 		textf("User '%s' added to /etc/passwd\n", "root");
-		if ( !install_configurationf("etc/group", "a", "root::0:root\n") )
+		if ( !install_configurationf("etc/group", "a",
+			"root::0:root\n"
+			"include /etc/default/group.d/*\n") )
 			continue;
 		install_skel("/root", 0, 0);
 		textf("Group '%s' added to /etc/group.\n", "root");

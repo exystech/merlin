@@ -69,6 +69,24 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Add include and comment support to passwd(5) and group(5)
+The
+.Xr passwd 5
+and
+.Xr group 5
+files have gained support for include statements via libc support.
+Installations must now include
+.Pa /etc/default/passwd.d/*
+and
+.Pa /etc/default/group.d/*
+respectively in order to have system users and groups.
+.Pp
+An upgrade hook will add the inclusions to
+.Pa /etc/passwd
+and
+.Pa /etc/group .
+Applications accessing passwd and group databases must be recompiled with the
+latest libc.
 .Ss Add memory statistics to struct psctl_stat
 The
 .Xr psctl 2

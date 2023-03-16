@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,6 +24,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <pwd.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -155,24 +156,50 @@ int main(int argc, char* argv[])
 	if ( crypt_newhash(first, cipher, newhash, sizeof(newhash)) < 0 )
 		err(1, "crypt_newhash");
 	explicit_bzero(first, sizeof(first));
-
 	// TODO: This is subject to races and is obviously an insecure design.
 	//       The backend and coordination of the passwd database should be moved
 	//       to its own daemon.
+	FILE* in = fopen("/etc/passwd", "r");
+	if ( !in )
+		err(1, "/etc/passwd");
 	int fd = open("/etc/passwd.new", O_WRONLY | O_CREAT | O_EXCL, 0644);
 	if ( fd < 0 )
 		err(1, "/etc/passwd.new");
 	fchown(fd, 0, 0); // HACK.
 	FILE* fp = fdopen(fd, "w");
 	if ( !fp )
-		err(1, "fdopen");
-	setpwent();
-	while ( (errno = 0, pwd = getpwent()) )
 	{
+		unlink("/etc/passwd.new");
+		err(1, "fdopen");
+	}
+	char* line = NULL;
+	size_t size = 0;
+	ssize_t length;
+	bool found = false;
+	while ( 0 < (length = getline(&line, &size, in)) )
+	{
+		char* copy = strdup(line);
+		if ( !copy )
+		{
+			unlink("/etc/passwd.new");
+			err(1, "malloc");
+		}
+		if ( copy[length - 1] == '\n' )
+			copy[--length] = '\0';
+		struct passwd passwd;
+		if ( !scanpwent(copy, (pwd = &passwd)) )
+		{
+			fputs(line, fp);
+			free(copy);
+			continue;
+		}
 		fputs(pwd->pw_name, fp);
 		fputc(':', fp);
 		if ( !strcmp(pwd->pw_name, username) )
+		{
 			fputs(newhash, fp);
+			found = true;
+		}
 		else
 			fputs(pwd->pw_passwd, fp);
 		fputc(':', fp);
@@ -191,16 +218,24 @@ int main(int argc, char* argv[])
 			unlink("/etc/passwd.new");
 			err(1, "/etc/passwd.new");
 		}
+		free(copy);
 	}
-	if ( errno != 0 )
+	free(line);
+	if ( ferror(in) )
 	{
 		unlink("/etc/passwd.new");
-		err(1, "getpwent");
+		err(1, "/etc/passwd");
 	}
-	if ( fclose(fp) == EOF )
+	fclose(in);
+	if ( ferror(fp) || fclose(fp) == EOF )
 	{
 		unlink("/etc/passwd.new");
 		err(1, "/etc/passwd.new");
+	}
+	if ( !found )
+	{
+		unlink("/etc/passwd.new");
+		errx(1, "user %s is not directly in /etc/passwd", username);
 	}
 	if ( rename("/etc/passwd.new", "/etc/passwd") < 0 )
 	{

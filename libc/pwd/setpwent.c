@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,8 +24,9 @@ FILE* __pwd_file = NULL;
 
 void setpwent(void)
 {
-	if ( __pwd_file )
+	FILE* new_file = openpw();
+	if ( !new_file && __pwd_file )
 		rewind(__pwd_file);
 	else
-		__pwd_file = openpw();
+		__pwd_file = new_file;
 }

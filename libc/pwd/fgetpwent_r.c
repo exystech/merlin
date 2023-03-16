@@ -17,70 +17,9 @@
  * Reads a passwd entry from a FILE.
  */
 
-#include <sys/types.h>
-
 #include <errno.h>
-#include <inttypes.h>
 #include <pwd.h>
-#include <stdbool.h>
-#include <stddef.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-static char* next_field(char** current)
-{
-	char* result = *current;
-	if ( result )
-	{
-		char* next = result;
-		while ( *next && *next != ':' )
-			next++;
-		if ( !*next )
-			next = NULL;
-		else
-			*next++ = '\0';
-		*current = next;
-	}
-	return result;
-}
-
-static bool next_field_uintmax(char** current, uintmax_t* result)
-{
-	char* id_str = next_field(current);
-	if ( !id_str )
-		return false;
-	char* id_endptr;
-	uintmax_t id_umax = strtoumax(id_str, &id_endptr, 10);
-	if ( *id_endptr )
-		return false;
-	*result = id_umax;
-	return true;
-}
-
-static bool next_field_gid(char** current, gid_t* result)
-{
-	uintmax_t id_umax;
-	if ( !next_field_uintmax(current, &id_umax) )
-		return false;
-	gid_t gid = (gid_t) id_umax;
-	if ( (uintmax_t) gid != (uintmax_t) id_umax )
-		return false;
-	*result = gid;
-	return true;
-}
-
-static bool next_field_uid(char** current, uid_t* result)
-{
-	uintmax_t id_umax;
-	if ( !next_field_uintmax(current, &id_umax) )
-		return false;
-	uid_t uid = (uid_t) id_umax;
-	if ( (uintmax_t) uid != (uintmax_t) id_umax )
-		return false;
-	*result = uid;
-	return true;
-}
 
 int fgetpwent_r(FILE* restrict fp,
                 struct passwd* restrict result,
@@ -144,22 +83,7 @@ int fgetpwent_r(FILE* restrict fp,
 	}
 	buf[buf_used] = '\0';
 
-	char* parse_str = buf;
-	if ( !(result->pw_name = next_field(&parse_str)) )
-		goto parse_failure;
-	if ( !(result->pw_passwd = next_field(&parse_str)) )
-		goto parse_failure;
-	if ( !next_field_uid(&parse_str, &result->pw_uid) )
-		goto parse_failure;
-	if ( !next_field_gid(&parse_str, &result->pw_gid) )
-		goto parse_failure;
-	if ( !(result->pw_gecos = next_field(&parse_str)) )
-		goto parse_failure;
-	if ( !(result->pw_dir = next_field(&parse_str)) )
-		goto parse_failure;
-	if ( !(result->pw_shell = next_field(&parse_str)) )
-		goto parse_failure;
-	if ( parse_str )
+	if ( !scanpwent(buf, result) )
 		goto parse_failure;
 
 	funlockfile(fp);

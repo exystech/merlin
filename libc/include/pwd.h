@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -62,6 +62,8 @@ struct passwd
 
 #if defined(__is_sortix_libc)
 extern FILE* __pwd_file;
+
+FILE* __openent(const char*);
 #endif
 
 int bcrypt_newhash(const char*, int, char*, size_t);
@@ -79,6 +81,7 @@ int getpwnam_r(const char* __restrict, struct passwd* __restrict,
 struct passwd* getpwuid(uid_t);
 int getpwuid_r(uid_t, struct passwd* __restrict, char* __restrict, size_t,
                struct passwd** __restrict);
+int scanpwent(char* __restrict, struct passwd* __restrict);
 FILE* openpw(void);
 void setpwent(void);
 

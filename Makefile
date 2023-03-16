@@ -447,7 +447,9 @@ $(LIVE_INITRD): sysroot
 	mkdir -p $(LIVE_INITRD).d/etc/init
 	echo require single-user exit-code > $(LIVE_INITRD).d/etc/init/default
 	echo "root::0:0:root:/root:sh" > $(LIVE_INITRD).d/etc/passwd
+	echo "include /etc/default/passwd.d/*" >> $(LIVE_INITRD).d/etc/passwd
 	echo "root::0:root" > $(LIVE_INITRD).d/etc/group
+	echo "include /etc/default/group.d/*" >> $(LIVE_INITRD).d/etc/group
 	mkdir -p $(LIVE_INITRD).d/home
 	mkdir -p $(LIVE_INITRD).d/root -m 700
 	cp -RT "$(SYSROOT)/etc/skel" $(LIVE_INITRD).d/root

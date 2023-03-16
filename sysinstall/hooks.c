@@ -296,6 +296,64 @@ void upgrade_prepare(const struct release* old_release,
 		free(init_target_path);
 		free(init_default_path);
 	}
+
+	// TODO: After releasing Sortix 1.1, remove this compatibility.
+	if ( hook_needs_to_be_run(source_prefix, target_prefix,
+	                          "sortix-1.1-passwd") )
+	{
+		char* passwd_path = join_paths(target_prefix, "/etc/passwd");
+		if ( !passwd_path )
+		{
+			warn("malloc");
+			_exit(2);
+		}
+		FILE* fp = fopen(passwd_path, "a");
+		if ( fp )
+		{
+			printf(" - Including /etc/default/passwd.d/* in /etc/passwd...\n");
+			if ( fprintf(fp, "include /etc/default/passwd.d/*\n") < 0 ||
+			     fclose(fp) == EOF )
+			{
+				warn("%s", passwd_path);
+				_exit(2);
+			}
+		}
+		else if ( errno != ENOENT )
+		{
+			warn("%s", passwd_path);
+			_exit(2);
+		}
+		free(passwd_path);
+	}
+
+	// TODO: After releasing Sortix 1.1, remove this compatibility.
+	if ( hook_needs_to_be_run(source_prefix, target_prefix,
+	                          "sortix-1.1-group") )
+	{
+		char* group_path = join_paths(target_prefix, "/etc/group");
+		if ( !group_path )
+		{
+			warn("malloc");
+			_exit(2);
+		}
+		FILE* fp = fopen(group_path, "a");
+		if ( fp )
+		{
+			printf(" - Including /etc/default/group.d/* in /etc/group...\n");
+			if ( fprintf(fp, "include /etc/default/group.d/*\n") < 0 ||
+			     fclose(fp) == EOF )
+			{
+				warn("%s", group_path);
+				_exit(2);
+			}
+		}
+		else if ( errno != ENOENT )
+		{
+			warn("%s", group_path);
+			_exit(2);
+		}
+		free(group_path);
+	}
 }
 
 void upgrade_finalize(const struct release* old_release,

@@ -478,7 +478,9 @@ pwd/getpwnam.o \
 pwd/getpwnam_r.o \
 pwd/getpwuid.o \
 pwd/getpwuid_r.o \
+pwd/__openent.o \
 pwd/openpw.o \
+pwd/scanpwent.o \
 pwd/setpwent.o \
 sched/sched_yield.o \
 pty/openpty.o \

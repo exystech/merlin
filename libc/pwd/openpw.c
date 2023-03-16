@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,5 +22,5 @@
 
 FILE* openpw(void)
 {
-	return fopen("/etc/passwd", "r");
+	return __openent("/etc/passwd");
 }
