@@ -1,7 +1,7 @@
 diff -Paur --no-dereference -- ssh.upstream/auth.c ssh/auth.c
 --- ssh.upstream/auth.c
 +++ ssh/auth.c
-@@ -100,7 +100,9 @@
+@@ -99,7 +99,9 @@
  int
  allowed_user(struct ssh *ssh, struct passwd * pw)
  {
@@ -11,7 +11,7 @@ diff -Paur --no-dereference -- ssh.upstream/auth.c ssh/auth.c
  	const char *hostname = NULL, *ipaddr = NULL;
  	u_int i;
  	int r;
-@@ -121,6 +123,8 @@
+@@ -120,6 +122,8 @@
  	 */
  	if (options.chroot_directory == NULL ||
  	    strcasecmp(options.chroot_directory, "none") == 0) {
@@ -20,7 +20,7 @@ diff -Paur --no-dereference -- ssh.upstream/auth.c ssh/auth.c
  		char *shell = xstrdup((pw->pw_shell[0] == '\0') ?
  		    _PATH_BSHELL : pw->pw_shell); /* empty = /bin/sh */
  
-@@ -138,6 +142,7 @@
+@@ -137,6 +141,7 @@
  			return 0;
  		}
  		free(shell);
@@ -83,7 +83,7 @@ diff -Paur --no-dereference -- ssh.upstream/channels.c ssh/channels.c
  		c->path = xstrdup(host);
  	} else {				/* SOCKS4A: two strings */
  		have = sshbuf_len(input);
-@@ -2450,8 +2451,8 @@
+@@ -2458,8 +2459,8 @@
  		return;
  	}
  	if ((euid != 0) && (getuid() != euid)) {
@@ -482,7 +482,7 @@ diff -Paur --no-dereference -- ssh.upstream/Makefile.in ssh/Makefile.in
  	-rmdir $(DESTDIR)$(sysconfdir)
  	-rmdir $(DESTDIR)$(bindir)
  	-rmdir $(DESTDIR)$(sbindir)
-@@ -553,7 +544,7 @@
+@@ -557,7 +548,7 @@
  
  regress/unittests/sshbuf/test_sshbuf$(EXEEXT): ${UNITTESTS_TEST_SSHBUF_OBJS} \
      regress/unittests/test_helper/libtest_helper.a libssh.a
@@ -491,7 +491,7 @@ diff -Paur --no-dereference -- ssh.upstream/Makefile.in ssh/Makefile.in
  	    regress/unittests/test_helper/libtest_helper.a \
  	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(TESTLIBS)
  
-@@ -567,7 +558,7 @@
+@@ -571,7 +562,7 @@
  
  regress/unittests/sshkey/test_sshkey$(EXEEXT): ${UNITTESTS_TEST_SSHKEY_OBJS} \
      regress/unittests/test_helper/libtest_helper.a libssh.a
@@ -500,7 +500,7 @@ diff -Paur --no-dereference -- ssh.upstream/Makefile.in ssh/Makefile.in
  	    regress/unittests/test_helper/libtest_helper.a \
  	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(TESTLIBS)
  
-@@ -578,7 +569,7 @@
+@@ -582,7 +573,7 @@
  
  regress/unittests/sshsig/test_sshsig$(EXEEXT): ${UNITTESTS_TEST_SSHSIG_OBJS} \
      regress/unittests/test_helper/libtest_helper.a libssh.a
@@ -509,7 +509,7 @@ diff -Paur --no-dereference -- ssh.upstream/Makefile.in ssh/Makefile.in
  	    regress/unittests/test_helper/libtest_helper.a \
  	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(TESTLIBS)
  
-@@ -587,7 +578,7 @@
+@@ -591,7 +582,7 @@
  
  regress/unittests/bitmap/test_bitmap$(EXEEXT): ${UNITTESTS_TEST_BITMAP_OBJS} \
      regress/unittests/test_helper/libtest_helper.a libssh.a
@@ -518,7 +518,7 @@ diff -Paur --no-dereference -- ssh.upstream/Makefile.in ssh/Makefile.in
  	    regress/unittests/test_helper/libtest_helper.a \
  	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(TESTLIBS)
  
-@@ -599,7 +590,7 @@
+@@ -603,7 +594,7 @@
  regress/unittests/authopt/test_authopt$(EXEEXT): \
      ${UNITTESTS_TEST_AUTHOPT_OBJS} \
      regress/unittests/test_helper/libtest_helper.a libssh.a
@@ -527,7 +527,7 @@ diff -Paur --no-dereference -- ssh.upstream/Makefile.in ssh/Makefile.in
  	    regress/unittests/test_helper/libtest_helper.a \
  	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(TESTLIBS)
  
-@@ -609,7 +600,7 @@
+@@ -613,7 +604,7 @@
  regress/unittests/conversion/test_conversion$(EXEEXT): \
      ${UNITTESTS_TEST_CONVERSION_OBJS} \
      regress/unittests/test_helper/libtest_helper.a libssh.a
@@ -536,7 +536,7 @@ diff -Paur --no-dereference -- ssh.upstream/Makefile.in ssh/Makefile.in
  	    regress/unittests/test_helper/libtest_helper.a \
  	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(TESTLIBS)
  
-@@ -621,7 +612,7 @@
+@@ -625,7 +616,7 @@
  
  regress/unittests/kex/test_kex$(EXEEXT): ${UNITTESTS_TEST_KEX_OBJS} \
      regress/unittests/test_helper/libtest_helper.a libssh.a
@@ -545,7 +545,7 @@ diff -Paur --no-dereference -- ssh.upstream/Makefile.in ssh/Makefile.in
  	    regress/unittests/test_helper/libtest_helper.a \
  	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(TESTLIBS)
  
-@@ -633,7 +624,7 @@
+@@ -637,7 +628,7 @@
  regress/unittests/hostkeys/test_hostkeys$(EXEEXT): \
      ${UNITTESTS_TEST_HOSTKEYS_OBJS} \
      regress/unittests/test_helper/libtest_helper.a libssh.a
@@ -554,7 +554,7 @@ diff -Paur --no-dereference -- ssh.upstream/Makefile.in ssh/Makefile.in
  	    regress/unittests/test_helper/libtest_helper.a \
  	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(TESTLIBS)
  
-@@ -643,7 +634,7 @@
+@@ -647,7 +638,7 @@
  regress/unittests/match/test_match$(EXEEXT): \
      ${UNITTESTS_TEST_MATCH_OBJS} \
      regress/unittests/test_helper/libtest_helper.a libssh.a
@@ -563,7 +563,7 @@ diff -Paur --no-dereference -- ssh.upstream/Makefile.in ssh/Makefile.in
  	    regress/unittests/test_helper/libtest_helper.a \
  	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(TESTLIBS)
  
-@@ -660,7 +651,7 @@
+@@ -664,7 +655,7 @@
  regress/unittests/misc/test_misc$(EXEEXT): \
      ${UNITTESTS_TEST_MISC_OBJS} \
      regress/unittests/test_helper/libtest_helper.a libssh.a
@@ -572,7 +572,7 @@ diff -Paur --no-dereference -- ssh.upstream/Makefile.in ssh/Makefile.in
  	    regress/unittests/test_helper/libtest_helper.a \
  	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(TESTLIBS)
  
-@@ -670,7 +661,7 @@
+@@ -674,7 +665,7 @@
  regress/unittests/utf8/test_utf8$(EXEEXT): \
      ${UNITTESTS_TEST_UTF8_OBJS} \
      regress/unittests/test_helper/libtest_helper.a libssh.a
@@ -618,7 +618,7 @@ diff -Paur --no-dereference -- ssh.upstream/misc.c ssh/misc.c
  /* remove newline at end of string */
  char *
  chop(char *s)
-@@ -2745,17 +2772,17 @@
+@@ -2742,17 +2769,17 @@
  
  		if (geteuid() == 0 &&
  		    initgroups(pw->pw_name, pw->pw_gid) == -1) {
@@ -669,7 +669,7 @@ diff -Paur --no-dereference -- ssh.upstream/monitor_fdpass.c ssh/monitor_fdpass.
 diff -Paur --no-dereference -- ssh.upstream/mux.c ssh/mux.c
 --- ssh.upstream/mux.c
 +++ ssh/mux.c
-@@ -497,7 +497,7 @@
+@@ -495,7 +495,7 @@
  	/* prepare reply */
  	if ((r = sshbuf_put_u32(reply, MUX_S_ALIVE)) != 0 ||
  	    (r = sshbuf_put_u32(reply, rid)) != 0 ||
@@ -829,7 +829,7 @@ diff -Paur --no-dereference -- ssh.upstream/openbsd-compat/getrrsetbyname.c ssh/
  #if defined(HAVE_DECL_H_ERRNO) && !HAVE_DECL_H_ERRNO
  extern int h_errno;
  #endif
-@@ -612,4 +634,6 @@
+@@ -643,4 +665,6 @@
  	return (n);
  }
  
@@ -922,7 +922,7 @@ diff -Paur --no-dereference -- ssh.upstream/pathnames.h ssh/pathnames.h
 diff -Paur --no-dereference -- ssh.upstream/progressmeter.c ssh/progressmeter.c
 --- ssh.upstream/progressmeter.c
 +++ ssh/progressmeter.c
-@@ -81,7 +81,8 @@
+@@ -80,7 +80,8 @@
  static int
  can_output(void)
  {
@@ -931,11 +931,11 @@ diff -Paur --no-dereference -- ssh.upstream/progressmeter.c ssh/progressmeter.c
 +	return (getpgid(0) == tcgetpgrp(STDOUT_FILENO));
  }
  
- static void
+ /* size needed to format integer type v, using (nbits(v) * log2(10) / 10) */
 diff -Paur --no-dereference -- ssh.upstream/readconf.c ssh/readconf.c
 --- ssh.upstream/readconf.c
 +++ ssh/readconf.c
-@@ -510,6 +510,10 @@
+@@ -509,6 +509,10 @@
  int
  default_ssh_port(void)
  {
@@ -946,7 +946,7 @@ diff -Paur --no-dereference -- ssh.upstream/readconf.c ssh/readconf.c
  	static int port;
  	struct servent *sp;
  
-@@ -518,6 +522,7 @@
+@@ -517,6 +521,7 @@
  		port = sp ? ntohs(sp->s_port) : SSH_DEFAULT_PORT;
  	}
  	return port;
@@ -974,7 +974,7 @@ diff -Paur --no-dereference -- ssh.upstream/regress/netcat.c ssh/regress/netcat.
 diff -Paur --no-dereference -- ssh.upstream/scp.c ssh/scp.c
 --- ssh.upstream/scp.c
 +++ ssh/scp.c
-@@ -645,7 +645,7 @@
+@@ -647,7 +647,7 @@
  		mode = MODE_SCP;
  
  	if ((pwd = getpwuid(userid = getuid())) == NULL)
@@ -983,7 +983,7 @@ diff -Paur --no-dereference -- ssh.upstream/scp.c ssh/scp.c
  
  	if (!isatty(STDOUT_FILENO))
  		showprogress = 0;
-@@ -1007,7 +1007,7 @@
+@@ -1009,7 +1009,7 @@
  
  static struct sftp_conn *
  do_sftp_connect(char *host, char *user, int port, char *sftp_direct,
@@ -995,7 +995,7 @@ diff -Paur --no-dereference -- ssh.upstream/scp.c ssh/scp.c
 diff -Paur --no-dereference -- ssh.upstream/servconf.c ssh/servconf.c
 --- ssh.upstream/servconf.c
 +++ ssh/servconf.c
-@@ -309,7 +309,10 @@
+@@ -308,7 +308,10 @@
  	if (options->pid_file == NULL)
  		options->pid_file = xstrdup(_PATH_SSH_DAEMON_PID_FILE);
  	if (options->moduli_file == NULL)
@@ -1007,7 +1007,7 @@ diff -Paur --no-dereference -- ssh.upstream/servconf.c ssh/servconf.c
  	if (options->login_grace_time == -1)
  		options->login_grace_time = 120;
  	if (options->permit_root_login == PERMIT_NOT_SET)
-@@ -454,7 +457,12 @@
+@@ -453,7 +456,12 @@
  
  	/* Turn privilege separation and sandboxing on by default */
  	if (use_privsep == -1)
@@ -1023,7 +1023,7 @@ diff -Paur --no-dereference -- ssh.upstream/servconf.c ssh/servconf.c
 diff -Paur --no-dereference -- ssh.upstream/session.c ssh/session.c
 --- ssh.upstream/session.c
 +++ ssh/session.c
-@@ -104,6 +104,15 @@
+@@ -103,6 +103,15 @@
  #include <selinux/selinux.h>
  #endif
  
@@ -1039,7 +1039,7 @@ diff -Paur --no-dereference -- ssh.upstream/session.c ssh/session.c
  #define IS_INTERNAL_SFTP(c) \
  	(!strncmp(c, INTERNAL_SFTP_NAME, sizeof(INTERNAL_SFTP_NAME) - 1) && \
  	 (c[sizeof(INTERNAL_SFTP_NAME) - 1] == '\0' || \
-@@ -1052,9 +1061,11 @@
+@@ -1051,9 +1060,11 @@
  #endif /* HAVE_LOGIN_CAP */
  
  	if (!options.use_pam) {
@@ -1157,7 +1157,7 @@ diff -Paur --no-dereference -- ssh.upstream/sftp-server-main.c ssh/sftp-server-m
 diff -Paur --no-dereference -- ssh.upstream/ssh-add.c ssh/ssh-add.c
 --- ssh.upstream/ssh-add.c
 +++ ssh/ssh-add.c
-@@ -979,8 +979,8 @@
+@@ -982,8 +982,8 @@
  		int count = 0;
  
  		if ((pw = getpwuid(getuid())) == NULL) {
@@ -1171,7 +1171,7 @@ diff -Paur --no-dereference -- ssh.upstream/ssh-add.c ssh/ssh-add.c
 diff -Paur --no-dereference -- ssh.upstream/ssh-agent.c ssh/ssh-agent.c
 --- ssh.upstream/ssh-agent.c
 +++ ssh/ssh-agent.c
-@@ -1749,8 +1749,8 @@
+@@ -1748,8 +1748,8 @@
  		return -1;
  	}
  	if ((euid != 0) && (getuid() != euid)) {
@@ -1218,7 +1218,7 @@ diff -Paur --no-dereference -- ssh.upstream/ssh.c ssh/ssh.c
 diff -Paur --no-dereference -- ssh.upstream/sshconnect.c ssh/sshconnect.c
 --- ssh.upstream/sshconnect.c
 +++ ssh/sshconnect.c
-@@ -164,7 +164,8 @@
+@@ -163,7 +163,8 @@
  		 * Execute the proxy command.
  		 * Note that we gave up any extra privileges above.
  		 */
@@ -1228,7 +1228,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshconnect.c ssh/sshconnect.c
  		perror(argv[0]);
  		exit(1);
  	}
-@@ -248,7 +249,7 @@
+@@ -247,7 +248,7 @@
  		 * extra privileges above.
  		 */
  		ssh_signal(SIGPIPE, SIG_DFL);
@@ -1237,7 +1237,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshconnect.c ssh/sshconnect.c
  		perror(argv[0]);
  		exit(1);
  	}
-@@ -306,7 +307,9 @@
+@@ -305,7 +306,9 @@
  	for (allow_local = 0; allow_local < 2; allow_local++) {
  		for (ifa = ifaddrs; ifa != NULL; ifa = ifa->ifa_next) {
  			if (ifa->ifa_addr == NULL || ifa->ifa_name == NULL ||
@@ -1247,7 +1247,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshconnect.c ssh/sshconnect.c
  			    ifa->ifa_addr->sa_family != af ||
  			    strcmp(ifa->ifa_name, options.bind_interface) != 0)
  				continue;
-@@ -1671,7 +1674,7 @@
+@@ -1670,7 +1673,7 @@
  	if (pid == 0) {
  		ssh_signal(SIGPIPE, SIG_DFL);
  		debug3("Executing %s -c \"%s\"", shell, args);
@@ -1279,7 +1279,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd.8 ssh/sshd.8
  .Pp
  The options are as follows:
  .Bl -tag -width Ds
-@@ -994,14 +994,6 @@
+@@ -1008,14 +1008,6 @@
  during privilege separation in the pre-authentication phase.
  The directory should not contain any files and must be owned by root
  and not group or world-writable.
@@ -1297,7 +1297,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd.8 ssh/sshd.8
 diff -Paur --no-dereference -- ssh.upstream/sshd.c ssh/sshd.c
 --- ssh.upstream/sshd.c
 +++ ssh/sshd.c
-@@ -129,6 +129,15 @@
+@@ -128,6 +128,15 @@
  #include "srclimit.h"
  #include "dh.h"
  
@@ -1313,7 +1313,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd.c ssh/sshd.c
  /* Re-exec fds */
  #define REEXEC_DEVCRYPTO_RESERVED_FD	(STDERR_FILENO + 1)
  #define REEXEC_STARTUP_PIPE_FD		(STDERR_FILENO + 2)
-@@ -234,7 +243,11 @@
+@@ -233,7 +242,11 @@
  static int startup_pipe = -1;		/* in child */
  
  /* variables used for privilege separation */
@@ -1325,7 +1325,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd.c ssh/sshd.c
  struct monitor *pmonitor = NULL;
  int privsep_is_preauth = 1;
  static int privsep_chroot = 1;
-@@ -460,8 +473,8 @@
+@@ -455,8 +468,8 @@
  			fatal("chdir(\"/\"): %s", strerror(errno));
  
  		/* Drop our privileges */
@@ -1336,7 +1336,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd.c ssh/sshd.c
  		gidset[0] = privsep_pw->pw_gid;
  		if (setgroups(1, gidset) == -1)
  			fatal("setgroups: %.100s", strerror(errno));
-@@ -1579,6 +1592,10 @@
+@@ -1589,6 +1602,10 @@
  	/* Initialize configuration options to their default values. */
  	initialize_server_options(&options);
  
@@ -1346,10 +1346,10 @@ diff -Paur --no-dereference -- ssh.upstream/sshd.c ssh/sshd.c
 +
  	/* Parse command-line arguments. */
  	while ((opt = getopt(ac, av,
- 	    "C:E:b:c:f:g:h:k:o:p:u:46DQRTdeiqrtV")) != -1) {
-@@ -1695,10 +1712,32 @@
+ 	    "C:E:b:c:f:g:h:k:o:p:u:46DGQRTdeiqrtV")) != -1) {
+@@ -1708,10 +1725,32 @@
  		rexec_flag = 0;
- 	if (!test_flag && rexec_flag && !path_absolute(av[0]))
+ 	if (!test_flag && !do_dump_cfg && rexec_flag && !path_absolute(av[0]))
  		fatal("sshd re-exec requires execution with an absolute path");
 -	if (rexeced_flag)
 -		closefrom(REEXEC_MIN_FREE_FD);
@@ -1384,7 +1384,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd.c ssh/sshd.c
  
  	seed_rng();
  
-@@ -2074,7 +2113,8 @@
+@@ -2081,7 +2120,8 @@
  		 * Write out the pid file after the sigterm handler
  		 * is setup and the listen sockets are bound
  		 */
@@ -1394,7 +1394,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd.c ssh/sshd.c
  			FILE *f = fopen(options.pid_file, "w");
  
  			if (f == NULL) {
-@@ -2086,6 +2126,15 @@
+@@ -2093,6 +2133,15 @@
  			}
  		}
  
@@ -1410,7 +1410,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd.c ssh/sshd.c
  		/* Accept a connection and return in a forked child */
  		server_accept_loop(&sock_in, &sock_out,
  		    &newsock, config_s);
-@@ -2445,10 +2494,10 @@
+@@ -2447,10 +2496,10 @@
  		do_cleanup(the_active_state, the_authctxt);
  		if (use_privsep && privsep_is_preauth &&
  		    pmonitor != NULL && pmonitor->m_pid > 1) {
@@ -1473,7 +1473,7 @@ diff -Paur --no-dereference -- ssh.upstream/ssh-keygen.1 ssh/ssh-keygen.1
 diff -Paur --no-dereference -- ssh.upstream/ssh-keygen.c ssh/ssh-keygen.c
 --- ssh.upstream/ssh-keygen.c
 +++ ssh/ssh-keygen.c
-@@ -829,7 +829,7 @@
+@@ -831,7 +831,7 @@
  	}
  	sshkey_free(prv);
  	free(comment);
@@ -1482,7 +1482,7 @@ diff -Paur --no-dereference -- ssh.upstream/ssh-keygen.c ssh/ssh-keygen.c
  }
  
  static void
-@@ -987,7 +987,7 @@
+@@ -989,7 +989,7 @@
  			free(line);
  			fclose(f);
  			fingerprint_private(path);
@@ -1491,7 +1491,7 @@ diff -Paur --no-dereference -- ssh.upstream/ssh-keygen.c ssh/ssh-keygen.c
  		}
  
  		/*
-@@ -1035,7 +1035,7 @@
+@@ -1037,7 +1037,7 @@
  
  	if (invalid)
  		fatal("%s is not a public key file.", path);
@@ -1500,7 +1500,7 @@ diff -Paur --no-dereference -- ssh.upstream/ssh-keygen.c ssh/ssh-keygen.c
  }
  
  static void
-@@ -1075,14 +1075,32 @@
+@@ -1077,14 +1077,32 @@
  
  		/* Check whether private key exists and is not zero-length */
  		if (stat(prv_file, &st) == 0) {
@@ -1534,7 +1534,7 @@ diff -Paur --no-dereference -- ssh.upstream/ssh-keygen.c ssh/ssh-keygen.c
  		/*
  		 * Private key doesn't exist or is invalid; proceed with
  		 * key generation.
-@@ -3347,7 +3365,7 @@
+@@ -3363,7 +3381,7 @@
  	/* we need this for the home * directory.  */
  	pw = getpwuid(getuid());
  	if (!pw)
@@ -1543,7 +1543,7 @@ diff -Paur --no-dereference -- ssh.upstream/ssh-keygen.c ssh/ssh-keygen.c
  	pw = pwcopy(pw);
  	if (gethostname(hostname, sizeof(hostname)) == -1)
  		fatal("gethostname: %s", strerror(errno));
-@@ -3703,8 +3721,10 @@
+@@ -3719,8 +3737,10 @@
  		}
  		return do_download_sk(sk_provider, sk_device);
  	}
@@ -1570,7 +1570,7 @@ diff -Paur --no-dereference -- ssh.upstream/ssh-keyscan.c ssh/ssh-keyscan.c
  #include "xmalloc.h"
  #include "ssh.h"
  #include "sshbuf.h"
-@@ -54,6 +59,14 @@
+@@ -55,6 +60,14 @@
  #include "dns.h"
  #include "addr.h"
  
