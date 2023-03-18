@@ -1230,7 +1230,7 @@ int main(void)
 			     "connections as well.\n\n");
 		bool might_want_sshd =
 			any_ssh_keys ||
-		    any_sshd_keys ||
+			any_sshd_keys ||
 			!access_or_die("/etc/sshd_config", F_OK);
 		while ( true )
 		{
