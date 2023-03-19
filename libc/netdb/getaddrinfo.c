@@ -408,7 +408,9 @@ int getaddrinfo(const char* restrict node,
 	}
 
 	// TODO: Implement missing flags.
-	int supported = AI_PASSIVE | AI_NUMERICHOST | AI_NUMERICSERV | AI_CANONNAME;
+	// TODO: Revisit AI_ADDRCONFIG when IPv6 is implemented.
+	int supported = AI_PASSIVE | AI_NUMERICHOST | AI_NUMERICSERV |
+	                AI_CANONNAME | AI_ADDRCONFIG;
 	if ( flags & ~supported )
 		return EAI_BADFLAGS;
 
