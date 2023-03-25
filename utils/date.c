@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2021, 2023 Jonas 'Sortie' Termansen.
  * Copyright (c) 2022 Juhani 'nortti' Krekelä.
  * Copyright (c) 2022 Dennis Wölfing.
  *
@@ -18,6 +18,8 @@
  * date.c
  * Print or set system date and time.
  */
+
+#include <sys/stat.h>
 
 #include <err.h>
 #include <stdbool.h>
@@ -50,13 +52,18 @@ static char* astrftime(const char* format, const struct tm* tm)
 
 int main(int argc, char* argv[])
 {
-	const char* format = "+%a %b %e %H:%M:%S %Z %Y";
+	const char* date = NULL;
+	bool set = false;
+	const char* reference = NULL;
 
 	int opt;
-	while ( (opt = getopt(argc, argv, "u")) != -1 )
+	while ( (opt = getopt(argc, argv, "d:r:s:u")) != -1 )
 	{
 		switch ( opt )
 		{
+		case 'd': date = optarg; break;
+		case 'r': reference = optarg; break;
+		case 's': date = optarg; set = true; break;
 		case 'u':
 			if ( setenv("TZ", "UTC0", 1) )
 				err(1, "setenv");
@@ -65,20 +72,52 @@ int main(int argc, char* argv[])
 		}
 	}
 
+	if ( date && reference )
+		errx(1, "the -d and -r options are mutually incompatible");
+	if ( set && reference )
+		errx(1, "the -s and -r options are mutually incompatible");
+
+	const char* format = "+%a %b %e %H:%M:%S %Z %Y";
 	if ( 1 <= argc - optind )
 	{
 		if ( argv[optind][0] != '+' )
-			errx(1, "setting the system time is not implemented");
+			errx(1, "the format specifier must start with a +");
 		format = argv[optind];
 	}
 	if ( 2 <= argc - optind )
 		errx(1, "unexpected extra operand: %s", argv[optind + 1]);
 
-	time_t current_time = time(NULL);
+	struct timespec moment = {0};
+	struct tm tm = {0};
 
-	struct tm tm;
-	if ( !localtime_r(&current_time, &tm) )
-		err(1, "localtime_r(%ji)", (intmax_t) current_time);
+	if ( date )
+	{
+		memset(&tm, 0, sizeof(tm));
+		if ( !strptime(date, format + 1, &tm) )
+			errx(1, "date didn't match %s: %s", format + 1, date);
+		moment.tv_sec = timegm(&tm); // TODO: timelocal
+	}
+	else
+	{
+		if ( reference )
+		{
+			struct stat st;
+			if ( stat(reference, &st) < 0 )
+				err(1, "%s", reference);
+			moment = st.st_mtim;
+		}
+		else
+			clock_gettime(CLOCK_REALTIME, &moment);
+		if ( !localtime_r(&moment.tv_sec, &tm) )
+			err(1, "localtime_r(%ji)", (intmax_t) moment.tv_sec);
+	}
+
+	if ( set )
+	{
+		if ( clock_settime(CLOCK_REALTIME, &moment) < 0 )
+			err(1, "clock_settime: CLOCK_REALTIME");
+		return 0;
+	}
 
 	char* string = astrftime(format, &tm);
 	if ( !string )
