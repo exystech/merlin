@@ -780,6 +780,10 @@ scram/scram.2 \
 sys/dnsconfig/getdnsconfig.2 \
 sys/dnsconfig/setdnsconfig.2 \
 
+MANPAGES3=\
+time/add_leap_seconds.3 \
+time/sub_leap_seconds.3 \
+
 HEADERS:=$(shell find include -type f)
 
 LIBK_OBJS:=$(FREEOBJS:.o=.libk.o)
@@ -906,3 +910,5 @@ install-libs-kernel: $(INSTALLLIBSKERNEL)
 install-man:
 	mkdir -p $(DESTDIR)$(MANDIR)/man2
 	cp $(MANPAGES2) $(DESTDIR)$(MANDIR)/man2
+	mkdir -p $(DESTDIR)$(MANDIR)/man3
+	cp $(MANPAGES3) $(DESTDIR)$(MANDIR)/man3

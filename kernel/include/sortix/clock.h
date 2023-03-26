@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -36,6 +36,8 @@ extern "C" {
 #define CLOCK_CHILD_SYSTIME_ID 7
 #define CLOCK_THREAD_CPUTIME_ID 8
 #define CLOCK_THREAD_SYSTIME_ID 9
+
+#define CLOCK_REALTIME_HAS_LEAP_SECONDS 1
 
 #ifdef __cplusplus
 } /* extern "C" */

@@ -1,0 +1,104 @@
+.Dd March 26, 2023
+.Dt ADD_LEAP_SECONDS 2
+.Os
+.Sh NAME
+.Nm add_leap_seconds ,
+.Nm sub_leap_seconds
+.Nd convert between utc and tai-10 timestamps
+.Sh SYNOPSIS
+.In time.h
+.Ft int
+.Fn add_leap_seconds "time_t *timestamp"
+.Ft int
+.Fn sub_leap_seconds "time_t *timestamp"
+.Sh DESCRIPTION
+.Fn add_leap_seconds
+adds leap seconds to the UTC
+.Fa timestamp
+to give the corresponding TAI-10 timestamp.
+.Pp
+.Fn sub_leap_seconds
+subtracts leap seconds from the TAI-10
+.Fa timestamp
+to give the corresponding UTC timestamp.
+.Pp
+Leap seconds are announced usually six months in advanced by the
+International Earth Rotation and Reference Systems Service (IERS) in Bulletin C.
+Leap seconds can be added or removed at the end of the June or December (UTC)
+where the last minute can be 61 or 59 seconds.
+Leap seconds correct the difference between solar time and civil time when
+planetary rotation varies.
+Leap seconds have never been removed as of mid 2023.
+.Pp
+.Dv CLOCK_REALTIME
+on this system is in the TAI-10 format which measures the number of actual
+seconds including leap seconds that has happened since the Unix epoch of
+1970-01-01 00:00:00 UTC.
+The inclusion of leap seconds is advertised by the
+.Dv CLOCK_REALTIME_HAS_LEAP_SECONDS
+definition.
+This violates POSIX's requirement that
+.Dv CLOCK_REALTIME
+is in UTC, which pretends leap seconds don't happen.
+The
+.Fn add_leap_seconds
+and
+.Fn sub_leap_seconds
+functions are useful when exchanging timestamps with other operating systems.
+.Pp
+TAI-10 is International Atomic Time (TAI) subtracted by 10 seconds so the epoch
+is the same moment in TAI-10 and UTC.
+.Pp
+TAI-10 has the advantage that every actual past moment in time has an unique and
+unambiguous and continuous representation.
+The time difference between two TAI-10 timestamps can be calculated as a simple
+subtraction.
+Durations can be simply added to TAI-10 timestamps to produce the the timestamp
+changed by that many seconds.
+However it's not possible to compute which TAI10  timestamp corresponds to a
+calendar date and time more than 6 months in the future, as the leap seconds
+have not been announced yet.
+The system leap second table needs to be up to date in order to perform properly
+between TAI-10 and calendar time.
+TAI-10 is the most useful format when dealing with relative times, as it's
+guaranteed a certain amount of time has elapsed.
+.Pp
+UTC has the disadvantage that two different seconds can have the same timestamp
+when leap seconds are removed, and UTC can be discontinuous if a leap second
+removed where a timestamp could correspond to no actual moment in time.
+The actual time between two UTC timestamps cannot be computed by a simple
+subtraction (a leap second table is required) and durations cannot simply be
+added to wait for a particular amount of time.
+UTC is the most useful format when dealing with calendar times, as it's always
+possible to losslessly convert UTC to and from calendar time.
+.Sh RETURN VALUES
+On success 1 is returned.
+.Pp
+0 is returned when the input timestamp has no representation in the output
+format or is ambigous.
+The output timestamp will be the best approximation.
+This can happen in
+.Fn sub_leap_seconds
+when converting from TAI-10 to UTC and a leap second has been
+inserted, or in
+.Fn add_leap_seconds
+when converting from UTC to TAI-10 and a leap second has been removed (which has
+never happened so far).
+.Pp
+-1 is returned when the input timestamp is too far in the future and it is
+unknown whether a leap second will occur.
+The output timestamp will be the best approximation.
+The accurate result can be obtained when the system leap second table has been
+updated.
+.Sh SEE ALSO
+.Xr clock_gettime 2 ,
+.Xr gmtime_r 3 ,
+.Xr localtime_r 3 ,
+.Xr mktime 3 ,
+.Xr timegm 3
+.Sh HISTORY
+The
+.Fn add_leap_seconds
+and
+.Fn sub_leap_seconds
+functions originally appeared in Sortix 1.1.

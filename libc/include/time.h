@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -163,7 +163,9 @@ time_t timegm(struct tm*);
 #if __USE_SORTIX
 int clock_gettimeres(clockid_t, struct timespec*, struct timespec*);
 int clock_settimeres(clockid_t, const struct timespec*, const struct timespec*);
-int timens(struct tmns* tmns);
+int timens(struct tmns*);
+int sub_leap_seconds(time_t*);
+int add_leap_seconds(time_t*);
 #endif
 
 extern char* tzname[2];

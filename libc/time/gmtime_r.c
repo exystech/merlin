@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,23 +23,25 @@
 #include <stdint.h>
 #include <time.h>
 
-static const int DAYS_JANUARY = 31;
-static const int DAYS_FEBRUARY = 28;
-static const int DAYS_MARCH = 31;
-static const int DAYS_APRIL = 30;
-static const int DAYS_MAY = 31;
-static const int DAYS_JUNE = 30;
-static const int DAYS_JULY = 31;
-static const int DAYS_AUGUST = 31;
-static const int DAYS_SEPTEMBER = 30;
-static const int DAYS_OCTOBER = 31;
-static const int DAYS_NOVEMBER = 30;
-static const int DAYS_DECEMBER = 31;
+#define DAYS_JANUARY 31
+#define DAYS_FEBRUARY 28
+#define DAYS_MARCH 31
+#define DAYS_APRIL 30
+#define DAYS_MAY 31
+#define DAYS_JUNE 30
+#define DAYS_JULY 31
+#define DAYS_AUGUST 31
+#define DAYS_SEPTEMBER 30
+#define DAYS_OCTOBER 31
+#define DAYS_NOVEMBER 30
+#define DAYS_DECEMBER 31
+
+#define UNKNOWN 127
 
 #define DECL_LEAP_SECOND(year, jun, dec) \
 	{0, 0, 0, 0, 0, jun, 0, 0, 0, 0, 0, dec}
 
-static int8_t leap_seconds[][12] =
+static const char leap_seconds[][12] =
 {
 	DECL_LEAP_SECOND(1970, 0, 0),
 	DECL_LEAP_SECOND(1971, 0, 0),
@@ -88,16 +90,45 @@ static int8_t leap_seconds[][12] =
 	DECL_LEAP_SECOND(2014, 0, 0),
 	DECL_LEAP_SECOND(2015, 1, 0),
 	DECL_LEAP_SECOND(2016, 0, 1),
+	DECL_LEAP_SECOND(2017, 0, 0),
+	DECL_LEAP_SECOND(2018, 0, 0),
+	DECL_LEAP_SECOND(2019, 0, 0),
+	DECL_LEAP_SECOND(2020, 0, 0),
+	DECL_LEAP_SECOND(2021, 0, 0),
+	DECL_LEAP_SECOND(2022, 0, 0),
+	DECL_LEAP_SECOND(2023, 0, UNKNOWN),
 };
 
-static time_t get_leap_second(int year, int month)
+static const char month_days_list[12] =
+{
+	DAYS_JANUARY,
+	DAYS_FEBRUARY,
+	DAYS_MARCH,
+	DAYS_APRIL,
+	DAYS_MAY,
+	DAYS_JUNE,
+	DAYS_JULY,
+	DAYS_AUGUST,
+	DAYS_SEPTEMBER,
+	DAYS_OCTOBER,
+	DAYS_NOVEMBER,
+	DAYS_DECEMBER,
+};
+
+static time_t get_leap_second_maybe(int year, int month)
 {
 	const time_t num_years = sizeof(leap_seconds) / sizeof(leap_seconds[0]);
 	if ( year < 1970 )
 		return 0;
 	if ( num_years <= year-1970 )
-		return 0;
+		return UNKNOWN;
 	return leap_seconds[year-1970][month];
+}
+
+static time_t get_leap_second(int year, int month)
+{
+	time_t result = get_leap_second_maybe(year, month);
+	return result == UNKNOWN ? 0 : result;
 }
 
 static time_t leap_seconds_in_year(int year)
@@ -127,6 +158,11 @@ static time_t days_in_year(int year)
 	       DAYS_OCTOBER +
 	       DAYS_NOVEMBER +
 	       DAYS_DECEMBER;
+}
+
+static int days_in_month(int year, int month)
+{
+	return month_days_list[month] + (month == 1 && is_leap_year(year));
 }
 
 struct tm* gmtime_r(const time_t* time_ptr, struct tm* ret)
@@ -165,29 +201,13 @@ struct tm* gmtime_r(const time_t* time_ptr, struct tm* ret)
 		ret->tm_wday = (ret->tm_wday - year_days + 7*7*7*7) % 7;
 	}
 
-	int month_days_list[12] =
-	{
-		DAYS_JANUARY,
-		DAYS_FEBRUARY + (is_leap_year(ret->tm_year) ? 1 : 0),
-		DAYS_MARCH,
-		DAYS_APRIL,
-		DAYS_MAY,
-		DAYS_JUNE,
-		DAYS_JULY,
-		DAYS_AUGUST,
-		DAYS_SEPTEMBER,
-		DAYS_OCTOBER,
-		DAYS_NOVEMBER,
-		DAYS_DECEMBER,
-	};
-
 	// Figure out the correct month.
 	ret->tm_mon = 0;
 	ret->tm_yday = 0;
 	while ( true )
 	{
 		int month_leaps = get_leap_second(ret->tm_year, ret->tm_mon);
-		int month_days = month_days_list[ret->tm_mon];
+		int month_days = days_in_month(ret->tm_year, ret->tm_mon);
 		int month_seconds = month_days * 24 * 60 * 60 + month_leaps;
 		if ( month_seconds <= left )
 		{
@@ -204,7 +224,7 @@ struct tm* gmtime_r(const time_t* time_ptr, struct tm* ret)
 	left = left % (24 * 60 * 60);
 
 	// If this is a regular timestamp.
-	if ( ret->tm_mday < month_days_list[ret->tm_mon] )
+	if ( ret->tm_mday < days_in_month(ret->tm_year, ret->tm_mon) )
 	{
 		ret->tm_yday += ret->tm_mday;
 
@@ -257,26 +277,10 @@ time_t timegm(struct tm* tm)
 		ret += year_seconds;
 	}
 
-	int month_days_list[12] =
-	{
-		DAYS_JANUARY,
-		DAYS_FEBRUARY + (is_leap_year(year) ? 1 : 0),
-		DAYS_MARCH,
-		DAYS_APRIL,
-		DAYS_MAY,
-		DAYS_JUNE,
-		DAYS_JULY,
-		DAYS_AUGUST,
-		DAYS_SEPTEMBER,
-		DAYS_OCTOBER,
-		DAYS_NOVEMBER,
-		DAYS_DECEMBER,
-	};
-
-	for ( uint8_t m = 0; m < month; m++ )
+	for ( int m = 0; m < month; m++ )
 	{
 		int month_leaps = get_leap_second(year, m);
-		int month_days = month_days_list[m];
+		int month_days = days_in_month(year, m);
 		int month_seconds = month_days * 24 * 60 * 60 + month_leaps;
 		ret += month_seconds;
 	}
@@ -289,4 +293,59 @@ time_t timegm(struct tm* tm)
 	gmtime_r(&ret, tm);
 
 	return ret;
+}
+
+int sub_leap_seconds(time_t* ptr)
+{
+	time_t t = *ptr;
+	time_t next = 0;
+	time_t offset = 0;
+	for ( int year = 1970; true; year++ )
+	{
+		for ( int month = 0; month < 12; month++ )
+		{
+			time_t seconds = days_in_month(year, month) * 24 * 60 * 60;
+			time_t leap = get_leap_second_maybe(year, month);
+			next += seconds;
+			if ( leap == UNKNOWN )
+			{
+				*ptr = t - offset;
+				return t < next - 1 ? 1 : -1;
+			}
+			next += leap;
+			if ( t < next )
+			{
+				*ptr = t - offset;
+				return 0 < leap && t + 1 == next ? 0 : 1;
+			}
+			offset += leap;
+		}
+	}
+}
+
+int add_leap_seconds(time_t* ptr)
+{
+	time_t t = *ptr;
+	time_t next = 0;
+	time_t offset = 0;
+	for ( int year = 1970; true; year++ )
+	{
+		for ( int month = 0; month < 12; month++ )
+		{
+			time_t seconds = days_in_month(year, month) * 24 * 60 * 60;
+			time_t leap = get_leap_second_maybe(year, month);
+			next += seconds;
+			if ( leap == UNKNOWN )
+			{
+				*ptr = t + offset;
+				return t < next - 1 ? 1 : -1;
+			}
+			if ( t < next )
+			{
+				*ptr = t + offset;
+				return leap < 0 && t + 1 == next ? 0 : 1;
+			}
+			offset += leap;
+		}
+	}
 }

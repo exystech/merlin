@@ -271,6 +271,17 @@ and such.
 .Dv CLOCK_REALTIME
 counts the number of seconds since the epoch including leap seconds, unlike
 other operating systems and in violation of POSIX.
+.Dv CLOCK_REALTIME_HAS_LEAP_SECONDS
+definition advertises
+.Dv CLOCK_REALTIME
+contains leap seconds since the epoch in the TAI-10 format.
+.Pp
+.Xr sub_leap_seconds 3
+converts timestamps from TAI-10 to UTC by subtracting the leap seconds, while
+.Xr add_leap_seconds 3
+converts timestamps from UTC TO TAI-10 by adding the leap seconds.
+These functions are useful when communicating with other operating systems
+either via the network or exchanged data files.
 .Ss u_char, u_short, u_int, u_long
 .Vt unsigned char ,
 .Vt unsigned short ,
