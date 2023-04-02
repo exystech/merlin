@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014, 2015, 2018, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2023 dzwdz.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,6 +23,7 @@
 #include <sys/wait.h>
 
 #include <assert.h>
+#include <ctype.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -201,7 +203,7 @@ static int setcloexecfrom(int from)
 	return 0;
 }
 
-bool login(const char* username)
+bool login(const char* username, const char* session)
 {
 	char login_pid[sizeof(pid_t) * 3];
 	snprintf(login_pid, sizeof(login_pid), "%" PRIiPID, getpid());
@@ -217,6 +219,8 @@ bool login(const char* username)
 	char* login_shell;
 	if ( asprintf(&login_shell, "-%s", pwd->pw_shell) < 0 )
 		return close(pipe_fds[0]), close(pipe_fds[1]), false;
+	if ( session && *session == '\0' )
+		session = login_shell;
 	sigset_t oldset, sigttou;
 	sigemptyset(&sigttou);
 	sigaddset(&sigttou, SIGTTOU);
@@ -252,11 +256,14 @@ bool login(const char* username)
 		tcsetpgrp(0, getpgid(0)) ||
 		sigprocmask(SIG_SETMASK, &oldset, NULL) < 0 ||
 		settermmode(0, TERMMODE_NORMAL) < 0 ||
-		(execlp("./.session", "./.session", (const char*) NULL) < 0 &&
-		 errno != ENOENT && errno != EACCES) ||
-		(execlp("/etc/session", "/etc/session", (const char*) NULL) < 0 &&
-		 errno != ENOENT && errno != EACCES) ||
-		execlp(pwd->pw_shell, login_shell, (const char*) NULL));
+		(session ?
+			execlp(session + (session[0] == '-'), session, (const char*) NULL) < 0
+			:
+			(execlp("./.session", "./.session", (const char*) NULL) < 0 &&
+			 errno != ENOENT && errno != EACCES) ||
+			(execlp("/etc/session", "/etc/session", (const char*) NULL) < 0 &&
+			 errno != ENOENT && errno != EACCES) ||
+			execlp(pwd->pw_shell, login_shell, (const char*) NULL)));
 		write(pipe_fds[1], &errno, sizeof(errno));
 		_exit(127);
 	}
@@ -318,6 +325,61 @@ static bool read_terminal_line(char* buffer, size_t size)
 	return true;
 }
 
+bool parse_username(const char* input,
+                    char** username,
+                    char** session,
+                    enum special_action* action)
+{
+	*username = NULL;
+	*session = NULL;
+	*action = SPECIAL_ACTION_NONE;
+	if ( !strcmp(input, "exit") )
+		return *action = SPECIAL_ACTION_POWEROFF, true;
+	else if ( !strcmp(input, "poweroff") )
+		return *action = SPECIAL_ACTION_POWEROFF, true;
+	else if ( !strcmp(input, "reboot") )
+		return *action = SPECIAL_ACTION_REBOOT, true;
+	else if ( !strcmp(input, "halt") )
+		return *action = SPECIAL_ACTION_HALT, true;
+
+	// Skip leading spaces to allow logging in as special accounts.
+	while ( isspace(*input) )
+		input++;
+	char* colon = strchr(input, ':');
+	if ( !colon )
+	{
+		*username = strdup(input);
+		return *username != NULL;
+	}
+	if ( strchr(colon + 1, ':') )
+	{
+		// Input contains more than one colon.
+		return false;
+	}
+	*username = strndup(input, colon - input);
+	if ( !*username )
+		return false;
+	*session = strdup(colon + 1);
+	if ( !*session )
+	{
+		free(*username);
+		*username = NULL;
+		return false;
+	}
+	return true;
+}
+
+void handle_special(enum special_action action)
+{
+	switch ( action )
+	{
+	case SPECIAL_ACTION_NONE: return;
+	case SPECIAL_ACTION_POWEROFF: exit(0);
+	case SPECIAL_ACTION_REBOOT: exit(1);
+	case SPECIAL_ACTION_HALT: exit(2);
+	}
+}
+
 int textual(void)
 {
 	unsigned int termmode = TERMMODE_UNICODE | TERMMODE_SIGNAL | TERMMODE_UTF8 |
@@ -326,6 +388,9 @@ int textual(void)
 		err(2, "settermmode");
 	unsigned int pw_termmode = termmode & ~(TERMMODE_ECHO);
 
+	char* username = NULL;
+	char* session = NULL;
+
 	while ( true )
 	{
 		char hostname[HOST_NAME_MAX + 1];
@@ -333,9 +398,9 @@ int textual(void)
 		gethostname(hostname, sizeof(hostname));
 		printf("%s login: ", hostname);
 		fflush(stdout);
-		char username[256];
+		char input[256];
 		errno = 0;
-		if ( !read_terminal_line(username, sizeof(username)) )
+		if ( !read_terminal_line(input, sizeof(input)) )
 		{
 			printf("\n");
 			if ( errno && errno != EINTR )
@@ -347,14 +412,17 @@ int textual(void)
 			continue;
 		}
 
-		if ( !strcmp(username, "exit") )
-			exit(0);
-		if ( !strcmp(username, "poweroff") )
-			exit(0);
-		if ( !strcmp(username, "reboot") )
-			exit(1);
-		if ( !strcmp(username, "halt") )
-			exit(2);
+		enum special_action action;
+		free(username);
+		free(session);
+		username = NULL;
+		session = NULL;
+		if ( !parse_username(input, &username, &session, &action) )
+		{
+			printf("Invalid username\n\n");
+			continue;
+		}
+		handle_special(action);
 
 		if ( settermmode(0, pw_termmode) < 0 )
 			err(2, "settermmode");
@@ -389,11 +457,10 @@ int textual(void)
 			continue;
 		}
 
-		if ( !login(username) )
+		if ( !login(username, session) )
 		{
 			warn("logging in as %s", username);
 			printf("\n");
-			continue;
 		}
 	}
 

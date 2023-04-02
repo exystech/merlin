@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2023 dzwdz.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -35,7 +36,15 @@ struct check
 	bool pipe_nonblock;
 };
 
-bool login(const char* username);
+enum special_action
+{
+	SPECIAL_ACTION_NONE,
+	SPECIAL_ACTION_POWEROFF,
+	SPECIAL_ACTION_REBOOT,
+	SPECIAL_ACTION_HALT,
+};
+
+bool login(const char* username, const char* session);
 bool check_real(const char* username, const char* password);
 bool check_begin(struct check* chk,
                  const char* username,
@@ -45,5 +54,11 @@ bool check_end(struct check* chk, bool* result, bool try);
 bool check(const char* username, const char* password);
 int graphical(void);
 int textual(void);
+
+bool parse_username(const char* input,
+                    char** out_username,
+                    char** out_session,
+                    enum special_action* action);
+void handle_special(enum special_action action);
 
 #endif

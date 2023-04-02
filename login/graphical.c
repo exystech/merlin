@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  * Copyright (c) 2021 Juhani 'nortti' Krekelä.
+ * Copyright (c) 2023 dzwdz.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -87,6 +88,8 @@ static inline void arrow_initialize()
 
 static struct textbox textbox_username;
 static struct textbox textbox_password;
+static char* username = NULL;
+static char* session = NULL;
 
 struct glogin
 {
@@ -605,7 +608,7 @@ static void think(struct glogin* state)
 		}
 		if ( result )
 		{
-			if ( !login(textbox_username.text) )
+			if ( !login(username, session) )
 				state->warning = strerror(errno);
 			state->stage = STAGE_USERNAME;
 			textbox_reset(&textbox_username);
@@ -626,24 +629,28 @@ static void keyboard_event(struct glogin* state, uint32_t codepoint)
 {
 	if ( codepoint == '\n' )
 	{
+		enum special_action action;
 		state->warning = NULL;
 		switch ( state->stage )
 		{
 		case STAGE_USERNAME:
-			if ( !strcmp(textbox_username.text, "exit") )
-				exit(0);
-			if ( !strcmp(textbox_username.text, "poweroff") )
-				exit(0);
-			if ( !strcmp(textbox_username.text, "reboot") )
-				exit(1);
-			if ( !strcmp(textbox_username.text, "halt") )
-				exit(2);
+			free(username);
+			free(session);
+			username = NULL;
+			session = NULL;
+			if ( !parse_username(textbox_username.text, &username,
+			                     &session, &action) )
+			{
+				state->warning = "Invalid username";
+				break;
+			}
+			handle_special(action);
 			state->stage = STAGE_PASSWORD;
 			textbox_reset(&textbox_password);
 			break;
 		case STAGE_PASSWORD:
 			state->stage = STAGE_CHECKING;
-			if ( !check_begin(&state->chk, textbox_username.text,
+			if ( !check_begin(&state->chk, username,
 			                 textbox_password.text, true) )
 			{
 				state->stage = STAGE_USERNAME;

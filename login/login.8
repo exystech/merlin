@@ -34,6 +34,9 @@ script if it exists and is executable, otherwise attempting
 .Pa /etc/session ,
 and ultimately falling back on the user's shell from
 .Xr passwd 5 .
+It can be overriden by suffixing the username with a colon and the name of the
+program to launch.
+If the program name is skipped, the login shell is launched.
 .Pp
 Type a special username to perform special options:
 .Pp
