@@ -268,7 +268,7 @@ size_t STRFTIME(STRFTIME_CHAR* s,
 			continue;
 		case STRFTIME_L('h'): OUTPUT_STRING(GetMonthAbbreviated(tm)); break;
 		case STRFTIME_L('H'): OUTPUT_INT_PADDED(tm->tm_hour, 2, STRFTIME_L('0')); break; /*O*/
-		case STRFTIME_L('I'): OUTPUT_INT_PADDED(tm->tm_hour % 12 + 1, 2, STRFTIME_L('0')); break; /*O*/
+		case STRFTIME_L('I'): OUTPUT_INT_PADDED((tm->tm_hour + 11) % 12 + 1, 2, STRFTIME_L('0')); break; /*O*/
 		case STRFTIME_L('j'): OUTPUT_INT_PADDED(tm->tm_yday + 1, 3, STRFTIME_L('0')); break;
 		case STRFTIME_L('m'): OUTPUT_INT_PADDED(tm->tm_mon + 1, 2, STRFTIME_L('0')); break; /*O*/
 		case STRFTIME_L('M'): OUTPUT_INT_PADDED(tm->tm_min, 2, STRFTIME_L('0')); break; /*O*/
