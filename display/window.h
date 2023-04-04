@@ -80,6 +80,7 @@ void window_move(struct window* window, size_t left, size_t top);
 void window_resize(struct window* window, size_t width, size_t height);
 void window_client_resize(struct window* window, size_t client_width, size_t client_height);
 void window_initialize(struct window* window, struct connection* connection, struct display* display, uint32_t window_id);
+void window_quit(struct window* window);
 void window_destroy(struct window* window);
 void window_drag_resize(struct window* window, int ld, int td, int wd, int hd);
 void window_on_display_resolution_change(struct window* window, struct display* display);
@@ -100,5 +101,7 @@ void window_tile_bottom(struct window* window);
 void window_tile_bottom_left(struct window* window);
 void window_tile_bottom_right(struct window* window);
 void window_notify_client_resize(struct window* window);
+
+size_t window_border_width(const struct window* window);
 
 #endif

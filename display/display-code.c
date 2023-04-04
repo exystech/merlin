@@ -476,17 +476,7 @@ void display_keyboard_event(struct display* display, uint32_t codepoint)
 		if ( (display->key_lalt && kbkey == KBKEY_F4) /* ||
 		     (display->key_lctrl && kbkey == KBKEY_Q)*/  )
 		{
-			struct event_keyboard event;
-			event.window_id = display->active_window->window_id;
-
-			struct display_packet_header header;
-			header.message_id = EVENT_QUIT;
-			header.message_length = sizeof(event);
-
-			assert(window->connection);
-
-			connection_schedule_transmit(window->connection, &header, sizeof(header));
-			connection_schedule_transmit(window->connection, &event, sizeof(event));
+			window_quit(window);
 			return;
 		}
 
@@ -659,8 +649,25 @@ void display_mouse_event(struct display* display, uint8_t byte)
 			      window_pointer_x < (ssize_t) window->width &&
 			      0 <= window_pointer_y &&
 			      window_pointer_y <= (ssize_t) TITLE_HEIGHT) )
-				display->mouse_state = MOUSE_STATE_TITLE_MOVE;
-			else if ( window_pointer_x < 0 && window_pointer_y < 0 )
+			{
+				size_t border_width = window_border_width(window);
+				size_t button_size = FONT_WIDTH - 1;
+				size_t button_spacing = FONT_WIDTH;
+				ssize_t butbox_width = border_width
+				                     + (FONT_HEIGHT - button_size) / 2
+									 + 6 * button_spacing;
+				ssize_t x_from_right = window->width - window_pointer_x;
+				if ( x_from_right < butbox_width / 3 )
+					window_quit(window);
+				else if ( x_from_right < butbox_width * 2 / 3 )
+					window_toggle_maximized(window);
+				else if ( x_from_right < butbox_width )
+				{
+					// TODO Minimize window.
+				}
+				else
+					display->mouse_state = MOUSE_STATE_TITLE_MOVE;
+			} else if ( window_pointer_x < 0 && window_pointer_y < 0 )
 				display->mouse_state = MOUSE_STATE_RESIZE_TOP_LEFT;
 			else if ( window_pointer_x < 0 &&
 			          0 <= window_pointer_y &&

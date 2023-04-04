@@ -110,7 +110,7 @@ void window_render_frame(struct window* window)
 	uint32_t tt_color = title_color;
 	render_text(framebuffer_crop(window->buffer, tt_pos_x, tt_pos_y, tt_width, tt_height), tt, tt_color);
 
-	size_t border_width = maximized ? BORDER_WIDTH / 2 : BORDER_WIDTH;
+	size_t border_width = window_border_width(window);
 	size_t button_size = FONT_WIDTH - 1;
 	size_t button_spacing = FONT_WIDTH;
 	struct framebuffer buttons_fb =
@@ -241,6 +241,21 @@ void window_initialize(struct window* window,
 	next_window_position += 30;
 	next_window_position %= max_position;
 	window_client_resize(window, 0, 0);
+}
+
+void window_quit(struct window* window)
+{
+	struct event_keyboard event;
+	event.window_id = window->window_id;
+
+	struct display_packet_header header;
+	header.message_id = EVENT_QUIT;
+	header.message_length = sizeof(event);
+
+	assert(window->connection);
+
+	connection_schedule_transmit(window->connection, &header, sizeof(header));
+	connection_schedule_transmit(window->connection, &event, sizeof(event));
 }
 
 void window_destroy(struct window* window)
@@ -479,4 +494,10 @@ void window_notify_client_resize(struct window* window)
 
 	connection_schedule_transmit(window->connection, &header, sizeof(header));
 	connection_schedule_transmit(window->connection, &event, sizeof(event));
+}
+
+size_t window_border_width(const struct window* window)
+{
+	bool maximized = window->window_state != WINDOW_STATE_REGULAR;
+	return maximized ? BORDER_WIDTH / 2 : BORDER_WIDTH;
 }
