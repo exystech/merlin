@@ -2549,7 +2549,7 @@ static void write_random_seed(void)
 {
 	const char* will_not = "next boot will not have fresh randomness";
 	const char* path = "/boot/random.seed";
-	int fd = open(path, O_WRONLY | O_CREAT | O_NOFOLLOW, 0600);
+	int fd = open(path, O_RDWR | O_CREAT | O_NOFOLLOW, 0600);
 	if ( fd < 0 )
 	{
 		if ( errno != ENOENT && errno != EROFS )
@@ -2568,6 +2568,10 @@ static void write_random_seed(void)
 		close(fd);
 		return;
 	}
+	// Mix in the old random seed so the sysadmin can add new randomness here.
+	unsigned char old[256] = {0};
+	readall(fd, old, sizeof(old));
+	lseek(fd, 0, SEEK_SET);
 	// Write out randomness, but mix in some fresh kernel randomness in case the
 	// randomness used to seed arc4random didn't have enough entropy, there may
 	// be more now.
@@ -2576,7 +2580,7 @@ static void write_random_seed(void)
 	unsigned char newbuf[256];
 	getentropy(newbuf, sizeof(newbuf));
 	for ( size_t i = 0; i < 256; i++ )
-		buf[i] ^= newbuf[i];
+		buf[i] ^= newbuf[i] ^ old[i];
 	size_t done = writeall(fd, buf, sizeof(buf));
 	explicit_bzero(buf, sizeof(buf));
 	if ( done < sizeof(buf) )
