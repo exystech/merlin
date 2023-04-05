@@ -101,14 +101,10 @@ void window_render_frame(struct window* window)
 	}
 
 	const char* tt = window->title ? window->title : "";
-	size_t tt_max_width = window->width - 2 * BORDER_WIDTH;
-	size_t tt_desired_width = render_text_width(tt);
-	size_t tt_width = tt_desired_width < tt_max_width ? tt_desired_width : tt_max_width;
+	ssize_t tt_width = render_text_width(tt); // Potentially adjusted later.
 	size_t tt_height = FONT_HEIGHT;
-	size_t tt_pos_x = BORDER_WIDTH + (tt_max_width - tt_width) / 2;
 	size_t tt_pos_y = (TITLE_HEIGHT - FONT_HEIGHT) / 2 + 2;
 	uint32_t tt_color = title_color;
-	render_text(framebuffer_crop(window->buffer, tt_pos_x, tt_pos_y, tt_width, tt_height), tt, tt_color);
 
 	size_t border_width = window_border_width(window);
 	size_t button_width = FONT_WIDTH * 2;
@@ -174,6 +170,16 @@ void window_render_frame(struct window* window)
 		framebuffer_set_pixel(buttons_fb, bx + i - 1,
 		                      by + button_size - 1 - i, tt_color);
 	}
+
+	ssize_t tt_pos_x = (window->width - tt_width) / 2;
+	if ( tt_pos_x + tt_width > buttons_x )
+	{
+		tt_pos_x = border_width;
+		tt_width = buttons_x - border_width;
+		if ( tt_width < 0 )
+			tt_width = 0;
+	}
+	render_text(framebuffer_crop(window->buffer, tt_pos_x, tt_pos_y, tt_width, tt_height), tt, tt_color);
 }
 
 void window_move(struct window* window, size_t left, size_t top)
