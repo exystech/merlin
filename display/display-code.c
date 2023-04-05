@@ -603,14 +603,27 @@ void display_mouse_event(struct display* display, uint8_t byte)
 	display->pointer_x += xm;
 	display->pointer_y += ym;
 
+	bool clipped_edge = false;
 	if ( display->pointer_x < 0 )
+	{
 		display->pointer_x = 0;
+		clipped_edge = true;
+	}
 	if ( display->pointer_y < 0 )
+	{
 		display->pointer_y = 0;
-	if ( display->screen_width <= (size_t) display->pointer_x )
+		clipped_edge = true;
+	}
+	if ( display->screen_width < (size_t) display->pointer_x )
+	{
 		display->pointer_x = display->screen_width;
-	if ( display->screen_height <= (size_t) display->pointer_y )
+		clipped_edge = true;
+	}
+	if ( display->screen_height < (size_t) display->pointer_y )
+	{
 		display->pointer_y = display->screen_height;
+		clipped_edge = true;
+	}
 	xm = display->pointer_x - old_pointer_x;
 	ym = display->pointer_y - old_pointer_y;
 
@@ -695,13 +708,60 @@ void display_mouse_event(struct display* display, uint8_t byte)
 		}
 		if ( xm || ym )
 		{
+			bool floating = window->window_state == WINDOW_STATE_REGULAR;
+			bool on_edge = display->pointer_x == 0
+			            || display->pointer_y == 0
+			            || display->pointer_x
+						   == (ssize_t) display->screen_width
+			            || display->pointer_y
+						   == (ssize_t) display->screen_height;
 			switch ( display->mouse_state )
 			{
 			case MOUSE_STATE_NONE: break;
 			case MOUSE_STATE_TITLE_MOVE:
-				if ( window->window_state != WINDOW_STATE_REGULAR )
-					window_restore(window);
-				window_move(window, window->left + xm, window->top + ym);
+				if ( clipped_edge )
+				{
+					// I'd declare those in function scope but I'm afraid of
+					// messing with the code too much.
+					ssize_t x = display->pointer_x;
+					ssize_t y = display->pointer_y;
+
+					ssize_t sw = display->screen_width;
+					ssize_t sh = display->screen_height;
+
+					ssize_t corner_size = (sw < sh ? sw : sh) / 4;
+					if ( x < corner_size && y < corner_size )
+						window_tile_top_left(window);
+					else if (sw - x < corner_size && y < corner_size )
+						window_tile_top_right(window);
+					else if ( x < corner_size && sh - y < corner_size )
+						window_tile_bottom_left(window);
+					else if (sw - x < corner_size && sh - y < corner_size )
+						window_tile_bottom_right(window);
+					else if (x == 0)
+						window_tile_left(window);
+					else if (x == sw)
+						window_tile_right(window);
+					else if (y == 0)
+						window_tile_top(window);
+					else if (y == sh)
+						window_tile_bottom(window);
+				}
+				else if (floating || !on_edge)
+				{
+					if ( !floating )
+					{
+						// The current behaviour of window_restore becomes
+						// awkward with tiling gestures. I could change the
+						// function itself, especially since this is currently
+						// its only callsite, but the old behaviour could be
+						// nice for a future untile hotkey. Thus, this hack.
+						window_restore(window);
+						window->top = display->pointer_y - TITLE_HEIGHT / 2;
+						window->left = display->pointer_x - window->width / 2;
+					}
+					window_move(window, window->left + xm, window->top + ym);
+				}
 				break;
 			case MOUSE_STATE_RESIZE_TOP_LEFT:
 				window_drag_resize(window, xm, ym, -xm, -ym);
