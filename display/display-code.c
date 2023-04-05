@@ -651,20 +651,18 @@ void display_mouse_event(struct display* display, uint8_t byte)
 			      window_pointer_y <= (ssize_t) TITLE_HEIGHT) )
 			{
 				size_t border_width = window_border_width(window);
-				size_t button_size = FONT_WIDTH - 1;
-				size_t button_spacing = FONT_WIDTH;
-				ssize_t butbox_width = border_width
-				                     + (FONT_HEIGHT - button_size) / 2
-									 + 6 * button_spacing;
-				ssize_t x_from_right = window->width - window_pointer_x;
-				if ( x_from_right < butbox_width / 3 )
-					window_quit(window);
-				else if ( x_from_right < butbox_width * 2 / 3 )
-					window_toggle_maximized(window);
-				else if ( x_from_right < butbox_width )
+				size_t button_width = FONT_WIDTH * 2;
+				ssize_t buttons_x = window->width - border_width
+				                  - button_width * 3 + 1;
+				ssize_t rel_x = window_pointer_x - buttons_x;
+				if ( 0 <= rel_x && rel_x < (ssize_t) button_width )
 				{
 					// TODO Minimize window.
 				}
+				else if ( 0 <= rel_x && rel_x < (ssize_t) button_width * 2 )
+					window_toggle_maximized(window);
+				else if ( 0 <= rel_x && rel_x < (ssize_t) button_width * 3 )
+					window_quit(window);
 				else
 					display->mouse_state = MOUSE_STATE_TITLE_MOVE;
 			} else if ( window_pointer_x < 0 && window_pointer_y < 0 )

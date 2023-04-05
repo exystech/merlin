@@ -111,51 +111,68 @@ void window_render_frame(struct window* window)
 	render_text(framebuffer_crop(window->buffer, tt_pos_x, tt_pos_y, tt_width, tt_height), tt, tt_color);
 
 	size_t border_width = window_border_width(window);
-	size_t button_size = FONT_WIDTH - 1;
-	size_t button_spacing = FONT_WIDTH;
+	size_t button_width = FONT_WIDTH * 2;
+	size_t button_height = FONT_HEIGHT;
+	ssize_t buttons_x = window->width - border_width - button_width * 3 + 1;
 	struct framebuffer buttons_fb =
-		framebuffer_crop(window->buffer,
-		                 window->width - border_width - (FONT_HEIGHT - button_size) / 2 - 5 * button_spacing,
-		                 tt_pos_y, tt_width, tt_height);
-	size_t buttons_top = (FONT_HEIGHT - button_size) / 2;
+		framebuffer_crop(window->buffer, buttons_x,
+		                 tt_pos_y, button_width * 3, tt_height);
+	size_t button_size = FONT_WIDTH - 1;
+#if 0
+	for (size_t x = 0; x < button_width; x++)
+		for (size_t y = 0; y < button_height; y++)
+			framebuffer_set_pixel(buttons_fb, button_width * 0 + x, y, 0xFF8080FF);
+	for (size_t x = 0; x < button_width; x++)
+		for (size_t y = 0; y < button_height; y++)
+			framebuffer_set_pixel(buttons_fb, button_width * 1 + x, y, 0xFFFF8080);
+	for (size_t x = 0; x < button_width; x++)
+		for (size_t y = 0; y < button_height; y++)
+			framebuffer_set_pixel(buttons_fb, button_width * 2 + x, y, 0xFF8080FF);
+#endif
 	for ( size_t i = 0; i < button_size; i++ )
 	{
-		framebuffer_set_pixel(buttons_fb, 0 * button_spacing + i,
-		                      buttons_top + button_size - 1, tt_color);
-		framebuffer_set_pixel(buttons_fb, 0 * button_spacing + i,
-		                      buttons_top + button_size - 2, tt_color);
+		size_t bx = button_width * 0 + (button_width - button_size) / 2;
+		size_t by = (button_height - button_size) / 2;
+		framebuffer_set_pixel(buttons_fb, bx + i,
+		                      by + button_size - 1, tt_color);
+		framebuffer_set_pixel(buttons_fb, bx + i,
+		                      by + button_size - 2, tt_color);
 	}
 	for ( size_t i = 0; i < button_size; i++ )
 	{
-		framebuffer_set_pixel(buttons_fb, 2 * button_spacing + i,
-		                      buttons_top, tt_color);
-		framebuffer_set_pixel(buttons_fb, 2 * button_spacing + i,
-		                      buttons_top + button_size - 1 , tt_color);
-		framebuffer_set_pixel(buttons_fb, 2 * button_spacing,
-		                      buttons_top + i, tt_color);
-		framebuffer_set_pixel(buttons_fb, 2 * button_spacing + button_size - 1,
-		                      buttons_top + i, tt_color);
+		size_t bx = button_width * 1 + (button_width - button_size) / 2;
+		size_t by = (button_height - button_size) / 2;
+		framebuffer_set_pixel(buttons_fb, bx + i,
+		                      by, tt_color);
+		framebuffer_set_pixel(buttons_fb, bx + i,
+		                      by + button_size - 1 , tt_color);
+		framebuffer_set_pixel(buttons_fb, bx,
+		                      by + i, tt_color);
+		framebuffer_set_pixel(buttons_fb, bx + button_size - 1,
+		                      by + i, tt_color);
 
-		framebuffer_set_pixel(buttons_fb, 2 * button_spacing + i,
-		                      buttons_top + 1, tt_color);
-		framebuffer_set_pixel(buttons_fb, 2 * button_spacing + i,
-		                      buttons_top + button_size - 2 , tt_color);
-		framebuffer_set_pixel(buttons_fb, 2 * button_spacing + 1,
-		                      buttons_top + i, tt_color);
-		framebuffer_set_pixel(buttons_fb, 2 * button_spacing + button_size - 2,
-		                      buttons_top + i, tt_color);
+		framebuffer_set_pixel(buttons_fb, bx + i,
+		                      by + 1, tt_color);
+		framebuffer_set_pixel(buttons_fb, bx + i,
+		                      by + button_size - 2 , tt_color);
+		framebuffer_set_pixel(buttons_fb, bx + 1,
+		                      by + i, tt_color);
+		framebuffer_set_pixel(buttons_fb, bx + button_size - 2,
+		                      by + i, tt_color);
 	}
 	for ( size_t i = 0; i < button_size; i++ )
 	{
-		framebuffer_set_pixel(buttons_fb, 4 * button_spacing + i,
-		                      buttons_top + i, tt_color);
-		framebuffer_set_pixel(buttons_fb, 4 * button_spacing + i,
-		                      buttons_top + button_size - 1 - i, tt_color);
+		size_t bx = button_width * 2 + (button_width - button_size) / 2;
+		size_t by = (button_height - button_size) / 2;
+		framebuffer_set_pixel(buttons_fb, bx + i,
+		                      by + i, tt_color);
+		framebuffer_set_pixel(buttons_fb, bx + i,
+		                      by + button_size - 1 - i, tt_color);
 
-		framebuffer_set_pixel(buttons_fb, 4 * button_spacing + i + 1,
-		                      buttons_top + i, tt_color);
-		framebuffer_set_pixel(buttons_fb, 4 * button_spacing + i + 1,
-		                      buttons_top + button_size - 1 - i, tt_color);
+		framebuffer_set_pixel(buttons_fb, bx + i - 1,
+		                      by + i, tt_color);
+		framebuffer_set_pixel(buttons_fb, bx + i - 1,
+		                      by + button_size - 1 - i, tt_color);
 	}
 }
 
