@@ -171,13 +171,25 @@ void window_render_frame(struct window* window)
 		                      by + button_size - 1 - i, tt_color);
 	}
 
-	ssize_t tt_pos_x = (window->width - tt_width) / 2;
-	if ( tt_pos_x + tt_width > buttons_x )
+	ssize_t q = 500 - window->width;
+	ssize_t q_width = 200;
+	q = q < q_width ? q : q_width;
+	q = 0 < q ? q : 0;
+	ssize_t center_over = window->width - (button_width * 3 * q / q_width);
+	ssize_t tt_pos_x = (center_over - tt_width) / 2;
+#if 0
+	for (int y = 0; y < 10; y++)
+	{
+		framebuffer_set_pixel(window->buffer, window->width / 2, y, 0xFFFF0000);
+		framebuffer_set_pixel(window->buffer, (window->width - button_width * 3) / 2, y, 0xFFFF0000);
+		framebuffer_set_pixel(window->buffer, center_over/2, y, 0xFFFF00FF);
+	}
+#endif
+	if ( tt_pos_x < (ssize_t)border_width )
 	{
 		tt_pos_x = border_width;
 		tt_width = buttons_x - border_width;
-		if ( tt_width < 0 )
-			tt_width = 0;
+		tt_width = 0 < tt_width ? tt_width : 0;
 	}
 	render_text(framebuffer_crop(window->buffer, tt_pos_x, tt_pos_y, tt_width, tt_height), tt, tt_color);
 }
