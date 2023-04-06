@@ -760,7 +760,7 @@ int TTY::tcflow(ioctx_t* /*ctx*/, int action)
 	case TCOON: break; // TODO: Resume suspended output.
 	case TCIOFF: break; // TODO: Transmit STOP character.
 	case TCION: break; // TODO: Transmit START character.
-	default: return errno = EINVAL -1;
+	default: return errno = EINVAL, -1;
 	}
 	return 0;
 }

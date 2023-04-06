@@ -2016,7 +2016,7 @@ ssize_t TCPSocket::send_unlocked(ioctx_t* ctx,
 			if ( sockerr )
 				return errno = sockerr, -1;
 			if ( ctx->dflags & O_NONBLOCK )
-				return errno = EWOULDBLOCK;
+				return errno = EWOULDBLOCK, -1;
 			if ( !kthread_cond_wait_signal(&transmit_cond, &tcp_lock) )
 				return errno = EINTR, -1;
 		}

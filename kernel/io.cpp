@@ -282,7 +282,7 @@ int sys_ftruncate(int fd, off_t length)
 int sys_fstatat(int dirfd, const char* path, struct stat* st, int flags)
 {
 	if ( flags & ~(AT_SYMLINK_NOFOLLOW) )
-		return errno = EINVAL;
+		return errno = EINVAL, -1;
 	char* pathcopy = GetStringFromUser(path);
 	if ( !pathcopy )
 		return -1;
@@ -319,7 +319,7 @@ int sys_fstatvfs(int fd, struct statvfs* stvfs)
 int sys_fstatvfsat(int dirfd, const char* path, struct statvfs* stvfs, int flags)
 {
 	if ( flags & ~(AT_SYMLINK_NOFOLLOW) )
-		return errno = EINVAL;
+		return errno = EINVAL, -1;
 	char* pathcopy = GetStringFromUser(path);
 	if ( !pathcopy )
 		return -1;

@@ -114,7 +114,7 @@ int sys_sigaction(int signum,
                   struct sigaction* user_oldact)
 {
 	if ( signum < 0 || signum == 0 /* null signal */ || SIG_MAX_NUM <= signum )
-		return errno = EINVAL;
+		return errno = EINVAL, -1;
 
 	Process* process = CurrentProcess();
 	ScopedLock lock(&process->signal_lock);

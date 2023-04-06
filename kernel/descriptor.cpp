@@ -608,7 +608,7 @@ int Descriptor::utimens(ioctx_t* ctx, const struct timespec* user_times)
 		return -1;
 	if ( !valid_utimens_timespec(times[0]) ||
 	     !valid_utimens_timespec(times[1]) )
-		return errno = EINVAL;
+		return errno = EINVAL, -1;
 	// TODO: Regardless of dflags, check if the user/group can utimens.
 	return vnode->utimens(ctx, times);
 }
