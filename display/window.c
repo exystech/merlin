@@ -207,7 +207,7 @@ void window_client_resize(struct window* window,
 	if ( window->window_state != WINDOW_STATE_MINIMIZED )
 		window->window_state = WINDOW_STATE_REGULAR;
 
-	free(window->buffer.buffer);
+	struct framebuffer old_fb = window->buffer;
 
 	window->width = client_width + BORDER_WIDTH + BORDER_WIDTH;
 	window->height = client_height + TITLE_HEIGHT + BORDER_WIDTH;
@@ -217,7 +217,12 @@ void window_client_resize(struct window* window,
 	window->buffer.pitch = window->width;
 	window->buffer.buffer = (uint32_t*)
 		malloc(sizeof(uint32_t) * window->width * window->height);
-	memset(window->buffer.buffer, 0, sizeof(uint32_t) * window->width * window->height);
+	for ( size_t y = 0; y < window->height; y++ )
+		for ( size_t x = 0; x < window->width; x++ )
+			framebuffer_set_pixel(window->buffer, x, y,
+			                      framebuffer_get_pixel(old_fb, x, y));
+
+	free(old_fb.buffer);
 
 	window_render_frame(window);
 	window_notify_client_resize(window);
