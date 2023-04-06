@@ -1,7 +1,7 @@
 diff -Paur --no-dereference -- links.upstream/configure links/configure
 --- links.upstream/configure
 +++ links/configure
-@@ -122,7 +122,7 @@
+@@ -124,7 +124,7 @@
  includedir='${prefix}/include'
  oldincludedir='/usr/include'
  infodir='${prefix}/info'
@@ -10,7 +10,7 @@ diff -Paur --no-dereference -- links.upstream/configure links/configure
  
  # Initialize some other variables.
  subdirs=
-@@ -239,7 +239,7 @@
+@@ -241,7 +241,7 @@
    --includedir=DIR        C header files in DIR [PREFIX/include]
    --oldincludedir=DIR     C header files for non-gcc in DIR [/usr/include]
    --infodir=DIR           info documentation in DIR [PREFIX/info]
