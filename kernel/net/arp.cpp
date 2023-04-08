@@ -513,10 +513,12 @@ bool RouteIPEthernet(NetworkInterface* netif,
 {
 	struct ether_addr local_ether;
 	struct in_addr local_in;
+	struct in_addr local_router;
 	struct in_addr local_subnet;
 	kthread_mutex_lock(&netif->cfg_lock);
 	memcpy(&local_ether, &netif->cfg.ether.address, sizeof(struct ether_addr));
 	memcpy(&local_in, &netif->cfg.inet.address, sizeof(struct in_addr));
+	memcpy(&local_router, &netif->cfg.inet.router, sizeof(struct in_addr));
 	memcpy(&local_subnet, &netif->cfg.inet.subnet, sizeof(struct in_addr));
 	kthread_mutex_unlock(&netif->cfg_lock);
 	if ( be32toh(local_in.s_addr) == INADDR_ANY )
@@ -552,6 +554,13 @@ bool RouteIPEthernet(NetworkInterface* netif,
 	assert(!pkt->next);
 	if ( !(entry->status & ARP_STATUS_RESOLVING) && !Resolve(netif, entry) )
 		return false;
+	// If the address isn't resolved, try send to the router instead.
+	if ( dst->s_addr != local_router.s_addr &&
+	     local_router.s_addr != INADDR_ANY )
+	{
+		lock.Reset();
+		return RouteIPEthernet(netif, pkt, &local_router);
+	}
 	// Drop the packet if the transmission queue is full.
 	if ( ARP_MAX_PENDING <= entry->pending )
 		return true;
