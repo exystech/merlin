@@ -299,6 +299,17 @@ int main(int argc, char* argv[])
 
 	compact_arguments(&argc, &argv);
 
+	unsigned int xres = 0;
+	unsigned int yres = 0;
+	unsigned int bpp = 0;
+	if ( 2 <= argc )
+	{
+		if ( 2 < argc )
+			error(1, 0, "Unexpected extra operand");
+		if ( sscanf(argv[1], "%ux%ux%u", &xres, &yres, &bpp) != 3 )
+			error(1, 0, "Invalid video mode: %s", argv[1]);
+	}
+
 	int tty_fd = open("/dev/tty", O_RDWR);
 	if ( tty_fd < 0 )
 		error(1, errno, "/dev/tty");
@@ -349,6 +360,34 @@ retry_pick_mode:
 	decided = false;
 	first_render = true;
 	memset(&render_at, 0, sizeof(render_at));
+	if ( 2 <= argc )
+	{
+		bool found_other = true;
+		size_t other_selection = 0;
+		for ( size_t i = 0; i < num_modes; i++ )
+		{
+			if ( modes[i].view_xres == xres &&
+			     modes[i].view_yres == yres &&
+			     modes[i].fb_format == bpp )
+			{
+				selection = i;
+				decided = true;
+				break;
+			}
+			if ( modes[i].control & DISPMSG_CONTROL_OTHER_RESOLUTIONS )
+			{
+				found_other = true;
+				other_selection = i;
+			}
+		}
+		if ( !decided )
+		{
+			if ( found_other )
+				selection = other_selection;
+			else
+				error(1, 0, "No such available resolution: %s", argv[1]);
+		}
+	}
 	while ( !decided )
 	{
 		fflush(stdout);
@@ -495,10 +534,10 @@ retry_pick_mode:
 	struct dispmsg_crtc_mode mode = modes[selection];
 	if ( mode.control & DISPMSG_CONTROL_OTHER_RESOLUTIONS )
 	{
-		uintmax_t req_bpp;
-		uintmax_t req_width;
-		uintmax_t req_height;
-		while ( true )
+		uintmax_t req_bpp = bpp;
+		uintmax_t req_width = xres;
+		uintmax_t req_height = yres;
+		while ( argc < 2 )
 		{
 			printf("Enter video mode [BPP x WIDTH x HEIGHT]: ");
 			fflush(stdout);
@@ -525,12 +564,6 @@ retry_pick_mode:
 			(uintmax_t) mode.view_xres,
 			(uintmax_t) mode.view_yres);
 		goto retry_pick_mode;
-	}
-
-	if ( 1 < argc )
-	{
-		execvp(argv[1], argv + 1);
-		error(127, errno, "`%s'", argv[1]);
 	}
 
 	return 0;

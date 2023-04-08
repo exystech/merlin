@@ -20,19 +20,21 @@
 .Op Fl \-height Ns "=" Ns Ar height
 .Op Fl \-min-height Ns "=" Ns Ar min-height
 .Op Fl \-max-height Ns "=" Ns Ar max-height
-.Op Ar command ...
+.Op Ar videomode
 .Sh DESCRIPTION
 .Nm
 changes the video mode by displaying an interactive menu containing a list of
 available modes, with an additional entry for entering a custom mode (if
 supported by the driver).
-If the mode change succeeds and
-.Ar command
-is specified,
-.Ar command
-is executed.
 If the mode change fails, the menu is redisplayed until cancellation or a
 successful mode change.
+If the
+.Ar videomode
+argument is specified in the
+.Ar width Ns x Ns Ar height Ns x Ns Ar bits-per-pixel
+format per
+.Xr videomode 5 ,
+then the video mode is immediately set non-interactively.
 .Pp
 By default,
 .Nm
@@ -142,17 +144,9 @@ inclusive.
 .Nm
 exits with an exit status of 10 if the menu is quit, 11 if no modes are
 available, 12 if no modes are available after filtering, 13 if the terminal has
-no associated video devices, 127 if
-.Ar command
-failed to run, or 1 on any other error.
-If
+no associated video devices, or 1 on any other error.
 .Nm
-changes the video mode successfully,
-.Nm
-exits with the exit status of
-.Ar command
-if specified,
-or 0 otherwise.
+exits 0 if the video mode is successfully changed.
 .Sh SEE ALSO
 .Xr chkblayout 1 ,
 .Xr dispmsg_issue 2 ,
