@@ -317,7 +317,7 @@ diff_package() {(
   base=$(basename -- "$port")
   if [ -e "$base.upstream" ]; then
     announce "diff $base.upstream $base"
-    diff -Paur --no-dereference -- "$base.upstream" "$base" |
+    LC_ALL=C diff -Paur --no-dereference -- "$base.upstream" "$base" |
     sed -E -e '/^Only in.*$/d' -e 's/^((---|\+\+\+)[^\t]+)\t.*/\1/' \
     > "$base.patch"
     if [ ! -s "$base.patch" ]; then rm "$base.patch"; fi
