@@ -34,79 +34,67 @@
 static void password(char* buffer,
                      size_t buffer_size,
                      const char* whose,
-                     const char* question)
+                     const char* question,
+                     bool require_tty)
 {
-	if ( !isatty(0) )
+	bool is_tty = isatty(0);
+	if ( !require_tty && is_tty )
 		errx(1, "Input is not a terminal");
-	unsigned int termmode;
-	gettermmode(0, &termmode);
-	settermmode(0, termmode & ~TERMMODE_ECHO);
-	if ( whose )
-		printf("%s's ", whose);
-	printf("%s ", question);
-	fflush(stdout);
-	fflush(stdin);
+	unsigned int termmode = 0;
+	if ( is_tty )
+	{
+		gettermmode(0, &termmode);
+		settermmode(0, termmode & ~TERMMODE_ECHO);
+		if ( whose )
+			printf("%s's ", whose);
+		printf("%s ", question);
+		fflush(stdout);
+		fflush(stdin);
+	}
 	// TODO: This may leave a copy of the password in the stdio buffer.
 	fgets(buffer, buffer_size, stdin);
-	fflush(stdin);
-	printf("\n");
+	if ( is_tty )
+	{
+		fflush(stdin);
+		printf("\n");
+		settermmode(0, termmode);
+	}
 	size_t buffer_length = strlen(buffer);
 	if ( buffer_length && buffer[buffer_length-1] == '\n' )
 		buffer[--buffer_length] = '\0';
-	settermmode(0, termmode);
-}
-
-static void compact_arguments(int* argc, char*** argv)
-{
-	for ( int i = 0; i < *argc; i++ )
-	{
-		while ( i < *argc && !(*argv)[i] )
-		{
-			for ( int n = i; n < *argc; n++ )
-				(*argv)[n] = (*argv)[n+1];
-			(*argc)--;
-		}
-	}
 }
 
 int main(int argc, char* argv[])
 {
 	const char* cipher = "blowfish,a";
+	bool hash_password = false;
 
-	for ( int i = 1; i < argc; i++ )
+	int opt;
+	while ( (opt = getopt(argc, argv, "c:H")) != -1 )
 	{
-		const char* arg = argv[i];
-		if ( arg[0] != '-' || !arg[1] )
-			continue;
-		argv[i] = NULL;
-		if ( !strcmp(arg, "--") )
-			break;
-		if ( arg[1] != '-' )
+		switch ( opt )
 		{
-			char c;
-			while ( (c = *++arg) ) switch ( c )
-			{
-			case 'c':
-				if ( !*(cipher = arg + 1) )
-				{
-					if ( i + 1 == argc )
-						errx(125, "option requires an argument -- 'c'");
-					cipher = argv[i+1];
-					argv[++i] = NULL;
-				}
-				arg = "c";
-				break;
-			default:
-				errx(1, "unknown option -- '%c'", c);
-			}
-		}
-		else
-		{
-			errx(1, "unrecognized option: %s", arg);
+		case 'c': cipher = optarg; break;
+		case 'H': hash_password = true; break;
+		default: return 1;
 		}
 	}
 
-	compact_arguments(&argc, &argv);
+	if ( hash_password )
+	{
+		if ( argc - optind )
+			errx(1, "Unexpected extra operand");
+		char pass[128];
+		password(pass, sizeof(pass), NULL, "Enter password (will not echo)",
+		         false);
+		fgets(pass, sizeof(pass), stdin);
+		char newhash[128];
+		if ( crypt_newhash(pass, cipher, newhash, sizeof(newhash)) < 0 )
+			err(1, "crypt_newhash");
+		if ( printf("%s\n", newhash) < 0 || fflush(stdout) == EOF )
+			err(1, "stdout");
+		return 0;
+	}
 
 	uid_t my_uid = getuid();
 	char* my_username = getlogin();
@@ -116,9 +104,9 @@ int main(int argc, char* argv[])
 		err(1, "stdup");
 
 	const char* username;
-	if ( argc <= 1 )
+	if ( argc - optind <= 1 )
 		username = my_username;
-	else if ( argc <= 2 )
+	else if ( argc - optind <= 2 )
 		username = argv[1];
 	else
 		errx(1, "Unexpected extra operand");
@@ -139,16 +127,17 @@ int main(int argc, char* argv[])
 	{
 		char current[128];
 		password(current, sizeof(current), pwd->pw_name,
-		         "current password (will not echo)");
+		         "current password (will not echo)", true);
 		if ( crypt_checkpass(current, pwd->pw_passwd) < 0 )
 			errx(1, "Wrong password for '%s'", pwd->pw_name);
 		explicit_bzero(current, sizeof(current));
 	}
 
 	char first[128];
-	password(first, sizeof(first), NULL, "Enter new password (will not echo)");
+	password(first, sizeof(first), NULL, "Enter new password (will not echo)",
+	         true);
 	char second[128];
-	password(second, sizeof(second), NULL, "Enter new password (again)");
+	password(second, sizeof(second), NULL, "Enter new password (again)", true);
 	if ( strcmp(first, second) != 0 )
 		errx(1, "Passwords don't match");
 	explicit_bzero(second, sizeof(second));

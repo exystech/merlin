@@ -6,6 +6,7 @@
 .Nd change user password
 .Sh SYNOPSIS
 .Nm
+.Op Fl H
 .Op Fl c Ar cipher
 .Op Ar user
 .Sh DESCRIPTION
@@ -19,6 +20,11 @@ The options are as follows:
 .It Fl c Ar cipher
 Hash the password using the specified
 .Ar cipher .
+.It Fl H
+Read a password from the standard input and write the
+.Xr crypt_newpass 3
+hash to the standard output.
+The password database is unchanged.
 .El
 .Sh FILES
 .Bl -tag -width "/etc/passwd" -compact
