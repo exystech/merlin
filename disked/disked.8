@@ -6,7 +6,10 @@
 .Nd disk editor
 .Sh SYNOPSIS
 .Nm disked
+.Op Fl in
 .Op Fl \-fstab Ns "=" Ns Ar path
+.Op Ar device
+.Op Ar command ...
 .Sh DESCRIPTION
 .Nm
 is an interactive program that manages partition tables.
@@ -19,17 +22,22 @@ supports the Master Boot Record and GUID Partition Table partitioning schemes.
 .Pp
 .Nm
 provides an interactive command line.
-Its prompt shows the currently selected device (defaulting to the first device
-alphabetically) or
+Its prompt shows the currently selected
+.Ar device
+(defaulting to the first device alphabetically if any) or
 .Li (disked)
 if none is selected.
+If a
+.Ar command
+is specified on the command line, then that command is run with its arguments
+non-interactively instead of reading from the standard input.
+.Pp
 Commands perform their actions when run rather than waiting for the user to
 write out changes.
 .Nm
 only creates partitions aligned to 1 MiB boundaries whose size is a multiple of
 1 MiB.
 Unused regions are aligned and those smaller than the alignment are not shown.
-.Pp
 The options are as follows:
 .Bl -tag -width "12345678"
 .It Fl \-fstab Ns "=" Ns Ar path
@@ -39,6 +47,17 @@ instead of
 .Pa /etc/fstab
 as
 .Xr fstab 5 .
+.It Fl i
+Run in interactive mode with prompt with line editing.
+Commands will ask for missing parameters.
+This is the default if the standard input and output are terminals and a
+.Ar command
+is not specified on the command line.
+.It Fl n
+Run in non-interactive mode reading commands from the standard input.
+Commands will not ask for missing parameters and
+.Nm
+will immediately exit unsuccessfully if any command fail.
 .El
 .Pp
 The following commands are supported:
@@ -78,14 +97,19 @@ Partitions are counted from 1.
 Display this manual page if no operands are given, otherwise run
 .Xr man 1
 with the given command line.
-.It Sy mkpart
+.It Sy mkpart Ar hole Ar offset Ar length Ar filesystem Ar mountpoint
 Create a partition on the current device.
 If the partition table has multiple unused regions
 .Pq holes ,
 .Nm
-asks you which one to use.
-You need to specify the offset into the hole where the partition is created and
-then the length of the partition.
+asks you which
+.Ar hole
+(counting from 1) to use.
+You need to specify the
+.Ar offset
+into the hole where the partition is created and
+then the
+.Ar length of the partition.
 See
 .Sx QUANTITIES
 below on the possible partition offset and length values.
@@ -106,7 +130,9 @@ Use the existing disk data.
 .El
 .Pp
 If you format a mountable filesystem, then you will be asked if you want to
-create a mountpoint for the partition, which will be added to
+create a
+.Ar mountpoint
+for the partition, which will be added to
 .Xr fstab 5 .
 .It Sy mktable Oo mbr "|" gpt Oc
 Create a partition table on the current device of the specified type.

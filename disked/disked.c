@@ -240,6 +240,8 @@ static const char* device_name(const char* name)
 	return name;
 }
 
+static bool interactive;
+
 static void display_rows_columns(char* (*format)(void*, size_t, size_t),
                                  void* ctx, size_t rows, size_t columns)
 {
@@ -395,6 +397,8 @@ static void prompt(char* buffer,
                    const char* question,
                    const char* answer)
 {
+	if ( !interactive )
+		errx(1, "Cannot ask question in non-interactive mode: %s", question);
 	while ( true )
 	{
 		printf("\e[1m");
@@ -599,7 +603,6 @@ bool rewrite_finish(struct rewrite* rewr)
 	return true;
 }
 
-static bool interactive;
 static bool quitting;
 static struct harddisk** hds;
 static size_t hds_count;
@@ -1132,6 +1135,25 @@ static void switch_device(struct harddisk* hd)
 	scan_device();
 }
 
+static bool lookup_harddisk_by_string(struct harddisk** out,
+                                      const char* argv0,
+                                      const char* name)
+{
+	for ( size_t i = 0; i < hds_count; i++ )
+	{
+		char buf[sizeof(i) * 3];
+		snprintf(buf, sizeof(buf), "%zu", i);
+		if ( strcmp(name, hds[i]->path) != 0 &&
+		     strcmp(name, device_name(hds[i]->path)) != 0 &&
+		     strcmp(name, buf) != 0 )
+			continue;
+		*out = hds[i];
+		return true;
+	}
+	command_errorx("%s: No such device `%s'", argv0, name);
+	return false;
+}
+
 static bool lookup_partition_by_string(struct partition** out,
                                        const char* argv0,
                                        const char* numstr)
@@ -1573,8 +1595,6 @@ static char* display_hole_format(void* ctx, size_t row, size_t column)
 
 static void on_mkpart(size_t argc, char** argv)
 {
-	(void) argc;
-	(void) argv;
 	size_t num_holes = 0;
 	struct device_area* hole = NULL;
 	for ( size_t i = 0; i < current_areas_count; i++ )
@@ -1598,8 +1618,11 @@ static void on_mkpart(size_t argc, char** argv)
 		char answer[sizeof(size_t) * 3];
 		while ( true )
 		{
-			prompt(answer, sizeof(answer),
-			       "Which hole to create the partition inside?", "1");
+			if ( 2 <= argc )
+				strlcpy(answer, argv[1], sizeof(answer));
+			else
+				prompt(answer, sizeof(answer),
+				       "Which hole to create the partition inside?", "1");
 			char* end;
 			unsigned long num = strtoul(answer, &end, 10);
 			if ( *end || num_holes < num )
@@ -1618,7 +1641,8 @@ static void on_mkpart(size_t argc, char** argv)
 			}
 			break;
 		}
-		printf("\n");
+		if ( argc < 2 )
+			printf("\n");
 	}
 	unsigned int slot = 0;
 	if ( current_pt_type == PARTITION_TABLE_TYPE_MBR && hole->inside_extended )
@@ -1678,54 +1702,68 @@ static void on_mkpart(size_t argc, char** argv)
 	assert(start_str); // TODO: Error handling.
 	char* length_str = format_bytes_amount((uintmax_t) hole->length);
 	assert(length_str); // TODO: Error handling.
-	printf("Creating partition inside hole at %s of length %s (100%%)\n",
-	       start_str, length_str);
+	if ( argc < 3 )
+		printf("Creating partition inside hole at %s of length %s (100%%)\n",
+		       start_str, length_str);
 	free(start_str);
 	free(length_str);
 	off_t start;
 	while ( true )
 	{
 		char answer[256];
-		prompt(answer, sizeof(answer),
-		       "Free space before partition? (42%/15G/...)", "0%");
+		if ( 3 <= argc )
+			strlcpy(answer, argv[2], sizeof(answer));
+		else
+			prompt(answer, sizeof(answer),
+			       "Free space before partition? (42%/15G/...)", "0%");
 		if ( !parse_disk_quantity(&start, answer, hole->length) )
 		{
-			fprintf(stderr, "Invalid quantity `%s'.\n", answer);
+			command_errorx("%s: %s: Invalid quantity: %s",
+			               argv[0], device_name(current_hd->path), answer);
 			continue;
 		}
 		if ( start == hole->length )
 		{
-			fprintf(stderr, "Answer was all free space, but need space for the "
-			                "partition itself.\n");
+			command_errorx("%s: %s: Answer was all free space, but need space "
+			               "for the partition itself",
+			               argv[0], device_name(current_hd->path));
 			continue;
 		}
 		break;
 	}
-	printf("\n");
+	if ( argc < 3 )
+		printf("\n");
 	off_t max_length = hole->length - start;
 	off_t length;
 	length_str = format_bytes_amount((uintmax_t) max_length);
 	assert(length_str);
-	printf("Partition size can be at most %s (100%%).\n", length_str);
+	if ( argc < 4 )
+		printf("Partition size can be at most %s (100%%).\n", length_str);
 	free(length_str);
 	while ( true )
 	{
 		char answer[256];
-		prompt(answer, sizeof(answer),
-		       "Partition size? (42%/15G/...)", "100%");
+		if ( 4 <= argc )
+			strlcpy(answer, argv[3], sizeof(answer));
+		else
+			prompt(answer, sizeof(answer),
+			       "Partition size? (42%/15G/...)", "100%");
 		if ( !parse_disk_quantity(&length, answer, max_length) )
 		{
-			fprintf(stderr, "Invalid quantity `%s'.\n", answer);
+			command_errorx("%s: %s: Invalid quantity: %s",
+			               argv[0], device_name(current_hd->path), answer);
 			continue;
 		}
 		if ( length == 0 )
 		{
-			fprintf(stderr, "Answer was zero (or rounded down to zero).\n");
+			command_errorx("%s: %s: Length was zero (or rounded down to zero)",
+			               argv[0], device_name(current_hd->path));
 			continue;
 		}
 		break;
 	}
-	printf("\n");
+	if ( argc < 4 )
+		printf("\n");
 	char fstype[256];
 	while ( true )
 	{
@@ -1736,13 +1774,17 @@ static void on_mkpart(size_t argc, char** argv)
 			question = "Format a filesystem? (no/ext2/extended)";
 		else if ( is_gpt )
 			question = "Format a filesystem? (no/ext2/biosboot)";
-		prompt(fstype, sizeof(fstype), question, "ext2");
+		if ( 5 <= argc )
+			strlcpy(fstype, argv[4], sizeof(fstype));
+		else
+			prompt(fstype, sizeof(fstype), question, "ext2");
 		if ( strcmp(fstype, "no") != 0 &&
 		     strcmp(fstype, "ext2") != 0 &&
 		     (!is_mbr || strcmp(fstype, "extended") != 0) &&
 		     (!is_gpt || strcmp(fstype, "biosboot") != 0) )
 		{
-			fprintf(stderr, "Invalid filesystem choice `%s'.\n", fstype);
+			command_errorx("%s: %s: Invalid filesystem choice: %s",
+			               argv[0], device_name(current_hd->path), fstype);
 			continue;
 		}
 		if ( !strcmp(fstype, "extended") )
@@ -1762,27 +1804,27 @@ static void on_mkpart(size_t argc, char** argv)
 	bool mountable = !strcmp(fstype, "ext2");
 	while ( mountable )
 	{
-		prompt(mountpoint, sizeof(mountpoint),
-		       "Where to mount partition? (mountpoint or 'no')", "no");
+		if ( 6 <= argc )
+			strlcpy(mountpoint, argv[5], sizeof(mountpoint));
+		else
+			prompt(mountpoint, sizeof(mountpoint),
+			       "Where to mount partition? (mountpoint or 'no')", "no");
 		if ( !strcmp(mountpoint, "no") )
 		{
 			mountpoint[0] = '\0';
 			break;
 		}
-		if ( !strcmp(mountpoint, "mountpoint") )
-		{
-			printf("Then answer which mountpoint.\n");
-			continue;
-		}
 		if ( !verify_mountpoint(mountpoint) )
 		{
-			fprintf(stderr, "Invalid mountpoint `%s'.\n", fstype);
+			command_errorx("%s: %s: Invalid mountpoint: %s",
+	                       argv[0], device_name(current_hd->path), mountpoint);
 			continue;
 		}
 		simplify_mountpoint(mountpoint);
 		break;
 	}
-	printf("\n");
+	if ( mountable && argc < 6 )
+		printf("\n");
 	size_t renumbered_partitions = 0;
 	if ( current_pt_type == PARTITION_TABLE_TYPE_MBR && hole->inside_extended )
 	{
@@ -2696,14 +2738,8 @@ static const struct command commands[] =
 };
 static const size_t commands_count = sizeof(commands) / sizeof(commands[0]);
 
-void execute(char* cmd)
+static void execute_argv(int argc, char** argv)
 {
-	size_t argc = 0;
-	char* argv[256];
-	split_arguments(cmd, &argc, argv, 255);
-	if ( argc < 1 )
-		return;
-	argv[argc] = NULL;
 	for ( size_t i = 0; i < commands_count; i++ )
 	{
 		if ( strcmp(argv[0], commands[i].name) != 0 )
@@ -2738,6 +2774,17 @@ void execute(char* cmd)
 	                "Try `help' for more information.\n", argv[0]);
 }
 
+static void execute(char* cmd)
+{
+	size_t argc = 0;
+	char* argv[256];
+	split_arguments(cmd, &argc, argv, 255);
+	if ( argc < 1 )
+		return;
+	argv[argc] = NULL;
+	execute_argv(argc, argv);
+}
+
 static void compact_arguments(int* argc, char*** argv)
 {
 	for ( int i = 0; i < *argc; i++ )
@@ -2766,6 +2813,8 @@ int main(int argc, char* argv[])
 {
 	setlocale(LC_ALL, "");
 
+	bool set_interactive = false;
+
 	const char* argv0 = argv[0];
 	for ( int i = 1; i < argc; i++ )
 	{
@@ -2780,6 +2829,8 @@ int main(int argc, char* argv[])
 			char c;
 			while ( (c = *++arg) ) switch ( c )
 			{
+			case 'i': interactive = true; set_interactive = true; break;
+			case 'n': interactive = false; set_interactive = true; break;
 			default:
 				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
 				help(stderr, argv0);
@@ -2813,20 +2864,30 @@ int main(int argc, char* argv[])
 
 	compact_arguments(&argc, &argv);
 
-	interactive = isatty(0) && isatty(1);
+	if ( !set_interactive )
+		interactive = isatty(0) && isatty(1) && argc < 3;
 
 	if ( !devices_open_all(&hds, &hds_count) )
 		err(1, "iterating devices");
 
 	qsort(hds, hds_count, sizeof(struct harddisk*), harddisk_compare_path);
 
-	if ( 1 <= hds_count )
+	if ( 2 <= argc )
+	{
+		struct harddisk* hd;
+		if ( !lookup_harddisk_by_string(&hd, argv[0], argv[1]) )
+			exit(1);
+		switch_device(hd);
+	}
+	else if ( 1 <= hds_count )
 		switch_device(hds[0]);
 
 	char* line = NULL;
 	size_t line_size = 0;
 	ssize_t line_length;
-	while ( !quitting )
+	if ( 3 <= argc )
+		execute_argv(argc - 2, argv + 2);
+	else while ( !quitting )
 	{
 		if ( interactive )
 		{
@@ -2855,4 +2916,6 @@ int main(int argc, char* argv[])
 	for ( size_t i = 0; i < hds_count; i++ )
 		harddisk_close(hds[i]);
 	free(hds);
+
+	return 0;
 }
