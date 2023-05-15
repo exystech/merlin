@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2023 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,6 +24,7 @@
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <ioleast.h>
 #include <locale.h>
 #include <stdbool.h>
@@ -32,59 +34,31 @@
 #include <unistd.h>
 #include <termios.h>
 
-static void compact_arguments(int* argc, char*** argv)
-{
-	for ( int i = 0; i < *argc; i++ )
-	{
-		while ( i < *argc && !(*argv)[i] )
-		{
-			for ( int n = i; n < *argc; n++ )
-				(*argv)[n] = (*argv)[n+1];
-			(*argc)--;
-		}
-	}
-}
-
 int main(int argc, char* argv[])
 {
 	bool list = false;
 
 	setlocale(LC_ALL, "");
 
-	const char* argv0 = argv[0];
-	for ( int i = 1; i < argc; i++ )
+	const struct option longopts[] =
 	{
-		const char* arg = argv[i];
-		if ( arg[0] != '-' || !arg[1] )
-			continue;
-		argv[i] = NULL;
-		if ( !strcmp(arg, "--") )
-			break;
-		if ( arg[1] != '-' )
+		{"list", no_argument, NULL, 'l'},
+		{0, 0, 0, 0}
+	};
+	const char* opts = "l";
+	int opt;
+	while ( (opt = getopt_long(argc, argv, opts, longopts, NULL)) != -1 )
+	{
+		switch ( opt )
 		{
-			char c;
-			while ( (c = *++arg) ) switch ( c )
-			{
-			case 'l': list = true; break;
-			default:
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				exit(1);
-			}
-		}
-		else if ( !strcmp(arg, "--list") )
-			list = true;
-		else
-		{
-			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			exit(1);
+		case 'l': list = true; break;
+		default: return 1;
 		}
 	}
 
-	compact_arguments(&argc, &argv);
-
 	if ( list )
 	{
-		if ( 2 <= argc )
+		if ( 0 < argc - optind )
 			errx(1, "unexpected extra operand");
 		execlp("ls", "ls", "/share/kblayout", (const char*) NULL);
 		err(127, "ls");
@@ -93,42 +67,44 @@ int main(int argc, char* argv[])
 	const char* tty_path = "/dev/tty";
 	int tty_fd = open(tty_path, O_WRONLY);
 	if ( tty_fd < 0 )
-		error(1, errno, "`%s'", tty_path);
+		err(1, "%s", tty_path);
 	if ( !isatty(tty_fd) )
-		error(1, errno, "`%s'", tty_path);
+		err(1, "%s", tty_path);
 
-	if ( argc == 1 )
-		error(1, 0, "expected new keyboard layout");
+	if ( argc - optind == 0 )
+		errx(1, "expected new keyboard layout");
+	if ( 1 < argc - optind )
+		errx(1, "unexpected extra operand");
 
-	const char* kblayout_path = argv[1];
+	const char* kblayout_path = argv[optind];
 	if ( !strchr(kblayout_path, '/') )
 	{
 		char* new_kblayout_path;
 		if ( asprintf(&new_kblayout_path, "/share/kblayout/%s", kblayout_path) < 0 )
-			error(1, errno, "asprintf");
+			err(1, "asprintf");
 		kblayout_path = new_kblayout_path;
 	}
 	int kblayout_fd = open(kblayout_path, O_RDONLY);
 	if ( kblayout_fd < 0 )
-		error(1, errno, "`%s'", kblayout_path);
+		err(1, "%s", kblayout_path);
 
 	struct stat kblayout_st;
 	if ( fstat(kblayout_fd, &kblayout_st) < 0 )
-		error(1, errno, "stat: `%s'", kblayout_path);
+		err(1, "stat: %s", kblayout_path);
 
-	if ( SIZE_MAX < (size_t) kblayout_st.st_size )
-		error(1, EFBIG, "`%s'", kblayout_path);
+	if ( (size_t) kblayout_st.st_size != (uintmax_t) kblayout_st.st_size )
+		error(1, EFBIG, "%s", kblayout_path);
 
 	size_t kblayout_size = (size_t) kblayout_st.st_size;
 	unsigned char* kblayout = (unsigned char*) malloc(kblayout_size);
 	if ( !kblayout )
-		error(1, errno, "malloc");
+		err(1, "malloc");
 	if ( readall(kblayout_fd, kblayout, kblayout_size) != kblayout_size )
-		error(1, errno, "read: `%s'", kblayout_path);
+		err(1, "read: %s", kblayout_path);
 	close(kblayout_fd);
 
 	if ( tcsetblob(tty_fd, "kblayout", kblayout, kblayout_size) < 0 )
-		error(1, errno, "tcsetblob(\"kblayout\", `%s')", kblayout_path);
+		err(1, "tcsetblob: kblayout: %s:", kblayout_path);
 
 	free(kblayout);
 
