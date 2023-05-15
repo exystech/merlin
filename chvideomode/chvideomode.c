@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2023 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,8 +25,9 @@
 #include <sys/wait.h>
 
 #include <errno.h>
-#include <error.h>
+#include <err.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <inttypes.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -39,7 +41,7 @@
 static uint64_t device;
 static uint64_t connector;
 
-bool SetCurrentMode(struct dispmsg_crtc_mode mode)
+static bool set_current_mode(struct dispmsg_crtc_mode mode)
 {
 	struct dispmsg_set_crtc_mode msg;
 	msg.msgid = DISPMSG_SET_CRTC_MODE;
@@ -49,7 +51,7 @@ bool SetCurrentMode(struct dispmsg_crtc_mode mode)
 	return dispmsg_issue(&msg, sizeof(msg)) == 0;
 }
 
-struct dispmsg_crtc_mode* GetAvailableModes(size_t* num_modes_ptr)
+static struct dispmsg_crtc_mode* get_available_modes(size_t* num_modes_ptr)
 {
 	struct dispmsg_get_crtc_modes msg;
 	msg.msgid = DISPMSG_GET_CRTC_MODES;
@@ -98,7 +100,8 @@ struct filter
 	size_t maxychars;
 };
 
-bool mode_passes_filter(struct dispmsg_crtc_mode mode, struct filter* filter)
+static bool mode_passes_filter(struct dispmsg_crtc_mode mode,
+                               struct filter* filter)
 {
 	if ( filter->include_all )
 		return true;
@@ -130,7 +133,7 @@ bool mode_passes_filter(struct dispmsg_crtc_mode mode, struct filter* filter)
 	return true;
 }
 
-void filter_modes(struct dispmsg_crtc_mode* modes, size_t* num_modes_ptr, struct filter* filter)
+static void filter_modes(struct dispmsg_crtc_mode* modes, size_t* num_modes_ptr, struct filter* filter)
 {
 	size_t in_num = *num_modes_ptr;
 	size_t out_num = 0;
@@ -142,104 +145,44 @@ void filter_modes(struct dispmsg_crtc_mode* modes, size_t* num_modes_ptr, struct
 	*num_modes_ptr = out_num;
 }
 
-size_t parse_size_t(const char* str, size_t def)
+static size_t parse_size_t(const char* str)
 {
-	if ( !str || !*str )
-		return def;
 	char* endptr;
-	size_t ret = (size_t) strtoumax(str, &endptr, 10);
-	if ( *endptr )
-		return def;
-	return ret;
+	errno = 0;
+	uintmax_t parsed = strtoumax(str, &endptr, 10);
+	if ( !*str || *endptr )
+		errx(1, "Invalid integer argument: %s", str);
+	if ( errno == ERANGE || (size_t) parsed != parsed )
+		errx(1, "Integer argument too large: %s", str);
+	return (size_t) parsed;
 }
 
-bool parse_bool(const char* str, bool def)
+static bool parse_bool(const char* str)
 {
-	if ( !str || !*str )
-		return def;
-	bool isfalse = !strcmp(str, "0") || !strcmp(str, "false");
-	return !isfalse;
-}
-
-static void compact_arguments(int* argc, char*** argv)
-{
-	for ( int i = 0; i < *argc; i++ )
-	{
-		while ( i < *argc && !(*argv)[i] )
-		{
-			for ( int n = i; n < *argc; n++ )
-				(*argv)[n] = (*argv)[n+1];
-			(*argc)--;
-		}
-	}
-}
-
-bool string_parameter(const char* option,
-                      const char* arg,
-                      int argc,
-                      char** argv,
-                      int* ip,
-                      const char* argv0,
-                      const char** result)
-{
-	size_t option_len = strlen(option);
-	if ( strncmp(option, arg, option_len) != 0 )
+	if ( !strcmp(str, "0") || !strcmp(str, "false") )
 		return false;
-	if ( arg[option_len] == '=' )
-		return *result = arg + option_len + 1, true;
-	if ( arg[option_len] != '\0' )
-		return false;
-	if ( *ip + 1 == argc )
-	{
-		fprintf(stderr, "%s: expected operand after `%s'\n", argv0, option);
-		exit(1);
-	}
-	*result = argv[++*ip];
-	argv[*ip] = NULL;
-	return true;
+	if ( !strcmp(str, "1") || !strcmp(str, "true") )
+		return true;
+	errx(1, "Invalid boolean argument: %s", str);
 }
 
-bool minmax_parameter(const char* option,
-                      const char* min_option,
-                      const char* max_option,
-                      const char* arg,
-                      int argc,
-                      char** argv,
-                      int* ip,
-                      const char* argv0,
-                      size_t* min_result,
-                      size_t* max_result)
+enum longopt
 {
-	const char* parameter;
-	if ( string_parameter(option, arg, argc, argv, ip, argv0, &parameter) )
-		return *min_result = *max_result = parse_size_t(parameter, 0), true;
-	if ( string_parameter(min_option, arg, argc, argv, ip, argv0, &parameter) )
-		return *min_result = parse_size_t(parameter, 0), true;
-	if ( string_parameter(max_option, arg, argc, argv, ip, argv0, &parameter) )
-		return *max_result = parse_size_t(parameter, 0), true;
-	return false;
-}
-
-#define MINMAX_PARAMETER(option, min_result, max_result) \
-        minmax_parameter("--" option, "--min-" option, "--max-" option, arg, \
-                         argc, argv, &i, argv0, min_result, max_result)
-
-bool bool_parameter(const char* option,
-                    const char* arg,
-                    int argc,
-                    char** argv,
-                    int* ip,
-                    const char* argv0,
-                    bool* result)
-{
-	const char* parameter;
-	if ( string_parameter(option, arg, argc, argv, ip, argv0, &parameter) )
-		return *result = parse_bool(parameter, false), true;
-	return false;
-}
-
-#define BOOL_PARAMETER(option, result) \
-        bool_parameter("--" option, arg, argc, argv, &i, argv0, result)
+	OPT_SHOW_ALL = 128,
+	OPT_SHOW_SUPPORTED,
+	OPT_SHOW_UNSUPPORTED,
+	OPT_SHOW_TEXT,
+	OPT_SHOW_GRAPHICS,
+	OPT_BPP,
+	OPT_MIN_BPP,
+	OPT_MAX_BPP,
+	OPT_WIDTH,
+	OPT_MIN_WIDTH,
+	OPT_MAX_WIDTH,
+	OPT_HEIGHT,
+	OPT_MIN_HEIGHT,
+	OPT_MAX_HEIGHT,
+};
 
 int main(int argc, char* argv[])
 {
@@ -263,56 +206,68 @@ int main(int argc, char* argv[])
 	filter.minychars = 0;
 	filter.maxychars = SIZE_MAX;
 
-	const char* argv0 = argv[0];
-	for ( int i = 1; i < argc; i++ )
+	const struct option longopts[] =
 	{
-		const char* arg = argv[i];
-		if ( arg[0] != '-' || !arg[1] )
-			break; // Intentionally not continue.
-		argv[i] = NULL;
-		if ( !strcmp(arg, "--") )
-			break;
-		if ( arg[1] != '-' )
+		{"show-all", required_argument, NULL, OPT_SHOW_ALL},
+		{"show-supported", required_argument, NULL, OPT_SHOW_SUPPORTED},
+		{"show-unsupported", required_argument, NULL, OPT_SHOW_UNSUPPORTED},
+		{"show-text", required_argument, NULL, OPT_SHOW_TEXT},
+		{"show-graphics", required_argument, NULL, OPT_SHOW_GRAPHICS},
+		{"bpp", required_argument, NULL, OPT_BPP},
+		{"min-bpp", required_argument, NULL, OPT_MIN_BPP},
+		{"max-bpp", required_argument, NULL, OPT_MAX_BPP},
+		{"width", required_argument, NULL, OPT_WIDTH},
+		{"min-width", required_argument, NULL, OPT_MIN_WIDTH},
+		{"max-width", required_argument, NULL, OPT_MAX_WIDTH},
+		{"height", required_argument, NULL, OPT_HEIGHT},
+		{"min-height", required_argument, NULL, OPT_MIN_HEIGHT},
+		{"max-height", required_argument, NULL, OPT_MAX_HEIGHT},
+		{0, 0, 0, 0}
+	};
+	const char* opts = "";
+	int opt;
+	while ( (opt = getopt_long(argc, argv, opts, longopts, NULL)) != -1 )
+	{
+		switch (opt)
 		{
-			char c;
-			while ( (c = *++arg) ) switch ( c )
-			{
-			default:
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				exit(1);
-			}
-		}
-		else if ( BOOL_PARAMETER("show-all", &filter.include_all) ) { }
-		else if ( BOOL_PARAMETER("show-supported", &filter.include_supported) ) { }
-		else if ( BOOL_PARAMETER("show-unsupported", &filter.include_unsupported) ) { }
-		else if ( BOOL_PARAMETER("show-text", &filter.include_text) ) { }
-		else if ( BOOL_PARAMETER("show-graphics", &filter.include_graphics) ) { }
-		else if ( MINMAX_PARAMETER("bpp", &filter.minbpp, &filter.maxbpp) ) { }
-		else if ( MINMAX_PARAMETER("width", &filter.minxres, &filter.maxxres) ) { }
-		else if ( MINMAX_PARAMETER("height", &filter.minyres, &filter.maxyres) ) { }
-		else
-		{
-			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			exit(1);
+		case OPT_SHOW_ALL: filter.include_all = parse_bool(optarg); break;
+		case OPT_SHOW_SUPPORTED:
+			filter.include_supported = parse_bool(optarg); break;
+		case OPT_SHOW_UNSUPPORTED:
+			filter.include_unsupported = parse_bool(optarg); break;
+		case OPT_SHOW_TEXT: filter.include_text = parse_bool(optarg); break;
+		case OPT_SHOW_GRAPHICS:
+			filter.include_graphics = parse_bool(optarg); break;
+		case OPT_BPP:
+			filter.minbpp = filter.maxbpp = parse_size_t(optarg); break;
+		case OPT_MIN_BPP: filter.minbpp = parse_size_t(optarg); break;
+		case OPT_MAX_BPP: filter.maxbpp = parse_size_t(optarg); break;
+		case OPT_WIDTH:
+			filter.minxres = filter.maxxres = parse_size_t(optarg); break;
+		case OPT_MIN_WIDTH: filter.minxres = parse_size_t(optarg); break;
+		case OPT_MAX_WIDTH: filter.maxxres = parse_size_t(optarg); break;
+		case OPT_HEIGHT:
+			filter.minyres = filter.maxyres = parse_size_t(optarg); break;
+		case OPT_MIN_HEIGHT: filter.minyres = parse_size_t(optarg); break;
+		case OPT_MAX_HEIGHT: filter.maxyres = parse_size_t(optarg); break;
+		default: return 1;
 		}
 	}
-
-	compact_arguments(&argc, &argv);
 
 	unsigned int xres = 0;
 	unsigned int yres = 0;
 	unsigned int bpp = 0;
-	if ( 2 <= argc )
+	if ( 1 <= argc - optind )
 	{
-		if ( 2 < argc )
-			error(1, 0, "Unexpected extra operand");
-		if ( sscanf(argv[1], "%ux%ux%u", &xres, &yres, &bpp) != 3 )
-			error(1, 0, "Invalid video mode: %s", argv[1]);
+		if ( 1 < argc - optind )
+			errx(1, "Unexpected extra operand");
+		if ( sscanf(argv[optind], "%ux%ux%u", &xres, &yres, &bpp) != 3 )
+			errx(1, "Invalid video mode: %s", argv[optind]);
 	}
 
 	int tty_fd = open("/dev/tty", O_RDWR);
 	if ( tty_fd < 0 )
-		error(1, errno, "/dev/tty");
+		err(1, "/dev/tty");
 	struct tiocgdisplay display;
 	struct tiocgdisplays gdisplays;
 	memset(&gdisplays, 0, sizeof(gdisplays));
@@ -327,9 +282,9 @@ int main(int argc, char* argv[])
 	connector = display.connector;
 
 	size_t num_modes = 0;
-	struct dispmsg_crtc_mode* modes = GetAvailableModes(&num_modes);
+	struct dispmsg_crtc_mode* modes = get_available_modes(&num_modes);
 	if ( !modes )
-		error(1, errno, "Unable to detect available video modes");
+		err(1, "Unable to detect available video modes");
 
 	if ( !num_modes )
 	{
@@ -360,7 +315,7 @@ retry_pick_mode:
 	decided = false;
 	first_render = true;
 	memset(&render_at, 0, sizeof(render_at));
-	if ( 2 <= argc )
+	if ( 1 <= argc - optind )
 	{
 		bool found_other = true;
 		size_t other_selection = 0;
@@ -385,7 +340,7 @@ retry_pick_mode:
 			if ( found_other )
 				selection = other_selection;
 			else
-				error(1, 0, "No such available resolution: %s", argv[1]);
+				err(1, "No such available resolution: %s", argv[optind]);
 		}
 	}
 	while ( !decided )
@@ -466,10 +421,10 @@ retry_pick_mode:
 
 		unsigned int oldtermmode;
 		if ( gettermmode(0, &oldtermmode) < 0 )
-			error(1, errno, "gettermmode");
+			err(1, "gettermmode");
 
 		if ( settermmode(0, TERMMODE_KBKEY | TERMMODE_UNICODE | TERMMODE_SIGNAL) < 0 )
-			error(1, errno, "settermmode");
+			err(1, "settermmode");
 
 		bool redraw = false;
 		while ( !redraw && !decided )
@@ -477,7 +432,7 @@ retry_pick_mode:
 			uint32_t codepoint;
 			ssize_t numbytes = read(0, &codepoint, sizeof(codepoint));
 			if ( numbytes < 0 )
-				error(1, errno, "read");
+				err(1, "read");
 
 			int kbkey = KBKEY_DECODE(codepoint);
 			if ( kbkey )
@@ -486,7 +441,7 @@ retry_pick_mode:
 				{
 				case KBKEY_ESC:
 					if ( settermmode(0, oldtermmode) < 0 )
-						error(1, errno, "settermmode");
+						err(1, "settermmode");
 					printf("\n");
 					exit(10);
 					break;
@@ -506,7 +461,7 @@ retry_pick_mode:
 					break;
 				case KBKEY_ENTER:
 					if ( settermmode(0, oldtermmode) < 0 )
-						error(1, errno, "settermmode");
+						err(1, "settermmode");
 					fgetc(stdin);
 					printf("\n");
 					decided = true;
@@ -528,7 +483,7 @@ retry_pick_mode:
 		}
 
 		if ( settermmode(0, oldtermmode) < 0 )
-			error(1, errno, "settermmode");
+			err(1, "settermmode");
 	}
 
 	struct dispmsg_crtc_mode mode = modes[selection];
@@ -537,7 +492,7 @@ retry_pick_mode:
 		uintmax_t req_bpp = bpp;
 		uintmax_t req_width = xres;
 		uintmax_t req_height = yres;
-		while ( argc < 2 )
+		while ( argc - optind < 1 )
 		{
 			printf("Enter video mode [BPP x WIDTH x HEIGHT]: ");
 			fflush(stdout);
@@ -557,12 +512,13 @@ retry_pick_mode:
 		mode.control |= DISPMSG_CONTROL_VALID;
 	}
 
-	if ( !SetCurrentMode(mode) )
+	if ( !set_current_mode(mode) )
 	{
-		error(0, mode_set_error = errno, "Unable to set video mode %ju x %ju x %ju",
-			(uintmax_t) mode.fb_format,
-			(uintmax_t) mode.view_xres,
-			(uintmax_t) mode.view_yres);
+		mode_set_error = errno;
+		warn("Unable to set video mode %ju x %ju x %ju",
+		     (uintmax_t) mode.fb_format,
+		     (uintmax_t) mode.view_xres,
+		     (uintmax_t) mode.view_yres);
 		goto retry_pick_mode;
 	}
 
