@@ -1,0 +1,203 @@
+.Dd April 23, 2023
+.Dt AUTOUPGRADE.CONF 5
+.Os
+.Sh NAME
+.Nm autoupgrade.conf
+.Nd automatic upgrade configuration
+.Sh SYNOPSIS
+.Nm /etc/autoupgrade.conf
+.Sh DESCRIPTION
+.Nm
+configures
+.Xr sysupgrade 8
+to do an automatic operating system
+.Xr upgrade 7 .
+.Pp
+The system administrator can automate operating system upgrades by
+following
+.Xr release-iso-modification 7
+to embed the
+.Pa /etc/autoupgrade.conf
+file into the release cdrom filesystem.
+New installations can similarly be automatically installed using
+.Xr autoinstall.conf 5 .
+.Pp
+Each line is formatted as
+.Ar question Ns = Ns Ar answer
+which provides an
+.Ar answer
+to a
+.Ar question
+asked during upgrading.
+Alternatively
+.Ar question Ns += Ns Ar answer
+appends to an existing answer (if any) separated by a space, and
+.Ar question Ns ++= Ns Ar answer
+appends another line to an existing answer (if any).
+Empty lines and lines starting with
+.Sq #
+are comments and are ignored.
+Otherwise whitespace is significant.
+The empty answer accepts the default answer (if any) and is different from no
+answer, which makes
+.Xr sysupgrade 8
+ask the question normally.
+Upgrades can be made fully non-interactive using
+.Sy accept_defaults .
+.Pp
+Each question has a counterpart question suffixed with
+.Sq "!"
+which contains a
+.Xr sh 1
+script that is executed before the question is asked.
+If the original question isn't answered, then the script's standard output
+is used as the answer to the original question.
+The upgrade aborts if the script exits unsuccessfully.
+These scripts are useful to customize the upgrades with arbitrary code.
+.Pp
+The questions in chronological order are as follows:
+.Bl -tag -width "12345678"
+.It Sy accept_defaults Ns "=" Ns Oo Sy no "|" yes Oc ( default Sy no )
+Accept the default answer (if any) to questions that were not
+configured in
+.Nm ?
+This feature makes upgrades entirely automated even if unexpected questions
+are asked, although the essential questions must be answered.
+.It Sy countdown Ns "=" Ns Ar seconds No ( default Li 10 )
+Count down for this many
+.Ar seconds
+with a warning that an automated upgrade is about to happen?
+The countdown happens if
+.Sy accept_defaults=yes
+or if the
+.Sy ready
+and
+.Sy confirm_upgrrade
+questions are answered.
+.It Sy ignore_missing_programs Ns "=" Ns Oo Sy no "|" yes Oc ( default Sy no )
+Ignore if the upgrader environment does not have the needed ports installed?
+This situation ordinarily does not happen.
+.It Sy ready Ns "=" Ns Ar affirmation
+Are you ready to begin the upgrade process?
+This is a human readable positive affirmation of your choice that you're ready
+to upgrade, useful for fully automated upgrades.
+Not answering this question is useful for semi-automated upgrades where one
+would acknowledge the upgrades before it's begun.
+It also provides the opportunity to escape to a shell before upgrading.
+.Pp
+The
+.Sy "ready!"
+question is convenient for running shell commands before the upgrade begins.
+.It Sy kblayout Ns "=" Ns Oo Sy default "|" Ar layout Oc ( default Sy default )
+Switch to this keyboard
+.Ar layout
+using
+.Xr chkblayout 1 ?
+.It Sy videomode Ns "=" Ns Oo Sy no "|" Sy yes "|" Ar WIDTH Ns x Ns Ar HEIGHT Ns x Ns Ar BPP Oc ( default Sy yes )
+Interactively select a graphics resolution using
+.Xr chvideomode 1
+or non-interactively set it to the specified resolution?
+.Pp
+If the upgrade is non-interactive with
+.Sy accept_defaults=true ,
+then the default is instead
+.Sy no .
+.It Sy run_installer_instead Ns "=" Ns Oo Sy no "|" yes Oc ( default Sy yes )
+Run the
+.Xr sysinstall 8
+installer instead if no installations were found?
+.Pp
+This answer is useful combined with
+.Xr autoinstall.conf 5
+to either install or upgrade the operating system, regardless of what is already
+installed on the machine.
+.It Sy which_installaton Ns "=" Ns Ar block-device
+The name of the
+.Ar block-device
+containing the root filesystem to upgrade?
+This question is only asked if multiple installations were found.
+.It Sy switch_architecture Ns "=" Ns Oo Sy no "|" yes Oc ( default Sy no )
+Switch the installation to another architecture?
+.Pp
+Such upgrades are not supported and may corrupt the installation.
+.It Sy downgrade_release Ns "=" Ns Oo Sy no "|" yes Oc ( default Sy no )
+Downgrade the installation to an earlier release?
+.Pp
+Such upgrades are not supported and may corrupt the installation.
+.It Sy skip_release Ns "=" Ns Oo Sy no "|" yes Oc ( default Sy no )
+Skip upgrading to a release that ordinarily must be upgraded to first?
+.Pp
+Such upgrades are not supported and may corrupt the installation.
+.It Sy downgrade_abi Ns "=" Ns Oo Sy no "|" yes Oc ( default Sy no )
+Downgrade the installation to an earlier ABI?
+.Pp
+Such upgrades are not supported and may corrupt the installation.
+.It Sy cancel_pending_sysmerge Ns "=" Ns Oo Sy no "|" yes Oc ( default Sy yes )
+Cancel an existing pending
+.Xr sysmerge 8
+upgrade?
+.It Sy confirm_upgrade Ns "=" Ns Oo Sy no "|" Sy yes "|" Sy exit "|" Sy poweroff "|" Sy reboot "|" Sy halt Oc ( default Sy yes )
+Upgrade the operating system or abort the upgrade?
+This is the final confirmation before the operating system is upgraded.
+.Pp
+The
+.Sy "confirm_upgrade!"
+question is convenient for running shell commands before the upgrade step.
+The working directory is the root filesystem of the installation with all
+filesystems mounted.
+Note how
+.Xr chroot 8
+command may not work as intended at this point since the ABI may have
+incompatibly changed.
+.It Sy finally Ns "=" Ns Oo Sy exit "|" Sy poweroff "|" Sy reboot "|" Sy halt "|" Sy boot Oc ( default Sy boot )
+What action should be taken when the upgrade is finished?
+.Pp
+The
+.Sy "finally!"
+question is convenient for running shell commands once the upgrade is
+complete to customize the upgraded installation.
+The working directory is the root filesystem of the installation with all
+filesystems mounted.
+The
+.Li "chroot -d ."
+command is useful to
+.Xr chroot 8
+into the root filesystem to run commands with the
+.Pa /dev
+filesystem mounted.
+.El
+.Sh FILES
+.Bl -tag -width "/etc/autoupgrade.conf" -compact
+.It Pa /etc/autoupgrade.conf
+Automatic upgrade configuration.
+.El
+.Sh EXAMPLES
+.Ss Fully automated upgrade
+To perform a fully automated upgrade with, create
+.Pa autoupgrade.conf :
+.Bd -literal -offset indent
+accept_defaults=yes
+.Ed
+.Pp
+Then follow
+.Xr release-iso-modification 7
+to configure the upgrade medium:
+.Bd -literal -offset indent
+tix-iso-liveconfig --autoupgrade=autoupgrade.conf liveconfig
+tix-iso-bootconfig \\
+  --liveconfig=liveconfig --default=1 --random-seed \\
+  bootconfig
+tix-iso-add sortix.iso bootconfig -o autosortix.iso
+.Ed
+.Pp
+The resulting
+.Pa autosortix.iso
+image will then automatically upgrade the operating system on whatever machine
+it is booted on.
+.Sh SEE ALSO
+.Xr autoinstall.conf 5 ,
+.Xr upgrade.conf 5 ,
+.Xr release-iso-modification 7 ,
+.Xr upgrade 7 ,
+.Xr sysupgrade 8 ,
+.Xr tix 8

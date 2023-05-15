@@ -185,6 +185,9 @@ set version="$version"
 set machine="$machine"
 set base_menu_title="Sortix \$version for \$machine"
 set menu_title="\$base_menu_title"
+set title_single_user='live environment'
+set title_sysinstall='new installation'
+set title_sysupgrade='upgrade existing installation'
 set timeout=10
 set default="0"
 if [ -e /boot/random.seed ]; then
@@ -202,6 +205,9 @@ export version
 export machine
 export base_menu_title
 export menu_title
+export title_single_user
+export title_sysinstall
+export title_sysupgrade
 export timeout
 export default
 export no_random_seed
@@ -412,9 +418,9 @@ menu_title="\$base_menu_title"
 hook_menu_pre
 EOF
 
-menuentry "live environment" '-- /sbin/init'
-menuentry "new installation" '-- /sbin/init --target=sysinstall'
-menuentry "upgrade existing installation" '-- /sbin/init --target=sysupgrade'
+menuentry "\$title_single_user" '-- /sbin/init'
+menuentry "\$title_sysinstall" '-- /sbin/init --target=sysinstall'
+menuentry "\$title_sysupgrade" '-- /sbin/init --target=sysupgrade'
 
 cat << EOF
 

@@ -130,7 +130,15 @@ if $random_seed; then
   fi
 fi
 
+has_autoinstall=false
+has_autoupgrade=false
 if [ -n "$liveconfig" ]; then
+  if [ -e "$liveconfig/etc/autoinstall.conf" ]; then
+    has_autoinstall=true
+  fi
+  if [ -e "$liveconfig/etc/autoupgrade.conf" ]; then
+    has_autoupgrade=true
+  fi
   mkdir -p -- "$directory/boot"
   (cd "$liveconfig" && tar -c -f- -- *) > "$directory/boot/liveconfig.tar"
   rm -f -- "$directory/boot/liveconfig.tar.xz"
@@ -146,6 +154,12 @@ mkdir -p -- "$directory/boot/grub"
  fi
  if [ -n "$timeout" ]; then
    printf 'timeout="%s"\n' "$timeout"
+ fi
+ if $has_autoinstall; then
+   echo "title_sysinstall='***AUTOMATIC INSTALLATION***'"
+ fi
+ if $has_autoupgrade; then
+   echo "title_sysupgrade='***AUTOMATIC UPGRADE***'"
  fi
  print_enable_default_bool "$enable_dhclient" dhclient dhclient
  print_enable_default "$enable_network_drivers" network_drivers network-drivers

@@ -31,6 +31,7 @@
 #include <termios.h>
 #include <wchar.h>
 
+#include "autoconf.h"
 #include "execute.h"
 #include "interactive.h"
 
@@ -158,7 +159,7 @@ void promptx(char* buffer,
              const char* answer,
              bool catch_if_shell)
 {
-	(void) autoconf_name;
+	char* autoconf_answer = autoconf_eval(autoconf_name);
 	while ( true )
 	{
 		printf("\e[1m");
@@ -169,6 +170,26 @@ void promptx(char* buffer,
 		else
 			printf(" ");
 		fflush(stdout);
+		const char* accept_defaults = autoconf_get("accept_defaults");
+		const char* automatic_answer = NULL;
+		if ( autoconf_answer )
+		{
+			automatic_answer = autoconf_answer;
+			if ( !automatic_answer[0] )
+				automatic_answer = answer;
+		}
+		else if ( accept_defaults && !strcasecmp(accept_defaults, "yes") )
+			automatic_answer = answer;
+		if ( automatic_answer )
+		{
+			printf("\e[93m");
+			printf("%s\n", automatic_answer);
+			printf("\e[m");
+			fflush(stdout);
+			strlcpy(buffer, automatic_answer, buffer_size);
+			free(autoconf_answer);
+			return;
+		}
 		fgets(buffer, buffer_size, stdin);
 		printf("\e[22m");
 		fflush(stdout);
@@ -200,6 +221,7 @@ void promptx(char* buffer,
 		}
 		break;
 	}
+	free(autoconf_answer);
 }
 
 void password(char* buffer,

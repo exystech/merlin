@@ -34,6 +34,7 @@
 #include <fstab.h>
 #include <limits.h>
 #include <pwd.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,6 +54,7 @@
 #include <mount/partition.h>
 #include <mount/uuid.h>
 
+#include "autoconf.h"
 #include "conf.h"
 #include "devices.h"
 #include "execute.h"
@@ -376,6 +378,12 @@ void exit_handler(void)
 		execute((const char*[]) { "rm", "-rf", etc, NULL }, "");
 }
 
+static void cancel_on_sigint(int signum)
+{
+	(void) signum;
+	errx(2, "fatal: Installation canceled");
+}
+
 int main(void)
 {
 	shlvl();
@@ -413,10 +421,53 @@ int main(void)
 	if ( !conf_load(&conf, "/etc/upgrade.conf") && errno != ENOENT )
 		warn("/etc/upgrade.conf");
 
+	autoconf_load("/etc/autoinstall.conf");
+
+	char* accepts_defaults = autoconf_eval("accept_defaults");
+	bool non_interactive = accepts_defaults &&
+	                       !strcasecmp(accepts_defaults, "yes");
+	free(accepts_defaults);
+
 	static char input[256];
 
 	textf("Hello and welcome to the " BRAND_DISTRIBUTION_NAME " " VERSIONSTR ""
 	      " installer for %s.\n\n", uts.machine);
+
+	if ( non_interactive ||
+	     (autoconf_has("ready") &&
+	      (autoconf_has("disked") || autoconf_has("confirm_install"))) )
+	{
+		int countdown = 10;
+		if ( autoconf_has("countdown") )
+		{
+			char* string = autoconf_eval("countdown");
+			countdown = atoi(string);
+			free(string);
+		}
+		sigset_t old_set;
+		sigset_t new_set;
+		sigemptyset(&new_set);
+		sigaddset(&new_set, SIGINT);
+		sigprocmask(SIG_BLOCK, &new_set, &old_set);
+		struct sigaction old_sa;
+		struct sigaction new_sa = { 0 };
+		new_sa.sa_handler = cancel_on_sigint;
+		sigaction(SIGINT, &new_sa, &old_sa);
+		for ( ; 0 < countdown; countdown-- )
+		{
+			textf("Automatically installing " BRAND_DISTRIBUTION_NAME " "
+			      VERSIONSTR " in %i %s... (Control-C to cancel)\n", countdown,
+			      countdown != 1 ? "seconds" : "second");
+			sigprocmask(SIG_SETMASK, &old_set, NULL);
+			sleep(1);
+			sigprocmask(SIG_BLOCK, &new_set, &old_set);
+		}
+		textf("Automatically installing " BRAND_DISTRIBUTION_NAME " "
+		      VERSIONSTR "...\n");
+		text("\n");
+		sigaction(SIGINT, &old_sa, NULL);
+		sigprocmask(SIG_SETMASK, &old_set, NULL);
+	}
 
 	// '|' rather than '||' is to ensure side effects.
 	if ( missing_program("cut") |
@@ -469,6 +520,12 @@ int main(void)
 	};
 	size_t num_readies = sizeof(readies) / sizeof(readies[0]);
 	const char* ready = readies[arc4random_uniform(num_readies)];
+	if ( autoconf_has("disked") )
+		text("Warning: This installer will perform automatic harddisk "
+		     "partitioning!\n");
+	if ( autoconf_has("confirm_install") )
+		text("Warning: This installer will automatically install an operating "
+		     "system!\n");
 	prompt(input, sizeof(input), "ready", "Ready?", ready);
 	text("\n");
 
@@ -574,24 +631,26 @@ int main(void)
 				good = true;
 			}
 		}
-		const char* def = good ? "no" : "yes";
+		const char* def = non_interactive || good ? "no" : "yes";
 		while ( true )
 		{
 			prompt(input, sizeof(input), "videomode",
-			       "Select a default display resolution? (yes/no)", def);
-			if ( strcasecmp(input, "no") && strcasecmp(input, "yes") )
+			       "Select display resolution? "
+			       "(yes/no/WIDTHxHEIGHTxBPP)", def);
+			unsigned int xres, yres, bpp;
+			bool set = sscanf(input, "%ux%ux%u", &xres, &yres, &bpp) == 3;
+			if ( !strcasecmp(input, "no") )
+			{
+				input[0] = '\0';
+				break;
+			}
+			const char* r = set ? input : NULL;
+			if ( execute((const char*[]) { "chvideomode", r, NULL }, "f") != 0 )
 				continue;
-			bool was_no = strcasecmp(input, "no") == 0;
 			input[0] = '\0';
-			if ( was_no )
-				break;
-			if ( execute((const char*[]) { "chvideomode", NULL }, "f") != 0 )
-				continue;
-			if ( dispmsg_issue(&get_mode, sizeof(get_mode)) < 0 )
-				break;
-			if ( !(get_mode.mode.control & DISPMSG_CONTROL_VALID) )
-				break;
-			if ( get_mode.mode.control & DISPMSG_CONTROL_VGA )
+			if ( dispmsg_issue(&get_mode, sizeof(get_mode)) < 0 ||
+			     !(get_mode.mode.control & DISPMSG_CONTROL_VALID) ||
+			     get_mode.mode.control & DISPMSG_CONTROL_VGA )
 				break;
 			snprintf(input, sizeof(input), "%ux%ux%u",
 			         get_mode.mode.view_xres,
@@ -654,14 +713,23 @@ int main(void)
 		text("\n");
 		while ( true )
 		{
+			const char* def =
+				non_interactive &&
+				!autoconf_has("grub_password_hash") ? "no" : "yes";
 			prompt(accept_grub_password, sizeof(accept_grub_password),
 			       "grub_password",
-			       "Password protect interactive bootloader? (yes/no)", "yes");
+			       "Password protect interactive bootloader? (yes/no)", def);
 			if ( strcasecmp(accept_grub_password, "no") == 0 ||
 			     strcasecmp(accept_grub_password, "yes") == 0 )
 				break;
 		}
-		while ( !strcasecmp(accept_grub_password, "yes") )
+		if ( autoconf_has("grub_password_hash") )
+		{
+			char* hash = autoconf_eval("grub_password_hash");
+			install_configurationf("grubpw", "w", "%s\n", hash);
+			free(hash);
+		}
+		else while ( !strcasecmp(accept_grub_password, "yes") )
 		{
 			char first[128];
 			char second[128];
@@ -730,14 +798,17 @@ int main(void)
 			text("Type man to display the disked(8) man page.\n");
 		not_first = true;
 		const char* argv[] = { "disked", "--fstab=fstab", NULL };
-		if ( execute(argv, "f") != 0 )
+		char* disked_input = autoconf_eval("disked");
+		if ( execute(argv, "fi", disked_input) != 0 )
 		{
+			free(disked_input);
 			// TODO: We also end up here on SIGINT.
 			// TODO: Offer a shell here instead of failing?
 			warnx("partitioning failed");
 			sleep(1);
 			continue;
 		}
+		free(disked_input);
 		free_mountpoints(mountpoints, mountpoints_used);
 		mountpoints = NULL;
 		mountpoints_used = 0;
@@ -969,6 +1040,8 @@ int main(void)
 	else while ( true )
 	{
 		char defhost[HOST_NAME_MAX + 1] = "";
+		if ( non_interactive )
+			gethostname(defhost, sizeof(defhost));
 		FILE* defhost_fp = fopen("etc/hostname", "r");
 		if ( defhost_fp )
 		{
@@ -1002,6 +1075,24 @@ int main(void)
 	     passwd_has_name("etc/passwd", "root") )
 	{
 		textf("Root account already exists, skipping creating it.\n");
+	}
+	else if ( non_interactive || autoconf_has("password_hash_root") )
+	{
+		char* hash = autoconf_eval("password_hash_root");
+		if ( !hash && !(hash = strdup("x")) )
+			err(2, "malloc");
+		if ( !install_configurationf("etc/passwd", "a",
+			"root:%s:0:0:root:/root:sh\n"
+			"include /etc/default/passwd.d/*\n", hash) )
+			err(2, "etc/passwd");
+		textf("User '%s' added to /etc/passwd\n", "root");
+		if ( !install_configurationf("etc/group", "a",
+			"root::0:root\n"
+			"include /etc/default/group.d/*\n") )
+			err(2, "etc/passwd");
+		install_skel("/root", 0, 0);
+		textf("Group '%s' added to /etc/group.\n", "root");
+		free(hash);
 	}
 	else while ( true )
 	{
@@ -1112,8 +1203,9 @@ int main(void)
 	text("Congratulations, the system is now functional! This is a good time "
 	     "to do further customization of the system.\n\n");
 
+	// TODO: autoconf users support.
 	bool made_user = false;
-	for ( uid_t uid = 1000; true; )
+	for ( uid_t uid = 1000; !has_autoconf; )
 	{
 		while ( passwd_has_uid("etc/passwd", uid) )
 			uid++;
@@ -1195,7 +1287,9 @@ int main(void)
 		uid++;
 		made_user = true;
 	}
-	text("\n");
+	// TODO: autoconf support.
+	if ( !has_autoconf )
+		text("\n");
 
 	// TODO: Ask if networking should be disabled / enabled.
 
@@ -1303,7 +1397,7 @@ int main(void)
 			!access_or_die("/etc/sshd_config", F_OK);
 		while ( true )
 		{
-			prompt(input, sizeof(input), "enable_ssh",
+			prompt(input, sizeof(input), "enable_sshd",
 			       "Enable ssh server? (yes/no)",
 			       might_want_sshd ? "yes" : "no");
 			if ( strcasecmp(input, "no") == 0 )
@@ -1356,7 +1450,7 @@ int main(void)
 		bool enable_sshd_password = false;
 		while ( true )
 		{
-			prompt(input, sizeof(input), "enable_ssh_password",
+			prompt(input, sizeof(input), "enable_sshd_password",
 				   "Enable sshd password authentication? (yes/no)", "no");
 			if ( strcasecmp(input, "no") == 0 )
 				break;
@@ -1374,7 +1468,7 @@ int main(void)
 		}
 		while ( enable_sshd_password )
 		{
-			prompt(input, sizeof(input), "enable_ssh_root_password",
+			prompt(input, sizeof(input), "enable_sshd_root_password",
 				   "Enable sshd password authentication for root? (yes/no)",
 			       "no");
 			if ( strcasecmp(input, "no") == 0 )
