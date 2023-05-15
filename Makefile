@@ -11,6 +11,8 @@ libmount \
 bench \
 carray \
 checksum \
+chkblayout \
+chvideomode \
 dhclient \
 disked \
 dnsconfig \

@@ -13,10 +13,8 @@ CPPFLAGS:=$(CPPFLAGS) -DVERSIONSTR=\"$(VERSION)\"
 BINARIES_EXCEPT_INSTALL:=\
 basename \
 cat \
-chkblayout \
 chmod \
 chown \
-chvideomode \
 clear \
 colormake \
 column \
@@ -81,8 +79,6 @@ $(BINARIES_EXCEPT_INSTALL) \
 xinstall
 
 MANPAGES1=\
-chkblayout.1 \
-chvideomode.1 \
 kernelinfo.1 \
 logname.1 \
 nc.1 \
