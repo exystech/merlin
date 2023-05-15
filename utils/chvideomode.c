@@ -221,7 +221,7 @@ bool minmax_parameter(const char* option,
 }
 
 #define MINMAX_PARAMETER(option, min_result, max_result) \
-        minmax_parameter("--" option, "--min-" option, "--max" option, arg, \
+        minmax_parameter("--" option, "--min-" option, "--max-" option, arg, \
                          argc, argv, &i, argv0, min_result, max_result)
 
 bool bool_parameter(const char* option,
