@@ -154,7 +154,7 @@ int getopt_long(int argc, char* const* argv, const char* shortopts,
 		// Check whether the next argument is the parameter to this option.
 		if ( !option_arg && option->has_arg != no_argument )
 		{
-			if ( optind + 1 < argc && argv[optind] &&
+			if ( optind < argc && argv[optind] &&
 			     (option->has_arg == required_argument || argv[optind][0] != '-') )
 				option_arg = argv[optind++];
 		}
