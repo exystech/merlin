@@ -405,10 +405,10 @@ retry_pick_mode:
 			printf("\e[2K");
 			printf(" [%-*zu] ", num_modes_display_length, index);
 			if ( modes[i].control & DISPMSG_CONTROL_VALID )
-				printf("%u x %u x %u",
-					modes[i].fb_format,
-					modes[i].view_xres,
-					modes[i].view_yres);
+				printf("%ux%ux%u",
+				       modes[i].view_xres,
+				       modes[i].view_yres,
+				       modes[i].fb_format);
 			else if ( modes[i].control & DISPMSG_CONTROL_OTHER_RESOLUTIONS )
 				printf("(enter a custom resolution)");
 			else
@@ -494,9 +494,9 @@ retry_pick_mode:
 		uintmax_t req_height = yres;
 		while ( argc - optind < 1 )
 		{
-			printf("Enter video mode [BPP x WIDTH x HEIGHT]: ");
+			printf("Enter video mode [WIDTHxHEIGHTxBPP]: ");
 			fflush(stdout);
-			if ( scanf("%ju x %ju x %ju", &req_bpp, &req_width, &req_height) != 3 )
+			if ( scanf("%jux%jux%ju", &req_width, &req_height, &req_bpp) != 3 )
 			{
 				fgetc(stdin);
 				fflush(stdin);
@@ -515,10 +515,10 @@ retry_pick_mode:
 	if ( !set_current_mode(mode) )
 	{
 		mode_set_error = errno;
-		warn("Unable to set video mode %ju x %ju x %ju",
-		     (uintmax_t) mode.fb_format,
+		warn("Unable to set video mode %jux%jux%ju",
 		     (uintmax_t) mode.view_xres,
-		     (uintmax_t) mode.view_yres);
+		     (uintmax_t) mode.view_yres,
+		     (uintmax_t) mode.fb_format);
 		goto retry_pick_mode;
 	}
 
