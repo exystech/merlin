@@ -1534,21 +1534,37 @@ int main(void)
 	while ( true )
 	{
 		prompt(input, sizeof(input), "finally",
-		       "What now? (poweroff/reboot/halt/boot)", "boot");
-		if ( !strcasecmp(input, "poweroff") )
+		       "What now? (exit/poweroff/reboot/halt/boot/chroot)", "boot");
+		if ( !strcasecmp(input, "exit") )
 			exit(0);
-		if ( !strcasecmp(input, "reboot") )
+		else if ( !strcasecmp(input, "poweroff") )
+			exit(0);
+		else if ( !strcasecmp(input, "reboot") )
 			exit(1);
-		if ( !strcasecmp(input, "halt") )
+		else if ( !strcasecmp(input, "halt") )
 			exit(2);
-		if ( !strcasecmp(input, "boot") )
+		else if ( !strcasecmp(input, "boot") )
+		{
+			if ( !access("/etc/fstab", F_OK) )
+			{
+				printf("Only a live environment can reinit installations.\n");
+				continue;
+			}
+			execute((const char*[]) {"mkdir", "-p", "/etc/init", NULL }, "ef");
+			execute((const char*[]) {"cp", "etc/fstab", "/etc/fstab", NULL },
+			        "ef");
+			execute((const char*[]) {"sh", "-c",
+			                         "echo 'require chain exit-code' > "
+			                         "/etc/init/default", NULL },
+			        "ef");
+			exit(3);
+		}
+		else if ( !strcasecmp(input, "chroot") )
 		{
 			unmount_all_but_root();
 			unsetenv("SYSINSTALL_TARGET");
 			unsetenv("SHLVL");
 			unsetenv("INIT_PID");
-			// TODO: If / is a kernel ramfs, and this is a live environment,
-			//       then uninstall the base system to save memory.
 			exit(execute((const char*[]) { "chroot", "-d", fs,
 			                               "/sbin/init", NULL }, "f"));
 		}

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -322,6 +322,7 @@ static void signal_handler(int signum)
 	case SIGINT: caught_exit_signal = 1; break;
 	case SIGTERM: caught_exit_signal = 0; break;
 	case SIGQUIT: caught_exit_signal = 2; break;
+	case SIGHUP: caught_exit_signal = 3; break;
 	}
 }
 
@@ -331,11 +332,13 @@ static void install_signal_handler(void)
 	sigaddset(&handled_signals, SIGINT);
 	sigaddset(&handled_signals, SIGQUIT);
 	sigaddset(&handled_signals, SIGTERM);
+	sigaddset(&handled_signals, SIGHUP);
 	sigprocmask(SIG_BLOCK, &handled_signals, NULL);
 	struct sigaction sa = { .sa_handler = signal_handler, .sa_flags = 0 };
 	sigaction(SIGINT, &sa, NULL);
 	sigaction(SIGQUIT, &sa, NULL);
 	sigaction(SIGTERM, &sa, NULL);
+	sigaction(SIGHUP, &sa, NULL);
 }
 
 static void uninstall_signal_handler(void)
@@ -346,6 +349,7 @@ static void uninstall_signal_handler(void)
 	sigaction(SIGINT, &sa, NULL);
 	sigaction(SIGQUIT, &sa, NULL);
 	sigaction(SIGTERM, &sa, NULL);
+	sigaction(SIGHUP, &sa, NULL);
 	sigprocmask(SIG_UNBLOCK, &handled_signals, NULL);
 }
 
@@ -1596,7 +1600,7 @@ static bool daemon_is_failed(struct daemon* daemon)
 		       WEXITSTATUS(daemon->exit_code) != 0;
 	case EXIT_CODE_MEANING_POWEROFF_REBOOT:
 		return !WIFEXITED(daemon->exit_code) ||
-		       3 <= WEXITSTATUS(daemon->exit_code);
+		       4 <= WEXITSTATUS(daemon->exit_code);
 	}
 	return true;
 }
@@ -2340,6 +2344,8 @@ static void init(void)
 				log_status("stopped", "Rebooting...\n");
 			else if ( caught_exit_signal == 2 )
 				log_status("stopped", "Halting...\n");
+			else if ( caught_exit_signal == 3 )
+				log_status("stopped", "Reinitializing...\n");
 			else
 				log_status("stopped", "Exiting %i...\n", caught_exit_signal);
 			if ( default_daemon->state != DAEMON_STATE_FINISHING &&
@@ -2542,7 +2548,11 @@ static void init(void)
 	sigprocmask(SIG_SETMASK, &saved_mask, NULL);
 
 	if ( default_daemon_exit_code != -1 )
-		daemon_find_by_name("default")->exit_code = default_daemon_exit_code;
+	{
+		struct daemon* default_daemon = daemon_find_by_name("default");
+		default_daemon->exit_code = default_daemon_exit_code;
+		default_daemon->exit_code_meaning = EXIT_CODE_MEANING_POWEROFF_REBOOT;
+	}
 }
 
 static void write_random_seed(void)
@@ -3366,6 +3376,14 @@ static void niht(void)
 	}
 }
 
+static void reinit(void)
+{
+	niht();
+	const char* argv[] = { "init", NULL };
+	execv("/sbin/init", (char* const*) argv);
+	fatal("Failed to load init during reinit: %s: %m", argv[0]);
+}
+
 int main(int argc, char* argv[])
 {
 	main_pid = getpid();
@@ -3659,11 +3677,8 @@ int main(int argc, char* argv[])
 		else if ( !WIFEXITED(status) )
 			fatal("Automatic upgrade failed: Unexpected unusual termination");
 		// Soft reinit into the freshly upgraded operating system.
-		niht();
 		// TODO: Use next_argv here.
-		const char* argv[] = { "init", NULL };
-		execv("/sbin/init", (char* const*) argv);
-		fatal("Failed to load init during reinit: %s: %m", argv[0]);
+		reinit();
 	}
 
 	// TODO: Use the arguments to specify additional things the default daemon
@@ -3676,6 +3691,13 @@ int main(int argc, char* argv[])
 
 	// Initialize the operating system.
 	init();
+
+	// Reinitialize the operating system if requested.
+	if ( default_daemon->exit_code_meaning ==
+	     EXIT_CODE_MEANING_POWEROFF_REBOOT &&
+	     WIFEXITED(default_daemon->exit_code) &&
+	     WEXITSTATUS(default_daemon->exit_code) == 3 )
+		reinit();
 
 	// Finish with the exit code of the default daemon.
 	return exit_code_to_exit_status(default_daemon->exit_code);

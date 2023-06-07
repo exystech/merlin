@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2023 Jonas 'Sortie' Termansen.
  * Copyright (c) 2023 dzwdz.
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -42,6 +42,7 @@ enum special_action
 	SPECIAL_ACTION_POWEROFF,
 	SPECIAL_ACTION_REBOOT,
 	SPECIAL_ACTION_HALT,
+	SPECIAL_ACTION_REINIT,
 };
 
 bool login(const char* username, const char* session);

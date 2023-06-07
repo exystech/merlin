@@ -49,6 +49,8 @@ exit asking for powering off the computer
 exit asking for rebooting the computer
 .It halt
 exit asking for halting the computer
+.It reinit
+exit asking for reinitializing the system
 .El
 .Sh SECURITY
 There is currently no method to confirm the login screen is in fact real other
@@ -87,7 +89,8 @@ fallback session script run upon login (see
 .Sh EXIT STATUS
 .Nm login
 exits 0 if the computer should power off, exits 1 if the computer should
-reboot, or exits 2 on fatal failure and the boot should halt.
+reboot, exits 2 on fatal failure and the boot should halt, or exits 3 if the
+system should reinitialize.
 .Sh SEE ALSO
 .Xr passwd 1 ,
 .Xr crypt_checkpass 3 ,

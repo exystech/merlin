@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, 2018, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2018, 2022, 2023 Jonas 'Sortie' Termansen.
  * Copyright (c) 2023 dzwdz.
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -341,6 +341,8 @@ bool parse_username(const char* input,
 		return *action = SPECIAL_ACTION_REBOOT, true;
 	else if ( !strcmp(input, "halt") )
 		return *action = SPECIAL_ACTION_HALT, true;
+	else if ( !strcmp(input, "reinit") )
+		return *action = SPECIAL_ACTION_REINIT, true;
 
 	// Skip leading spaces to allow logging in as special accounts.
 	while ( isspace(*input) )
@@ -377,6 +379,7 @@ void handle_special(enum special_action action)
 	case SPECIAL_ACTION_POWEROFF: exit(0);
 	case SPECIAL_ACTION_REBOOT: exit(1);
 	case SPECIAL_ACTION_HALT: exit(2);
+	case SPECIAL_ACTION_REINIT: exit(3);
 	}
 }
 

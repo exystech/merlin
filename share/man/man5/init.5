@@ -222,8 +222,9 @@ Any other exit means the daemon failed.
 The
 .Sy poweroff-reboot
 meaning is that exiting 0 means the system should power off, exiting 1 means the
-system should reboot, exiting 2 means the system should halt, and any other exit
-means the daemon failed.
+system should reboot, exiting 2 means the system should halt, exit means system
+should reload its configuration and reinitialize, and any other exit means the
+daemon failed.
 .Pp
 Daemons are considered successful if they exit by
 .Sy SIGTERM
