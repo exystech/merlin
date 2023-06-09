@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2023 Jonas 'Sortie' Termansen.
  * Copyright (c) 2023 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -38,25 +38,25 @@
 #include <termios.h>
 #include <unistd.h>
 
-static uint64_t device;
-static uint64_t connector;
-
-static bool set_current_mode(struct dispmsg_crtc_mode mode)
+static bool set_current_mode(const struct tiocgdisplay* display,
+                             struct dispmsg_crtc_mode mode)
 {
 	struct dispmsg_set_crtc_mode msg;
 	msg.msgid = DISPMSG_SET_CRTC_MODE;
-	msg.device = 0;
-	msg.connector = 0;
+	msg.device = display->device;
+	msg.connector = display->connector;
 	msg.mode = mode;
 	return dispmsg_issue(&msg, sizeof(msg)) == 0;
 }
 
-static struct dispmsg_crtc_mode* get_available_modes(size_t* num_modes_ptr)
+static struct dispmsg_crtc_mode*
+get_available_modes(const struct tiocgdisplay* display,
+                    size_t* num_modes_ptr)
 {
 	struct dispmsg_get_crtc_modes msg;
 	msg.msgid = DISPMSG_GET_CRTC_MODES;
-	msg.device = 0;
-	msg.connector = 0;
+	msg.device = display->device;
+	msg.connector = display->connector;
 	size_t guess = 1;
 	while ( true )
 	{
@@ -133,7 +133,9 @@ static bool mode_passes_filter(struct dispmsg_crtc_mode mode,
 	return true;
 }
 
-static void filter_modes(struct dispmsg_crtc_mode* modes, size_t* num_modes_ptr, struct filter* filter)
+static void filter_modes(struct dispmsg_crtc_mode* modes,
+                         size_t* num_modes_ptr,
+                         struct filter* filter)
 {
 	size_t in_num = *num_modes_ptr;
 	size_t out_num = 0;
@@ -143,6 +145,247 @@ static void filter_modes(struct dispmsg_crtc_mode* modes, size_t* num_modes_ptr,
 			modes[out_num++] = modes[i];
 	}
 	*num_modes_ptr = out_num;
+}
+
+static bool get_mode(struct dispmsg_crtc_mode* modes,
+                     size_t num_modes,
+                     unsigned int xres,
+                     unsigned int yres,
+                     unsigned int bpp,
+                     struct dispmsg_crtc_mode* mode)
+{
+	bool found = false;
+	bool found_other = false;
+	size_t index;
+	size_t other_index = 0;
+	for ( size_t i = 0; i < num_modes; i++ )
+	{
+		if ( modes[i].view_xres == xres &&
+			 modes[i].view_yres == yres &&
+			 modes[i].fb_format == bpp )
+		{
+			index = i;
+			found = true;
+			break;
+		}
+		if ( modes[i].control & DISPMSG_CONTROL_OTHER_RESOLUTIONS )
+		{
+			found_other = true;
+			other_index = i;
+		}
+	}
+	if ( !found )
+	{
+		if ( found_other )
+			index = other_index;
+		else
+			// Not in the list of pre-set resolutions and setting a custom
+			// resolution is not supported.
+			return false;
+	}
+
+	*mode = modes[index];
+	if ( mode->control & DISPMSG_CONTROL_OTHER_RESOLUTIONS )
+	{
+		mode->fb_format = bpp;
+		mode->view_xres = xres;
+		mode->view_yres = yres;
+		mode->control &= ~DISPMSG_CONTROL_OTHER_RESOLUTIONS;
+		mode->control |= DISPMSG_CONTROL_VALID;
+	}
+
+	return true;
+}
+
+static bool select_mode(struct dispmsg_crtc_mode* modes,
+                        size_t num_modes,
+                        int mode_set_error,
+                        struct dispmsg_crtc_mode* mode)
+{
+	int num_modes_display_length = 1;
+	for ( size_t i = num_modes; 10 <= i; i /= 10 )
+		num_modes_display_length++;
+
+	size_t selection;
+	bool decided;
+	bool first_render;
+	struct wincurpos render_at;
+	selection = 0;
+	decided = false;
+	first_render = true;
+	memset(&render_at, 0, sizeof(render_at));
+	while ( !decided )
+	{
+		fflush(stdout);
+
+		struct winsize ws;
+		if ( tcgetwinsize(1, &ws) != 0 )
+		{
+			ws.ws_col = 80;
+			ws.ws_row = 25;
+		}
+
+		struct wincurpos wcp;
+		if ( tcgetwincurpos(1, &wcp) != 0 )
+		{
+			wcp.wcp_col = 1;
+			wcp.wcp_row = 1;
+		}
+
+		size_t off = 1; // The "Please select ..." line at the top.
+		if ( mode_set_error )
+			off++;
+
+		size_t entries_per_page = ws.ws_row - off;
+		size_t page = selection / entries_per_page;
+		size_t from = page * entries_per_page;
+		size_t how_many_available = num_modes - from;
+		size_t how_many = entries_per_page;
+		if ( how_many_available < how_many )
+			how_many = how_many_available;
+		size_t lines_on_screen = off + how_many;
+
+		if ( first_render )
+		{
+			while ( wcp.wcp_row &&
+			        ws.ws_row - (wcp.wcp_row + 1) < lines_on_screen )
+			{
+				printf("\e[S");
+				printf("\e[%juH", 1 + (uintmax_t) wcp.wcp_row);
+				wcp.wcp_row--;
+				wcp.wcp_col = 1;
+			}
+			render_at = wcp;
+			first_render = false;
+		}
+
+		printf("\e[m");
+		printf("\e[%juH", 1 + (uintmax_t) render_at.wcp_row);
+		printf("\e[2K");
+
+		if ( mode_set_error )
+			printf("Error: Could not set desired mode: %s\n",
+			       strerror(mode_set_error));
+		printf("Please select one of these video modes or press ESC to "
+		       "abort.\n");
+
+		for ( size_t i = 0; i < how_many; i++ )
+		{
+			size_t index = from + i;
+			size_t screenline = off + index - from;
+			const char* color = index == selection ? "\e[31m" : "\e[m";
+			printf("\e[%zuH", 1 + render_at.wcp_row + screenline);
+			printf("%s", color);
+			printf("\e[2K");
+			printf(" [%-*zu] ", num_modes_display_length, index);
+			if ( modes[i].control & DISPMSG_CONTROL_VALID )
+				printf("%ux%ux%u",
+				       modes[i].view_xres,
+				       modes[i].view_yres,
+				       modes[i].fb_format);
+			else if ( modes[i].control & DISPMSG_CONTROL_OTHER_RESOLUTIONS )
+				printf("(enter a custom resolution)");
+			else
+				printf("(unknown video device feature)");
+			printf("\e[m");
+		}
+
+		printf("\e[J");
+		fflush(stdout);
+
+		unsigned int oldtermmode;
+		if ( gettermmode(0, &oldtermmode) < 0 )
+			err(1, "gettermmode");
+
+		if ( settermmode(0, TERMMODE_KBKEY | TERMMODE_UNICODE |
+		                    TERMMODE_SIGNAL) < 0 )
+			err(1, "settermmode");
+
+		bool redraw = false;
+		while ( !redraw && !decided )
+		{
+			uint32_t codepoint;
+			ssize_t numbytes = read(0, &codepoint, sizeof(codepoint));
+			if ( numbytes < 0 )
+				err(1, "read");
+
+			int kbkey = KBKEY_DECODE(codepoint);
+			if ( kbkey )
+			{
+				switch ( kbkey )
+				{
+				case KBKEY_ESC:
+					if ( settermmode(0, oldtermmode) < 0 )
+						err(1, "settermmode");
+					printf("\n");
+					return false;
+					break;
+				case KBKEY_UP:
+					if ( selection )
+						selection--;
+					else
+						selection = num_modes -1;
+					redraw = true;
+					break;
+				case KBKEY_DOWN:
+					if ( selection + 1 == num_modes )
+						selection = 0;
+					else
+						selection++;
+					redraw = true;
+					break;
+				case KBKEY_ENTER:
+					if ( settermmode(0, oldtermmode) < 0 )
+						err(1, "settermmode");
+					fgetc(stdin);
+					printf("\n");
+					decided = true;
+					break;
+				}
+			}
+			else
+			{
+				if ( L'0' <= codepoint && codepoint <= '9' )
+				{
+					uint32_t requested = codepoint - '0';
+					if ( requested < num_modes )
+					{
+						selection = requested;
+						redraw = true;
+					}
+				}
+			}
+		}
+
+		if ( settermmode(0, oldtermmode) < 0 )
+			err(1, "settermmode");
+	}
+
+	*mode = modes[selection];
+	if ( mode->control & DISPMSG_CONTROL_OTHER_RESOLUTIONS )
+	{
+		uintmax_t req_bpp, req_width, req_height;
+		while ( true )
+		{
+			printf("Enter video mode [WIDTHxHEIGHTxBPP]: ");
+			fflush(stdout);
+			if ( scanf("%jux%jux%ju", &req_width, &req_height, &req_bpp) != 3 )
+			{
+				fgetc(stdin);
+				fflush(stdin);
+				continue;
+			}
+			fgetc(stdin);
+			break;
+		}
+		mode->fb_format = req_bpp;
+		mode->view_xres = req_width;
+		mode->view_yres = req_height;
+		mode->control &= ~DISPMSG_CONTROL_OTHER_RESOLUTIONS;
+		mode->control |= DISPMSG_CONTROL_VALID;
+	}
+
+	return true;
 }
 
 static size_t parse_size_t(const char* str)
@@ -254,20 +497,6 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	unsigned int xres = 0;
-	unsigned int yres = 0;
-	unsigned int bpp = 0;
-	if ( 1 <= argc - optind )
-	{
-		if ( 1 < argc - optind )
-			errx(1, "Unexpected extra operand");
-		if ( sscanf(argv[optind], "%ux%ux%u", &xres, &yres, &bpp) != 3 )
-			errx(1, "Invalid video mode: %s", argv[optind]);
-	}
-
-	int tty_fd = open("/dev/tty", O_RDWR);
-	if ( tty_fd < 0 )
-		err(1, "/dev/tty");
 	struct tiocgdisplay display;
 	struct tiocgdisplays gdisplays;
 	memset(&gdisplays, 0, sizeof(gdisplays));
@@ -278,248 +507,67 @@ int main(int argc, char* argv[])
 		fprintf(stderr, "No video devices are associated with this terminal.\n");
 		exit(13);
 	}
-	device = display.device;
-	connector = display.connector;
 
 	size_t num_modes = 0;
-	struct dispmsg_crtc_mode* modes = get_available_modes(&num_modes);
+	struct dispmsg_crtc_mode* modes = get_available_modes(&display, &num_modes);
 	if ( !modes )
 		err(1, "Unable to detect available video modes");
 
 	if ( !num_modes )
 	{
 		fprintf(stderr, "No video modes are currently available.\n");
-		fprintf(stderr, "Try make sure a device driver exists and is activated.\n");
+		fprintf(stderr, "Try make sure a device driver exists and is "
+		                "activated.\n");
 		exit(11);
 	}
 
 	filter_modes(modes, &num_modes, &filter);
 	if ( !num_modes )
 	{
-		fprintf(stderr, "No video mode remains after filtering away unwanted modes.\n");
-		fprintf(stderr, "Try make sure the desired device driver is loaded and is configured correctly.\n");
+		fprintf(stderr, "No video mode remains after filtering away unwanted "
+		                "modes.\n");
+		fprintf(stderr, "Try make sure the desired device driver is loaded and "
+		                "is configured correctly.\n");
 		exit(12);
 	}
 
-	int num_modes_display_length = 1;
-	for ( size_t i = num_modes; 10 <= i; i /= 10 )
-		num_modes_display_length++;
-
-	int mode_set_error = 0;
-	size_t selection;
-	bool decided;
-	bool first_render;
-	struct wincurpos render_at;
-retry_pick_mode:
-	selection = 0;
-	decided = false;
-	first_render = true;
-	memset(&render_at, 0, sizeof(render_at));
-	if ( 1 <= argc - optind )
+	if ( 1 < argc - optind )
+		errx(1, "Unexpected extra operand");
+	else if ( argc - optind == 1 )
 	{
-		bool found_other = true;
-		size_t other_selection = 0;
-		for ( size_t i = 0; i < num_modes; i++ )
-		{
-			if ( modes[i].view_xres == xres &&
-			     modes[i].view_yres == yres &&
-			     modes[i].fb_format == bpp )
-			{
-				selection = i;
-				decided = true;
-				break;
-			}
-			if ( modes[i].control & DISPMSG_CONTROL_OTHER_RESOLUTIONS )
-			{
-				found_other = true;
-				other_selection = i;
-			}
-		}
-		if ( !decided )
-		{
-			if ( found_other )
-				selection = other_selection;
-			else
-				err(1, "No such available resolution: %s", argv[optind]);
-		}
+		unsigned int xres, yres, bpp;
+		if ( sscanf(argv[optind], "%ux%ux%u", &xres, &yres, &bpp) != 3 )
+			errx(1, "Invalid video mode: %s", argv[optind]);
+
+		struct dispmsg_crtc_mode mode;
+		if ( !get_mode(modes, num_modes, xres, yres, bpp, &mode) )
+			errx(1, "No such available resolution: %s", argv[optind]);
+
+		if ( !set_current_mode(&display, mode) )
+			err(1, "Failed to set video mode %jux%jux%ju",
+			    (uintmax_t) mode.view_xres,
+			    (uintmax_t) mode.view_yres,
+			    (uintmax_t) mode.fb_format);
 	}
-	while ( !decided )
+	else
 	{
-		fflush(stdout);
-
-		struct winsize ws;
-		if ( tcgetwinsize(1, &ws) != 0 )
+		int mode_set_error = 0;
+		bool mode_set = false;
+		while ( !mode_set )
 		{
-			ws.ws_col = 80;
-			ws.ws_row = 25;
-		}
+			struct dispmsg_crtc_mode mode;
+			if ( !select_mode(modes, num_modes, mode_set_error, &mode) )
+				exit(10);
 
-		struct wincurpos wcp;
-		if ( tcgetwincurpos(1, &wcp) != 0 )
-		{
-			wcp.wcp_col = 1;
-			wcp.wcp_row = 1;
-		}
-
-		size_t off = 1; // The "Please select ..." line at the top.
-		if ( mode_set_error )
-			off++;
-
-		size_t entries_per_page = ws.ws_row - off;
-		size_t page = selection / entries_per_page;
-		size_t from = page * entries_per_page;
-		size_t how_many_available = num_modes - from;
-		size_t how_many = entries_per_page;
-		if ( how_many_available < how_many )
-			how_many = how_many_available;
-		size_t lines_on_screen = off + how_many;
-
-		if ( first_render )
-		{
-			while ( wcp.wcp_row && ws.ws_row - (wcp.wcp_row + 1) < lines_on_screen )
+			if ( !(mode_set = set_current_mode(&display, mode)) )
 			{
-				printf("\e[S");
-				printf("\e[%juH", 1 + (uintmax_t) wcp.wcp_row);
-				wcp.wcp_row--;
-				wcp.wcp_col = 1;
-			}
-			render_at = wcp;
-			first_render = false;
-		}
-
-		printf("\e[m");
-		printf("\e[%juH", 1 + (uintmax_t) render_at.wcp_row);
-		printf("\e[2K");
-
-		if ( mode_set_error )
-			printf("Error: Could not set desired mode: %s\n", strerror(mode_set_error));
-		printf("Please select one of these video modes or press ESC to abort.\n");
-
-		for ( size_t i = 0; i < how_many; i++ )
-		{
-			size_t index = from + i;
-			size_t screenline = off + index - from;
-			const char* color = index == selection ? "\e[31m" : "\e[m";
-			printf("\e[%zuH", 1 + render_at.wcp_row + screenline);
-			printf("%s", color);
-			printf("\e[2K");
-			printf(" [%-*zu] ", num_modes_display_length, index);
-			if ( modes[i].control & DISPMSG_CONTROL_VALID )
-				printf("%ux%ux%u",
-				       modes[i].view_xres,
-				       modes[i].view_yres,
-				       modes[i].fb_format);
-			else if ( modes[i].control & DISPMSG_CONTROL_OTHER_RESOLUTIONS )
-				printf("(enter a custom resolution)");
-			else
-				printf("(unknown video device feature)");
-			printf("\e[m");
-		}
-
-		printf("\e[J");
-		fflush(stdout);
-
-		unsigned int oldtermmode;
-		if ( gettermmode(0, &oldtermmode) < 0 )
-			err(1, "gettermmode");
-
-		if ( settermmode(0, TERMMODE_KBKEY | TERMMODE_UNICODE | TERMMODE_SIGNAL) < 0 )
-			err(1, "settermmode");
-
-		bool redraw = false;
-		while ( !redraw && !decided )
-		{
-			uint32_t codepoint;
-			ssize_t numbytes = read(0, &codepoint, sizeof(codepoint));
-			if ( numbytes < 0 )
-				err(1, "read");
-
-			int kbkey = KBKEY_DECODE(codepoint);
-			if ( kbkey )
-			{
-				switch ( kbkey )
-				{
-				case KBKEY_ESC:
-					if ( settermmode(0, oldtermmode) < 0 )
-						err(1, "settermmode");
-					printf("\n");
-					exit(10);
-					break;
-				case KBKEY_UP:
-					if ( selection )
-						selection--;
-					else
-						selection = num_modes -1;
-					redraw = true;
-					break;
-				case KBKEY_DOWN:
-					if ( selection + 1 == num_modes )
-						selection = 0;
-					else
-						selection++;
-					redraw = true;
-					break;
-				case KBKEY_ENTER:
-					if ( settermmode(0, oldtermmode) < 0 )
-						err(1, "settermmode");
-					fgetc(stdin);
-					printf("\n");
-					decided = true;
-					break;
-				}
-			}
-			else
-			{
-				if ( L'0' <= codepoint && codepoint <= '9' )
-				{
-					uint32_t requested = codepoint - '0';
-					if ( requested < num_modes )
-					{
-						selection = requested;
-						redraw = true;
-					}
-				}
+				mode_set_error = errno;
+				warn("Failed to set video mode %jux%jux%ju",
+				     (uintmax_t) mode.view_xres,
+				     (uintmax_t) mode.view_yres,
+				     (uintmax_t) mode.fb_format);
 			}
 		}
-
-		if ( settermmode(0, oldtermmode) < 0 )
-			err(1, "settermmode");
-	}
-
-	struct dispmsg_crtc_mode mode = modes[selection];
-	if ( mode.control & DISPMSG_CONTROL_OTHER_RESOLUTIONS )
-	{
-		uintmax_t req_bpp = bpp;
-		uintmax_t req_width = xres;
-		uintmax_t req_height = yres;
-		while ( argc - optind < 1 )
-		{
-			printf("Enter video mode [WIDTHxHEIGHTxBPP]: ");
-			fflush(stdout);
-			if ( scanf("%jux%jux%ju", &req_width, &req_height, &req_bpp) != 3 )
-			{
-				fgetc(stdin);
-				fflush(stdin);
-				continue;
-			}
-			fgetc(stdin);
-			break;
-		}
-		mode.fb_format = req_bpp;
-		mode.view_xres = req_width;
-		mode.view_yres = req_height;
-		mode.control &= ~DISPMSG_CONTROL_OTHER_RESOLUTIONS;
-		mode.control |= DISPMSG_CONTROL_VALID;
-	}
-
-	if ( !set_current_mode(mode) )
-	{
-		mode_set_error = errno;
-		warn("Unable to set video mode %jux%jux%ju",
-		     (uintmax_t) mode.view_xres,
-		     (uintmax_t) mode.view_yres,
-		     (uintmax_t) mode.fb_format);
-		goto retry_pick_mode;
 	}
 
 	return 0;
