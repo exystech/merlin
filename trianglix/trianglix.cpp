@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016, 2018, 2013 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,7 +26,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
-#include <dispd.h>
+#include <err.h>
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
@@ -892,13 +892,6 @@ public:
 		buffer(buffer), pitch(pitch), xres(xres), yres(yres) { }
 	FrameBufferInfo(const FrameBufferInfo& o) :
 		buffer(o.buffer), pitch(o.pitch), xres(o.xres), yres(o.yres) { }
-	FrameBufferInfo(struct dispd_framebuffer* fb)
-	{
-		buffer = dispd_get_framebuffer_data(fb);
-		pitch = dispd_get_framebuffer_pitch(fb);
-		xres = dispd_get_framebuffer_width(fb);
-		yres = dispd_get_framebuffer_height(fb);
-	}
 	~FrameBufferInfo() { }
 
 public:
@@ -1414,14 +1407,45 @@ static void Render(FrameBufferInfo fb, struct Desktop* desktop)
 	RenderBackground(fb, desktop);
 }
 
-static bool Render(struct dispd_window* window, struct RenderInfo* info)
+static bool Render(struct RenderInfo* info)
 {
-	struct dispd_framebuffer* fb = dispd_begin_render(window);
-	if ( !fb )
-		return false;
-	FrameBufferInfo fbinfo(fb);
+	struct dispmsg_get_crtc_mode get_mode_msg;
+	memset(&get_mode_msg, 0, sizeof(get_mode_msg));
+	get_mode_msg.msgid = DISPMSG_GET_CRTC_MODE;
+	get_mode_msg.device = 0; // TODO: Multi-screen support!
+	get_mode_msg.connector = 0; // TODO: Multi-screen support!
+	if ( dispmsg_issue(&get_mode_msg, sizeof(get_mode_msg)) != 0 )
+		err(1, "dispmsg_issue: dispmsg_get_crtc_mode");
+	struct dispmsg_crtc_mode mode = get_mode_msg.mode;
+
+	if ( !(mode.control & DISPMSG_CONTROL_VALID) )
+		errx(1, "No valid video mode was set");
+	if ( mode.control & DISPMSG_CONTROL_VGA )
+		errx(1, "A VGA text mode was set");
+	if ( mode.fb_format != 32 )
+		errx(1, "A 32-bit video mode wasn't set");
+
+	size_t pitch = 4 * mode.view_xres;
+	size_t framebuffer_size = pitch * mode.view_yres;
+	uint8_t* framebuffer = (uint8_t*) malloc(framebuffer_size);
+	if ( !framebuffer )
+		err(1, "malloc");
+
+	FrameBufferInfo fbinfo(framebuffer, pitch, mode.view_xres, mode.view_yres);
 	Render(fbinfo, &info->desktop);
-	dispd_finish_render(fb);
+
+	struct dispmsg_write_memory write_memory_msg;
+	memset(&write_memory_msg, 0, sizeof(write_memory_msg));
+	write_memory_msg.msgid = DISPMSG_WRITE_MEMORY;
+	write_memory_msg.device = get_mode_msg.device;
+	write_memory_msg.offset = get_mode_msg.connector;
+	write_memory_msg.size = framebuffer_size;
+	write_memory_msg.src = framebuffer;
+	if ( dispmsg_issue(&write_memory_msg, sizeof(write_memory_msg)) != 0 )
+		err(1, "dispmsg_issue: dispmsg_write_memory");
+
+	free(framebuffer);
+
 	return true;
 }
 
@@ -1815,7 +1839,7 @@ static void HandleEvents(int kbfd, struct Desktop* desktop)
 	desktop->text_angle += text_speed * delta;
 }
 
-static int MainLoop(int argc, char* argv[], int kbfd, struct dispd_window* window)
+static int MainLoop(int argc, char* argv[], int kbfd)
 {
 	(void) argc;
 	(void) argv;
@@ -1824,7 +1848,7 @@ static int MainLoop(int argc, char* argv[], int kbfd, struct dispd_window* windo
 	for ( info.frame = 0; true; info.frame++ )
 	{
 		HandleEvents(kbfd, &info.desktop);
-		if ( !Render(window, &info) )
+		if ( !Render(&info) )
 			return 1;
 	}
 	return 0;
@@ -1873,27 +1897,13 @@ int main(int argc, char* argv[])
 
 	memcpy(font + 128 * 16, rune_font, sizeof(rune_font));
 
-	if ( !dispd_initialize(&argc, &argv) )
-		error(1, 0, "couldn't initialize dispd library");
-	struct dispd_session* session = dispd_attach_default_session();
-	if ( !session )
-		error(1, 0, "couldn't attach to dispd default session");
-	if ( !dispd_session_setup_game_rgba(session) )
-		error(1, 0, "couldn't setup dispd rgba session");
-	struct dispd_window* window = dispd_create_window_game_rgba(session);
-	if ( !window )
-		error(1, 0, "couldn't create dispd rgba window");
-
 	int kbfd = CreateKeyboardConnection();
 	if ( kbfd < 0 )
 		error(1, 0, "couldn't create keyboard connection");
 
-	int ret = MainLoop(argc, argv, kbfd, window);
+	int ret = MainLoop(argc, argv, kbfd);
 
 	close(kbfd);
-
-	dispd_destroy_window(window);
-	dispd_detach_session(session);
 
 	return ret;
 }

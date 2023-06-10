@@ -11,11 +11,9 @@ CXXFLAGS:=$(CXXFLAGS) -std=gnu++11 -Wall -Wextra -fno-exceptions -fno-rtti -fche
 
 BINARY:=trianglix
 
-LIBS:=-ldispd
-
 all: $(BINARY)
 
-.PHONY: all install uninstall clean
+.PHONY: all install clean
 
 install: all
 	mkdir -p $(DESTDIR)$(BINDIR)
