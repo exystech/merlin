@@ -278,12 +278,12 @@ static bool select_mode(struct dispmsg_crtc_mode* modes,
 			printf("%s", color);
 			printf("\e[2K");
 			printf(" [%-*zu] ", num_modes_display_length, index);
-			if ( modes[i].control & DISPMSG_CONTROL_VALID )
+			if ( modes[index].control & DISPMSG_CONTROL_VALID )
 				printf("%ux%ux%u",
-				       modes[i].view_xres,
-				       modes[i].view_yres,
-				       modes[i].fb_format);
-			else if ( modes[i].control & DISPMSG_CONTROL_OTHER_RESOLUTIONS )
+				       modes[index].view_xres,
+				       modes[index].view_yres,
+				       modes[index].fb_format);
+			else if ( modes[index].control & DISPMSG_CONTROL_OTHER_RESOLUTIONS )
 				printf("(enter a custom resolution)");
 			else
 				printf("(unknown video device feature)");
