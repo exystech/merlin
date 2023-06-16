@@ -20,8 +20,6 @@
 
 #include <sys/display.h>
 #include <sys/ioctl.h>
-#include <sys/keycodes.h>
-#include <sys/termmode.h>
 #include <sys/wait.h>
 
 #include <errno.h>
@@ -29,6 +27,7 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <inttypes.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -37,6 +36,17 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+
+struct termios saved;
+
+static void restore_terminal(int sig)
+{
+	if ( tcsetattr(0, TCSANOW, &saved) )
+		err(1, "tcsetattr");
+	// Re-raise the signal. As we set SA_RESETHAND this will not run the handler
+	// again but rather fall back to default.
+	raise(sig);
+}
 
 static bool set_current_mode(const struct tiocgdisplay* display,
                              struct dispmsg_crtc_mode mode)
@@ -202,18 +212,15 @@ static bool select_mode(struct dispmsg_crtc_mode* modes,
                         int mode_set_error,
                         struct dispmsg_crtc_mode* mode)
 {
+	if ( !isatty(0) )
+		errx(1, "Interactive menu requires stdin to be a terminal");
+
 	int num_modes_display_length = 1;
 	for ( size_t i = num_modes; 10 <= i; i /= 10 )
 		num_modes_display_length++;
 
-	size_t selection;
-	bool decided;
-	bool first_render;
-	struct wincurpos render_at;
-	selection = 0;
-	decided = false;
-	first_render = true;
-	memset(&render_at, 0, sizeof(render_at));
+	size_t selection = 0;
+	bool decided = false;
 	while ( !decided )
 	{
 		fflush(stdout);
@@ -223,13 +230,6 @@ static bool select_mode(struct dispmsg_crtc_mode* modes,
 		{
 			ws.ws_col = 80;
 			ws.ws_row = 25;
-		}
-
-		struct wincurpos wcp;
-		if ( tcgetwincurpos(1, &wcp) != 0 )
-		{
-			wcp.wcp_col = 1;
-			wcp.wcp_row = 1;
 		}
 
 		size_t off = 1; // The "Please select ..." line at the top.
@@ -245,36 +245,18 @@ static bool select_mode(struct dispmsg_crtc_mode* modes,
 			how_many = how_many_available;
 		size_t lines_on_screen = off + how_many;
 
-		if ( first_render )
-		{
-			while ( wcp.wcp_row &&
-			        ws.ws_row - (wcp.wcp_row + 1) < lines_on_screen )
-			{
-				printf("\e[S");
-				printf("\e[%juH", 1 + (uintmax_t) wcp.wcp_row);
-				wcp.wcp_row--;
-				wcp.wcp_col = 1;
-			}
-			render_at = wcp;
-			first_render = false;
-		}
-
 		printf("\e[m");
-		printf("\e[%juH", 1 + (uintmax_t) render_at.wcp_row);
 		printf("\e[2K");
 
 		if ( mode_set_error )
 			printf("Error: Could not set desired mode: %s\n",
 			       strerror(mode_set_error));
-		printf("Please select one of these video modes or press ESC to "
-		       "abort.\n");
+		printf("Please select one of these video modes or press Q to abort.\n");
 
 		for ( size_t i = 0; i < how_many; i++ )
 		{
 			size_t index = from + i;
-			size_t screenline = off + index - from;
 			const char* color = index == selection ? "\e[31m" : "\e[m";
-			printf("\e[%zuH", 1 + render_at.wcp_row + screenline);
 			printf("%s", color);
 			printf("\e[2K");
 			printf(" [%-*zu] ", num_modes_display_length, index);
@@ -288,77 +270,108 @@ static bool select_mode(struct dispmsg_crtc_mode* modes,
 			else
 				printf("(unknown video device feature)");
 			printf("\e[m");
+			if ( i + 1 < how_many )
+				printf("\n");
 		}
 
 		printf("\e[J");
 		fflush(stdout);
 
-		unsigned int oldtermmode;
-		if ( gettermmode(0, &oldtermmode) < 0 )
-			err(1, "gettermmode");
+		// Block delivery of SIGTSTP during menu to avoid having to deal with
+		// complex interactions between signals and terminal settings.
+		sigset_t sigtstp;
+		sigemptyset(&sigtstp);
+		sigaddset(&sigtstp, SIGTSTP);
+		sigprocmask(SIG_BLOCK, &sigtstp, NULL);
 
-		if ( settermmode(0, TERMMODE_KBKEY | TERMMODE_UNICODE |
-		                    TERMMODE_SIGNAL) < 0 )
-			err(1, "settermmode");
+		if ( tcgetattr(0, &saved) )
+			err(1, "tcgetattr");
+
+		// Revert back to normal terminal settings before dying on a signal.
+		struct sigaction sa = {0};
+		sa.sa_handler = restore_terminal;
+		sa.sa_flags = SA_RESETHAND; // The handler should only run once.
+		sigaction(SIGINT, &sa, NULL);
+		sigaction(SIGQUIT, &sa, NULL);
+		sigaction(SIGTERM, &sa, NULL);
+
+		struct termios altered = saved;
+		altered.c_lflag &= ~(ECHO | ICANON);
+		if ( tcsetattr(0, TCSANOW, &altered) )
+			err(1, "tcsetattr");
 
 		bool redraw = false;
 		while ( !redraw && !decided )
 		{
-			uint32_t codepoint;
-			ssize_t numbytes = read(0, &codepoint, sizeof(codepoint));
-			if ( numbytes < 0 )
-				err(1, "read");
+			int byte = fgetc(stdin);
 
-			int kbkey = KBKEY_DECODE(codepoint);
-			if ( kbkey )
+			if ( byte == '\e' )
 			{
-				switch ( kbkey )
+				switch ( fgetc(stdin) )
 				{
-				case KBKEY_ESC:
-					if ( settermmode(0, oldtermmode) < 0 )
-						err(1, "settermmode");
+				case 'O': fgetc(stdin); break; // \eO is followed by one byte
+				case '[':
+				{
+					// Sequence can have numbers separated by a semicolon before
+					// the final character, so read until a non-digit
+					// non-semicolon is found.
+					size_t length = 1;
+					while ( (byte = fgetc(stdin)) &&
+					        (('0' <= byte && byte <= '9') || byte == ';' ) )
+						length++;
+
+					if ( length == 1 && byte == 'A' ) // Up key
+					{
+						if ( selection )
+							selection--;
+						else
+							selection = num_modes - 1;
+						redraw = true;
+					}
+					else if ( length == 1 && byte == 'B' ) // Down key
+					{
+						if ( selection + 1 == num_modes )
+							selection = 0;
+						else
+							selection++;
+						redraw = true;
+					}
+					break;
+				}
+				}
+			}
+			else if ( '0' <= byte && byte <= '9' )
+			{
+				uint32_t requested = byte - '0';
+				if ( requested < num_modes )
+				{
+					selection = requested;
+					redraw = true;
+				}
+			}
+			else
+			{
+				switch ( byte )
+				{
+				case 'q':
+				case 'Q':
+					if ( tcsetattr(0, TCSANOW, &saved) )
+						err(1, "tcsetattr");
 					printf("\n");
 					return false;
-					break;
-				case KBKEY_UP:
-					if ( selection )
-						selection--;
-					else
-						selection = num_modes -1;
-					redraw = true;
-					break;
-				case KBKEY_DOWN:
-					if ( selection + 1 == num_modes )
-						selection = 0;
-					else
-						selection++;
-					redraw = true;
-					break;
-				case KBKEY_ENTER:
-					if ( settermmode(0, oldtermmode) < 0 )
-						err(1, "settermmode");
-					fgetc(stdin);
+				case '\n':
 					printf("\n");
 					decided = true;
 					break;
 				}
 			}
-			else
-			{
-				if ( L'0' <= codepoint && codepoint <= '9' )
-				{
-					uint32_t requested = codepoint - '0';
-					if ( requested < num_modes )
-					{
-						selection = requested;
-						redraw = true;
-					}
-				}
-			}
 		}
 
-		if ( settermmode(0, oldtermmode) < 0 )
-			err(1, "settermmode");
+		if ( redraw )
+			printf("\e[%zuF", lines_on_screen - 1);
+
+		if ( tcsetattr(0, TCSANOW, &saved) )
+			err(1, "tcsetattr");
 	}
 
 	*mode = modes[selection];
@@ -498,8 +511,7 @@ int main(int argc, char* argv[])
 	}
 
 	struct tiocgdisplay display;
-	struct tiocgdisplays gdisplays;
-	memset(&gdisplays, 0, sizeof(gdisplays));
+	struct tiocgdisplays gdisplays = {0};
 	gdisplays.count = 1;
 	gdisplays.displays = &display;
 	if ( ioctl(1, TIOCGDISPLAYS, &gdisplays) < 0 || gdisplays.count == 0 )
