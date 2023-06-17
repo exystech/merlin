@@ -59,7 +59,8 @@ static int open_local_server_socket(const char* path, int flags)
 	return fd;
 }
 
-void server_initialize(struct server* server, struct display* display)
+void server_initialize(struct server* server, struct display* display,
+                       const char* tty, const char* mouse, const char* socket)
 {
 	memset(server, 0, sizeof(*server));
 
@@ -68,18 +69,19 @@ void server_initialize(struct server* server, struct display* display)
 	load_font();
 
 	server->tty_fd = 0;
-	if ( !isatty(server->tty_fd) )
+	if ( tty || !isatty(server->tty_fd) )
 	{
-		server->tty_fd = open("/dev/tty", O_RDONLY);
+		tty = tty ? tty : "/dev/tty";
+		server->tty_fd = open(tty, O_RDONLY);
 		if ( server->tty_fd < 0 )
-			err(1, "/dev/tty");
+			err(1, tty);
 	}
 
-	server->mouse_fd = open("/dev/mouse", O_RDONLY | O_CLOEXEC);
+	server->mouse_fd = open(mouse, O_RDONLY | O_CLOEXEC);
 	if ( server->mouse_fd < 0 )
-		err(1, "%s", "/dev/mouse");
+		err(1, "%s", mouse);
 
-	server->server_path = "/run/display";
+	server->server_path = socket;
 	server->server_fd = open_local_server_socket(server->server_path,
 	                                             SOCK_NONBLOCK | SOCK_CLOEXEC);
 	if ( server->server_fd < 0 )
@@ -87,7 +89,7 @@ void server_initialize(struct server* server, struct display* display)
 
 	unsigned int termmode =
 		TERMMODE_KBKEY | TERMMODE_UNICODE | TERMMODE_NONBLOCK;
-	if ( settermmode(0, termmode) < 0 )
+	if ( settermmode(server->tty_fd, termmode) < 0 )
 		err(1, "settermmode");
 
 	server->pfds_count = server_pfds_count(server);

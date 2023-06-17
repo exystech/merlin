@@ -41,7 +41,8 @@ struct server
 	size_t pfds_count;
 };
 
-void server_initialize(struct server* server, struct display* display);
+void server_initialize(struct server* server, struct display* display,
+                       const char* tty, const char* mouse, const char* socket);
 bool server_accept(struct server* server);
 size_t server_pfds_count(const struct server* server);
 void server_poll(struct server* server);

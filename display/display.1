@@ -25,6 +25,25 @@ script in the background.
 .Nm
 exits when Control + Alt + Delete is pressed.
 .Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl m Ar mouse
+Use
+.Pa mouse
+device instead of
+.Pa /dev/mouse .
+.It Fl t Ar tty
+Use
+.Pa tty
+device instead of
+.Pa /dev/tty .
+.It Fl s Ar socket
+Listen on
+.Pa socket
+instead of
+.Pa /var/run/display .
+.El
+.Pp
 The keyboard shortcuts are as follows:
 .Bl -tag -width "Control + Alt + Delete"
 .It Alt + F4
@@ -93,7 +112,7 @@ Applications use
 to connect to
 .Nm
 or
-.Pa /run/display
+.Pa /var/run/display
 by default.
 .El
 .Sh FILES
@@ -101,7 +120,7 @@ by default.
 .It Pa ~/.displayrc , /etc/displayrc , /etc/default/displayrc
 .Xr displayrc 5
 script that spawns the user's preferred startup applications.
-.It Pa /run/display
+.It Pa /var/run/display
 .Xr unix 4
 socket where
 .Nm

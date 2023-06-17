@@ -45,43 +45,23 @@ static void ready(void)
 	unsetenv("READYFD");
 }
 
-static void compact_arguments(int* argc, char*** argv)
-{
-	for ( int i = 0; i < *argc; i++ )
-	{
-		while ( i < *argc && !(*argv)[i] )
-		{
-			for ( int n = i; n < *argc; n++ )
-				(*argv)[n] = (*argv)[n+1];
-			(*argc)--;
-		}
-	}
-}
-
 int main(int argc, char* argv[])
 {
-	for ( int i = 1; i < argc; i++ )
-	{
-		const char* arg = argv[i];
-		if ( arg[0] != '-' || !arg[1] )
-			continue;
-		argv[i] = NULL;
-		if ( !strcmp(arg, "--") )
-			break;
-		if ( arg[1] != '-' )
-		{
-			char c;
-			while ( (c = *++arg) ) switch ( c )
-			{
-			default:
-				errx(1, "unknown option -- '%c'", c);
-			}
-		}
-		else
-			errx(1, "unknown option: %s", arg);
-	}
+	const char* mouse = "/dev/mouse";
+	const char* socket = "/var/run/display";
+	const char* tty = NULL;
 
-	compact_arguments(&argc, &argv);
+	int opt;
+	while ( (opt = getopt(argc, argv, "m:s:t")) != -1 )
+	{
+		switch ( opt )
+		{
+		case 'm': mouse = optarg; break;
+		case 's': socket = optarg; break;
+		case 't': tty = optarg; break;
+		default: return 1;
+		}
+	}
 
 	memcpy(arrow_buffer, arrow, sizeof(arrow));
 
@@ -95,7 +75,7 @@ int main(int argc, char* argv[])
 	display_initialize(&display);
 
 	struct server server;
-	server_initialize(&server, &display);
+	server_initialize(&server, &display, tty, mouse, socket);
 
 	if ( setenv("DISPLAY_SOCKET", server.server_path, 1) < 0 )
 		err(1, "setenv");

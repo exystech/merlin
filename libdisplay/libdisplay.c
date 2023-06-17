@@ -100,7 +100,7 @@ struct display_connection* display_connect_default(void)
 {
 	return display_connect(getenv("DISPLAY_SOCKET") ?
 	                       getenv("DISPLAY_SOCKET") :
-	                       "/run/display");
+	                       "/var/run/display");
 }
 
 void display_disconnect(struct display_connection* connection)
