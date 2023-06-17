@@ -31,6 +31,7 @@ kblayout \
 kblayout-compiler \
 login \
 mkinitrd \
+nyan \
 ping \
 regress \
 rw \
