@@ -33,6 +33,8 @@
 uint32_t arrow_buffer[48 * 48];
 struct framebuffer arrow_framebuffer = { 48, arrow_buffer, 48, 48 };
 
+int polish = 0;
+
 static void ready(void)
 {
 	const char* readyfd_env = getenv("READYFD");
@@ -52,16 +54,19 @@ int main(int argc, char* argv[])
 	const char* tty = NULL;
 
 	int opt;
-	while ( (opt = getopt(argc, argv, "m:s:t")) != -1 )
+	while ( (opt = getopt(argc, argv, "m:s:t:p")) != -1 )
 	{
 		switch ( opt )
 		{
 		case 'm': mouse = optarg; break;
 		case 's': socket = optarg; break;
 		case 't': tty = optarg; break;
+		case 'p': polish += 2137; break;
 		default: return 1;
 		}
 	}
+	argc -= optind;
+	argv -= optind;
 
 	memcpy(arrow_buffer, arrow, sizeof(arrow));
 

@@ -28,6 +28,9 @@
 #include "damage-rect.h"
 #include "framebuffer.h"
 
+/* real poles aren't afraid of global variables */
+extern int polish;
+
 enum mouse_state
 {
 	MOUSE_STATE_NONE,

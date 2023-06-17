@@ -265,6 +265,13 @@ static void wallpaper(struct framebuffer fb)
 			if ( c.g != 255 && tc.g - c.g > (int8_t) (r >> 12) + 240 ) c.g++;
 			if ( c.b && c.b - tc.b > (int8_t) (r >> 16) + 64 ) c.b--;
 			if ( c.b != 255 && tc.b - c.b > (int8_t) (r >> 20) + 240 ) c.b++;
+			
+			if ( polish > 0 )
+			{
+				c.v |= 0xFFF0C0C0;
+				if ( y * 2 > fb.yres )
+					c.v &= 0xFFFF0F0F;
+			}
 			framebuffer_set_pixel(fb, x, y, c.v);
 		}
 	}
