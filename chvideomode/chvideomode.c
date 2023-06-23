@@ -22,6 +22,8 @@
 #include <sys/ioctl.h>
 #include <sys/wait.h>
 
+#include <assert.h>
+#include <display.h>
 #include <errno.h>
 #include <err.h>
 #include <fcntl.h>
@@ -37,7 +39,22 @@
 #include <termios.h>
 #include <unistd.h>
 
-struct termios saved;
+#define REQUEST_DISPLAYS_ID 0
+#define REQUEST_DISPLAY_MODES_ID 1
+#define SET_DISPLAY_MODE_ID 2
+
+static uint32_t display_id;
+static bool displays_received = false;
+
+static size_t modes_count = 0;
+static struct dispmsg_crtc_mode* modes;
+static int request_display_modes_error = 0;
+static bool modes_received = false;
+
+static int set_display_mode_error = 0;
+static bool set_display_mode_ack_received;
+
+static struct termios saved;
 
 static void restore_terminal(int sig)
 {
@@ -46,6 +63,88 @@ static void restore_terminal(int sig)
 	// Re-raise the signal. As we set SA_RESETHAND this will not run the handler
 	// again but rather fall back to default.
 	raise(sig);
+}
+
+static void on_displays(void* ctx, uint32_t id, uint32_t displays)
+{
+	(void) ctx;
+	if ( id != REQUEST_DISPLAYS_ID )
+		return;
+	if ( displays < 1 )
+		errx(1, "No displays available");
+	display_id = 0; // TODO: Multimonitor support.
+	displays_received = true;
+}
+
+static void on_display_modes(void* ctx, uint32_t id,
+                             uint32_t display_modes_count,
+                             void* aux, size_t aux_size)
+{
+	(void) ctx;
+	assert(display_modes_count * sizeof(struct dispmsg_crtc_mode) == aux_size);
+	if ( id != REQUEST_DISPLAY_MODES_ID )
+		return;
+	modes = malloc(aux_size);
+	if ( !modes )
+		err(1, "malloc");
+	memcpy(modes, aux, aux_size);
+	modes_count = display_modes_count;
+	modes_received = true;
+}
+
+static void on_ack(void* ctx, uint32_t id, int32_t error)
+{
+	(void) ctx;
+	switch ( id )
+	{
+	case REQUEST_DISPLAY_MODES_ID:
+		if ( error )
+		{
+			modes = NULL;
+			request_display_modes_error = error;
+			modes_received = true;
+		}
+		break;
+	case SET_DISPLAY_MODE_ID:
+		set_display_mode_error = error;
+		set_display_mode_ack_received = true;
+		break;
+	}
+}
+
+static void request_displays(struct display_connection* connection)
+{
+	display_request_displays(connection, REQUEST_DISPLAYS_ID);
+	struct display_event_handlers handlers = {0};
+	handlers.displays_handler = on_displays;
+	while ( !displays_received )
+		display_wait_event(connection, &handlers);
+}
+
+static void request_display_modes(struct display_connection* connection,
+                                  uint32_t display_id)
+{
+	display_request_display_modes(connection, REQUEST_DISPLAY_MODES_ID,
+								  display_id);
+	struct display_event_handlers handlers = {0};
+	handlers.display_modes_handler = on_display_modes;
+	handlers.ack_handler = on_ack;
+	while ( !modes_received )
+		display_wait_event(connection, &handlers);
+	errno = request_display_modes_error;
+}
+
+static bool request_set_display_mode(struct display_connection* connection,
+                                     uint32_t display_id,
+                                     struct dispmsg_crtc_mode mode)
+{
+	display_set_display_mode(connection, SET_DISPLAY_MODE_ID, display_id, mode);
+	struct display_event_handlers handlers = {0};
+	handlers.ack_handler = on_ack;
+	set_display_mode_ack_received = false;
+	while ( !set_display_mode_ack_received )
+		display_wait_event(connection, &handlers);
+	return !(errno = set_display_mode_error);
 }
 
 static bool set_current_mode(const struct tiocgdisplay* display,
@@ -61,7 +160,7 @@ static bool set_current_mode(const struct tiocgdisplay* display,
 
 static struct dispmsg_crtc_mode*
 get_available_modes(const struct tiocgdisplay* display,
-                    size_t* num_modes_ptr)
+                    size_t* modes_count_ptr)
 {
 	struct dispmsg_get_crtc_modes msg;
 	msg.msgid = DISPMSG_GET_CRTC_MODES;
@@ -70,15 +169,15 @@ get_available_modes(const struct tiocgdisplay* display,
 	size_t guess = 1;
 	while ( true )
 	{
-		struct dispmsg_crtc_mode* ret = (struct dispmsg_crtc_mode*)
-			malloc(sizeof(struct dispmsg_crtc_mode) * guess);
+		struct dispmsg_crtc_mode* ret =
+			calloc(guess, sizeof(struct dispmsg_crtc_mode));
 		if ( !ret )
 			return NULL;
 		msg.modes_length = guess;
 		msg.modes = ret;
 		if ( dispmsg_issue(&msg, sizeof(msg)) == 0 )
 		{
-			*num_modes_ptr = guess;
+			*modes_count_ptr = guess;
 			return ret;
 		}
 		free(ret);
@@ -144,21 +243,21 @@ static bool mode_passes_filter(struct dispmsg_crtc_mode mode,
 }
 
 static void filter_modes(struct dispmsg_crtc_mode* modes,
-                         size_t* num_modes_ptr,
+                         size_t* modes_count_ptr,
                          struct filter* filter)
 {
-	size_t in_num = *num_modes_ptr;
-	size_t out_num = 0;
-	for ( size_t i = 0; i < in_num; i++ )
+	size_t in_count = *modes_count_ptr;
+	size_t out_count = 0;
+	for ( size_t i = 0; i < in_count; i++ )
 	{
 		if ( mode_passes_filter(modes[i], filter) )
-			modes[out_num++] = modes[i];
+			modes[out_count++] = modes[i];
 	}
-	*num_modes_ptr = out_num;
+	*modes_count_ptr = out_count;
 }
 
 static bool get_mode(struct dispmsg_crtc_mode* modes,
-                     size_t num_modes,
+                     size_t modes_count,
                      unsigned int xres,
                      unsigned int yres,
                      unsigned int bpp,
@@ -168,7 +267,7 @@ static bool get_mode(struct dispmsg_crtc_mode* modes,
 	bool found_other = false;
 	size_t index;
 	size_t other_index = 0;
-	for ( size_t i = 0; i < num_modes; i++ )
+	for ( size_t i = 0; i < modes_count; i++ )
 	{
 		if ( modes[i].view_xres == xres &&
 			 modes[i].view_yres == yres &&
@@ -208,16 +307,16 @@ static bool get_mode(struct dispmsg_crtc_mode* modes,
 }
 
 static bool select_mode(struct dispmsg_crtc_mode* modes,
-                        size_t num_modes,
+                        size_t modes_count,
                         int mode_set_error,
                         struct dispmsg_crtc_mode* mode)
 {
 	if ( !isatty(0) )
 		errx(1, "Interactive menu requires stdin to be a terminal");
 
-	int num_modes_display_length = 1;
-	for ( size_t i = num_modes; 10 <= i; i /= 10 )
-		num_modes_display_length++;
+	int modes_count_display_length = 1;
+	for ( size_t i = modes_count; 10 <= i; i /= 10 )
+		modes_count_display_length++;
 
 	size_t selection = 0;
 	bool decided = false;
@@ -239,7 +338,7 @@ static bool select_mode(struct dispmsg_crtc_mode* modes,
 		size_t entries_per_page = ws.ws_row - off;
 		size_t page = selection / entries_per_page;
 		size_t from = page * entries_per_page;
-		size_t how_many_available = num_modes - from;
+		size_t how_many_available = modes_count - from;
 		size_t how_many = entries_per_page;
 		if ( how_many_available < how_many )
 			how_many = how_many_available;
@@ -259,7 +358,7 @@ static bool select_mode(struct dispmsg_crtc_mode* modes,
 			const char* color = index == selection ? "\e[31m" : "\e[m";
 			printf("%s", color);
 			printf("\e[2K");
-			printf(" [%-*zu] ", num_modes_display_length, index);
+			printf(" [%-*zu] ", modes_count_display_length, index);
 			if ( modes[index].control & DISPMSG_CONTROL_VALID )
 				printf("%ux%ux%u",
 				       modes[index].view_xres,
@@ -325,12 +424,12 @@ static bool select_mode(struct dispmsg_crtc_mode* modes,
 						if ( selection )
 							selection--;
 						else
-							selection = num_modes - 1;
+							selection = modes_count - 1;
 						redraw = true;
 					}
 					else if ( length == 1 && byte == 'B' ) // Down key
 					{
-						if ( selection + 1 == num_modes )
+						if ( selection + 1 == modes_count )
 							selection = 0;
 						else
 							selection++;
@@ -343,7 +442,7 @@ static bool select_mode(struct dispmsg_crtc_mode* modes,
 			else if ( '0' <= byte && byte <= '9' )
 			{
 				uint32_t requested = byte - '0';
-				if ( requested < num_modes )
+				if ( requested < modes_count )
 				{
 					selection = requested;
 					redraw = true;
@@ -510,22 +609,37 @@ int main(int argc, char* argv[])
 		}
 	}
 
+	bool use_display = getenv("DISPLAY_SOCKET");
+
+	struct display_connection* connection = NULL;
 	struct tiocgdisplay display;
-	struct tiocgdisplays gdisplays = {0};
-	gdisplays.count = 1;
-	gdisplays.displays = &display;
-	if ( ioctl(1, TIOCGDISPLAYS, &gdisplays) < 0 || gdisplays.count == 0 )
+	if ( use_display )
 	{
-		fprintf(stderr, "No video devices are associated with this terminal.\n");
-		exit(13);
+		connection = display_connect_default();
+		if ( !connection )
+			err(1, "Could not connect to display server");
+		request_displays(connection);
+		request_display_modes(connection, display_id);
+	}
+	else
+	{
+		struct tiocgdisplays gdisplays = {0};
+		// TODO: Multimonitor support.
+		gdisplays.count = 1;
+		gdisplays.displays = &display;
+		if ( ioctl(1, TIOCGDISPLAYS, &gdisplays) < 0 || gdisplays.count == 0 )
+		{
+			fprintf(stderr, "No displays associated with this terminal.\n");
+			exit(13);
+		}
+
+		modes = get_available_modes(&display, &modes_count);
 	}
 
-	size_t num_modes = 0;
-	struct dispmsg_crtc_mode* modes = get_available_modes(&display, &num_modes);
 	if ( !modes )
 		err(1, "Unable to detect available video modes");
 
-	if ( !num_modes )
+	if ( !modes_count )
 	{
 		fprintf(stderr, "No video modes are currently available.\n");
 		fprintf(stderr, "Try make sure a device driver exists and is "
@@ -533,8 +647,8 @@ int main(int argc, char* argv[])
 		exit(11);
 	}
 
-	filter_modes(modes, &num_modes, &filter);
-	if ( !num_modes )
+	filter_modes(modes, &modes_count, &filter);
+	if ( !modes_count )
 	{
 		fprintf(stderr, "No video mode remains after filtering away unwanted "
 		                "modes.\n");
@@ -552,10 +666,15 @@ int main(int argc, char* argv[])
 			errx(1, "Invalid video mode: %s", argv[optind]);
 
 		struct dispmsg_crtc_mode mode;
-		if ( !get_mode(modes, num_modes, xres, yres, bpp, &mode) )
+		if ( !get_mode(modes, modes_count, xres, yres, bpp, &mode) )
 			errx(1, "No such available resolution: %s", argv[optind]);
 
-		if ( !set_current_mode(&display, mode) )
+		bool mode_set;
+		if ( use_display )
+			mode_set = request_set_display_mode(connection, display_id, mode);
+		else
+			mode_set = set_current_mode(&display, mode);
+		if ( !mode_set )
 			err(1, "Failed to set video mode %jux%jux%ju",
 			    (uintmax_t) mode.view_xres,
 			    (uintmax_t) mode.view_yres,
@@ -568,10 +687,15 @@ int main(int argc, char* argv[])
 		while ( !mode_set )
 		{
 			struct dispmsg_crtc_mode mode;
-			if ( !select_mode(modes, num_modes, mode_set_error, &mode) )
+			if ( !select_mode(modes, modes_count, mode_set_error, &mode) )
 				exit(10);
 
-			if ( !(mode_set = set_current_mode(&display, mode)) )
+			if ( use_display )
+				mode_set = request_set_display_mode(connection, display_id,
+				                                    mode);
+			else
+				mode_set = set_current_mode(&display, mode);
+			if ( !mode_set )
 			{
 				mode_set_error = errno;
 				warn("Failed to set video mode %jux%jux%ju",
@@ -581,6 +705,9 @@ int main(int argc, char* argv[])
 			}
 		}
 	}
+
+	if ( use_display )
+		display_disconnect(connection);
 
 	return 0;
 }

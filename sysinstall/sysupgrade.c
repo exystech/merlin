@@ -73,6 +73,7 @@ static struct mountpoint* mountpoints;
 static size_t mountpoints_used;
 static bool fs_made = false;
 static char fs[] = "/tmp/fs.XXXXXX";
+static int exit_gui_code = -1;
 
 static bool add_installation(struct blockdevice* bdev,
                              struct release* release,
@@ -329,6 +330,14 @@ void exit_handler(void)
 	}
 	if ( fs_made )
 		rmdir(fs);
+	if ( 0 <= exit_gui_code )
+		gui_shutdown(exit_gui_code);
+}
+
+void exit_gui(int code)
+{
+	exit_gui_code = code;
+	exit(code);
 }
 
 static void cancel_on_sigint(int signum)
@@ -457,7 +466,8 @@ int main(void)
 	prompt(input, sizeof(input), "ready", "Ready?", ready);
 	text("\n");
 
-	bool kblayout_setable = 0 <= tcgetblob(0, "kblayout", NULL, 0);
+	bool kblayout_setable = 0 <= tcgetblob(0, "kblayout", NULL, 0) ||
+	                        getenv("DISPLAY_SOCKET");
 	while ( kblayout_setable )
 	{
 		// TODO: Detect the name of the current keyboard layout.
@@ -499,38 +509,16 @@ int main(void)
 	if ( kblayout_setable )
 		text("\n");
 
-	struct tiocgdisplay display;
-	struct tiocgdisplays gdisplays;
-	memset(&gdisplays, 0, sizeof(gdisplays));
-	gdisplays.count = 1;
-	gdisplays.displays = &display;
-	struct dispmsg_get_driver_name dgdn = { 0 };
-	dgdn.msgid = DISPMSG_GET_DRIVER_NAME;
-	dgdn.device = 0;
-	dgdn.driver_index = 0;
-	dgdn.name.byte_size = 0;
-	dgdn.name.str = NULL;
-	if ( ioctl(1, TIOCGDISPLAYS, &gdisplays) == 0 &&
-	     0 < gdisplays.count &&
-	     (dgdn.device = display.device, true) &&
-	     (dispmsg_issue(&dgdn, sizeof(dgdn)) == 0 || errno != ENODEV) )
+	struct dispmsg_crtc_mode mode;
+	if ( get_video_mode(&mode) )
 	{
-		struct dispmsg_get_crtc_mode get_mode;
-		memset(&get_mode, 0, sizeof(get_mode));
-		get_mode.msgid = DISPMSG_GET_CRTC_MODE;
-		get_mode.device = 0;
-		get_mode.connector = 0;
-		bool good = false;
-		if ( dispmsg_issue(&get_mode, sizeof(get_mode)) == 0 )
+		bool good = (mode.control & DISPMSG_CONTROL_VALID) &&
+		            (mode.control & DISPMSG_CONTROL_GOOD_DEFAULT);
+		if ( mode.control & DISPMSG_CONTROL_VM_AUTO_SCALE )
 		{
-			good = (get_mode.mode.control & DISPMSG_CONTROL_VALID) &&
-			       (get_mode.mode.control & DISPMSG_CONTROL_GOOD_DEFAULT);
-			if ( get_mode.mode.control & DISPMSG_CONTROL_VM_AUTO_SCALE )
-			{
-				text("The display resolution will automatically change to "
-				     "match the size of the virtual machine window.\n\n");
-				good = true;
-			}
+			text("The display resolution will automatically change to "
+			     "match the size of the virtual machine window.\n\n");
+			good = true;
 		}
 		const char* def = non_interactive || good ? "no" : "yes";
 		while ( true )
@@ -835,7 +823,7 @@ int main(void)
 		while ( true )
 		{
 			promptx(input, sizeof(input), "confirm_upgrade",
-				   "Upgrade? (yes/no/poweroff/reboot/halt)", "yes", true);
+				   "Upgrade? (yes/no/exit/poweroff/reboot/halt)", "yes", true);
 			if ( !strcasecmp(input, "yes") )
 				break;
 			else if ( !strcasecmp(input, "no") )
@@ -848,12 +836,14 @@ int main(void)
 				     "'halt' or cancel the upgrade.\n");
 				continue;
 			}
-			else if ( !strcasecmp(input, "poweroff") )
+			else if ( !strcasecmp(input, "exit") )
 				exit(0);
+			else if ( !strcasecmp(input, "poweroff") )
+				exit_gui(0);
 			else if ( !strcasecmp(input, "reboot") )
-				exit(1);
+				exit_gui(1);
 			else if ( !strcasecmp(input, "halt") )
-				exit(2);
+				exit_gui(2);
 			else if ( !strcasecmp(input, "!") )
 				break;
 			else
@@ -991,12 +981,14 @@ int main(void)
 	while ( true )
 	{
 		prompt(input, sizeof(input), "finally",
-		       "What now? (poweroff/reboot/halt)", "reboot");
-		if ( !strcasecmp(input, "poweroff") )
-			return 0;
-		if ( !strcasecmp(input, "reboot") )
-			return 1;
-		if ( !strcasecmp(input, "halt") )
-			return 2;
+		       "What now? (exit/poweroff/reboot/halt)", "reboot");
+		if ( !strcasecmp(input, "exit") )
+			exit(0);
+		else if ( !strcasecmp(input, "poweroff") )
+			exit_gui(0);
+		else if ( !strcasecmp(input, "reboot") )
+			exit_gui(1);
+		else if ( !strcasecmp(input, "halt") )
+			exit_gui(2);
 	}
 }

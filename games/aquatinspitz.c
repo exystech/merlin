@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2016, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,6 +22,7 @@
 #include <sys/types.h>
 
 #include <assert.h>
+#include <err.h>
 #include <errno.h>
 #include <error.h>
 #include <math.h>
@@ -34,12 +35,15 @@
 #include <timespec.h>
 #include <unistd.h>
 
-#include <dispd.h>
+#include <display.h>
 
 // Utility global variables every game will need.
+uint32_t window_id = 0;
+static size_t framesize;
+static uint32_t* fb;
 static bool game_running = true;
-static size_t game_width = 1280;
-static size_t game_height = 720;
+static size_t game_width = 800;
+static size_t game_height = 512;
 #define MAX_KEY_NUMBER 512
 static bool keys_down[MAX_KEY_NUMBER];
 static bool keys_pending[MAX_KEY_NUMBER];
@@ -200,20 +204,16 @@ void update(float deltatime)
 }
 
 // Render the game into the framebuffer.
-void render(struct dispd_window* window)
+void render(struct display_connection* connection)
 {
-	struct dispd_framebuffer* window_fb = dispd_begin_render(window);
-	if ( !window_fb )
-	{
-		error(0, 0, "unable to begin rendering dispd window");
-		game_running = false;
-		return;
-	}
+	size_t old_framesize = framesize;
 
-	uint32_t* fb = (uint32_t*) dispd_get_framebuffer_data(window_fb);
-	size_t xres = dispd_get_framebuffer_width(window_fb);
-	size_t yres = dispd_get_framebuffer_height(window_fb);
-	size_t pitch = dispd_get_framebuffer_pitch(window_fb) / sizeof(uint32_t);
+	size_t xres = game_width;
+	size_t yres = game_height;
+	size_t pitch = xres;
+	framesize = xres * yres * sizeof(uint32_t);
+	if ( old_framesize != framesize && !(fb = realloc(fb, framesize)) )
+		err(1, "malloc");
 
 	// Render a colorful background.
 	for ( size_t y = 0; y < yres; y++ )
@@ -273,7 +273,9 @@ void render(struct dispd_window* window)
 		}
 	}
 
-	dispd_finish_render(window_fb);
+	display_render_window(connection, window_id, 0, 0,
+	                      game_width, game_height, fb);
+	display_show_window(connection, window_id);
 }
 
 // ... to here. No need to edit stuff below.
@@ -310,50 +312,68 @@ bool pop_is_key_just_down(int abskbkey)
 	return true;
 }
 
-// Read input from the keyboard.
-void input(void)
+// When the connection to the display server has disconnected.
+void on_disconnect(void* ctx)
 {
-	// Read the keyboard input from the user.
-	unsigned termmode = TERMMODE_KBKEY | TERMMODE_SIGNAL | TERMMODE_NONBLOCK;
-	if ( settermmode(0, termmode) )
-		error(1, errno, "settermmode");
-	uint32_t codepoint;
-	ssize_t numbytes;
-	while ( 0 < (numbytes = read(0, &codepoint, sizeof(codepoint))) )
-	{
-		int kbkey = KBKEY_DECODE(codepoint);
-		if( !kbkey )
-			continue;
-		int abskbkey = (kbkey < 0) ? -kbkey : kbkey;
-		if ( MAX_KEY_NUMBER <= (size_t) abskbkey )
-			continue;
-		bool is_key_down_event = 0 < kbkey;
-		if ( !keys_down[abskbkey] && is_key_down_event )
-			keys_pending[abskbkey] = true;
-		keys_down[abskbkey] = is_key_down_event;
-	}
+	(void) ctx;
+	exit(0);
+}
+
+// When the window is asked to quit.
+void on_quit(void* ctx, uint32_t window_id)
+{
+	(void) ctx;
+	(void) window_id;
+	exit(0);
+}
+
+// When the window has been resized.
+void on_resize(void* ctx, uint32_t window_id,  uint32_t width, uint32_t height)
+{
+	(void) ctx;
+	if ( window_id != window_id )
+		return;
+	game_width = width;
+	game_height = height;
+}
+
+// When a key has been pressed.
+void on_keyboard(void* ctx, uint32_t window_id, uint32_t codepoint)
+{
+	(void) ctx;
+	if ( window_id != window_id )
+		return;
+	int kbkey = KBKEY_DECODE(codepoint);
+	if ( !kbkey )
+		return;
+	int abskbkey = (kbkey < 0) ? -kbkey : kbkey;
+	if ( MAX_KEY_NUMBER <= (size_t) abskbkey )
+		return;
+	bool is_key_down_event = 0 < kbkey;
+	if ( !keys_down[abskbkey] && is_key_down_event )
+		keys_pending[abskbkey] = true;
+	keys_down[abskbkey] = is_key_down_event;
 }
 
 // Run the game until no longer needed.
-void mainloop(struct dispd_window* window)
+void mainloop(struct display_connection* connection)
 {
-	struct dispd_framebuffer* window_fb = dispd_begin_render(window);
-	if ( window_fb )
-	{
-		game_width = dispd_get_framebuffer_width(window_fb);
-		game_height = dispd_get_framebuffer_height(window_fb);
-		dispd_finish_render(window_fb);
-	}
+	struct display_event_handlers handlers = {0};
+	handlers.disconnect_handler = on_disconnect;
+	handlers.quit_handler = on_quit;
+	handlers.resize_handler = on_resize;
+	handlers.keyboard_handler = on_keyboard;
 
 	init();
 
 	struct timespec last_frame_time;
 	clock_gettime(CLOCK_MONOTONIC, &last_frame_time);
 
-	render(window);
+	render(connection);
 
 	while ( game_running )
 	{
+
 		struct timespec current_frame_time;
 		clock_gettime(CLOCK_MONOTONIC, &current_frame_time);
 
@@ -361,71 +381,31 @@ void mainloop(struct dispd_window* window)
 			timespec_sub(current_frame_time, last_frame_time);
 		float deltatime = deltatime_ts.tv_sec + deltatime_ts.tv_nsec / 1E9f;
 
-		input();
+		while ( display_poll_event(connection, &handlers) == 0 );
+
 		update(deltatime);
-		render(window);
+		render(connection);
 
 		last_frame_time = current_frame_time;
 	}
 }
 
-// Reset the terminal state when the process terminates.
-static struct termios saved_tio;
-
-static void restore_terminal_on_exit(void)
-{
-	tcsetattr(0, TCSAFLUSH, &saved_tio);
-}
-
-static void restore_terminal_on_signal(int signum)
-{
-	if ( signum == SIGTSTP )
-	{
-		struct termios tio;
-		tcgetattr(0, &tio);
-		tcsetattr(0, TCSAFLUSH, &saved_tio);
-		raise(SIGSTOP);
-		tcgetattr(0, &saved_tio);
-		tcsetattr(0, TCSAFLUSH, &tio);
-		return;
-	}
-	tcsetattr(0, TCSAFLUSH, &saved_tio);
-	raise(signum);
-}
-
 // Create a display context, run the game, and then cleanly exit.
 int main(int argc, char* argv[])
 {
-	if ( !isatty(0) )
-		error(1, errno, "standard input");
-	if ( tcgetattr(0, &saved_tio) < 0 )
-		error(1, errno, "tcsetattr: standard input");
-	if ( atexit(restore_terminal_on_exit) != 0 )
-		error(1, errno, "atexit");
-	struct sigaction sa;
-	memset(&sa, 0, sizeof(sa));
-	sa.sa_handler = restore_terminal_on_signal;
-	sigaction(SIGTSTP, &sa, NULL);
-	sa.sa_flags = SA_RESETHAND;
-	sigaction(SIGINT, &sa, NULL);
-	sigaction(SIGQUIT, &sa, NULL);
-	sigaction(SIGTERM, &sa, NULL);
+	struct display_connection* connection = display_connect_default();
+	if ( !connection && errno == ECONNREFUSED )
+		display_spawn(argc, argv);
+	if ( !connection )
+		error(1, errno, "Could not connect to display server");
 
-	if ( !dispd_initialize(&argc, &argv) )
-		error(1, 0, "couldn't initialize dispd library");
-	struct dispd_session* session = dispd_attach_default_session();
-	if ( !session )
-		error(1, 0, "couldn't attach to dispd default session");
-	if ( !dispd_session_setup_game_rgba(session) )
-		error(1, 0, "couldn't setup dispd rgba session");
-	struct dispd_window* window = dispd_create_window_game_rgba(session);
-	if ( !window )
-		error(1, 0, "couldn't create dispd rgba window");
+	display_create_window(connection, window_id);
+	display_resize_window(connection, window_id, game_width, game_height);
+	display_title_window(connection, window_id, "Aquatinspitz");
 
-	mainloop(window);
+	mainloop(connection);
 
-	dispd_destroy_window(window);
-	dispd_detach_session(session);
+	display_disconnect(connection);
 
 	return 0;
 }

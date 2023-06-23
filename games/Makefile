@@ -15,7 +15,7 @@ BINARIES:=\
 asteroids \
 aquatinspitz \
 
-LIBS:=-ldispd
+LIBS:=-ldisplay
 
 all: $(BINARIES)
 

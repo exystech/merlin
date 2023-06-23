@@ -1,0 +1,44 @@
+.Dd June 17, 2023
+.Dt TERMINAL 1
+.Os
+.Sh NAME
+.Nm terminal
+.Nd graphical terminal emulator
+.Sh SYNOPSIS
+.Nm
+.Op Ar command ...
+.Sh DESCRIPTION
+.Nm
+is a graphical terminal emulator for the
+.Xr display 1
+desktop environment.
+.Nm
+has essentially the same features as the
+.Xr kernel 7
+console.
+.Pp
+The
+.Ar command
+is executed inside a
+.Xr pts 4
+psuedoterminal.
+A login shell can be requested with a leading hyphen
+.Sq - .
+If no command was specified, the user's shell per
+.Xr passwd 5
+is run as a login shell with
+.Xr sh 1
+as a fallback.
+.Sh ENVIRONMENT
+.Bl -tag -width "TERM"
+.It TERM Ns = Ns Sy sortix
+The terminal type.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr display 1 ,
+.Xr sh 1  ,
+.Xr pts 4 ,
+.Xr tty 4

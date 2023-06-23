@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,23 +13,43 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * framebuffer.h
- * Keeps track of framebuffers.
+ * pixel.h
+ * Pixel functions.
  */
 
-#ifndef INCLUDE_DISPD_FRAMEBUFFER_H
-#define INCLUDE_DISPD_FRAMEBUFFER_H
+#ifndef PIXEL_H
+#define PIXEL_H
 
-struct dispd_framebuffer
+#include <stdint.h>
+
+// TODO: This isn't the only pixel format in the world!
+union color_rgba8
 {
-	struct dispd_window* window;
-	uint8_t* data;
-	size_t datasize;
-	size_t pitch;
-	int bpp;
-	int width;
-	int height;
-	uint64_t fb_location;
+	struct
+	{
+		uint8_t b;
+		uint8_t g;
+		uint8_t r;
+		uint8_t a;
+	};
+	uint32_t value;
 };
+
+static inline uint32_t make_color_a(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+{
+	union color_rgba8 color;
+	color.r = r;
+	color.g = g;
+	color.b = b;
+	color.a = a;
+	return color.value;
+}
+
+static inline uint32_t make_color(uint8_t r, uint8_t g, uint8_t b)
+{
+	return make_color_a(r, g, b, 255);
+}
+
+uint32_t blend_pixel(uint32_t bg_value, uint32_t fg_value);
 
 #endif

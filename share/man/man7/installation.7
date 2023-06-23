@@ -156,6 +156,15 @@ Ports can additionally be loaded as binary packages in the
 directory by navigating to the advanced menu and then the select binary packages
 submenu and then selecting which ports.
 .Pp
+The
+.Xr display 1
+graphical user interface and desktop environment can be disabled by navigating
+to the advanced menu and selecting
+.Sy Disable GUI ,
+which will instead boot to a plain
+.Pa /dev/tty1
+terminal.
+.Pp
 The network drivers can be disabled by navigating to the advanced menu and
 selecting
 .Sy Disable network drivers .
@@ -179,6 +188,17 @@ bootloader.
 If not, you can run the installer by running the
 .Xr sysinstall 8
 command.
+.Pp
+You will boot into the
+.Xr display 1
+graphical user interface and desktop environment by default.
+A single
+.Xr terminal 1
+window will open by default.
+More terminals can be opened by pressing Control + Alt + T.
+See
+.Xr display 1
+for the available shortcuts.
 .Pp
 The installer is an interactive command line program that asks you questions and
 you answer them.
@@ -386,6 +406,14 @@ and
 .Pp
 Please note that Sortix is not currently secure as a multi-user system and
 filesystem permissions are not enforced.
+.Ss Graphical User Interface
+You will be asked if you want to enable the graphical user interface.
+If you answer yes, then the system-wide default
+.Xr session 5
+is configured to run
+.Xr display 1
+upon login.
+Otherwise the user's preferred shell will be run upon login.
 .Ss Network Time
 You will be asked if you want to enable the Network Time Protocol client
 .Xr ntpd 8 ,
@@ -519,6 +547,7 @@ fragment instead.
 .Sh SEE ALSO
 .Xr chkblayout 1 ,
 .Xr chvideomode 1 ,
+.Xr display 1 ,
 .Xr man 1 ,
 .Xr fstab 5 ,
 .Xr group 5 ,

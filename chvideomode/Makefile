@@ -11,7 +11,7 @@ CFLAGS += -Wall -Wextra
 BINARIES = chvideomode
 MANPAGES1 = chvideomode.1
 
-LIBS =
+LIBS = -ldisplay
 
 all: $(BINARIES)
 

@@ -11,7 +11,7 @@ CFLAGS += -Wall -Wextra
 BINARIES = chkblayout
 MANPAGES1 = chkblayout.1
 
-LIBS =
+LIBS = -ldisplay
 
 all: $(BINARIES)
 

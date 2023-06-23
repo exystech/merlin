@@ -348,6 +348,7 @@ static bool etc_made = false;
 static char etc[] = "/tmp/etc.XXXXXX";
 static bool fs_made = false;
 static char fs[] = "/tmp/fs.XXXXXX";
+static int exit_gui_code = -1;
 
 static void unmount_all_but_root(void)
 {
@@ -376,6 +377,14 @@ void exit_handler(void)
 		rmdir(fs);
 	if ( etc_made )
 		execute((const char*[]) { "rm", "-rf", etc, NULL }, "");
+	if ( 0 <= exit_gui_code )
+		gui_shutdown(exit_gui_code);
+}
+
+void exit_gui(int code)
+{
+	exit_gui_code = code;
+	exit(code);
 }
 
 static void cancel_on_sigint(int signum)
@@ -544,7 +553,8 @@ int main(void)
 
 	install_configurationf("upgrade.conf", "a", "src = yes\n");
 
-	bool kblayout_setable = 0 <= tcgetblob(0, "kblayout", NULL, 0);
+	bool kblayout_setable = 0 <= tcgetblob(0, "kblayout", NULL, 0) ||
+	                        getenv("DISPLAY_SOCKET");
 	while ( kblayout_setable )
 	{
 		// TODO: Detect the name of the current keyboard layout.
@@ -598,38 +608,16 @@ int main(void)
 		text("\n");
 	}
 
-	struct tiocgdisplay display;
-	struct tiocgdisplays gdisplays;
-	memset(&gdisplays, 0, sizeof(gdisplays));
-	gdisplays.count = 1;
-	gdisplays.displays = &display;
-	struct dispmsg_get_driver_name dgdn = { 0 };
-	dgdn.msgid = DISPMSG_GET_DRIVER_NAME;
-	dgdn.device = 0;
-	dgdn.driver_index = 0;
-	dgdn.name.byte_size = 0;
-	dgdn.name.str = NULL;
-	if ( ioctl(1, TIOCGDISPLAYS, &gdisplays) == 0 &&
-	     0 < gdisplays.count &&
-	     (dgdn.device = display.device, true) &&
-	     (dispmsg_issue(&dgdn, sizeof(dgdn)) == 0 || errno != ENODEV) )
+	struct dispmsg_crtc_mode mode;
+	if ( get_video_mode(&mode) )
 	{
-		struct dispmsg_get_crtc_mode get_mode;
-		memset(&get_mode, 0, sizeof(get_mode));
-		get_mode.msgid = DISPMSG_GET_CRTC_MODE;
-		get_mode.device = 0;
-		get_mode.connector = 0;
-		bool good = false;
-		if ( dispmsg_issue(&get_mode, sizeof(get_mode)) == 0 )
+		bool good = (mode.control & DISPMSG_CONTROL_VALID) &&
+		            (mode.control & DISPMSG_CONTROL_GOOD_DEFAULT);
+		if ( mode.control & DISPMSG_CONTROL_VM_AUTO_SCALE )
 		{
-			good = (get_mode.mode.control & DISPMSG_CONTROL_VALID) &&
-			       (get_mode.mode.control & DISPMSG_CONTROL_GOOD_DEFAULT);
-			if ( get_mode.mode.control & DISPMSG_CONTROL_VM_AUTO_SCALE )
-			{
-				text("The display resolution will automatically change to "
-				     "match the size of the virtual machine window.\n\n");
-				good = true;
-			}
+			text("The display resolution will automatically change to "
+			     "match the size of the virtual machine window.\n\n");
+			good = true;
 		}
 		const char* def = non_interactive || good ? "no" : "yes";
 		while ( true )
@@ -648,14 +636,12 @@ int main(void)
 			if ( execute((const char*[]) { "chvideomode", r, NULL }, "f") != 0 )
 				continue;
 			input[0] = '\0';
-			if ( dispmsg_issue(&get_mode, sizeof(get_mode)) < 0 ||
-			     !(get_mode.mode.control & DISPMSG_CONTROL_VALID) ||
-			     get_mode.mode.control & DISPMSG_CONTROL_VGA )
-				break;
+			if ( !get_video_mode(&mode) ||
+			     !(mode.control & DISPMSG_CONTROL_VALID) ||
+			     mode.control & DISPMSG_CONTROL_VGA )
+				continue;
 			snprintf(input, sizeof(input), "%ux%ux%u",
-			         get_mode.mode.view_xres,
-			         get_mode.mode.view_yres,
-			         get_mode.mode.fb_format);
+			         mode.view_xres, mode.view_yres, mode.fb_format);
 			break;
 		}
 
@@ -918,7 +904,7 @@ int main(void)
 	{
 		prompt(input, sizeof(input), "confirm_install",
 		       "Install " BRAND_DISTRIBUTION_NAME "? "
-		       "(yes/no/poweroff/reboot/halt)", "yes");
+		       "(yes/no/exit/poweroff/reboot/halt)", "yes");
 		if ( !strcasecmp(input, "yes") )
 			break;
 		else if ( !strcasecmp(input, "no") )
@@ -929,12 +915,14 @@ int main(void)
 			     "'halt' to cancel the installation.\n");
 			continue;
 		}
-		else if ( !strcasecmp(input, "poweroff") )
+		else if ( !strcasecmp(input, "exit") )
 			exit(0);
+		else if ( !strcasecmp(input, "poweroff") )
+			exit_gui(0);
 		else if ( !strcasecmp(input, "reboot") )
-			exit(1);
+			exit_gui(1);
 		else if ( !strcasecmp(input, "halt") )
-			exit(2);
+			exit_gui(2);
 		else
 			continue;
 	}
@@ -1293,6 +1281,27 @@ int main(void)
 
 	// TODO: Ask if networking should be disabled / enabled.
 
+	while ( true )
+	{
+		prompt(input, sizeof(input), "enable_gui",
+			   "Enable graphical user interface?",
+		       getenv("DISPLAY_SOCKET") ? "yes" : "no");
+		if ( strcasecmp(input, "no") == 0 )
+			break;
+		if ( strcasecmp(input, "yes") != 0 )
+			continue;
+		if ( !install_configurationf("etc/session", "w",
+		                             "#!sh\nexec display\n") ||
+		     chmod("etc/session", 0755) < 0 )
+		{
+			warn("etc/session");
+			continue;
+		}
+		text("Added 'exec display' to /etc/session\n");
+		break;
+	}
+	text("\n");
+
 	if ( !access_or_die("/tix/tixinfo/ntpd", F_OK) )
 	{
 		text("A Network Time Protocol client (ntpd) has been installed that "
@@ -1538,11 +1547,11 @@ int main(void)
 		if ( !strcasecmp(input, "exit") )
 			exit(0);
 		else if ( !strcasecmp(input, "poweroff") )
-			exit(0);
+			exit_gui(0);
 		else if ( !strcasecmp(input, "reboot") )
-			exit(1);
+			exit_gui(1);
 		else if ( !strcasecmp(input, "halt") )
-			exit(2);
+			exit_gui(2);
 		else if ( !strcasecmp(input, "boot") )
 		{
 			if ( !access("/etc/fstab", F_OK) )
@@ -1557,7 +1566,7 @@ int main(void)
 			                         "echo 'require chain exit-code' > "
 			                         "/etc/init/default", NULL },
 			        "ef");
-			exit(3);
+			exit_gui(3);
 		}
 		else if ( !strcasecmp(input, "chroot") )
 		{

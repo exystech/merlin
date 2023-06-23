@@ -151,6 +151,7 @@ EOF
 tix-iso-bootconfig \
   --random-seed \
   --timeout=0 \
+  --disable-gui \
   --liveconfig=liveconfig \
   bootconfig
 mkdir -p bootconfig/boot/grub

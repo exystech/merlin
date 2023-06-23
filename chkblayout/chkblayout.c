@@ -20,6 +20,7 @@
 
 #include <sys/stat.h>
 
+#include <display.h>
 #include <err.h>
 #include <errno.h>
 #include <error.h>
@@ -33,6 +34,20 @@
 #include <string.h>
 #include <unistd.h>
 #include <termios.h>
+
+#define CHKBLAYOUT_ID 0
+
+static bool chkblayout_ack_received = false;
+static int chkblayout_error;
+
+static void on_ack(void* ctx, uint32_t id, int32_t error)
+{
+	(void) ctx;
+	if ( id != CHKBLAYOUT_ID )
+		return;
+	chkblayout_error = error;
+	chkblayout_ack_received = true;
+}
 
 int main(int argc, char* argv[])
 {
@@ -103,8 +118,29 @@ int main(int argc, char* argv[])
 		err(1, "read: %s", kblayout_path);
 	close(kblayout_fd);
 
-	if ( tcsetblob(tty_fd, "kblayout", kblayout, kblayout_size) < 0 )
-		err(1, "tcsetblob: kblayout: %s:", kblayout_path);
+	if ( getenv("DISPLAY_SOCKET") )
+	{
+		struct display_connection* connection = display_connect_default();
+		if ( !connection )
+			err(1, "Could not connect to display server");
+
+		display_chkblayout(connection, CHKBLAYOUT_ID, kblayout, kblayout_size);
+
+		struct display_event_handlers handlers = {0};
+		handlers.ack_handler = on_ack;
+		while ( !chkblayout_ack_received )
+			display_wait_event(connection, &handlers);
+
+		if ( chkblayout_error )
+		{
+			errno = chkblayout_error;
+			err(1, "tcsetblob: kblayout: %s", kblayout_path);
+		}
+
+		display_disconnect(connection);
+	}
+	else if ( tcsetblob(tty_fd, "kblayout", kblayout, kblayout_size) < 0 )
+		err(1, "tcsetblob: kblayout: %s", kblayout_path);
 
 	free(kblayout);
 

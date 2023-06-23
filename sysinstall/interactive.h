@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -42,5 +42,7 @@ void password(char* buffer,
               size_t buffer_size,
               const char* question);
 bool missing_program(const char* program);
+bool get_video_mode(struct dispmsg_crtc_mode* mode);
+void gui_shutdown(int code);
 
 #endif

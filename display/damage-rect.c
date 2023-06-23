@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,30 +13,27 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * session.h
- * Handles session management.
+ * damage-rect.c
+ * Damage rectangles.
  */
 
-#ifndef INCLUDE_DISPD_SESSION_H
-#define INCLUDE_DISPD_SESSION_H
+#include <stddef.h>
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
+#include "damage-rect.h"
 
-struct dispd_session
+struct damage_rect damage_rect_add(struct damage_rect a, struct damage_rect b)
 {
-	size_t refcount;
-	uint64_t device;
-	uint64_t connector;
-	struct dispd_window* current_window;
-	bool is_rgba;
-};
-
-bool dispd__session_initialize(int* argc, char*** argv);
-
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif
-
-#endif
+	if ( !a.width || !a.height )
+		return b;
+	if ( !b.width || !b.height )
+		return a;
+	if ( a.left < b.left )
+		b.width += b.left - a.left, b.left = a.left;
+	if ( b.width < a.width )
+		b.width = a.width;
+	if ( a.top < b.top )
+		b.height += b.top - a.top, b.top = a.top;
+	if ( b.height < a.height )
+		b.height = a.height;
+	return b;
+}

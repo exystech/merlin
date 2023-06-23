@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,26 +13,26 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * window.h
- * Handles windows.
+ * pixel.c
+ * Pixel functions.
  */
 
-#ifndef INCLUDE_DISPD_WINDOW_H
-#define INCLUDE_DISPD_WINDOW_H
+#include <stdint.h>
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
+#include "pixel.h"
 
-struct dispd_window
+uint32_t blend_pixel(uint32_t bg_value, uint32_t fg_value)
 {
-	struct dispd_session* session;
-	uint8_t* cached_buffer;
-	size_t cached_buffer_size;
-};
-
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif
-
-#endif
+	union color_rgba8 fg; fg.value = fg_value;
+	union color_rgba8 bg; bg.value = bg_value;
+	if ( fg.a == 255 )
+		return fg.value;
+	if ( fg.a == 0 )
+		return bg.value;
+	union color_rgba8 ret;
+	ret.a = 255;
+	ret.r = ((255-fg.a)*bg.r + fg.a*fg.r) / 256;
+	ret.g = ((255-fg.a)*bg.g + fg.a*fg.g) / 256;
+	ret.b = ((255-fg.a)*bg.b + fg.a*fg.b) / 256;
+	return ret.value;
+}

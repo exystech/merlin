@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2015, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2023 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,11 +18,15 @@
  * Interactive utility functions.
  */
 
+#include <sys/display.h>
+#include <sys/ioctl.h>
 #include <sys/termmode.h>
 #include <sys/types.h>
 
 #include <ctype.h>
+#include <display.h>
 #include <err.h>
+#include <errno.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -31,9 +36,21 @@
 #include <termios.h>
 #include <wchar.h>
 
+#include <display.h>
+
 #include "autoconf.h"
 #include "execute.h"
 #include "interactive.h"
+
+#define REQUEST_DISPLAYS_ID 0
+#define REQUEST_DISPLAY_MODE_ID 1
+
+static uint32_t displays_count;
+static bool displays_count_received;
+
+static struct dispmsg_crtc_mode display_mode;
+static int request_display_mode_error;
+static bool display_mode_received;
 
 void shlvl(void)
 {
@@ -258,4 +275,108 @@ bool missing_program(const char* program)
 		return false;
 	warnx("%s: Program is absent", program);
 	return true;
+}
+
+static void on_displays(void* ctx, uint32_t id, uint32_t displays)
+{
+	(void) ctx;
+	if ( id != REQUEST_DISPLAYS_ID )
+		return;
+	displays_count = displays;
+	displays_count_received = true;
+}
+
+static void on_display_mode(void* ctx, uint32_t id,
+                            struct dispmsg_crtc_mode mode)
+{
+	(void) ctx;
+	if ( id != REQUEST_DISPLAY_MODE_ID )
+		return;
+	display_mode = mode;
+	request_display_mode_error = 0;
+	display_mode_received = true;
+}
+
+static void on_ack(void* ctx, uint32_t id, int32_t error)
+{
+	(void) ctx;
+	if ( id != REQUEST_DISPLAY_MODE_ID )
+		return;
+	if ( error )
+	{
+		request_display_mode_error = error;
+		display_mode_received = true;
+	}
+}
+
+bool get_video_mode(struct dispmsg_crtc_mode* mode)
+{
+	if ( getenv("DISPLAY_SOCKET") )
+	{
+		struct display_connection* connection = display_connect_default();
+		if ( !connection )
+			return false;
+		struct display_event_handlers handlers = {0};
+		handlers.displays_handler = on_displays;
+		handlers.display_mode_handler = on_display_mode;
+		handlers.ack_handler = on_ack;
+		display_request_displays(connection, REQUEST_DISPLAYS_ID);
+		displays_count_received = false;
+		while ( !displays_count_received )
+			display_wait_event(connection, &handlers);
+		if ( displays_count < 1 )
+		{
+			display_disconnect(connection);
+			return false;
+		}
+		// TODO: Multimonitor support.
+		display_request_display_mode(connection, REQUEST_DISPLAY_MODE_ID, 0);
+		display_mode_received = false;
+		while ( !display_mode_received )
+			display_wait_event(connection, &handlers);
+		display_disconnect(connection);
+		if ( request_display_mode_error )
+			return false;
+		*mode = display_mode;
+		return true;
+	}
+
+	struct tiocgdisplay display;
+	struct tiocgdisplays gdisplays;
+	memset(&gdisplays, 0, sizeof(gdisplays));
+	gdisplays.count = 1;
+	gdisplays.displays = &display;
+	struct dispmsg_get_driver_name dgdn = { 0 };
+	if ( ioctl(1, TIOCGDISPLAYS, &gdisplays) < 0 || gdisplays.count == 0 )
+		return false;
+	dgdn.device = display.device;
+	dgdn.msgid = DISPMSG_GET_DRIVER_NAME;
+	dgdn.device = display.device;
+	dgdn.driver_index = 0;
+	dgdn.name.byte_size = 0;
+	dgdn.name.str = NULL;
+	if ( dispmsg_issue(&dgdn, sizeof(dgdn)) < 0 && errno == ENODEV )
+		return false;
+	struct dispmsg_get_crtc_mode get_mode;
+	memset(&get_mode, 0, sizeof(get_mode));
+	get_mode.msgid = DISPMSG_GET_CRTC_MODE;
+	get_mode.device = display.device;
+	get_mode.connector = display.connector;
+	// TODO: Still allow setting the video mode if none was already set.
+	if ( dispmsg_issue(&get_mode, sizeof(get_mode)) < 0 )
+		return false;
+	*mode = get_mode.mode;
+	return true;
+}
+
+void gui_shutdown(int code)
+{
+	if ( getenv("DISPLAY_SOCKET") )
+	{
+		struct display_connection* connection = display_connect_default();
+		if ( connection )
+			display_shutdown(connection, code);
+		else
+			warn("display_connect_default");
+	}
 }

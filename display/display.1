@@ -1,0 +1,182 @@
+.Dd June 11, 2023
+.Dt DISPLAY 1
+.Os
+.Sh NAME
+.Nm display
+.Nd desktop environment
+.Sh SYNOPSIS
+.Nm
+.Op Ar session ...
+.Sh DESCRIPTION
+.Nm
+is a desktop environment and windowing system compositor.
+Applications talk to the
+.Nm
+server process to receive user input and show their graphical user interfaces
+in windows.
+.Pp
+The user's preferred startup applications are launched on startup by launching
+the
+.Xr session
+program (if set) or otherwise the
+.Xr displayrc 5
+script in the background.
+.Pp
+.Nm
+exits when Control + Alt + Delete is pressed.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl m Ar mouse
+Use
+.Pa mouse
+device instead of
+.Pa /dev/mouse .
+.It Fl t Ar tty
+Use
+.Pa tty
+device instead of
+.Pa /dev/tty .
+.It Fl s Ar socket
+Listen on
+.Pa socket
+instead of
+.Pa /var/run/display .
+.El
+.Pp
+The keyboard shortcuts are as follows:
+.Bl -tag -width "Control + Alt + Delete"
+.It Alt + F4
+Quit the current window.
+.It Alt + F10
+Maximize (or restore) the current window.
+.It Alt + Tab
+Switch to the next window.
+.It Alt + Drag
+Drag the current window.
+.It Control + Alt + Delete
+Exit the desktop environment.
+.It Control + Alt + T
+Launch the
+.Xr terminal 1
+application.
+.It Super + Left
+Tile the current window leftwards.
+.It Super + Right
+Tile the current window rightwards.
+.It Super + Up
+Tile the current window upwards.
+.It Super + Down
+Tile the current window downwards.
+.It F11
+Grab input for the current window.
+.It F12
+Release the input grab on the current window.
+.El
+.Pp
+The mouse gestures are as follow:
+.Bl -bullet
+.It
+Clicking on a window brings it to the foreground.
+.It
+Dragging the window title bar moves the window.
+.It
+Double clicking on the window title bar maximizes (or restores) the window.
+.It
+Clicking on the rectangle icon in the title bar maximizes (or restores) the
+window.
+.It
+Clicking on the X icon in the title bar closes the window.
+.It
+Dragging the edges of a window resizes it.
+.It
+Windows can be tiled by moving them when the cursor meets the left, right, top,
+and bottom edges or any corner.
+.El
+.Pp
+The keyboard layout can be changed with the
+.Xr chkblayout 1
+program.
+The display resolution can be changed with the
+.Xr chvideomode 1
+program.
+.Sh ENVIRONMENT
+.Bl -tag -width "DISPLAY_SOCKET"
+.It Ev DISPLAY_SOCKET
+.Nm
+sets
+.Ev DISPLAY_SOCKET
+to the path of the
+.Xr unix 4
+socket where it listens for connections from applications.
+Applications use
+.Ev DISPLAY_SOCKET
+to connect to
+.Nm
+or
+.Pa /var/run/display
+by default.
+.El
+.Sh FILES
+.Bl -tag -width 12345678 -compact
+.It Pa ~/.displayrc , /etc/displayrc , /etc/default/displayrc
+.Xr displayrc 5
+script that spawns the user's preferred startup applications.
+.It Pa /var/run/display
+.Xr unix 4
+socket where
+.Nm
+listens for connections from applications, as advertised in the
+.Ev DISPLAY_SOCKET
+environment variable.
+.El
+.Sh ASYNCHRONOUS EVENTS
+.Bl -tag -width "SIGTERM"
+.It Dv SIGTERM
+Request daemon termination.
+.El
+.Sh EXIT STATUS
+.Nm
+runs as a
+.Xr daemon 7
+until stopped by
+.Dv SIGTERM ,
+the user explicitly exits the desktop environment, or an application asks
+it to exit.
+.Nm
+signals readiness on the
+.Ev READYFD
+file descriptor when the display server is ready to receive connections from
+applications.
+.Nm
+will exit non-zero on any fatal startup error.
+.Sh EXAMPLES
+.Nm
+can be selected as the user's graphical user interface with this executable
+.Pa ~/.session
+script:
+.Bd -literal -offset indent
+#!/bin/sh
+exec display
+.Ed
+.Pp
+.Xr chkblayout 1 ,
+.Xr chvideomode 1 ,
+.Xr display 1
+will run the
+.Xr displayrc 5
+script on startup, which can be used to start applications.
+.Sh SEE ALSO
+.Xr terminal 1 ,
+.Xr displayrc 5 ,
+.Xr session 5
+.Sh BUGS
+The following features are not yet implemented:
+.Bl -bullet -compact
+.It
+Windows cannot be minimized.
+.It
+Applications cannot receive mouse events.
+.It
+The wallpaper is random and cannot be controlled.
+.El

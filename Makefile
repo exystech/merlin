@@ -6,8 +6,9 @@ include build-aux/version.mak
 MODULES=\
 libc \
 libm \
-dispd \
+libdisplay \
 libmount \
+libui \
 bench \
 carray \
 checksum \
@@ -15,6 +16,7 @@ chkblayout \
 chvideomode \
 dhclient \
 disked \
+display \
 dnsconfig \
 editor \
 ext \
@@ -32,6 +34,7 @@ rw \
 sf \
 sh \
 sysinstall \
+terminal \
 tix \
 trianglix \
 update-initrd \
