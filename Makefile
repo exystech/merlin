@@ -73,10 +73,10 @@ include build-aux/dirs.mak
 
 BUILD_NAME:=sortix-$(RELEASE)-$(MACHINE)
 
-LIVE_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).live.initrd
-OVERLAY_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).overlay.initrd
-SRC_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).src.initrd
-SYSTEM_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).system.initrd
+LIVE_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).live.tar
+OVERLAY_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).overlay.tar
+SRC_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).src.tar
+SYSTEM_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).system.tar
 
 .PHONY: all
 all: sysroot
@@ -455,7 +455,6 @@ $(LIVE_INITRD): sysroot
 	echo "include /etc/default/passwd.d/*" >> $(LIVE_INITRD).d/etc/passwd
 	echo "root::0:root" > $(LIVE_INITRD).d/etc/group
 	echo "include /etc/default/group.d/*" >> $(LIVE_INITRD).d/etc/group
-	mkdir -p $(LIVE_INITRD).d/home
 	mkdir -p $(LIVE_INITRD).d/root -m 700
 	cp -RT "$(SYSROOT)/etc/skel" $(LIVE_INITRD).d/root
 	(echo "You can view the documentation for new users by typing:" && \
@@ -466,19 +465,23 @@ $(LIVE_INITRD): sysroot
 	 echo && \
 	 echo "  man installation") > $(LIVE_INITRD).d/root/welcome
 	tix-collection $(LIVE_INITRD).d create --platform=$(HOST) --prefix= --generation=2
-	mkinitrd --format=sortix-initrd-2 $(LIVE_INITRD).d -o $(LIVE_INITRD)
+	LC_ALL=C ls -A $(LIVE_INITRD).d | \
+	tar -cf $(LIVE_INITRD) -C $(LIVE_INITRD).d --numeric-owner --owner=0 --group=0 -T -
 	rm -rf $(LIVE_INITRD).d
 
 .PHONY: $(OVERLAY_INITRD)
 $(OVERLAY_INITRD): sysroot
 	test ! -d "$(SYSROOT_OVERLAY)" || \
-	mkinitrd --format=sortix-initrd-2 "$(SYSROOT_OVERLAY)" -o $(OVERLAY_INITRD)
+	LC_ALL=C ls -A "$(SYSROOT_OVERLAY)" | \
+	tar -cf $(OVERLAY_INITRD) -C "$(SYSROOT_OVERLAY)" --numeric-owner --owner=0 --group=0 -T -
 
 $(SRC_INITRD): sysroot
-	mkinitrd --format=sortix-initrd-2 --manifest="$(SYSROOT)/tix/manifest/src" "$(SYSROOT)" -o $(SRC_INITRD)
+	sed -E 's,^/,,' "$(SYSROOT)/tix/manifest/src" | \
+	tar -cf $(SRC_INITRD) -C "$(SYSROOT)" --numeric-owner --owner=0 --group=0 --no-recursion -T - tix/manifest/src
 
 $(SYSTEM_INITRD): sysroot
-	mkinitrd --format=sortix-initrd-2 --manifest="$(SYSROOT)/tix/manifest/system" "$(SYSROOT)" -o $(SYSTEM_INITRD)
+	sed -E 's,^/,,' "$(SYSROOT)/tix/manifest/system" | \
+	tar -cf $(SYSTEM_INITRD) -C "$(SYSROOT)" --numeric-owner --owner=0 --group=0 --no-recursion -T - tix/manifest/system
 
 # Packaging
 
@@ -499,29 +502,29 @@ $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso: sysroot $(LIVE_INITRD) $(OVERLAY_INITRD)
 	build-aux/iso-repository.sh $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/repository
 ifeq ($(SORTIX_ISO_COMPRESSION),xz)
 	xz -c "$(SYSROOT)/boot/sortix.bin" > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix.bin.xz
-	xz -c $(LIVE_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/live.initrd.xz
+	xz -c $(LIVE_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/live.tar.xz
 	test ! -e "$(OVERLAY_INITRD)" || \
-	xz -c $(OVERLAY_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/overlay.initrd.xz
-	xz -c $(SRC_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/src.initrd.xz
-	xz -c $(SYSTEM_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/system.initrd.xz
+	xz -c $(OVERLAY_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/overlay.tar.xz
+	xz -c $(SRC_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/src.tar.xz
+	xz -c $(SYSTEM_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/system.tar.xz
 	build-aux/iso-grub-cfg.sh --platform $(HOST) --version $(VERSION) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 	grub-mkrescue --compress=xz -o $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 else ifeq ($(SORTIX_ISO_COMPRESSION),gzip)
 	gzip -c "$(SYSROOT)/boot/sortix.bin" > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix.bin.gz
-	gzip -c $(LIVE_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/live.initrd.gz
+	gzip -c $(LIVE_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/live.tar.gz
 	test ! -e "$(OVERLAY_INITRD)" || \
-	gzip -c $(OVERLAY_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/overlay.initrd.gz
-	gzip -c $(SRC_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/src.initrd.gz
-	gzip -c $(SYSTEM_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/system.initrd.gz
+	gzip -c $(OVERLAY_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/overlay.tar.gz
+	gzip -c $(SRC_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/src.tar.gz
+	gzip -c $(SYSTEM_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/system.tar.gz
 	build-aux/iso-grub-cfg.sh --platform $(HOST) --version $(VERSION) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 	grub-mkrescue --compress=gz -o $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 else # none
 	cp "$(SYSROOT)/boot/sortix.bin" $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix.bin
-	cp $(LIVE_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/live.initrd
+	cp $(LIVE_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/live.tar
 	test ! -e "$(OVERLAY_INITRD)" || \
-	cp $(OVERLAY_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/overlay.initrd
-	cp $(SRC_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/src.initrd
-	cp $(SYSTEM_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/system.initrd
+	cp $(OVERLAY_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/overlay.tar
+	cp $(SRC_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/src.tar
+	cp $(SYSTEM_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/system.tar
 	build-aux/iso-grub-cfg.sh --platform $(HOST) --version $(VERSION) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 	grub-mkrescue -o $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 endif
@@ -555,25 +558,25 @@ $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot: $(SORTIX_RELEASE_DIR)/$(RELEAS
 $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/sortix.bin.xz: sysroot $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot
 	xz -c "$(SYSROOT)/boot/sortix.bin" > $@
 
-$(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/live.initrd.xz: $(LIVE_INITRD) $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/live.tar.xz: $(LIVE_INITRD) $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot
 	xz -c $< > $@
 
-$(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/overlay.initrd.xz: $(OVERLAY_INITRD) $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/overlay.tar.xz: $(OVERLAY_INITRD) $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot
 	test ! -e $< || xz -c $< > $@
 
-$(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/src.initrd.xz: $(SRC_INITRD) $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/src.tar.xz: $(SRC_INITRD) $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot
 	xz -c $< > $@
 
-$(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/system.initrd.xz: $(SYSTEM_INITRD) $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/system.tar.xz: $(SYSTEM_INITRD) $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot
 	xz -c $< > $@
 
 .PHONY: release-boot
 release-boot: \
   $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/sortix.bin.xz \
-  $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/live.initrd.xz \
-  $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/overlay.initrd.xz \
-  $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/src.initrd.xz \
-  $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/system.initrd.xz \
+  $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/live.tar.xz \
+  $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/overlay.tar.xz \
+  $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/src.tar.xz \
+  $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/system.tar.xz \
 
 .PHONY: release-iso
 release-iso: $(SORTIX_RELEASE_DIR)/$(RELEASE)/builds/$(BUILD_NAME).iso

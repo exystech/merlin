@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2015, 2016, 2017 Jonas 'Sortie' Termansen.
+# Copyright (c) 2015, 2016, 2017, 2023 Jonas 'Sortie' Termansen.
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,7 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 # update-initrd
-# Generate a mkinitrd that locates and chain boots the real root filesystem.
+# Generate an initrd(7) that locates and chain boots the real root filesystem.
 
 set -e
 
@@ -86,4 +86,6 @@ require chain exit-code
 EOF
 fi
 mkdir -p "$sysroot/boot"
-mkinitrd --format=sortix-initrd-2 "$tmp" -o "$sysroot/boot/sortix.initrd" > /dev/null
+LC_AL=C ls -A "$tmp" |
+tar -C "$tmp" -cf "$sysroot/boot/sortix.initrd" \
+    --numeric-owner --owner=0 --group=0 -T -

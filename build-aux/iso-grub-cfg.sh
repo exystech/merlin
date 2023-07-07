@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2018, 2022 Jonas 'Sortie' Termansen.
+# Copyright (c) 2018, 2022, 2023 Jonas 'Sortie' Termansen.
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -111,10 +111,10 @@ isinset() {
 cd "$directory"
 
 kernel=$(maybe_compressed boot/sortix.bin)
-live_initrd=$(maybe_compressed boot/live.initrd)
-overlay_initrd=$(maybe_compressed boot/overlay.initrd)
-src_initrd=$(maybe_compressed boot/src.initrd)
-system_initrd=$(maybe_compressed boot/system.initrd)
+live_initrd=$(maybe_compressed boot/live.tar)
+overlay_initrd=$(maybe_compressed boot/overlay.tar)
+src_initrd=$(maybe_compressed boot/src.tar)
+system_initrd=$(maybe_compressed boot/system.tar)
 ports=$(ls repository |
        grep -E '\.tix\.tar\.xz$' |
        sed -E 's/\.tix\.tar\.xz$//')
