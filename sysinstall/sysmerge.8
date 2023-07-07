@@ -6,7 +6,7 @@
 .Nd upgrade current operating system from a sysroot
 .Sh SYNOPSIS
 .Nm sysmerge
-.Op Fl cfw
+.Op Fl cfpsw
 .Op Fl \-booting
 .Op Fl \-hook-finalize
 .Op Fl \-hook-prepare
@@ -87,6 +87,16 @@ This is meant to be used by the old
 when it invokes the new
 .Nm
 during a non-waiting upgrade.
+.It Fl s , Fl \-system
+Upgrade the system.
+This option is implied unless
+.Fl \-ports
+is passed.
+.It Fl p , Fl \-ports
+Upgrade the ports.
+This option is implied unless
+.Fl \-system
+is passed.
 .It Fl w , Fl \-wait
 Wait until the next boot to complete the upgrade, rather than finishing it now.
 This installs into the

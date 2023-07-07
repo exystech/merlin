@@ -112,6 +112,8 @@ int main(int argc, char* argv[])
 	bool full = false;
 	bool hook_finalize = false;
 	bool hook_prepare = false;
+	bool ports = false;
+	bool system = false;
 	bool wait = false;
 
 	for ( int i = 1; i < argc; i++ )
@@ -129,6 +131,8 @@ int main(int argc, char* argv[])
 			{
 			case 'c': cancel = true; break;
 			case 'f': full = true; break;
+			case 'p': ports = true; break;
+			case 's': system = true; break;
 			case 'w': wait = true; break;
 			default:
 				errx(1, "unknown option -- '%c'", c);
@@ -144,6 +148,10 @@ int main(int argc, char* argv[])
 			hook_finalize = true;
 		else if ( !strcmp(arg, "--hook-prepare") )
 			hook_prepare = true;
+		else if ( !strcmp(arg, "--system") )
+			system = true;
+		else if ( !strcmp(arg, "--ports") )
+			ports = true;
 		else if ( !strcmp(arg, "--wait") )
 			wait = true;
 		else
@@ -171,6 +179,8 @@ int main(int argc, char* argv[])
 		source = "/sysmerge";
 		if ( 1 < argc )
 			errx(2, "Unexpected extra operand `%s'", argv[1]);
+		system = access_or_die("/sysmerge/tix/sysmerge.system", F_OK) == 0;
+		ports = access_or_die("/sysmerge/tix/sysmerge.ports", F_OK) == 0;
 		full = access_or_die("/sysmerge/tix/sysmerge.full", F_OK) == 0;
 	}
 	else
@@ -181,6 +191,11 @@ int main(int argc, char* argv[])
 		if ( 2 < argc )
 			errx(2, "Unexpected extra operand `%s'", argv[2]);
 	}
+
+	if ( !system && !ports )
+		system = ports = true;
+	if ( !ports )
+		full = false;
 
 	bool did_cancel = false;
 	if ( !no_cancel && has_pending_upgrade() )
@@ -215,9 +230,14 @@ int main(int argc, char* argv[])
 	struct release new_release;
 	if ( !os_release_load(&new_release, new_release_path, new_release_path) )
 	{
-		if ( errno == ENOENT )
-			warn("%s", new_release_path);
-		exit(2);
+		if ( !system )
+			new_release = old_release;
+		else
+		{
+			if ( errno == ENOENT )
+				warn("%s", new_release_path);
+			exit(2);
+		}
 	}
 	free(new_release_path);
 
@@ -228,7 +248,8 @@ int main(int argc, char* argv[])
 	char* new_machine_path;
 	if ( asprintf(&new_machine_path, "%s/etc/machine", source) < 0 )
 		err(2, "asprintf");
-	char* new_machine = read_string_file(new_machine_path);
+	char* new_machine = !system ? strdup(old_machine) :
+	                    read_string_file(new_machine_path);
 	if ( !new_machine )
 		err(2, "%s", new_machine_path);
 	if ( strcmp(old_machine, new_machine) != 0 )
@@ -300,6 +321,12 @@ int main(int argc, char* argv[])
 		my_finalize = false;
 	}
 
+	if ( !system )
+	{
+		run_prepare = false;
+		run_finalize = false;
+	}
+
 	if ( header )
 	{
 		if ( wait )
@@ -339,7 +366,7 @@ int main(int argc, char* argv[])
 			execute((const char*[]) { "tix-collection", "/sysmerge", "create",
 			                           NULL }, "e");
 		}
-		install_manifests_detect(source, target, true, true, full);
+		install_manifests_detect(source, target, system, ports, full);
 	}
 
 	if ( wait )
@@ -350,6 +377,20 @@ int main(int argc, char* argv[])
 			int fd = open("/sysmerge/tix/sysmerge.full", O_WRONLY | O_CREAT);
 			if ( fd < 0 )
 				err(1, "/sysmerge/tix/sysmerge.full");
+			close(fd);
+		}
+		if ( system && !ports )
+		{
+			int fd = open("/sysmerge/tix/sysmerge.system", O_WRONLY | O_CREAT);
+			if ( fd < 0 )
+				err(1, "/sysmerge/tix/sysmerge.system");
+			close(fd);
+		}
+		if ( ports && !system )
+		{
+			int fd = open("/sysmerge/tix/sysmerge.ports", O_WRONLY | O_CREAT);
+			if ( fd < 0 )
+				err(1, "/sysmerge/tix/sysmerge.ports");
 			close(fd);
 		}
 		execute((const char*[]) { "cp", "/boot/sortix.bin",
