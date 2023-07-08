@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016, 2022, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,8 +24,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <ioleast.h>
@@ -658,8 +658,8 @@ void HandleIncomingMessage(int chl, struct fsm_msg_header* hdr, Filesystem* fs)
 	if ( (uint16_t) request_uid != request_uid ||
 	     (uint16_t) request_gid != request_gid )
 	{
-		fprintf(stderr, "extfs: id exceeded 16-bit: uid=%ju gid=%ju\n",
-		        (uintmax_t) request_uid, (uintmax_t) request_gid);
+		warn("id exceeded 16-bit: uid=%ju gid=%ju\n",
+		     (uintmax_t) request_uid, (uintmax_t) request_gid);
 		RespondError(chl, EOVERFLOW);
 		return;
 	}
@@ -690,7 +690,7 @@ void HandleIncomingMessage(int chl, struct fsm_msg_header* hdr, Filesystem* fs)
 	handlers[FSM_REQ_TCGETBLOB] = (handler_t) HandleTCGetBlob;
 	if ( FSM_MSG_NUM <= hdr->msgtype || !handlers[hdr->msgtype] )
 	{
-		fprintf(stderr, "extfs: message type %zu not supported\n", hdr->msgtype);
+		warn("message type %zu not supported\n", hdr->msgtype);
 		RespondError(chl, ENOTSUP);
 		return;
 	}
@@ -744,14 +744,14 @@ int fsmarshall_main(const char* argv0,
 	struct stat root_inode_st;
 	Inode* root_inode = fs->GetInode((uint32_t) EXT2_ROOT_INO);
 	if ( !root_inode )
-		error(1, errno, "GetInode(%u)", EXT2_ROOT_INO);
+		err(1, "GetInode(%u)", EXT2_ROOT_INO);
 	StatInode(root_inode, &root_inode_st);
 	root_inode->Unref();
 
 	// Create a filesystem server connected to the kernel that we'll listen on.
 	int serverfd = fsm_mountat(AT_FDCWD, mount_path, &root_inode_st, 0);
 	if ( serverfd < 0 )
-		error(1, errno, "%s", mount_path);
+		err(1, "%s", mount_path);
 
 	// Make sure the server isn't unexpectedly killed and data is lost.
 	signal(SIGINT, TerminationHandler);
@@ -763,7 +763,7 @@ int fsmarshall_main(const char* argv0,
 	{
 		pid_t child_pid = fork();
 		if ( child_pid < 0 )
-			error(1, errno, "fork");
+			err(1, "fork");
 		if ( child_pid )
 			exit(0);
 		setpgid(0, 0);
@@ -785,7 +785,7 @@ int fsmarshall_main(const char* argv0,
 		size_t amount;
 		if ( (amount = readall(channel, &hdr, sizeof(hdr))) != sizeof(hdr) )
 		{
-			//error(0, errno, "incomplete header: got %zi of %zu bytes", amount, sizeof(hdr));
+			//warn("incomplete header: got %zi of %zu bytes", amount, sizeof(hdr));
 			errno = 0;
 			continue;
 		}

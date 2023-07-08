@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,8 +22,8 @@
 
 #include <assert.h>
 #include <dirent.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -212,7 +212,7 @@ int main(int argc, char* argv[])
 	read = read || write;
 
 	// Default to read and write filesystem access.
-	bool default_access = !read && !write ? read = write = true : false;
+	bool default_access = !read && !write ? (read = write = true) : false;
 
 	if ( argc == 1 )
 	{
@@ -236,74 +236,71 @@ int main(int argc, char* argv[])
 
 	int fd = open(device_path, write ? O_RDWR : O_RDONLY);
 	if ( fd < 0 )
-		error(1, errno, "`%s'", device_path);
+		err(1, "%s", device_path);
 
 	// Read the super block from the filesystem so we can verify it.
 	struct ext_superblock sb;
 	if ( preadall(fd, &sb, sizeof(sb), 1024) != sizeof(sb) )
 	{
 		if ( errno == EEOF )
-			error(1, 0, "`%s' isn't a valid extended filesystem", device_path);
+			errx(1, "%s: Isn't a valid extended filesystem", device_path);
 		else
-			error(1, errno, "read: `%s'", device_path);
+			err(1, "read: %s", device_path);
 	}
 
 	// Verify the magic value to detect a compatible filesystem.
 	if ( sb.s_magic != EXT2_SUPER_MAGIC )
-		error(1, 0, "`%s' isn't a valid extended filesystem", device_path);
+		errx(1, "%s: Isn't a valid extended filesystem", device_path);
 
 	// Test whether this revision of the extended filesystem is supported.
 	if ( sb.s_rev_level == EXT2_GOOD_OLD_REV )
-		error(1, 0, "`%s' is formatted with an obsolete filesystem revision",
-		            device_path);
+		errx(1, "%s: Is formatted with an obsolete filesystem revision",
+		     device_path);
 
 	// Verify that no incompatible features are in use.
 	if ( sb.s_feature_compat & ~EXT2_FEATURE_INCOMPAT_SUPPORTED )
-		error(1, 0, "`%s' uses unsupported and incompatible features",
-		            device_path);
+		errx(1, "%s: Uses unsupported and incompatible features", device_path);
 
 	// Verify that no incompatible features are in use if opening for write.
 	if ( !default_access && write &&
 	     sb.s_feature_ro_compat & ~EXT2_FEATURE_RO_COMPAT_SUPPORTED )
-		error(1, 0, "`%s' uses unsupported and incompatible features, "
-		            "read-only access is possible, but write-access was "
-		            "requested", device_path);
+		errx(1, "%s: Uses unsupported and incompatible features, "
+		     "read-only access is possible, but write-access was requested",
+		     device_path);
 
 	if ( write && sb.s_feature_ro_compat & ~EXT2_FEATURE_RO_COMPAT_SUPPORTED )
 	{
-		fprintf(stderr, "Warning: `%s' uses unsupported and incompatible "
-		                "features, falling back to read-only access\n",
-		                device_path);
+		warn("warning: %s: Uses unsupported and incompatible features, "
+		     "falling back to read-only access\n", device_path);
 		// TODO: Modify the file descriptor such that writing fails!
 		write = false;
 	}
 
 	// Check whether any features are in use that we can safely disregard.
 	if ( sb.s_feature_compat & ~EXT2_FEATURE_COMPAT_SUPPORTED )
-		fprintf(stderr, "Note: filesystem uses unsupported but compatible "
-		                "features\n");
+		warn("%s: Filesystem uses unsupported but compatible features\n",
+		     device_path);
 
 	// Check the block size is sane. 64 KiB may have issues, 32 KiB then.
 	if ( sb.s_log_block_size > (15-10) /* 32 KiB blocks */ )
-		error(1, 0, "`%s': excess block size", device_path);
+		errx(1, "%s: Filesystem has excess block size", device_path);
 
 	// Check whether the filesystem was unmounted cleanly.
 	if ( sb.s_state != EXT2_VALID_FS )
-		fprintf(stderr, "Warning: `%s' wasn't unmounted cleanly\n",
-	                    device_path);
+		warn("warning: %s: Filesystem wasn't unmounted cleanly\n", device_path);
 
 	uint32_t block_size = 1024U << sb.s_log_block_size;
 
 	Device* dev = new Device(fd, device_path, block_size, write);
 	if ( !dev ) // TODO: Use operator new nothrow!
-		error(1, errno, "malloc");
+		err(1, "malloc");
 	Filesystem* fs = new Filesystem(dev, pretend_mount_path);
 	if ( !fs ) // TODO: Use operator new nothrow!
-		error(1, errno, "malloc");
+		err(1, "malloc");
 
 	fs->block_groups = new BlockGroup*[fs->num_groups];
 	if ( !fs->block_groups ) // TODO: Use operator new nothrow!
-		error(1, errno, "malloc");
+		err(1, "malloc");
 	for ( size_t i = 0; i < fs->num_groups; i++ )
 		fs->block_groups[i] = NULL;
 
