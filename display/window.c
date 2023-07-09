@@ -323,18 +323,39 @@ void window_destroy(struct window* window)
 void window_on_display_resolution_change(struct window* window,
                                          struct display* display)
 {
-	// TODO: Move window back inside screen.
-	if ( window->window_state == WINDOW_STATE_MAXIMIZED )
+	switch ( window->window_state )
 	{
-		// TODO: Change size of maximized window.
-		(void) display;
+	case WINDOW_STATE_REGULAR:
+	{
+		ssize_t left = window->left, top = window->top;
+		if ( (ssize_t) display->screen_width <= left )
+			left = 0;
+		if ( (ssize_t) display->screen_height <= top )
+			top = 0;
+		window_move(window, left, top);
+		break;
+	}
+	case WINDOW_STATE_MAXIMIZED: window_maximize(window); break;
+	case WINDOW_STATE_MINIMIZED: break;
+	case WINDOW_STATE_TILE_LEFT: window_tile_left(window); break;
+	case WINDOW_STATE_TILE_RIGHT: window_tile_right(window); break;
+	case WINDOW_STATE_TILE_TOP: window_tile_top(window); break;
+	case WINDOW_STATE_TILE_TOP_LEFT: window_tile_top_left(window); break;
+	case WINDOW_STATE_TILE_TOP_RIGHT: window_tile_top_right(window); break;
+	case WINDOW_STATE_TILE_BOTTOM: window_tile_bottom(window); break;
+	case WINDOW_STATE_TILE_BOTTOM_LEFT: window_tile_bottom_left(window); break;
+	case WINDOW_STATE_TILE_BOTTOM_RIGHT:
+		window_tile_bottom_right(window);
+		break;
 	}
 }
 
 void window_tile(struct window* window, enum window_state state, size_t left,
                  size_t top, size_t width, size_t height)
 {
-	if ( window->window_state == state )
+	if ( window->window_state == state &&
+	     window->left == (ssize_t) left && window->top == (ssize_t) top &&
+	     window->width == width && window->height == height )
 		return;
 
 	if ( window->window_state == WINDOW_STATE_REGULAR )
