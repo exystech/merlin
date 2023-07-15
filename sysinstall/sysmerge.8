@@ -7,6 +7,7 @@
 .Sh SYNOPSIS
 .Nm sysmerge
 .Op Fl cfpsw
+.Op Fl t Ar target
 .Op Fl \-booting
 .Op Fl \-hook-finalize
 .Op Fl \-hook-prepare
@@ -92,6 +93,30 @@ Upgrade the system.
 This option is implied unless
 .Fl \-ports
 is passed.
+.It Fl t , Fl \-target Ns = Ns Ar target
+Upgrade the installation in the
+.Ar target
+directory rather than the root filesystem.
+This option is supported if the
+.Pa target
+is the
+.Pa /
+directory or only has ports installed and no system.
+This option is unsupported if
+.Ar target
+has the system installed and is not the
+.Pa / directory .
+Instead one should
+.Xr chroot 8
+into the
+.Pa target
+and run the old
+.Nm
+inside rather than the new
+.Nm .
+However, this option may be useful for repairing installations and should work
+in practice, however it is untested and might not properly handle incompatible
+changes across releases.
 .It Fl p , Fl \-ports
 Upgrade the ports.
 This option is implied unless

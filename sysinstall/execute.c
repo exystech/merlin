@@ -32,6 +32,7 @@
 
 int execute(const char* const* argv, const char* flags, ...)
 {
+	const char* chroot = NULL;
 	bool _exit_instead = false;
 	bool exit_on_failure = false;
 	bool foreground = false;
@@ -51,6 +52,7 @@ int execute(const char* const* argv, const char* flags, ...)
 		switch ( flags[i] )
 		{
 		case '_': _exit_instead = true; break;
+		case 'c': chroot = va_arg(ap, const char*); break;
 		case 'e': exit_on_failure = true; break;
 		case 'f': foreground = true; break;
 		case 'g': gid_set = true; gid = va_arg(ap, gid_t); break;
@@ -63,6 +65,8 @@ int execute(const char* const* argv, const char* flags, ...)
 		}
 	}
 	va_end(ap);
+	if ( chroot && !strcmp(chroot, "/") )
+		chroot = NULL;
 	sigset_t oldset, sigttou;
 	if ( foreground )
 	{
@@ -88,6 +92,25 @@ int execute(const char* const* argv, const char* flags, ...)
 	}
 	if ( child_pid == 0 )
 	{
+		if ( chroot )
+		{
+			int argc = 0;
+			while ( argv[argc] )
+				argc++;
+			const char** new_argv = calloc(argc + 4, sizeof(const char*));
+			if ( !new_argv )
+			{
+				if ( !quiet_stderr )
+					warn("malloc");
+				_exit(2);
+			}
+			new_argv[0] = "chroot";
+			new_argv[1] = "-d";
+			new_argv[2] = chroot;
+			for ( int i = 0; i < argc; i++ )
+				new_argv[3 + i] = argv[i];
+			argv = new_argv;
+		}
 		if ( gid_set )
 		{
 			setegid(gid);

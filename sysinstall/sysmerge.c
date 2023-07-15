@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2018, 2020, 2021, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2018, 2020, 2021, 2022, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,6 +24,7 @@
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -83,24 +84,20 @@ static bool is_partition_name(const char* path)
 	return *name == '\0';
 }
 
-static void compact_arguments(int* argc, char*** argv)
+static bool has_pending_upgrade(const char* target)
 {
-	for ( int i = 0; i < *argc; i++ )
-	{
-		while ( i < *argc && !(*argv)[i] )
-		{
-			for ( int n = i; n < *argc; n++ )
-				(*argv)[n] = (*argv)[n+1];
-			(*argc)--;
-		}
-	}
-}
-
-static bool has_pending_upgrade(void)
-{
-	return access_or_die("/boot/sortix.bin.sysmerge.orig", F_OK) == 0 ||
-	       access_or_die("/boot/sortix.initrd.sysmerge.orig", F_OK) == 0 ||
-	       access_or_die("/sysmerge", F_OK) == 0;
+	char* kernel = join_paths(target, "boot/sortix.bin.sysmerge.orig");
+	char* initrd = join_paths(target, "boot/sortix.initrd.sysmerge.orig");
+	char* sysmerge = join_paths(target, "sysmerge");
+	if ( !kernel || !initrd || !sysmerge )
+		err(2, "malloc");
+	bool result = access_or_die(kernel, F_OK) == 0 ||
+	              access_or_die(initrd, F_OK) == 0 ||
+	              access_or_die(sysmerge, F_OK) == 0;
+	free(kernel);
+	free(initrd);
+	free(sysmerge);
+	return result;
 }
 
 int main(int argc, char* argv[])
@@ -114,52 +111,46 @@ int main(int argc, char* argv[])
 	bool hook_prepare = false;
 	bool ports = false;
 	bool system = false;
+	const char* target = "/";
 	bool wait = false;
 
-	for ( int i = 1; i < argc; i++ )
+	enum longopt
 	{
-		const char* arg = argv[i];
-		if ( arg[0] != '-' || !arg[1] )
-			continue;
-		argv[i] = NULL;
-		if ( !strcmp(arg, "--") )
-			break;
-		if ( arg[1] != '-' )
+		OPT_BOOTING = 128,
+		OPT_HOOK_FINALIZE,
+		OPT_HOOK_PREPARE,
+	};
+	const struct option longopts[] =
+	{
+		{"booting", no_argument, NULL, OPT_BOOTING},
+		{"cancel", no_argument, NULL, 'c'},
+		{"full", no_argument, NULL, 'f'},
+		{"hook-finalize", no_argument, NULL, OPT_HOOK_FINALIZE},
+		{"hook-prepare", no_argument, NULL, OPT_HOOK_PREPARE},
+		{"ports", no_argument, NULL, 'p'},
+		{"system", no_argument, NULL, 's'},
+		{"target", required_argument, NULL, 't'},
+		{"wait", no_argument, NULL, 'w'},
+		{0, 0, 0, 0}
+	};
+	const char* opts = "cfpst:w";
+	int opt;
+	while ( (opt = getopt_long(argc, argv, opts, longopts, NULL)) != -1 )
+	{
+		switch (opt)
 		{
-			char c;
-			while ( (c = *++arg) ) switch ( c )
-			{
-			case 'c': cancel = true; break;
-			case 'f': full = true; break;
-			case 'p': ports = true; break;
-			case 's': system = true; break;
-			case 'w': wait = true; break;
-			default:
-				errx(1, "unknown option -- '%c'", c);
-			}
+		case OPT_BOOTING: booting = true; break;
+		case 'c': cancel = true; break;
+		case 'f': full = true; break;
+		case OPT_HOOK_FINALIZE: hook_finalize = true; break;
+		case OPT_HOOK_PREPARE: hook_prepare = true; break;
+		case 'p': ports = true; break;
+		case 's': system = true; break;
+		case 't': target = optarg; break;
+		case 'w': wait = true; break;
+		default: return 2;
 		}
-		else if ( !strcmp(arg, "--booting") )
-			booting = true;
-		else if ( !strcmp(arg, "--cancel") )
-			cancel = true;
-		else if ( !strcmp(arg, "--full") )
-			full = true;
-		else if ( !strcmp(arg, "--hook-finalize") )
-			hook_finalize = true;
-		else if ( !strcmp(arg, "--hook-prepare") )
-			hook_prepare = true;
-		else if ( !strcmp(arg, "--system") )
-			system = true;
-		else if ( !strcmp(arg, "--ports") )
-			ports = true;
-		else if ( !strcmp(arg, "--wait") )
-			wait = true;
-		else
-			errx(1, "unknown option: %s", arg);
 	}
-
-	compact_arguments(&argc, &argv);
-
 	if ( 1 < booting + cancel + hook_finalize + hook_prepare + wait )
 		errx(2, "Mutually incompatible options were passed");
 
@@ -171,25 +162,35 @@ int main(int argc, char* argv[])
 	if ( no_source )
 	{
 		source = "";
-		if ( 1 < argc )
-			errx(2, "Unexpected extra operand `%s'", argv[1]);
+		if ( optind < argc )
+			errx(2, "Unexpected extra operand: %s", argv[optind]);
 	}
 	else if ( booting )
 	{
-		source = "/sysmerge";
-		if ( 1 < argc )
-			errx(2, "Unexpected extra operand `%s'", argv[1]);
-		system = access_or_die("/sysmerge/tix/sysmerge.system", F_OK) == 0;
-		ports = access_or_die("/sysmerge/tix/sysmerge.ports", F_OK) == 0;
-		full = access_or_die("/sysmerge/tix/sysmerge.full", F_OK) == 0;
+		source = join_paths(target, "sysmerge");
+		if ( !source )
+			err(2, "malloc");
+		if ( optind < argc )
+			errx(2, "Unexpected extra operand: %s", argv[optind]);
+		char* system_path = join_paths(target, "sysmerge/tix/sysmerge.system");
+		char* ports_path = join_paths(target, "sysmerge/tix/sysmerge.ports");
+		char* full_path = join_paths(target, "sysmerge/tix/sysmerge.full");
+		if ( !system_path || !ports_path || !full_path )
+			err(2, "malloc");
+		system = access_or_die(system_path, F_OK) == 0;
+		ports = access_or_die(ports_path, F_OK) == 0;
+		full = access_or_die(full_path, F_OK) == 0;
+		free(system_path);
+		free(ports_path);
+		free(full_path);
 	}
 	else
 	{
-		if ( argc < 2 )
+		if ( argc - optind < 1 )
 			errx(2, "No source operand was given");
-		source = argv[1];
-		if ( 2 < argc )
-			errx(2, "Unexpected extra operand `%s'", argv[2]);
+		source = argv[optind];
+		if ( 1 < argc - optind )
+			errx(2, "Unexpected extra operand: %s", argv[optind + 1]);
 	}
 
 	if ( !system && !ports )
@@ -197,13 +198,29 @@ int main(int argc, char* argv[])
 	if ( !ports )
 		full = false;
 
+	char* system_manifest = join_paths(target, "tix/manifest/system");
+	if ( !system_manifest )
+		err(2, "malloc");
+	bool has_system = !access_or_die(system_manifest, F_OK);
+	free(system_manifest);
+
+	if ( !has_system )
+		system = false;
+
 	bool did_cancel = false;
-	if ( !no_cancel && has_pending_upgrade() )
+	if ( !no_cancel && has_pending_upgrade(target) )
 	{
-		rename("/boot/sortix.bin.sysmerge.orig", "/boot/sortix.bin");
-		rename("/boot/sortix.initrd.sysmerge.orig", "/boot/sortix.initrd");
-		execute((const char*[]) { "rm", "-rf", "/sysmerge", NULL }, "");
-		execute((const char*[]) { "update-initrd", NULL }, "e");
+		char* kernel = join_paths(target, "boot/sortix.bin.sysmerge.orig");
+		char* kernel_real = join_paths(target, "boot/sortix.bin");
+		char* initrd = join_paths(target, "boot/sortix.initrd.sysmerge.orig");
+		char* initrd_real = join_paths(target, "boot/sortix.initrd");
+		char* sysmerge = join_paths(target, "sysmerge");
+		if ( !kernel || !kernel_real || !initrd || !initrd_real || !sysmerge )
+			err(2, "malloc");
+		rename(kernel, kernel_real);
+		rename(initrd, initrd_real);
+		execute((const char*[]) { "rm", "-rf", "--", sysmerge, NULL }, "");
+		execute((const char*[]) { "update-initrd", NULL }, "ce", target);
 		printf("Cancelled pending system upgrade.\n");
 		did_cancel = true;
 	}
@@ -215,18 +232,24 @@ int main(int argc, char* argv[])
 		return 0;
 	}
 
-	const char* old_release_path = "/etc/sortix-release";
+	char* old_release_path = join_paths(target, "etc/sortix-release");
+	if ( !old_release_path )
+		err(2, "malloc");
 	struct release old_release;
 	if ( !os_release_load(&old_release, old_release_path, old_release_path) )
 	{
-		if ( errno == ENOENT )
-			warn("%s", old_release_path);
-		exit(2);
+		if ( has_system || errno != ENOENT )
+		{
+			if ( errno == ENOENT )
+				warn("%s", old_release_path);
+			exit(2);
+		}
 	}
+	free(old_release_path);
 
-	char* new_release_path;
-	if ( asprintf(&new_release_path, "%s/etc/sortix-release", source) < 0 )
-		err(2, "asprintf");
+	char* new_release_path = join_paths(source, "etc/sortix-release");
+	if ( !new_release_path )
+		err(2, "malloc");
 	struct release new_release;
 	if ( !os_release_load(&new_release, new_release_path, new_release_path) )
 	{
@@ -241,30 +264,39 @@ int main(int argc, char* argv[])
 	}
 	free(new_release_path);
 
-	const char* old_machine_path = "/etc/machine";
-	char* old_machine = read_string_file(old_machine_path);
-	if ( !old_machine )
-		err(2, "%s", old_machine_path);
-	char* new_machine_path;
-	if ( asprintf(&new_machine_path, "%s/etc/machine", source) < 0 )
-		err(2, "asprintf");
-	char* new_machine = !system ? strdup(old_machine) :
-	                    read_string_file(new_machine_path);
-	if ( !new_machine )
-		err(2, "%s", new_machine_path);
-	if ( strcmp(old_machine, new_machine) != 0 )
-		errx(2, "%s (%s) does not match %s (%s)", new_machine_path,
-		     new_machine, old_machine_path, old_machine);
-	free(old_machine);
-	free(new_machine_path);
-	free(new_machine);
+	if ( has_system )
+	{
+		char* old_machine_path = join_paths(target, "etc/machine");
+		if ( !old_machine_path )
+			err(2, "malloc");
+		char* old_machine = read_string_file(old_machine_path);
+		if ( !old_machine )
+			err(2, "%s", old_machine_path);
+		free(old_machine_path);
+		char* new_machine_path = join_paths(source, "etc/machine");
+		if ( !new_machine_path )
+			err(2, "malloc");
+		char* new_machine = !system ? strdup(old_machine) :
+			                read_string_file(new_machine_path);
+		if ( !new_machine )
+			err(2, "%s", new_machine_path);
+		if ( strcmp(old_machine, new_machine) != 0 )
+			errx(2, "%s (%s) does not match %s (%s)", new_machine_path,
+				 new_machine, old_machine_path, old_machine);
+		free(old_machine);
+		free(new_machine_path);
+		free(new_machine);
+	}
 
 	// TODO: Check for version (skipping, downgrading).
 
 	struct conf conf;
 	conf_init(&conf);
-	if ( !conf_load(&conf, "/etc/upgrade.conf") && errno == ENOENT )
-		err(2, "/etc/upgrade.conf");
+	char* conf_path = join_paths(target, "etc/upgrade.conf");
+	if ( !conf_path )
+		err(2, "malloc");
+	if ( !conf_load(&conf, conf_path) && errno != ENOENT )
+		err(2, conf_path);
 
 	bool can_run_new_abi =
 		abi_compatible(new_release.abi_major, new_release.abi_minor,
@@ -327,21 +359,27 @@ int main(int argc, char* argv[])
 		run_finalize = false;
 	}
 
+	if ( wait && !has_system )
+		err(2, "--wait requires a system is installed in: %s", target);
+
 	if ( header )
 	{
-		if ( wait )
+		if ( wait && new_release.pretty_name )
 			printf("Scheduling upgrade to %s on next boot using %s:\n",
 			       new_release.pretty_name, source);
-		else
+		else if ( new_release.pretty_name )
 			printf("Upgrading to %s using %s:\n",
 			       new_release.pretty_name, source);
+		else
+			printf("Upgrading %s using %s:\n", target, source);
 	}
 
 	// Upgrade hooks that runs before the old system is replaced.
-	if ( run_prepare )
+	if ( has_system && run_prepare )
 	{
+		const char* prefix = !strcmp(target, "/") ? "" : target;
 		if ( my_prepare )
-			upgrade_prepare(&old_release, &new_release, source, "");
+			upgrade_prepare(&old_release, &new_release, source, prefix);
 		else
 		{
 			char* new_sysmerge = join_paths(source, "sbin/sysmerge");
@@ -357,51 +395,61 @@ int main(int argc, char* argv[])
 
 	if ( copy_files )
 	{
-		const char* target = "";
+		const char* sysmerge = target;
 		if ( wait )
 		{
-			target = "/sysmerge";
-			if ( mkdir(target, 0755) < 0 )
-				err(2, "%s", target);
-			execute((const char*[]) { "tix-collection", "/sysmerge", "create",
+			sysmerge = join_paths(target, "sysmerge");
+			if ( !sysmerge )
+				err(2, "malloc");
+			if ( mkdir(sysmerge, 0755) < 0 )
+				err(2, "%s", sysmerge);
+			execute((const char*[]) { "tix-collection", sysmerge, "create",
 			                           NULL }, "e");
 		}
-		install_manifests_detect(source, target, system, ports, full);
+		const char* prefix = !strcmp(sysmerge, "/") ? "" : sysmerge;
+		install_manifests_detect(source, prefix, system, ports, full);
 	}
 
 	if ( wait )
 	{
 		printf(" - Scheduling upgrade on next boot...\n");
+		char* system_path = join_paths(target, "sysmerge/tix/sysmerge.system");
+		char* ports_path = join_paths(target, "sysmerge/tix/sysmerge.ports");
+		char* full_path = join_paths(target, "sysmerge/tix/sysmerge.full");
+		char* kernel = join_paths(target, "boot/sortix.bin.sysmerge.orig");
+		char* kernel_real = join_paths(target, "boot/sortix.bin");
+		char* kernel_new = join_paths(target, "sysmerge/boot/sortix.bin");
+		char* initrd = join_paths(target, "boot/sortix.initrd.sysmerge.orig");
+		char* initrd_real = join_paths(target, "boot/sortix.initrd");
+		if ( !system_path || !ports_path || !full_path || !kernel ||
+		     !kernel_real || !kernel_new || !initrd || !initrd_real )
+			err(2, "malloc");
 		if ( full )
 		{
-			int fd = open("/sysmerge/tix/sysmerge.full", O_WRONLY | O_CREAT);
+			int fd = open(full_path, O_WRONLY | O_CREAT);
 			if ( fd < 0 )
-				err(1, "/sysmerge/tix/sysmerge.full");
+				err(2, "%s", full_path);
 			close(fd);
 		}
 		if ( system && !ports )
 		{
-			int fd = open("/sysmerge/tix/sysmerge.system", O_WRONLY | O_CREAT);
+			int fd = open(system_path, O_WRONLY | O_CREAT);
 			if ( fd < 0 )
-				err(1, "/sysmerge/tix/sysmerge.system");
+				err(2, "%s", system_path);
 			close(fd);
 		}
 		if ( ports && !system )
 		{
-			int fd = open("/sysmerge/tix/sysmerge.ports", O_WRONLY | O_CREAT);
+			int fd = open(ports_path, O_WRONLY | O_CREAT);
 			if ( fd < 0 )
-				err(1, "/sysmerge/tix/sysmerge.ports");
+				err(2, "%s", ports_path);
 			close(fd);
 		}
-		execute((const char*[]) { "cp", "/boot/sortix.bin",
-		                                "/boot/sortix.bin.sysmerge.orig",
-		                                NULL }, "e");
-		execute((const char*[]) { "cp", "/boot/sortix.initrd",
-		                                "/boot/sortix.initrd.sysmerge.orig",
-		                                NULL }, "e");
-		execute((const char*[]) { "cp", "/sysmerge/boot/sortix.bin",
-		                                "/boot/sortix.bin", NULL }, "e");
-		execute((const char*[]) { "/sysmerge/sbin/update-initrd", NULL }, "e");
+		execute((const char*[]) { "cp", kernel_real, kernel, NULL }, "e");
+		execute((const char*[]) { "cp", initrd_real, initrd, NULL }, "e");
+		execute((const char*[]) { "cp", kernel_new, kernel_real, NULL }, "e");
+		execute((const char*[]) { "/sysmerge/sbin/update-initrd", NULL }, "ce",
+		        target);
 
 		printf("The system will be upgraded to %s on the next boot.\n",
 		       new_release.pretty_name);
@@ -411,15 +459,16 @@ int main(int argc, char* argv[])
 	}
 
 	// Upgrade hooks that run after the new system is installed.
-	if ( run_finalize )
+	if ( has_system && run_finalize )
 	{
+		const char* prefix = !strcmp(target, "/") ? "" : target;
 		if ( my_finalize )
-			upgrade_finalize(&old_release, &new_release, source, "");
+			upgrade_finalize(&old_release, &new_release, source, prefix);
 		else
 		{
 			char* new_sysmerge = join_paths(source, "sbin/sysmerge");
 			if ( !new_sysmerge )
-				err(2, "asprintf");
+				err(2, "malloc");
 			execute((const char*[]) { new_sysmerge, "--hook-finalize", source,
 			                          NULL }, "e");
 			free(new_sysmerge);
@@ -428,46 +477,62 @@ int main(int argc, char* argv[])
 			return 0;
 	}
 
-	if ( booting )
+	if ( has_system && booting )
 	{
-		unlink("/boot/sortix.bin.sysmerge.orig");
-		unlink("/boot/sortix.initrd.sysmerge.orig");
-		execute((const char*[]) { "rm", "-rf", "/sysmerge", NULL }, "");
+		char* kernel = join_paths(target, "boot/sortix.bin.sysmerge.orig");
+		char* initrd = join_paths(target, "boot/sortix.initrd.sysmerge.orig");
+		char* sysmerge = join_paths(target, "sysmerge");
+		if ( !kernel || !initrd || !sysmerge )
+			err(2, "malloc");
+		unlink(kernel);
+		unlink(initrd);
+		execute((const char*[]) { "rm", "-rf", "--", sysmerge, NULL }, "");
+		free(kernel);
+		free(initrd);
+		free(sysmerge);
 	}
 
-	if ( access_or_die("/etc/fstab", F_OK) == 0 )
+	if ( has_system && access_or_die("/etc/fstab", F_OK) == 0 )
 	{
 		printf(" - Creating initrd...\n");
-		execute((const char*[]) { "update-initrd", NULL }, "e");
+		execute((const char*[]) { "update-initrd", NULL }, "ce", target);
 
 		if ( conf.grub )
 		{
-			int boot_fd = open("/boot", O_RDONLY);
+			char* boot_path = join_paths(target, "boot");
+			if ( !boot_path )
+				err(2, "malloc");
+			int boot_fd = open(boot_path, O_RDONLY);
 			if ( boot_fd < 0 )
-				err(2, "/boot");
+				err(2, boot_path);
 			char* boot_device = atcgetblob(boot_fd, "device-path", NULL);
 			if ( !boot_device )
-				err(2, "Failed to find device of filesystem: /boot");
+				err(2, "Failed to find device of filesystem: %s", boot_path);
 			close(boot_fd);
+			free(boot_path);
 			// TODO: A better design for finding the parent block device of a
 			//       partition without scanning every block device.
 			if ( is_partition_name(boot_device) )
 				*strrchr(boot_device, 'p') = '\0';
 			printf(" - Installing bootloader...\n");
 			execute((const char*[]) { "grub-install", boot_device,
-			                          NULL },"eqQ");
+			                          NULL }, "ceqQ", target);
 			free(boot_device);
 			printf(" - Configuring bootloader...\n");
-			execute((const char*[]) { "update-grub", NULL }, "eqQ");
+			execute((const char*[]) { "update-grub", NULL }, "ceqQ", target);
 		}
 		else if ( access_or_die("/etc/grub.d/10_sortix", F_OK) == 0 )
 		{
 			printf(" - Creating bootloader fragment...\n");
-			execute((const char*[]) { "/etc/grub.d/10_sortix", NULL }, "eq");
+			execute((const char*[]) { "/etc/grub.d/10_sortix", NULL }, "ceq",
+			        target);
 		}
 	}
 
-	printf("Successfully upgraded to %s.\n", new_release.pretty_name);
+	if ( new_release.pretty_name )
+		printf("Successfully upgraded to %s.\n", new_release.pretty_name);
+	else
+		printf("Successfully upgraded %s.\n", target);
 
 	return 0;
 }
