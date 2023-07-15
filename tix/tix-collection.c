@@ -27,6 +27,7 @@
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <libgen.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -107,13 +108,6 @@ int main(int argc, char* argv[])
 	compact_arguments(&argc, &argv);
 
 	ParseOptionalCommandLineCollectionPrefix(&collection, &argc, &argv);
-	VerifyCommandLineCollection(&collection);
-
-	int generation = atoi(generation_string);
-	free(generation_string);
-
-	if ( !prefix )
-		prefix = strdup(collection);
 
 	if ( argc == 1 )
 	{
@@ -121,11 +115,29 @@ int main(int argc, char* argv[])
 		exit(1);
 	}
 
+	// The collection directory might not exist yet.
+	if ( strcmp(argv[1], "create") != 0 )
+		VerifyCommandLineCollection(&collection);
+
+	int generation = atoi(generation_string);
+	free(generation_string);
+	// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
+	if ( generation != 2 && generation != 3 )
+		errx(1, "Unsupported generation: %i", generation);
+
+	if ( !prefix )
+		prefix = strdup(collection);
+
 	const char* cmd = argv[1];
 	if ( !strcmp(cmd, "create") )
 	{
 		if ( !platform && !(platform = GetBuildTriplet()) )
 			err(1, "unable to determine platform, use --platform");
+
+		if ( mkdir_p(collection, 0755) != 0 )
+			err(1, "mkdir: `%s'", collection);
+
+		VerifyCommandLineCollection(&collection);
 
 		char* tix_path = join_paths(collection, "tix");
 		if ( mkdir_p(tix_path, 0755) != 0 )
@@ -149,26 +161,41 @@ int main(int argc, char* argv[])
 			errx(1, "error: `%s' already exists, a tix collection is "
 			        "already installed at `%s'.", collection_conf_path,
 			        collection);
-		fprintf(conf_fp, "tix.version=1\n");
-		fprintf(conf_fp, "tix.class=collection\n");
-		fprintf(conf_fp, "collection.generation=%i\n", generation);
-		fprintf(conf_fp, "collection.prefix=%s\n", !strcmp(prefix, "/") ? "" :
-		                                           prefix);
-		fprintf(conf_fp, "collection.platform=%s\n", platform);
+		if ( 3 <= generation )
+		{
+			fwrite_variable(conf_fp, "TIX_COLLECTION_VERSION", "3");
+			fwrite_variable(conf_fp, "PREFIX",
+			                !strcmp(prefix, "/") ? "" : prefix);
+			fwrite_variable(conf_fp, "PLATFORM", platform);
+		}
+		// TODO: After releasing Sortix 1.1, delete generation 2 compatibility.
+		else
+		{
+			fprintf(conf_fp, "tix.version=1\n");
+			fprintf(conf_fp, "tix.class=collection\n");
+			fprintf(conf_fp, "collection.generation=%i\n", generation);
+			fprintf(conf_fp, "collection.prefix=%s\n",
+			        !strcmp(prefix, "/") ? "" : prefix);
+			fprintf(conf_fp, "collection.platform=%s\n", platform);
+		}
 		fclose(conf_fp);
 		free(collection_conf_path);
 
-		const char* repo_list_path = join_paths(tixdb_path, "repository.list");
-		FILE* repo_list_fp = fopen(repo_list_path, "w");
-		if ( !repo_list_fp )
-			err(1, "`%s'", repo_list_path);
-		fclose(repo_list_fp);
+		// TODO: After releasing Sortix 1.1, delete generation 2 compatibility.
+		if ( generation < 3 )
+		{
+			const char* repo_list_path = join_paths(tixdb_path, "repository.list");
+			FILE* repo_list_fp = fopen(repo_list_path, "w");
+			if ( !repo_list_fp )
+				err(1, "`%s'", repo_list_path);
+			fclose(repo_list_fp);
 
-		const char* inst_list_path = join_paths(tixdb_path, "installed.list");
-		FILE* inst_list_fp = fopen(inst_list_path, "w");
-		if ( !inst_list_fp )
-			err(1, "`%s'", inst_list_path);
-		fclose(inst_list_fp);
+			const char* inst_list_path = join_paths(tixdb_path, "installed.list");
+			FILE* inst_list_fp = fopen(inst_list_path, "w");
+			if ( !inst_list_fp )
+				err(1, "`%s'", inst_list_path);
+			fclose(inst_list_fp);
+		}
 
 		return 0;
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015, 2016, 2017, 2020, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015-2017, 2020, 2022-2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,6 +27,7 @@
 #include <errno.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <libgen.h>
 #include <limits.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -78,50 +79,24 @@ void VerifyTixDatabase(const char* prefix,
 		err(1, "error: tix collection information unavailable: `%s'",
 		        info_path);
 	}
-	char* installed_list_path = join_paths(tixdb_path, "installed.list");
-	FILE* installed_list_fp = fopen(installed_list_path, "a");
-	if ( !installed_list_fp )
-	{
-		warn("error: unable to open `%s' for writing",
-		     installed_list_path);
-		errx(1, "error: `%s': do you have sufficient permissions to "
-		        "administer this tix collection?", prefix);
-	}
-	fclose(installed_list_fp);
-	free(installed_list_path);
 	free(info_path);
 }
 
 bool IsPackageInstalled(const char* tixdb_path, const char* package)
 {
-	char* installed_list_path = join_paths(tixdb_path, "installed.list");
-	FILE* installed_list_fp = fopen(installed_list_path, "r");
-	if ( !installed_list_fp )
-		err(1, "`%s'", installed_list_path);
-
-	bool ret = false;
-	char* line = NULL;
-	size_t line_size = 0;
-	ssize_t line_len;
-	while ( 0 < (line_len = getline(&line, &line_size, installed_list_fp)) )
-	{
-		if ( line[line_len-1] == '\n' )
-			line[--line_len] = '\0';
-		if ( !strcmp(line, package) )
-		{
-			ret = true;
-			break;
-		}
-	}
-	free(line);
-	if ( ferror(installed_list_fp) )
-		err(1, "`%s'", installed_list_path);
-
-	fclose(installed_list_fp);
-	free(installed_list_path);
-	return ret;
+	char* tixinfo_dir = join_paths(tixdb_path, "tixinfo");
+	if ( !tixinfo_dir )
+		err(1, "malloc");
+	char* tixinfo = join_paths(tixinfo_dir, package);
+	if ( !tixinfo )
+		err(1, "malloc");
+	bool installed = !access(tixinfo, F_OK);
+	free(tixinfo);
+	free(tixinfo_dir);
+	return installed;
 }
 
+// TODO: After releasing Sortix 1.1, delete generation 2 compatibility.
 void MarkPackageAsInstalled(const char* tixdb_path, const char* package)
 {
 	char* installed_list_path = join_paths(tixdb_path, "installed.list");
@@ -228,18 +203,40 @@ int main(int argc, char* argv[])
 
 	char* coll_conf_path = join_paths(tix_directory_path, "collection.conf");
 	string_array_t coll_conf = string_array_make();
-	if ( !dictionary_append_file_path(&coll_conf, coll_conf_path) )
-		err(1, "`%s'", coll_conf_path);
-	VerifyTixCollectionConfiguration(&coll_conf, coll_conf_path);
-	free(coll_conf_path);
+	switch ( variables_append_file_path(&coll_conf, coll_conf_path) )
+	{
+	case -1: err(1, "%s", coll_conf_path);
+	case -2: errx(2, "%s: Syntax error", coll_conf_path);
+	}
 
-	const char* coll_generation = dictionary_get(&coll_conf, "collection.generation");
-	assert(coll_generation);
+	VerifyTixCollectionConfiguration(&coll_conf, coll_conf_path);
+
+	const char* coll_generation =
+		dictionary_get(&coll_conf, "TIX_COLLECTION_VERSION");
+	// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
+	if ( !coll_generation )
+		coll_generation = dictionary_get(&coll_conf, "collection.generation");
+	if ( !coll_generation )
+		err(1, "%s: No TIX_COLLECTION_VERSION was set", coll_conf_path);
 	generation = atoi(coll_generation);
-	coll_prefix = dictionary_get(&coll_conf, "collection.prefix");
-	assert(coll_prefix);
-	coll_platform = dictionary_get(&coll_conf, "collection.platform");
-	assert(coll_platform);
+	if ( generation == 3 )
+	{
+		coll_prefix = dictionary_get(&coll_conf, "PREFIX");
+		coll_platform = dictionary_get(&coll_conf, "PLATFORM");
+	}
+	// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
+	else if ( generation == 2  )
+	{
+		coll_prefix = dictionary_get(&coll_conf, "collection.prefix");
+		coll_platform = dictionary_get(&coll_conf, "collection.platform");
+	}
+	else
+		errx(1, "%s: Unsupported TIX_COLLECTION_VERSION: %i",
+		     coll_conf_path, generation);
+	if ( !coll_prefix )
+		err(1, "%s: No PREFIX was set", coll_conf_path);
+	if ( !coll_platform )
+		err(1, "%s: No PLATFORM was set", coll_conf_path);
 
 	for ( int i = 1; i < argc; i++ )
 		InstallPackage(argv[i]);
@@ -247,6 +244,7 @@ int main(int argc, char* argv[])
 	string_array_reset(&coll_conf);
 
 	free(tix_directory_path);
+	free(coll_conf_path);
 
 	return 0;
 }
@@ -263,25 +261,47 @@ void InstallPackage(const char* tix_path)
 	if ( !IsFile(tix_path) )
 		err(1, "`%s'", tix_path);
 
-	const char* tixinfo_path = "tix/tixinfo";
+	// TODO: After releasing Sortix 1.1, delete generation 2 compatibility.
+	bool modern = true;
+	const char* tixinfo_path = "tix/tixinfo/";
 	if ( !TarContainsFile(tix_path, tixinfo_path) )
-		errx(1, "`%s' doesn't contain a `%s' file", tix_path, tixinfo_path);
+	{
+		const char* tixinfo_path_old = "tix/tixinfo";
+		if ( !TarContainsFile(tix_path, tixinfo_path_old) )
+			errx(1, "`%s' doesn't contain a `%s' directory", tix_path,
+			     tixinfo_path);
+		tixinfo_path = tixinfo_path_old;
+		modern = false;
+	}
 
 	string_array_t tixinfo = string_array_make();
 	FILE* tixinfo_fp = TarOpenFile(tix_path, tixinfo_path);
-	dictionary_append_file(&tixinfo, tixinfo_fp);
+	switch ( variables_append_file(&tixinfo, tixinfo_fp) )
+	{
+	case -1: err(1, "%s: %s", tix_path, tixinfo_path);
+	case -2: errx(1, "%s: %s: Syntax error", tix_path, tixinfo_path);
+	}
+
 	fclose(tixinfo_fp);
 
-	const char* package_name = dictionary_get(&tixinfo, "pkg.name");
+	const char* version = dictionary_get(&tixinfo, "TIX_VERSION");
+	if ( modern && (!version || strcmp(version, "3") != 0) )
+		errx(1, "%s: unsupported TIX_VERSION: %s", tix_path, version);
+
+	const char* package_name =
+		dictionary_get(&tixinfo, modern ? "NAME" : "pkg.name");
 	assert(package_name);
 
-	const char* package_prefix = dictionary_get(&tixinfo, "pkg.prefix");
+	const char* package_prefix =
+		dictionary_get(&tixinfo, modern ? "PREFIX" : "pkg.prefix");
 	assert(package_prefix || !package_prefix);
 
-	const char* package_platform = dictionary_get(&tixinfo, "tix.platform");
+	const char* package_platform =
+		dictionary_get(&tixinfo, modern ? "PLATFORM" : "tix.platform");
 	assert(package_platform || !package_platform);
 
-	bool already_installed = IsPackageInstalled(tix_directory_path, package_name);
+	bool already_installed =
+		IsPackageInstalled(tix_directory_path, package_name);
 	if ( already_installed && !reinstall )
 		errx(1, "error: package `%s' is already installed. Use --reinstall "
 		        "to force reinstallation.", package_name);
@@ -313,44 +333,51 @@ void InstallPackage(const char* tix_path)
 		fflush(stdout);
 	}
 
+	const char* data = modern ? "" : "data";
 	char* data_and_prefix = package_prefix && package_prefix[0] ?
-	                        print_string("data%s", package_prefix) :
-	                        strdup("data");
+	                        print_string("%s%s", data, package_prefix) :
+	                        strdup(data);
 
-	char* tixinfo_out_path = print_string("%s/tixinfo/%s", tix_directory_path, package_name);
-	int tixinfo_fd = open(tixinfo_out_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-	if ( tixinfo_fd < 0 )
-		err(1, "%s", tixinfo_out_path);
-	TarExtractFileToFD(tix_path, "tix/tixinfo", tixinfo_fd);
-	close(tixinfo_fd);
-
-	FILE* index_fp = TarOpenIndex(tix_path);
-	string_array_t files = string_array_make();
-	string_array_append_file(&files, index_fp);
-	qsort(files.strings, files.length, sizeof(char*), strcmp_indirect);
-	char* manifest_path = print_string("%s/manifest/%s", tix_directory_path, package_name);
-	FILE* manifest_fp = fopen(manifest_path, "w");
-	if ( !manifest_fp )
-		err(1, "%s", manifest_path);
-	for ( size_t i = 0; i < files.length; i++ )
+	if ( !modern )
 	{
-		char* str = files.strings[i];
-		if ( strncmp(str, "data", strlen("data")) != 0 )
-			continue;
-		str += strlen("data");
-		if ( str[0] && str[0] != '/' )
-			continue;
-		size_t len = strlen(str);
-		while ( 2 <= len && str[len-1] == '/' )
-			str[--len] = '\0';
-		if ( fprintf(manifest_fp, "%s\n", str) < 0 )
+		char* tixinfo_out_path =
+			print_string("%s/tixinfo/%s", tix_directory_path, package_name);
+		int tixinfo_fd =
+			open(tixinfo_out_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+		if ( tixinfo_fd < 0 )
+			err(1, "%s", tixinfo_out_path);
+		TarExtractFileToFD(tix_path, "tix/tixinfo", tixinfo_fd);
+		close(tixinfo_fd);
+
+		FILE* index_fp = TarOpenIndex(tix_path);
+		string_array_t files = string_array_make();
+		string_array_append_file(&files, index_fp);
+		qsort(files.strings, files.length, sizeof(char*), strcmp_indirect);
+		char* manifest_path =
+			print_string("%s/manifest/%s", tix_directory_path, package_name);
+		FILE* manifest_fp = fopen(manifest_path, "w");
+		if ( !manifest_fp )
 			err(1, "%s", manifest_path);
+		for ( size_t i = 0; i < files.length; i++ )
+		{
+			char* str = files.strings[i];
+			if ( strncmp(str, "data", strlen("data")) != 0 )
+				continue;
+			str += strlen("data");
+			if ( str[0] && str[0] != '/' )
+				continue;
+			size_t len = strlen(str);
+			while ( 2 <= len && str[len-1] == '/' )
+				str[--len] = '\0';
+			if ( fprintf(manifest_fp, "%s\n", str) < 0 )
+				err(1, "%s", manifest_path);
+		}
+		if ( ferror(manifest_fp) || fflush(manifest_fp) == EOF )
+			err(1, "%s", manifest_path);
+		fclose(manifest_fp);
+		string_array_reset(&files);
+		fclose(index_fp);
 	}
-	if ( ferror(manifest_fp) || fflush(manifest_fp) == EOF )
-		err(1, "%s", manifest_path);
-	fclose(manifest_fp);
-	string_array_reset(&files);
-	fclose(index_fp);
 
 	if ( fork_and_wait_or_death() )
 	{
@@ -358,14 +385,14 @@ void InstallPackage(const char* tix_path)
 		const char* cmd_argv[] =
 		{
 			"tar",
-			print_string("--strip-components=%zu", num_strips),
 			"-C", collection,
 			"--extract",
 			"--file", tix_path,
 			"--keep-directory-symlink",
 			"--same-permissions",
 			"--no-same-owner",
-			data_and_prefix,
+			modern ? NULL : print_string("--strip-components=%zu", num_strips),
+			modern ? NULL : data_and_prefix,
 			NULL
 		};
 		execvp(cmd_argv[0], (char* const*) cmd_argv);
@@ -373,7 +400,8 @@ void InstallPackage(const char* tix_path)
 	}
 	free(data_and_prefix);
 
-	if ( !already_installed )
+	// TODO: After releasing Sortix 1.1, delete generation 2 compatibility.
+	if ( generation <= 2 && !already_installed )
 		MarkPackageAsInstalled(tix_directory_path, package_name);
 
 	string_array_reset(&tixinfo);

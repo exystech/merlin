@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016, 2020, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013-2016, 2020, 2022-2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,6 +27,7 @@
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <libgen.h>
 #include <limits.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -667,22 +668,32 @@ static void Build(struct metainfo* minfo)
 	Make(minfo, build_target, NULL, true, subdir);
 }
 
-static void CreateDestination(void)
+static void CreateDestination(struct metainfo* minfo)
 {
 	char* tardir_rel = join_paths(tmp_root, "tix");
-	char* destdir_rel = join_paths(tardir_rel, "data");
-	char* tixdir_rel = join_paths(tardir_rel, "tix");
-
-	if ( mkdir(tardir_rel, 0777) < 0 )
-		err(1, "mkdir: %s", tardir_rel);
-	if ( mkdir(destdir_rel, 0755) != 0 )
-		err(1, "mkdir: `%s'", destdir_rel);
-	if ( mkdir(tixdir_rel, 0755) != 0 )
-		err(1, "mkdir: `%s'", tixdir_rel);
-
+	if ( !tardir_rel )
+		err(1, "malloc");
+	// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
+	const char* prefix = 3 <= minfo->generation ? minfo->prefix : "";
+	char* prefixdir_rel = print_string("%s%s", tardir_rel, prefix);
+	if ( !prefixdir_rel )
+		err(1, "malloc");
+	if ( mkdir_p(prefixdir_rel, 0755) < 0 )
+		err(1, "mkdir: %s", prefixdir_rel);
+	// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
+	if ( minfo->generation == 2 )
+	{
+		char* destdir_rel = join_paths(prefixdir_rel, "data");
+		char* tixdir_rel = join_paths(prefixdir_rel, "tix");
+		if ( mkdir(destdir_rel, 0755) != 0 )
+			err(1, "mkdir: `%s'", destdir_rel);
+		if ( mkdir(tixdir_rel, 0755) != 0 )
+			err(1, "mkdir: `%s'", tixdir_rel);
+		free(tixdir_rel);
+		free(destdir_rel);
+	}
+	free(prefixdir_rel);
 	free(tardir_rel);
-	free(destdir_rel);
-	free(tixdir_rel);
 }
 
 static void Install(struct metainfo* minfo)
@@ -692,10 +703,12 @@ static void Install(struct metainfo* minfo)
 		metainfo_get_def(minfo, "MAKE_INSTALL_TARGET",
 		                 "pkg.make.install-target", "install");
 	char* tardir_rel = join_paths(tmp_root, "tix");
-	char* destdir_rel = join_paths(tardir_rel, "data");
+	// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
+	char* destdir_rel = minfo->generation == 3 ? strdup(tardir_rel) :
+	                    join_paths(tardir_rel, "data");
 	char* destdir = realpath(destdir_rel, NULL);
 	if ( !destdir )
-		err(1, "realpath: %s", destdir_rel);
+		err(1, "realpath: %s", tardir_rel);
 
 	Make(minfo, install_target, destdir, true, subdir);
 
@@ -716,7 +729,9 @@ static void PostInstall(struct metainfo* minfo)
 
 	const char* subdir = metainfo_get(minfo, "SUBDIR", "pkg.subdir");
 	char* tardir_rel = join_paths(tmp_root, "tix");
-	char* destdir_rel = join_paths(tardir_rel, "data");
+	// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
+	char* destdir_rel = minfo->generation == 3 ? strdup(tardir_rel) :
+	                    join_paths(tardir_rel, "data");
 	char* destdir = realpath(destdir_rel, NULL);
 	if ( !destdir )
 		err(1, "realpath: %s", destdir_rel);
@@ -758,9 +773,28 @@ static void TixInfo(struct metainfo* minfo)
 	char* tardir_rel = join_paths(tmp_root, "tix");
 	if ( !tardir_rel )
 		err(1, "malloc");
-	char* tixinfo_rel = join_paths(tardir_rel, "tix/tixinfo");
-	if ( !tixinfo_rel )
+	// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
+	const char* prefix = 3 <= minfo->generation ? minfo->prefix : "";
+	char* prefixdir_rel = print_string("%s%s", tardir_rel, prefix);
+	if ( !prefixdir_rel )
 		err(1, "malloc");
+	char* tixdir_rel = join_paths(prefixdir_rel, "tix");
+	if ( !tixdir_rel )
+		err(1, "malloc");
+	// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
+	if ( 3 <= minfo->generation && mkdir(tixdir_rel, 0755) && errno != EEXIST )
+		err(1, "%s", tixdir_rel);
+	char* tixinfodir_rel = join_paths(tixdir_rel, "tixinfo");
+	if ( !tixinfodir_rel )
+		err(1, "malloc");
+	// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
+	if ( 3 <= minfo->generation &&
+	     mkdir(tixinfodir_rel, 0755) && errno != EEXIST )
+		err(1, "%s", tixdir_rel);
+	char* tixinfo_rel = 3 <= minfo->generation ?
+	                     join_paths(tixinfodir_rel, minfo->package_name) :
+	                     strdup(tixinfodir_rel);
+
 	const char* alias = metainfo_get(minfo, "ALIAS_OF", "pkg.alias-of");
 	const char* runtime_deps =
 		metainfo_get(minfo, "RUNTIME_DEPS", "pkg.runtime-deps");
@@ -772,20 +806,48 @@ static void TixInfo(struct metainfo* minfo)
 	if ( !tixinfo_fp )
 		err(1, "`%s'", tixinfo_rel);
 
-	fprintf(tixinfo_fp, "tix.version=1\n");
-	fprintf(tixinfo_fp, "tix.class=tix\n");
-	fprintf(tixinfo_fp, "tix.platform=%s\n", minfo->host);
-	fprintf(tixinfo_fp, "pkg.name=%s\n", minfo->package_name);
-	if ( alias )
-		fprintf(tixinfo_fp, "pkg.alias-of=%s\n", alias);
+	if ( 3 <= minfo->generation )
+	{
+		// TODO: Shell escape the values if needed.
+		fwrite_variable(tixinfo_fp, "TIX_VERSION", "3");
+		fwrite_variable(tixinfo_fp, "NAME", minfo->package_name);
+		const char* version = metainfo_get(minfo, "VERSION", "VERSION");
+		if ( version )
+			fwrite_variable(tixinfo_fp, "VERSION", version);
+		const char* version_2 = metainfo_get(minfo, "VERSION_2", "VERSION_2");
+		if ( version_2 )
+			fwrite_variable(tixinfo_fp, "VERSION_2", version_2);
+		fwrite_variable(tixinfo_fp, "PLATFORM", minfo->host);
+		if ( alias )
+			fwrite_variable(tixinfo_fp, "ALIAS_OF", alias);
+		else
+		{
+			if ( runtime_deps )
+				fwrite_variable(tixinfo_fp, "RUNTIME_DEPS", runtime_deps);
+			if ( location_independent )
+				fwrite_variable(tixinfo_fp, "LOCATION_INDEPENDENT", "true");
+			else
+				fwrite_variable(tixinfo_fp, "PREFIX", minfo->prefix);
+		}
+	}
+	// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
 	else
 	{
-		if ( runtime_deps )
-			fprintf(tixinfo_fp, "pkg.runtime-deps=%s\n", runtime_deps);
-		if ( location_independent )
-			fprintf(tixinfo_fp, "pkg.location-independent=true\n");
+		fprintf(tixinfo_fp, "tix.version=1\n");
+		fprintf(tixinfo_fp, "tix.class=tix\n");
+		fprintf(tixinfo_fp, "tix.platform=%s\n", minfo->host);
+		fprintf(tixinfo_fp, "pkg.name=%s\n", minfo->package_name);
+		if ( alias )
+			fprintf(tixinfo_fp, "pkg.alias-of=%s\n", alias);
 		else
-			fprintf(tixinfo_fp, "pkg.prefix=%s\n", minfo->prefix);
+		{
+			if ( runtime_deps )
+				fprintf(tixinfo_fp, "pkg.runtime-deps=%s\n", runtime_deps);
+			if ( location_independent )
+				fprintf(tixinfo_fp, "pkg.location-independent=true\n");
+			else
+				fprintf(tixinfo_fp, "pkg.prefix=%s\n", minfo->prefix);
+		}
 	}
 
 	if ( ferror(tixinfo_fp) || fflush(tixinfo_fp) == EOF )
@@ -793,27 +855,64 @@ static void TixInfo(struct metainfo* minfo)
 
 	fclose(tixinfo_fp);
 	free(tardir_rel);
+	free(prefixdir_rel);
+	free(tixdir_rel);
+	free(tixinfodir_rel);
 	free(tixinfo_rel);
+}
+
+static void TixManifest(struct metainfo* minfo)
+{
+	if ( !fork_and_wait_or_recovery() )
+		return;
+	char* tardir_rel = join_paths(tmp_root, "tix");
+	if ( !tardir_rel )
+		err(1, "malloc");
+	// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
+	const char* prefix = 3 <= minfo->generation ? minfo->prefix : "";
+	char* prefixdir_rel = print_string("%s%s", tardir_rel, prefix);
+	if ( !prefixdir_rel )
+		err(1, "malloc");
+	if ( chdir(prefixdir_rel) < 0 )
+		err(1, "%s", prefixdir_rel);
+	if ( mkdir("tix", 0755) && errno != EEXIST )
+		err(1, "%s", "tix");
+	if ( mkdir("tix/manifest", 0755) && errno != EEXIST )
+		err(1, "%s", "tix/manifest");
+	char* command;
+	if ( asprintf(&command,
+	              "find . -name tix -prune -o -print | "
+	              "sed -E -e 's,^\\.$,/,' -e 's,^\\./,/,' | "
+	              "LC_ALL=C sort > tix/manifest/%s",
+	              minfo->package_name) < 0 )
+		err(1, "malloc");
+	const char* cmd_argv[] = { "sh", "-c", command, NULL };
+	recovery_execvp(cmd_argv[0], (char* const*) cmd_argv);
+	err(127, "%s", cmd_argv[0]);
 }
 
 static void Package(struct metainfo* minfo)
 {
 	if ( !fork_and_wait_or_recovery() )
 		return;
-
 	char* tardir_rel = join_paths(tmp_root, "tix");
 	if ( !tardir_rel )
+		err(1, "malloc");
+	// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
+	const char* prefix = 3 <= minfo->generation ? minfo->prefix : "";
+	char* prefixdir_rel = print_string("%s%s", tardir_rel, prefix);
+	if ( !prefixdir_rel )
 		err(1, "malloc");
 	char* package_tix = print_string("%s/%s.tix.tar.xz",
 		minfo->destination, minfo->package_name);
 	if ( !package_tix )
 		err(1, "malloc");
 	printf("Creating `%s'...\n", package_tix);
-
+	fflush(stdout);
 	const char* cmd_argv[] =
 	{
 		minfo->tar,
-		"-C", tardir_rel,
+		"-C", prefixdir_rel,
 		"--remove-files",
 		"--create",
 		"--xz",
@@ -821,12 +920,30 @@ static void Package(struct metainfo* minfo)
 		"--owner=0",
 		"--group=0",
 		"--file", package_tix,
+		"--",
 		"tix",
-		"data",
 		NULL
 	};
-	recovery_execvp(cmd_argv[0], (char* const*) cmd_argv);
-	err(127, "%s", cmd_argv[0]);
+	string_array_t cmd = string_array_make();
+	for ( size_t i = 0; cmd_argv[i]; i++ )
+		if ( !string_array_append(&cmd, cmd_argv[i]) )
+			err(1, "malloc");
+	struct dirent** entries;
+	int count = scandir(prefixdir_rel, &entries, NULL, alphasort);
+	if ( count < 0 )
+		err(1, "scandir: %s", prefixdir_rel);
+	for ( int i = 0; i < count; i++ )
+	{
+		const char* name = entries[i]->d_name;
+		if ( !strcmp(name, ".") || !strcmp(name, "..") || !strcmp(name, "tix") )
+			continue;
+		if ( !string_array_append(&cmd, name) )
+			err(1, "malloc");
+	}
+	if ( !string_array_append(&cmd, NULL) )
+		err(1, "malloc");
+	recovery_execvp(cmd.strings[0], (char* const*) cmd.strings);
+	err(127, "%s", cmd.strings[0]);
 }
 
 static void Compile(struct metainfo* minfo)
@@ -970,7 +1087,7 @@ static void BuildPackage(struct metainfo* minfo)
 		        "specify the intended destination prefix using --prefix",
 		        minfo->package_name);
 
-	CreateDestination();
+	CreateDestination(minfo);
 
 	// Possibly build a native version of the package to aid cross-compilation.
 	// This is an anti-feature needed for broken packages that don't properly
@@ -991,6 +1108,9 @@ static void BuildPackage(struct metainfo* minfo)
 	if ( SHOULD_DO_BUILD_STEP(BUILD_STEP_PACKAGE, minfo) )
 	{
 		TixInfo(minfo);
+		// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
+		if ( 3 <= minfo->generation )
+			TixManifest(minfo);
 		Package(minfo);
 	}
 }
@@ -1144,6 +1264,9 @@ int main(int argc, char* argv[])
 
 	minfo.generation = atoi(generation_string);
 	free(generation_string);
+	// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
+	if ( minfo.generation != 2 && minfo.generation != 3 )
+		errx(1, "Unsupported generation: %i", minfo.generation);
 
 	if ( !(minfo.start_step = step_of_step_name(start_step_string)) )
 	{
@@ -1220,8 +1343,8 @@ int main(int argc, char* argv[])
 		minfo.tixbuildinfo = true;
 		minfo.package_info = string_array_make();
 		string_array_t* package_info = &minfo.package_info;
-		if ( !dictionary_append_file_path(package_info,
-		                                  minfo.package_info_path) )
+		if ( variables_append_file_path(package_info,
+		                                minfo.package_info_path) < 0 )
 			err(1, "`%s'", minfo.package_info_path);
 	}
 	else

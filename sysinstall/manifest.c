@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2018, 2020, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2018, 2020, 2021, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,6 +20,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <dirent.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -479,8 +480,8 @@ void install_manifest(const char* manifest,
 			_exit(2);
 		}
 	}
-	// Write out the new manifests atomically afterwards to ensure no paths are
-	// leaked if the operation is aborted part way.
+	// Write out the new tixinfo afterwards to ensure no paths are leaked if the
+	// operation is aborted part way.
 	char* in_tixinfo;
 	char* out_tixinfo;
 	if ( asprintf(&in_tixinfo, "%s/tix/tixinfo/%s", from_prefix,
@@ -537,81 +538,6 @@ void install_manifest(const char* manifest,
 	}
 	free(in_tixinfo);
 	free(out_tixinfo);
-	// Likewise write out the new installation list atomically afterwards to
-	// ensure no manifests are leaked if the operation is aborted part way.
-	char* installed_path;
-	char* installed_path_new;
-	if ( asprintf(&installed_path, "%s/tix/installed.list", to_prefix) < 0 ||
-	     asprintf(&installed_path_new, "%s/tix/installed.list.new",
-		          to_prefix) < 0 )
-	{
-		warn("malloc");
-		_exit(2);
-	}
-	size_t installed_count;
-	char** installed = read_lines_file(installed_path, &installed_count);
-	if ( !installed )
-	{
-		warn("%s", installed_path);
-		_exit(2);
-	}
-	size_t installed_length = installed_count;
-	if ( is_tix )
-	{
-		bool found = false;
-		for ( size_t i = 0; !found && i < installed_count; i++ )
-			found = !strcmp(installed[i], manifest);
-		if ( !found && !string_array_append(&installed, &installed_count,
-		                                    &installed_length, manifest) )
-		{
-			warn("malloc");
-			_exit(2);
-		}
-	}
-	else
-	{
-		size_t o = 0;
-		for ( size_t i = 0; i < installed_count; i++ )
-		{
-			if ( !strcmp(installed[i], manifest) )
-				free(installed[i]);
-			else
-				installed[o++] = installed[i];
-		}
-		installed_count = o;
-	}
-	string_array_sort_strcmp(installed, installed_count);
-	mode_t temp_umask = umask(0022);
-	FILE* installed_fp = fopen(installed_path_new, "w");
-	if ( !installed_fp )
-	{
-		warn("%s", installed_path_new);
-		_exit(2);
-	}
-	umask(temp_umask);
-	for ( size_t i = 0; i < installed_count; i++ )
-	{
-		const char* name = installed[i];
-		if ( fputs(name, installed_fp) == EOF ||
-		     fputc('\n', installed_fp) == EOF )
-		{
-			warn("%s", installed_path_new);
-			_exit(2);
-		}
-	}
-	if ( fclose(installed_fp) == EOF )
-	{
-		warn("%s", installed_path_new);
-		_exit(2);
-	}
-	if ( rename(installed_path_new, installed_path) < 0 )
-	{
-		warn("rename: %s -> %s", installed_path_new, installed_path);
-		_exit(2);
-	}
-	string_array_free(&installed, &installed_count, &installed_length);
-	free(installed_path);
-	free(installed_path_new);
 	if ( in_files != empty )
 	{
 		for ( size_t i = 0; i < in_files_count; i++ )
@@ -701,36 +627,47 @@ void install_manifests(const char* const* manifests,
 
 char** read_installed_list(const char* prefix, size_t* out_count)
 {
-	char* path;
-	if ( asprintf(&path, "%s/tix/installed.list", prefix) < 0 )
+	char* tixinfo;
+	if ( asprintf(&tixinfo, "%s/tix/tixinfo", prefix) < 0 )
 	{
 		warn("malloc");
 		_exit(2);
 	}
+	size_t count;
+	size_t length;
 	char** installed;
-	size_t installed_count;
-	if ( !access_or_die(path, F_OK) )
+	if ( !string_array_init(&installed, &count, &length) )
 	{
-		if ( !(installed = read_lines_file(path, &installed_count)) )
-		{
-			warn("%s", path);
-			_exit(2);
-		}
-		string_array_sort_strcmp(installed, installed_count);
+		warn("malloc");
+		_exit(2);
 	}
-	else
+	DIR* dir = opendir(tixinfo);
+	if ( !dir )
 	{
-		installed = malloc(1);
-		if ( !installed )
+		if ( errno == ENOENT )
+			return *out_count = count, installed;
+		warn("opendir: %s", tixinfo);
+		_exit(2);
+	}
+	struct dirent* entry;
+	while ( (errno = 0, entry = readdir(dir)) )
+	{
+		if ( entry->d_name[0] == '.' )
+			continue;
+		if ( !string_array_append(&installed, &count, &length, entry->d_name) )
 		{
 			warn("malloc");
 			_exit(2);
 		}
-		installed_count = 0;
 	}
-	free(path);
-	*out_count = installed_count;
-	return installed;
+	if ( errno )
+	{
+		warn("readdir: %s", tixinfo);
+		_exit(2);
+	}
+	free(tixinfo);
+	string_array_sort_strcmp(installed, count);
+	return *out_count = count, installed;
 }
 
 void install_manifests_detect(const char* from_prefix,

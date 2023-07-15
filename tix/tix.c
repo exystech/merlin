@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2016, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,6 +27,7 @@
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <libgen.h>
 #include <limits.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -45,7 +46,6 @@ typedef struct
 	char* tixdb_path;
 	string_array_t coll_conf;
 	string_array_t repo_list;
-	string_array_t inst_list;
 	bool reinstall;
 } params_t;
 
@@ -92,20 +92,36 @@ string_array_t GetPackageDependencies(params_t* params, const char* pkg_name)
 	if ( !pkg_path )
 		err(1, "unable to locate package `%s'", pkg_name);
 
-	const char* tixinfo_path = "tix/tixinfo";
+	// TODO: After releasing Sortix 1.1, delete generation 2 compatibility.
+	bool modern = false;
+	const char* tixinfo_path = "tix/tixinfo/";
 	if ( !TarContainsFile(pkg_path, tixinfo_path) )
-		errx(1, "`%s' doesn't contain a `%s' file", pkg_path, tixinfo_path);
+	{
+		const char* tixinfo_path_old = "tix/tixinfo";
+		if ( !TarContainsFile(pkg_path, tixinfo_path_old) )
+			errx(1, "`%s' doesn't contain a `%s' directory", pkg_path,
+			     tixinfo_path);
+		tixinfo_path = tixinfo_path_old;
+		modern = false;
+	}
 
 	string_array_t tixinfo = string_array_make();
 	FILE* tixinfo_fp = TarOpenFile(pkg_path, tixinfo_path);
-	dictionary_append_file(&tixinfo, tixinfo_fp);
+	switch ( variables_append_file(&tixinfo, tixinfo_fp) )
+	{
+	case -1: err(1, "%s: %s", pkg_path, tixinfo_path);
+	case -2: errx(1, "%s: %s: Syntax error", pkg_path, tixinfo_path);
+	}
+
 	fclose(tixinfo_fp);
 
 	VerifyTixInformation(&tixinfo, pkg_path);
 
-	const char* deps = dictionary_get_def(&tixinfo, "pkg.runtime-deps", "");
+	const char* deps = dictionary_get_def(&tixinfo, modern ? "RUNTIME_DEPS" :
+	                                      "pkg.runtime-deps", "");
 	string_array_append_token_string(&ret, deps);
-	const char* alias = dictionary_get_def(&tixinfo, "pkg.alias-of", "");
+	const char* alias = dictionary_get_def(&tixinfo, modern ? "ALIAS_OF" :
+	                                       "pkg.alias-of", "");
 	string_array_append_token_string(&ret, alias);
 
 	string_array_reset(&tixinfo);
@@ -224,22 +240,21 @@ int main(int argc, char* argv[])
 
 	char* coll_conf_path = join_paths(params.tixdb_path, "collection.conf");
 	params.coll_conf = string_array_make();
-	if ( !dictionary_append_file_path(&params.coll_conf, coll_conf_path) )
-		err(1, "`%s'", coll_conf_path);
+	switch ( variables_append_file_path(&params.coll_conf, coll_conf_path) )
+	{
+	case -1: err(1, "%s", coll_conf_path);
+	case -2: errx(2, "%s: Syntax error", coll_conf_path);
+	}
 	VerifyTixCollectionConfiguration(&params.coll_conf, coll_conf_path);
 	free(coll_conf_path);
 
+	// TODO: Decide the fate of repository.list.
 	char* repo_list_path = join_paths(params.tixdb_path, "repository.list");
 	params.repo_list = string_array_make();
-	if ( !string_array_append_file_path(&params.repo_list, repo_list_path) )
+	if ( !string_array_append_file_path(&params.repo_list, repo_list_path) &&
+	     errno != ENOENT )
 		err(1, "`%s'", repo_list_path);
 	free(repo_list_path);
-
-	char* inst_list_path = join_paths(params.tixdb_path, "installed.list");
-	params.inst_list = string_array_make();
-	if ( !string_array_append_file_path(&params.inst_list, inst_list_path) )
-		err(1, "`%s'", inst_list_path);
-	free(inst_list_path);
 
 	if ( argc == 1 )
 		errx(1, "error: no command specified.");
@@ -252,10 +267,16 @@ int main(int argc, char* argv[])
 
 		string_array_t work = string_array_make();
 
+		char* tixinfo_dir = join_paths(params.tixdb_path, "tixinfo");
+		if ( !tixinfo_dir )
+			err(1, "malloc");
 		for ( int i = 2; i < argc; i++ )
 		{
 			const char* pkg_name = argv[i];
-			if ( string_array_contains(&params.inst_list, pkg_name) )
+			char* tixinfo = join_paths(tixinfo_dir, pkg_name);
+			bool installed = !access(tixinfo, F_OK);
+			free(tixinfo);
+			if ( installed )
 			{
 				if ( params.reinstall )
 				{
@@ -268,6 +289,7 @@ int main(int argc, char* argv[])
 
 			GetPackageRecursiveDependencies(&params, &work, pkg_name);
 		}
+		free(tixinfo_dir);
 
 		for ( size_t i = 0; i < work.length; i++ )
 			InstallPackageOfName(&params, work.strings[i]);

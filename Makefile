@@ -464,7 +464,7 @@ $(LIVE_INITRD): sysroot
 	 echo "You can view the installation instructions by typing:" && \
 	 echo && \
 	 echo "  man installation") > $(LIVE_INITRD).d/root/welcome
-	tix-collection $(LIVE_INITRD).d create --platform=$(HOST) --prefix= --generation=2
+	tix-collection $(LIVE_INITRD).d create --platform=$(HOST) --prefix= --generation=3
 	LC_ALL=C ls -A $(LIVE_INITRD).d | \
 	tar -cf $(LIVE_INITRD) -C $(LIVE_INITRD).d --numeric-owner --owner=0 --group=0 -T -
 	rm -rf $(LIVE_INITRD).d

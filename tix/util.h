@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015, 2016, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2016, 2022, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,7 +20,7 @@
 #ifndef UTIL_H
 #define UTIL_H
 
-#define DEFAULT_GENERATION "2"
+#define DEFAULT_GENERATION "3"
 
 extern char** environ;
 
@@ -326,34 +326,6 @@ void dictionary_normalize_entry(char* entry)
 	entry[output_off] = '\0';
 }
 
-void dictionary_append_file(string_array_t* sa, FILE* fp)
-{
-	char* entry = NULL;
-	size_t entry_size = 0;
-	ssize_t entry_length;
-	while ( 0 < (entry_length = getline(&entry, &entry_size, fp)) )
-	{
-		if ( entry[entry_length-1] == '\n' )
-			entry[--entry_length] = '\0';
-		dictionary_normalize_entry(entry);
-		if ( entry[0] == '#' )
-			continue;
-		string_array_append(sa, entry);
-	}
-	free(entry);
-	assert(!ferror(fp));
-}
-
-bool dictionary_append_file_path(string_array_t* sa, const char* path)
-{
-	FILE* fp = fopen(path, "r");
-	if ( !fp )
-		return false;
-	dictionary_append_file(sa, fp);
-	fclose(fp);
-	return true;
-}
-
 bool is_identifier_char(char c)
 {
 	return ('a' <= c && c <= 'z') ||
@@ -595,10 +567,24 @@ const char* getenv_def(const char* var, const char* def)
 int mkdir_p(const char* path, mode_t mode)
 {
 	int saved_errno = errno;
-	if ( mkdir(path, mode) != 0 && errno != EEXIST )
-		return -1;
-	errno = saved_errno;
-	return 0;
+	if ( !mkdir(path, mode) )
+		return 0;
+	if ( errno == ENOENT )
+	{
+		char* prev = strdup(path);
+		if ( !prev )
+			return -1;
+		int status = mkdir_p(dirname(prev), mode | 0500);
+		free(prev);
+		if ( status < 0 )
+			return -1;
+		errno = saved_errno;
+		if ( !mkdir(path, mode) )
+			return 0;
+	}
+	if ( errno == EEXIST )
+		return errno = saved_errno, 0;
+	return -1;
 }
 
 static void compact_arguments(int* argc, char*** argv)
@@ -925,23 +911,39 @@ void VerifyCommandLineCollection(char** collection)
 
 void VerifyTixCollectionConfiguration(string_array_t* info, const char* path)
 {
+	// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
 	const char* tix_version = dictionary_get(info, "tix.version");
-	if ( !tix_version )
-		errx(1, "error: `%s': no `tix.version' variable declared", path);
-	if ( atoi(tix_version) != 1 )
-		errx(1, "error: `%s': tix version `%s' not supported", path,
-		        tix_version);
-	const char* tix_class = dictionary_get(info, "tix.class");
-	if ( !tix_class )
-		errx(1, "error: `%s': no `tix.class' variable declared", path);
-	if ( strcmp(tix_class, "collection") != 0 )
-		errx(1, "error: `%s': error: unexpected tix class `%s'.", path,
-		        tix_class);
-	if ( !(dictionary_get(info, "collection.prefix")) )
-		errx(1, "error: `%s': no `collection.prefix' variable declared", path);
-	if ( !(dictionary_get(info, "collection.platform")) )
-		errx(1, "error: `%s': no `collection.platform' variable declared",
-		        path);
+	if ( tix_version )
+	{
+		if ( !tix_version )
+			errx(1, "error: `%s': no `tix.version' variable declared", path);
+		if ( atoi(tix_version) != 1 )
+			errx(1, "error: `%s': tix version `%s' not supported", path,
+				    tix_version);
+		const char* tix_class = dictionary_get(info, "tix.class");
+		if ( !tix_class )
+			errx(1, "error: `%s': no `tix.class' variable declared", path);
+		if ( strcmp(tix_class, "collection") != 0 )
+			errx(1, "error: `%s': error: unexpected tix class `%s'.", path,
+				    tix_class);
+		if ( !(dictionary_get(info, "collection.prefix")) )
+			errx(1, "error: `%s': no `collection.prefix' variable declared",
+			        path);
+		if ( !(dictionary_get(info, "collection.platform")) )
+			errx(1, "error: `%s': no `collection.platform' variable declared",
+				    path);
+		return;
+	}
+
+	const char* version = dictionary_get(info, "TIX_COLLECTION_VERSION");
+	if ( !version )
+		errx(1, "%s: Mandatory TIX_COLLECTION_VERSION was not set", path);
+	if ( atoi(version) != 3 )
+		errx(1, "%s: Unsupported: TIX_COLLECTION_VERSION: %s", path, version);
+	if ( !(dictionary_get(info, "PREFIX")) )
+		errx(1, "%s: Mandatory PREFIX was not set", path);
+	if ( !(dictionary_get(info, "PLATFORM")) )
+		errx(1, "%s: Mandatory PLATFORM was not set", path);
 }
 
 static pid_t original_pid;
@@ -1029,6 +1031,37 @@ void fprint_shell_variable_assignment(FILE* fp, const char* variable, const char
 	else
 	{
 		fprintf(fp, "unset %s\n", variable);
+	}
+}
+
+bool needs_single_quote(const char* string)
+{
+	for ( size_t i = 0; string[i]; i++ )
+	{
+		char c = string[i];
+		if ( !(('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') ||
+		       ('0' <= c && c <= '9') ||
+		       c == '/' || c == '_' || c == '.' || c == '+' || c == ':' ||
+		       c == '%' || c == '$' || c == '{' || c == '}' || c == '-') )
+			return true;
+	}
+	return false;
+}
+
+void fwrite_variable(FILE* fp, const char* key, const char* value)
+{
+	fprintf(fp, "%s=", key);
+	if ( !needs_single_quote(value) )
+		fprintf(fp, "%s\n", value);
+	else
+	{
+		fputc('\'', fp);
+		for ( size_t i = 0; value[i]; i++ )
+			if ( value[i] == '\'' )
+				fprintf(fp, "'\\''");
+			else
+				fputc(value[i], fp);
+		fputs("'\n", fp);
 	}
 }
 
@@ -1149,6 +1182,7 @@ int recovery_execvp(const char* path, char* const* argv)
 	}
 
 	printf("\n");
+	fflush(stdout);
 
 	if ( recovery_configure_state(false) == RECOVERY_STATE_PRINT_COMMAND )
 		_exit(0);

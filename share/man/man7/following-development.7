@@ -69,6 +69,26 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Third generation Tix
+The tix binary package format has upgraded from generation 2 to 3 and has a new
+internal layout that can be directly extracted into the filesystem.
+The metatdata in
+.Pa /tix
+is now using the
+.Xr tix-vars 1
+format in the style of
+.Xr port 5 .
+.Pp
+Tix must be upgraded to build the new ports:
+.Bd -literal
+    cd /src/tix &&
+    make clean &&
+    make install
+.Ed
+.Pp
+An upgrade hook will migrate the
+.Pa /tix
+metadata to tix generation 3.
 .Ss Add include and comment support to passwd(5) and group(5)
 The
 .Xr passwd 5

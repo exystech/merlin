@@ -371,7 +371,7 @@ for port in $ports; do
   fi
   if \$port_$(portvar "$port"); then
     echo -n "Loading /$tix ($(human_size $tix)) ... "
-    module /$tix --tix
+    module /$tix
     echo done
   fi
 EOF

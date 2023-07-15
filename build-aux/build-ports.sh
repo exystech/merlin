@@ -82,7 +82,7 @@ export CXXFLAGS
 # Initialize Tix package management in the system root if absent.
 if [ "$OPERATION" = build ]; then
   if [ ! -e "$SYSROOT/tix/collection.conf" ]; then
-    tix-collection "$SYSROOT" create --platform=$HOST --prefix= --generation=2
+    tix-collection "$SYSROOT" create --platform=$HOST --prefix= --generation=3
   fi
 fi
 
@@ -138,7 +138,7 @@ for PACKAGE in $PACKAGES; do
     --collection="$SYSROOT" \
     --destination="$SORTIX_REPOSITORY_DIR" \
     ${END:+--end="$END"} \
-    --generation=2 \
+    --generation=3 \
     --host=$HOST \
     ${SORTIX_PORTS_MIRROR:+--mirror="$SORTIX_PORTS_MIRROR"} \
     --mirror-directory="$SORTIX_MIRROR_DIR" \

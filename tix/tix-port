@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2022 Jonas 'Sortie' Termansen.
+# Copyright (c) 2022, 2023 Jonas 'Sortie' Termansen.
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -304,6 +304,9 @@ desired_version() {(
   if [ -f "$port.rmpatch" ]; then
     stamp="$stamp.$(cat "$port.rmpatch" | sha256sum | grep -Eo '^[^ ]*')"
   fi
+  if [ -f "$port.post-install" ]; then
+    stamp="$stamp.$(cat "$port.post-install" | sha256sum | grep -Eo '^[^ ]*')"
+  fi
   DEVELOPMENT=$(tix-vars -d false "$port.port" DEVELOPMENT)
   if [ "$DEVELOPMENT" = true ]; then
     stamp="$stamp.development"
@@ -428,12 +431,20 @@ strip_tix() {(
   strip=${host+$host-}strip
   dir=$(mktemp -d)
   tar -C "$dir" -xf "$1"
-  $strip -d "$dir/data/bin/"* 2>/dev/null || true
-  $strip -d "$dir/data/lib/"* 2>/dev/null || true
-  $strip -d "$dir/data/libexec"* 2>/dev/null || true
-  $strip -d "$dir/data/libexec/git-core/"* 2>/dev/null || true
-  $strip -d "$dir/data/sbin/"* 2>/dev/null || true
-  (cd "$dir" && tar --numeric-owner --owner=0 --group=0 -cJf port.tar.tix.xz tix data)
+  # TODO: After releasing Sortix 1.1, remove the data directory compatibility.
+  if [ -e "$dir/data" ]; then
+    data_dir="$dir/data"
+  else
+    data_dir="$dir"
+  fi
+  $strip -d "$data_dir/bin/"* 2>/dev/null || true
+  $strip -d "$data_dir/lib/"* 2>/dev/null || true
+  $strip -d "$data_dir/libexec"* 2>/dev/null || true
+  $strip -d "$data_dir/libexec/git-core/"* 2>/dev/null || true
+  $strip -d "$data_dir/sbin/"* 2>/dev/null || true
+  (cd "$dir" &&
+   LC_ALL=C ls -A | grep -Ev '^tix$' |
+   tar --numeric-owner --owner=0 --group=0 -cJf port.tar.tix.xz tix -T -)
   cp "$dir/port.tar.tix.xz" "$1"
   rm -rf "$dir"
 )}

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -447,18 +447,6 @@ static bool ReadTar(TAR* TAR)
 	}
 }
 
-static bool SearchTar(struct initrd_context* ctx, TAR* TAR, const char* path)
-{
-	OpenTar(TAR, ctx->initrd, ctx->initrd_size);
-	while ( ReadTar(TAR) )
-	{
-		if ( !strcmp(TAR->name, path) )
-			return true;
-	}
-	CloseTar(TAR);
-	return false;
-}
-
 static void ExtractTarObject(Ref<Descriptor> desc,
                              struct initrd_context* ctx,
                              TAR* TAR)
@@ -515,166 +503,6 @@ static void ExtractTar(Ref<Descriptor> desc, struct initrd_context* ctx)
 	while ( ReadTar(&TAR) )
 		ExtractTarObject(desc, ctx, &TAR);
 	CloseTar(&TAR);
-}
-
-static bool TarIsTix(struct initrd_context* ctx)
-{
-	TAR TAR;
-	bool result = SearchTar(ctx, &TAR, "tix/tixinfo");
-	CloseTar(&TAR);
-	return result;
-}
-
-static char* tixinfo_lookup(const char* info,
-                            size_t info_size,
-                            const char* what)
-{
-	size_t what_length = strlen(what);
-	while ( info_size )
-	{
-		size_t line_length = 0;
-		while ( line_length < info_size && info[line_length] != '\n' )
-			line_length++;
-		if ( what_length <= line_length &&
-		     !strncmp(info, what, what_length) &&
-		     info[what_length] == '=' )
-		{
-			char* result = strndup(info + what_length + 1,
-			                       line_length - (what_length + 1));
-			if ( !result )
-				Panic("initrd tar malloc failure");
-			return result;
-		}
-		info += line_length;
-		info_size -= line_length;
-		if ( info_size && info[0] == '\n' )
-		{
-			info++;
-			info_size--;
-		}
-	}
-	return NULL;
-}
-
-static void DescriptorWriteLine(Ref<Descriptor> desc,
-                                ioctx_t* ioctx,
-                                const char* str)
-{
-	size_t len = strlen(str);
-	while ( str[0] )
-	{
-		ssize_t done = desc->write(ioctx, (unsigned char*) str, len);
-		if ( done <= 0 )
-			PanicF("initrd tix metadata write: %m");
-		str += done;
-		len -= done;
-	}
-	if ( desc->write(ioctx, (unsigned char*) "\n", 1) != 1 )
-		PanicF("initrd tix metadata write: %m");
-}
-
-static int manifest_sort(const void* a_ptr, const void* b_ptr)
-{
-	const char* a = *(const char* const*) a_ptr;
-	const char* b = *(const char* const*) b_ptr;
-	return strcmp(a, b);
-}
-
-static void ExtractTix(Ref<Descriptor> desc, struct initrd_context* ctx)
-{
-	TAR TAR;
-	if ( !SearchTar(ctx, &TAR, "tix/tixinfo") )
-		Panic("initrd was not tix");
-	char* pkg_name =
-		tixinfo_lookup((const char*) TAR.data, TAR.size, "pkg.name");
-	if ( !pkg_name )
-		Panic("initrd tixinfo lacked pkg.name");
-	if ( desc->mkdir(&ctx->ioctx, "/tix", 0755) < 0 && errno != EEXIST )
-		PanicF("/tix: %m");
-	if ( desc->mkdir(&ctx->ioctx, "/tix/tixinfo", 0755) < 0 && errno != EEXIST )
-		PanicF("/tix/tixinfo: %m");
-	if ( desc->mkdir(&ctx->ioctx, "/tix/manifest", 0755) < 0 && errno != EEXIST )
-		PanicF("/tix/manifest: %m");
-	char* tixinfo_path;
-	if ( asprintf(&tixinfo_path, "/tix/tixinfo/%s", pkg_name) < 0 )
-		Panic("initrd tar malloc failure");
-	char* TAR_oldname = TAR.name;
-	TAR.name = tixinfo_path;
-	ExtractTarObject(desc, ctx, &TAR);
-	TAR.name = TAR_oldname;
-	free(tixinfo_path);
-	CloseTar(&TAR);
-	Ref<Descriptor> installed_list =
-		desc->open(&ctx->ioctx, "/tix/installed.list",
-		           O_CREATE | O_WRITE | O_APPEND, 0644);
-	if ( !installed_list )
-		PanicF("/tix/installed.list: %m");
-	DescriptorWriteLine(installed_list, &ctx->ioctx, pkg_name);
-	installed_list.Reset();
-	size_t manifest_list_size = 0;
-	OpenTar(&TAR, ctx->initrd, ctx->initrd_size);
-	while ( ReadTar(&TAR) )
-	{
-		if ( !strncmp(TAR.name, "data", 4) && TAR.name[4] == '/' )
-			manifest_list_size++;
-	}
-	CloseTar(&TAR);
-	char** manifest_list = new char*[manifest_list_size];
-	if ( !manifest_list )
-		Panic("initrd tar malloc failure");
-	OpenTar(&TAR, ctx->initrd, ctx->initrd_size);
-	size_t manifest_list_count = 0;
-	while ( ReadTar(&TAR) )
-	{
-		if ( strncmp(TAR.name, "data", 4) != 0 || TAR.name[4] != '/' )
-			continue;
-		char* path = strdup(TAR.name + 4);
-		if ( !path )
-			Panic("initrd tar malloc failure");
-		size_t length = strlen(path);
-		// Trim the trailing slash from directories.
-		if ( 2 <= length && path[length-1] == '/' )
-			path[length-1] = '\0';
-		manifest_list[manifest_list_count++] = path;
-	}
-	CloseTar(&TAR);
-	qsort(manifest_list, manifest_list_count, sizeof(char*), manifest_sort);
-	char* manifest_path;
-	if ( asprintf(&manifest_path, "/tix/manifest/%s", pkg_name) < 0 )
-		Panic("initrd tar malloc failure");
-	Ref<Descriptor> manifest =
-		desc->open(&ctx->ioctx, manifest_path, O_WRITE | O_CREATE | O_TRUNC, 0644);
-	if ( !manifest )
-		PanicF("%s: %m", manifest_path);
-	free(manifest_path);
-	for ( size_t i = 0; i < manifest_list_count; i++ )
-		DescriptorWriteLine(manifest, &ctx->ioctx, manifest_list[i]);
-	manifest.Reset();
-	for ( size_t i = 0; i < manifest_list_count; i++ )
-		free(manifest_list[i]);
-	delete[] manifest_list;
-	OpenTar(&TAR, ctx->initrd, ctx->initrd_size);
-	const char* subdir = "data/";
-	size_t subdir_length = strlen(subdir);
-	while ( ReadTar(&TAR) )
-	{
-		bool name_data = !strncmp(TAR.name, subdir, subdir_length) &&
-		                 TAR.name[subdir_length];
-		bool linkname_data = !strncmp(TAR.linkname, subdir, subdir_length) &&
-		                     TAR.linkname[subdir_length];
-		if ( name_data )
-		{
-			TAR.name += subdir_length;
-			if ( linkname_data )
-				TAR.linkname += subdir_length;
-			ExtractTarObject(desc, ctx, &TAR);
-			TAR.name -= subdir_length;
-			if ( linkname_data )
-				TAR.linkname -= subdir_length;
-		}
-	}
-	CloseTar(&TAR);
-	free(pkg_name);
 }
 
 static int ExtractTo_mkdir(Ref<Descriptor> desc, ioctx_t* ctx,
@@ -791,16 +619,7 @@ static void ExtractModule(struct multiboot_mod_list* module,
 		ExtractInitrd(desc, ctx);
 	else if ( sizeof(struct tar) <= ctx->initrd_size &&
 	          !memcmp(ctx->initrd + offsetof(struct tar, magic), "ustar", 5) )
-	{
-		if ( !strcmp(cmdline, "--tar") )
-			ExtractTar(desc, ctx);
-		else if ( !strcmp(cmdline, "--tix") )
-			ExtractTix(desc, ctx);
-		else if ( TarIsTix(ctx) )
-			ExtractTix(desc, ctx);
-		else
-			ExtractTar(desc, ctx);
-	}
+		ExtractTar(desc, ctx);
 	else if ( sizeof(xz_magic) <= ctx->initrd_size &&
 	          !memcmp(ctx->initrd, xz_magic, sizeof(xz_magic)) )
 		Panic("Bootloader failed to decompress an xz initrd, "

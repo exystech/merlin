@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2017, 2018, 2020, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2017, 2018, 2020, 2021, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,9 +19,11 @@
 
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/utsname.h>
 
 #include <err.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -109,6 +111,74 @@ static bool hook_needs_to_be_run(const char* source_prefix,
 	free(source_path);
 	free(target_path);
 	return result;
+}
+
+// If a hook needs to run a finalization step after the upgrade, it can leave
+// behind a .running file in the hooks directory, which is deleted once the
+// hook has run.
+__attribute__((used))
+static char* hook_finalization_file(const char* target_prefix, const char* hook)
+{
+	char* target_path;
+	if ( asprintf(&target_path, "%s/share/sysinstall/hooks/%s.running",
+	              target_prefix, hook) < 0 )
+	{
+		warn("malloc");
+		_exit(2);
+	}
+	return target_path;
+}
+
+__attribute__((used))
+static void hook_want_finalization(const char* target_prefix, const char* hook)
+{
+	// TODO: After releasing Sortix 1.1, remove compatibility for Sortix 1.0
+	//       not having the /share/sysinstall/hooks directory.
+	char* path;
+	if ( asprintf(&path, "%s/share/sysinstall", target_prefix) < 0 )
+	{
+		warn("malloc");
+		_exit(2);
+	}
+	mkdir(path, 0755);
+	free(path);
+	if ( asprintf(&path, "%s/share/sysinstall/hooks", target_prefix) < 0 )
+	{
+		warn("malloc");
+		_exit(2);
+	}
+	mkdir(path, 0755);
+	free(path);
+	char* target_path = hook_finalization_file(target_prefix, hook);
+	int fd = open(target_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	if ( fd < 0 )
+	{
+		warn("%s", target_path);
+		_exit(2);
+	}
+	close(fd);
+	free(target_path);
+}
+
+__attribute__((used))
+static bool hook_needs_finalization(const char* target_prefix, const char* hook)
+{
+	char* target_path = hook_finalization_file(target_prefix, hook);
+	bool result = !access_or_die(target_path, F_OK);
+	free(target_path);
+	return result;
+}
+
+__attribute__((used))
+static void hook_did_finalization(const char* target_prefix, const char* hook)
+{
+	char* target_path = hook_finalization_file(target_prefix, hook);
+	if ( unlink(target_path) && errno != ENOENT )
+	{
+		warn("%s", target_path);
+		_exit(2);
+	}
+	free(target_path);
 }
 
 void upgrade_prepare(const struct release* old_release,
@@ -354,6 +424,42 @@ void upgrade_prepare(const struct release* old_release,
 		}
 		free(group_path);
 	}
+
+	// TODO: After releasing Sortix 1.1, remove this compatibility.
+	if ( hook_needs_to_be_run(source_prefix, target_prefix,
+	                          "sortix-1.1-tix-3g") )
+	{
+		char* path = join_paths(target_prefix, "/tix/collection.conf");
+		if ( !path )
+		{
+			warn("malloc");
+			_exit(2);
+		}
+		FILE* fp = fopen(path, "w");
+		if ( fp )
+		{
+			printf(" - Migrating to tix version 3...\n");
+			struct utsname uts;
+			uname(&uts);
+			if ( fprintf(fp, "TIX_COLLECTION_VERSION=3\n") < 0 ||
+			     fprintf(fp, "PREFIX=\n") < 0 ||
+			     fprintf(fp, "PLATFORM=%s-%s\n",
+				         uts.machine, uts.sysname) < 0 ||
+			     fclose(fp) == EOF )
+			{
+				warn("%s", path);
+				_exit(2);
+			}
+		}
+		else
+		{
+			warn("%s", path);
+			_exit(2);
+		}
+		free(path);
+		// Delay deleting installed.list since it's needed for the upgrade.
+		hook_want_finalization(target_prefix, "sortix-1.1-tix-3g");
+	}
 }
 
 void upgrade_finalize(const struct release* old_release,
@@ -365,6 +471,36 @@ void upgrade_finalize(const struct release* old_release,
 	(void) new_release;
 	(void) source_prefix;
 	(void) target_prefix;
+
+	if ( hook_needs_finalization(target_prefix, "sortix-1.1-tix-3g") )
+	{
+		printf(" - Finishing migration to tix version 3...\n");
+		char* path = join_paths(target_prefix, "/tix/installed.list");
+		if ( !path )
+		{
+			warn("malloc");
+			_exit(2);
+		}
+		if ( unlink(path) < 0 && errno != ENOENT )
+		{
+			warn("%s", path);
+			_exit(2);
+		}
+		free(path);
+		path = join_paths(target_prefix, "/tix/repository.list");
+		if ( !path )
+		{
+			warn("malloc");
+			_exit(2);
+		}
+		if ( unlink(path) < 0 && errno != ENOENT )
+		{
+			warn("%s", path);
+			_exit(2);
+		}
+		free(path);
+		hook_did_finalization(target_prefix, "sortix-1.1-tix-3g");
+	}
 }
 
 // TODO: After releasing Sortix 1.1, remove this compatibility. These manifests
