@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -106,6 +106,7 @@ int main(int argc, char* argv[])
 		sigaction(SIGHUP, &sa, NULL);
 		sigaction(SIGINT, &sa, NULL);
 		sigaction(SIGQUIT, &sa, NULL);
+		sigaction(SIGTERM, &sa, NULL);
 
 		// Mount the current device directory inside the new root filesystem.
 		int old_dev_fd = open("/dev", O_DIRECTORY | O_RDONLY);
@@ -119,6 +120,7 @@ int main(int argc, char* argv[])
 		sigaddset(&sigs, SIGHUP);
 		sigaddset(&sigs, SIGINT);
 		sigaddset(&sigs, SIGQUIT);
+		sigaddset(&sigs, SIGTERM);
 		sigprocmask(SIG_BLOCK, &sigs, &oldset);
 		pid_t child_pid = fork();
 		if ( child_pid < 0 )
@@ -146,6 +148,7 @@ int main(int argc, char* argv[])
 		signal(SIGHUP, SIG_DFL);
 		signal(SIGINT, SIG_DFL);
 		signal(SIGQUIT, SIG_DFL);
+		signal(SIGTERM, SIG_DFL);
 		sigprocmask(SIG_SETMASK, &oldset, NULL);
 	}
 
