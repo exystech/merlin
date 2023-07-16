@@ -31,7 +31,6 @@
 
 #include <sortix/dirent.h>
 #include <sortix/fcntl.h>
-#include <sortix/initrd.h>
 #include <sortix/mman.h>
 #include <sortix/stat.h>
 #include <sortix/tar.h>
@@ -51,17 +50,12 @@
 
 namespace Sortix {
 
-// TODO: The initrd is not being properly verified.
-// TODO: The initrd is not handled in an endian-neutral manner.
-
 struct initrd_context
 {
 	uint8_t* initrd;
 	size_t initrd_size;
 	addr_t initrd_unmap_start;
 	addr_t initrd_unmap_end;
-	struct initrd_superblock* sb;
-	Ref<Descriptor> links;
 	ioctx_t ioctx;
 };
 
@@ -79,262 +73,6 @@ static void UnmapInitrdPage(struct initrd_context* ctx, addr_t vaddr)
 	if ( !(ctx->initrd_unmap_start <= addr && addr < ctx->initrd_unmap_end) )
 		return;
 	Page::Put(addr, PAGE_USAGE_WASNT_ALLOCATED);
-}
-
-static mode_t initrd_mode_to_host_mode(uint32_t mode)
-{
-	mode_t result = mode & 0777;
-	if ( INITRD_S_ISVTX & mode ) result |= S_ISVTX;
-	if ( INITRD_S_ISSOCK(mode) ) result |= S_IFSOCK;
-	if ( INITRD_S_ISLNK(mode) ) result |= S_IFLNK;
-	if ( INITRD_S_ISREG(mode) ) result |= S_IFREG;
-	if ( INITRD_S_ISBLK(mode) ) result |= S_IFBLK;
-	if ( INITRD_S_ISDIR(mode) ) result |= S_IFDIR;
-	if ( INITRD_S_ISCHR(mode) ) result |= S_IFCHR;
-	if ( INITRD_S_ISFIFO(mode) ) result |= S_IFIFO;
-	return result;
-}
-
-static struct initrd_inode* initrd_get_inode(struct initrd_context* ctx,
-                                             uint32_t inode)
-{
-	if ( ctx->sb->inodecount <= inode )
-		return errno = EINVAL, (struct initrd_inode*) NULL;
-	uint32_t pos = ctx->sb->inodeoffset + ctx->sb->inodesize * inode;
-	return (struct initrd_inode*) (ctx->initrd + pos);
-}
-
-static uint8_t* initrd_inode_get_data(struct initrd_context* ctx,
-                                      struct initrd_inode* inode,
-                                      size_t* size)
-{
-	return *size = inode->size, ctx->initrd + inode->dataoffset;
-}
-
-static uint32_t initrd_directory_open(struct initrd_context* ctx,
-                                      struct initrd_inode* inode,
-                                      const char* name)
-{
-	if ( !INITRD_S_ISDIR(inode->mode) )
-		return errno = ENOTDIR, 0;
-	uint32_t offset = 0;
-	while ( offset < inode->size )
-	{
-		uint32_t pos = inode->dataoffset + offset;
-		struct initrd_dirent* dirent =
-			(struct initrd_dirent*) (ctx->initrd + pos);
-		if ( dirent->namelen && !strcmp(dirent->name, name) )
-			return dirent->inode;
-		offset += dirent->reclen;
-	}
-	return errno = ENOENT, 0;
-}
-
-static const char* initrd_directory_get_filename(struct initrd_context* ctx,
-                                                 struct initrd_inode* inode,
-                                                 size_t index)
-{
-	if ( !INITRD_S_ISDIR(inode->mode) )
-		return errno = ENOTDIR, (const char*) NULL;
-	uint32_t offset = 0;
-	while ( offset < inode->size )
-	{
-		uint32_t pos = inode->dataoffset + offset;
-		struct initrd_dirent* dirent =
-			(struct initrd_dirent*) (ctx->initrd + pos);
-		if ( index-- == 0 )
-			return dirent->name;
-		offset += dirent->reclen;
-	}
-	return errno = EINVAL, (const char*) NULL;
-}
-
-static size_t initrd_directory_get_num_files(struct initrd_context* ctx,
-                                             struct initrd_inode* inode)
-{
-	if ( !INITRD_S_ISDIR(inode->mode) )
-		return errno = ENOTDIR, 0;
-	uint32_t offset = 0;
-	size_t numentries = 0;
-	while ( offset < inode->size )
-	{
-		uint32_t pos = inode->dataoffset + offset;
-		const struct initrd_dirent* dirent =
-			(const struct initrd_dirent*) (ctx->initrd + pos);
-		numentries++;
-		offset += dirent->reclen;
-	}
-	return numentries;
-}
-
-static void ExtractNode(struct initrd_context* ctx,
-                        struct initrd_inode* inode,
-                        Ref<Descriptor> node);
-
-static void ExtractFile(struct initrd_context* ctx,
-                        struct initrd_inode* inode,
-                        Ref<Descriptor> file)
-{
-	size_t filesize;
-	uint8_t* data = initrd_inode_get_data(ctx, inode, &filesize);
-	if ( file->truncate(&ctx->ioctx, filesize) != 0 )
-		PanicF("initrd: truncate: %m");
-	size_t sofar = 0;
-	while ( sofar < filesize )
-	{
-		size_t left = filesize - sofar;
-		size_t chunk = 1024 * 1024;
-		size_t count = left < chunk ? left : chunk;
-		ssize_t numbytes = file->write(&ctx->ioctx, data + sofar, count);
-		if ( numbytes <= 0 )
-			PanicF("initrd: write: %m");
-		sofar += numbytes;
-	}
-}
-
-static void ExtractDir(struct initrd_context* ctx,
-                       struct initrd_inode* inode,
-                       Ref<Descriptor> dir)
-{
-	size_t numfiles = initrd_directory_get_num_files(ctx, inode);
-	for ( size_t i = 0; i < numfiles; i++ )
-	{
-		const char* name = initrd_directory_get_filename(ctx, inode, i);
-		if ( !name )
-			PanicF("initrd_directory_get_filename: %m");
-		if ( IsDotOrDotDot(name) )
-			continue;
-		uint32_t childino = initrd_directory_open(ctx, inode, name);
-		if ( !childino )
-			PanicF("initrd_directory_open: %s: %m", name);
-		struct initrd_inode* child =
-			(struct initrd_inode*) initrd_get_inode(ctx, childino);
-		if ( !child )
-			PanicF("initrd_get_inode(%u): %s: %m", childino, name);
-		mode_t mode = initrd_mode_to_host_mode(child->mode);
-		if ( INITRD_S_ISDIR(child->mode) )
-		{
-			if ( dir->mkdir(&ctx->ioctx, name, mode) && errno != EEXIST )
-				PanicF("initrd: mkdir: %s: %m", name);
-			Ref<Descriptor> desc = dir->open(&ctx->ioctx, name,
-			                                 O_SEARCH | O_DIRECTORY, 0);
-			if ( !desc )
-				PanicF("initrd: %s: %m", name);
-			ExtractNode(ctx, child, desc);
-		}
-		if ( INITRD_S_ISREG(child->mode) )
-		{
-			assert(child->nlink != 0);
-			char link_path[sizeof(childino) * 3];
-			snprintf(link_path, sizeof(link_path), "%ju", (uintmax_t) childino);
-			Ref<Descriptor> existing(ctx->links->open(&ctx->ioctx, link_path,
-			                         O_READ, 0));
-			if ( !existing || dir->link(&ctx->ioctx, name, existing) != 0 )
-			{
-				Ref<Descriptor> desc(dir->open(&ctx->ioctx, name,
-				                               O_WRITE | O_CREATE, mode));
-				if ( !desc )
-					PanicF("initrd: %s: %m", name);
-				ExtractNode(ctx, child, desc);
-				if ( 2 <= child->nlink )
-					ctx->links->link(&ctx->ioctx, link_path, desc);
-			}
-			if ( --child->nlink == 0 && INITRD_S_ISREG(child->mode) )
-			{
-				size_t filesize;
-				const uint8_t* data =
-					initrd_inode_get_data(ctx, child, &filesize);
-				uintptr_t from = (uintptr_t) data;
-				uintptr_t size = filesize;
-				uintptr_t from_aligned = Page::AlignUp(from);
-				uintptr_t from_distance = from_aligned - from;
-				if ( from_distance <= size )
-				{
-					uintptr_t size_aligned =
-						Page::AlignDown(size - from_distance);
-					for ( size_t i = 0; i < size_aligned; i += Page::Size() )
-						UnmapInitrdPage(ctx, from_aligned + i);
-					Memory::Flush();
-				}
-			}
-		}
-		if ( INITRD_S_ISLNK(child->mode) )
-		{
-			size_t filesize;
-			uint8_t* data = initrd_inode_get_data(ctx, child, &filesize);
-			char* oldname = new char[filesize + 1];
-			if ( !oldname )
-				PanicF("initrd: malloc: %m");
-			memcpy(oldname, data, filesize);
-			oldname[filesize] = '\0';
-			int ret = dir->symlink(&ctx->ioctx, oldname, name);
-			delete[] oldname;
-			if ( ret < 0 )
-				PanicF("initrd: symlink: %s", name);
-			Ref<Descriptor> desc = dir->open(&ctx->ioctx, name,
-			                                 O_READ | O_SYMLINK_NOFOLLOW, 0);
-			if ( desc )
-				ExtractNode(ctx, child, desc);
-		}
-	}
-}
-
-static void ExtractNode(struct initrd_context* ctx,
-                        struct initrd_inode* inode,
-                        Ref<Descriptor> node)
-{
-	if ( node->chmod(&ctx->ioctx, initrd_mode_to_host_mode(inode->mode)) < 0 )
-		PanicF("initrd: chmod: %m");
-	if ( node->chown(&ctx->ioctx, inode->uid, inode->gid) < 0 )
-		PanicF("initrd: chown: %m");
-	if ( INITRD_S_ISDIR(inode->mode) )
-		ExtractDir(ctx, inode, node);
-	if ( INITRD_S_ISREG(inode->mode) )
-		ExtractFile(ctx, inode, node);
-	struct timespec times[2];
-	times[0] = timespec_make((time_t) inode->mtime, 0);
-	times[1] = timespec_make((time_t) inode->mtime, 0);
-	if ( node->utimens(&ctx->ioctx, times) < 0 )
-		PanicF("initrd: utimens: %m");
-}
-
-static void ExtractInitrd(Ref<Descriptor> desc, struct initrd_context* ctx)
-{
-	ctx->sb = (struct initrd_superblock*) ctx->initrd;
-
-	if ( ctx->initrd_size < ctx->sb->fssize )
-		Panic("Initrd header does not match its size");
-
-	if ( desc->mkdir(&ctx->ioctx, ".initrd-links", 0777) != 0 )
-		PanicF("initrd: .initrd-links: %m");
-
-	if ( !(ctx->links = desc->open(&ctx->ioctx, ".initrd-links",
-	                               O_READ | O_DIRECTORY, 0)) )
-		PanicF("initrd: .initrd-links: %m");
-
-	struct initrd_inode* root = initrd_get_inode(ctx, ctx->sb->root);
-	if ( !root )
-		PanicF("initrd: initrd_get_inode(%u): %m", ctx->sb->root);
-	ExtractNode(ctx, root, desc);
-
-	union
-	{
-		struct dirent dirent;
-		uint8_t dirent_data[sizeof(struct dirent) + sizeof(uintmax_t) * 3];
-	};
-
-	while ( 0 < ctx->links->readdirents(&ctx->ioctx, &dirent, sizeof(dirent_data)) &&
-	        ((const char*) dirent.d_name)[0] )
-	{
-		if ( ((const char*) dirent.d_name)[0] == '.' )
-			continue;
-		ctx->links->unlinkat(&ctx->ioctx, dirent.d_name, AT_REMOVEFILE);
-		ctx->links->lseek(&ctx->ioctx, 0, SEEK_SET);
-	}
-
-	ctx->links.Reset();
-
-	desc->unlinkat(&ctx->ioctx, ".initrd-links", AT_REMOVEDIR);
 }
 
 struct TAR
@@ -614,9 +352,10 @@ static void ExtractModule(struct multiboot_mod_list* module,
 	else if ( !strncmp(cmdline, "--create-to ", strlen("--create-to ")) ||
 	          !strncmp(cmdline, "--create-to=", strlen("--create-to=")) )
 		ExtractTo(desc, ctx, cmdline + strlen("--create-to "), O_EXCL);
-	else if ( sizeof(struct initrd_superblock) <= ctx->initrd_size &&
+	// TODO: After releasing Sortix 1.1, remove this nice error message.
+	else if ( strlen("sortix-initrd-2") <= ctx->initrd_size &&
 	          !memcmp(ctx->initrd, "sortix-initrd-2", strlen("sortix-initrd-2")) )
-		ExtractInitrd(desc, ctx);
+		Panic("The sortix-initrd-2 format is no longer supported");
 	else if ( sizeof(struct tar) <= ctx->initrd_size &&
 	          !memcmp(ctx->initrd + offsetof(struct tar, magic), "ustar", 5) )
 		ExtractTar(desc, ctx);
@@ -639,7 +378,6 @@ static void ExtractModule(struct multiboot_mod_list* module,
 	for ( size_t i = 0; i < mod_size; i += Page::Size() )
 		UnmapInitrdPage(ctx, mapat + i);
 	Memory::Flush();
-
 
 	// Free the used virtual address space.
 	FreeKernelAddress(&initrd_addr_alloc);
