@@ -69,6 +69,74 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Support system upgrades and configuration in GRUB
+The GRUB configuration now implements the
+.Pa /etc
+and
+.Pa /etc/default
+configuration split per
+.Xr hier 7
+and
+.Xr sysmerge 8
+now collaborates with system upgrades to boot them correctly.
+Installations with manually configured bootloaders may need updating.
+.Pp
+Notably
+.Pa /etc/default/grub
+has been moved to
+.Pa /etc/grub
+since it is owned by the system administrator and there is no counterpart with
+operating system provided defaults.
+.Pp
+Additionally
+.Pa /etc/grub.d
+has been moved into
+.Pa /etc/default/grub.d
+since it provides operating system defaults.
+The system administrator can now create the
+.Pa /etc/grub.d
+directory manually to override files in
+.Pa /etc/default/grub.d ,
+although overriding
+.Pa 10_sortix
+is unsupported.
+.Pp
+.Pa 10_sortix
+now supports the
+.Pa GRUB_CMDLINE_SORTIX
+variable in
+.Pa /etc/grub
+to specify kernel command line options.
+.Pp
+.Xr sysmerge 8
+now colloborates with the
+.Xr update-initrd 8
+and
+.Pa 10_sortix
+scripts in the new system to prepare the upgrade system's kernel files in
+.Pa /boot/sysmerge/ .
+If the GRUB bootloader is accepted, then
+.Pa /boot/grub/grub.cfg
+is regenerated with a menu entry to perform the upgrade.
+The
+.Pa /boot/sortix.bin
+and
+.Pa /boot/sortix.initrd
+files are no longer replaced with the new versions and continue to boot the old
+system without upgrading.
+Any manual bootloader configuration must be configured to instead load the
+kernel and initrd from
+.Pa /boot/sysmerge/
+(if they exist).
+The
+.Pa /etc/default/grub.d/10_sortix.cache
+file will demonstrate how to boot the new system using GRUB after starting a
+.Xr sysmerge 8
+(if the grub port is installed).
+.Pp
+An upgrade hook will delete the obsolete stale
+.Pa /etc/grub.d/10_sortix.cache
+file.
 .Ss Third generation Tix
 The tix binary package format has upgraded from generation 2 to 3 and has a new
 internal layout that can be directly extracted into the filesystem.
@@ -315,7 +383,7 @@ The kernel will issue a security warning if it was booted without a random seed,
 unless the kernel command line contains
 .Fl \-no-random-seed .
 The GRUB port has been updated with an improved
-.Pa /etc/grub.d/10_sortix
+.Pa /etc/default/grub.d/10_sortix
 script that will automatically emit the appropriate GRUB commands.
 .Pp
 Users using the included GRUB will need to update to the latest GRUB port
@@ -341,9 +409,9 @@ If the GRUB port is installed, but not used, then if that port is updated with
 or
 .Xr sysmerge 8
 or manually, the
-.Pa /etc/grub.d/10_sortix
+.Pa /etc/default/grub.d/10_sortix
 script can be invoked, which will generate a
-.Pa /etc/grub.d/10_sortix.cache
+.Pa /etc/default/grub.d/10_sortix.cache
 fragment that can be spliced into the configuration of another GRUB
 installation.
 .Pp

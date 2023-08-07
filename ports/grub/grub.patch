@@ -1,77 +1,58 @@
-diff -Paur --no-dereference -- grub.upstream/10_sortix grub/10_sortix
---- grub.upstream/10_sortix
-+++ grub/10_sortix
-@@ -0,0 +1,70 @@
-+#!/bin/sh -e
-+! [ -e /etc/sortix-release ] && exit 0
-+. /etc/sortix-release
-+find_mountpoint() {(
-+  FILE="$1"
-+  DEVICE=$(grub-probe -t device -- "$FILE")
-+  while [ "$FILE" != "/" ]; do
-+    PARENT="$(dirname -- "$FILE")"
-+    if [ x"$(grub-probe -t device -- "$PARENT")" != x"$DEVICE" ]; then
-+      echo "$FILE"
-+      exit 0
-+    fi
-+    FILE="$PARENT"
-+  done
-+  echo "$FILE"
-+  exit 0
-+)}
-+mountpoint_relative() {(
-+  REL=""
-+  FILE="$1"
-+  DEVICE=$(grub-probe -t device -- "$FILE")
-+  while [ "$FILE" != "/" ]; do
-+    PARENT="$(dirname -- "$FILE")"
-+    if [ x"$(grub-probe -t device -- "$PARENT")" != x"$DEVICE" ]; then
-+      echo "$REL"
-+      exit 0
-+    fi
-+    REL="/$(basename -- "$FILE")$REL"
-+    FILE="$PARENT"
-+  done
-+  echo "$REL"
-+  exit 0
-+)}
-+BOOT_MNT=$(find_mountpoint /boot)
-+BOOT_REL=$(mountpoint_relative /boot)
-+DEVICE=$(grub-probe -t device -- "$BOOT_MNT")
-+FS_UUID=$(grub-probe -t fs_uuid -- "$BOOT_MNT")
-+HINTS_STRING=$(grub-probe -t hints_string -- "$BOOT_MNT")
-+PARTMAP=$(grub-probe -t partmap -- "$BOOT_MNT")
-+FS=$(grub-probe -t fs -- "$BOOT_MNT")
-+echo "Found $PRETTY_NAME on $DEVICE" >&2
-+cat > "$0.cache" << EOF
-+menuentry "$PRETTY_NAME (on $DEVICE)" --unrestricted {
-+  insmod part_$PARTMAP
-+  insmod $FS
-+  search --no-floppy --fs-uuid --set=root $HINTS_STRING $FS_UUID
-+  if [ -e $BOOT_REL/sortix.bin.xz ]; then
-+    insmod xzio
-+    multiboot $BOOT_REL/sortix.bin.xz
-+  elif [ -e $BOOT_REL/sortix.bin.gz ]; then
-+    insmod gzio
-+    multiboot $BOOT_REL/sortix.bin.gz
-+  else
-+    multiboot $BOOT_REL/sortix.bin
-+  fi
-+  if [ -e $BOOT_REL/random.seed ]; then
-+    module $BOOT_REL/random.seed --random-seed
-+  fi
-+  if [ -e $BOOT_REL/sortix.initrd.xz ]; then
-+    insmod xzio
-+    module $BOOT_REL/sortix.initrd.xz
-+  elif [ -e $BOOT_REL/sortix.initrd.gz ]; then
-+    insmod gzio
-+    module $BOOT_REL/sortix.initrd.gz
-+  else
-+    module $BOOT_REL/sortix.initrd
-+  fi
-+}
-+EOF
-+cat "$0.cache"
+diff -Paur --no-dereference -- grub.upstream/Makefile.in grub/Makefile.in
+--- grub.upstream/Makefile.in
++++ grub/Makefile.in
+@@ -1212,6 +1212,7 @@
+ 	util/grub.d/10_kfreebsd.in util/grub.d/10_illumos.in \
+ 	util/grub.d/10_netbsd.in util/grub.d/10_linux.in \
+ 	util/grub.d/10_xnu.in util/grub.d/20_linux_xen.in \
++	util/grub.d/10_sortix.in \
+ 	util/grub.d/30_os-prober.in util/grub.d/40_custom.in \
+ 	util/grub.d/41_custom.in util/grub-mkconfig.in \
+ 	util/grub-set-default.in util/grub-reboot.in \
+@@ -2372,7 +2373,7 @@
+ CCASFLAGS_LIBRARY = 
+ 
+ # Other variables
+-grubconfdir = $(sysconfdir)/grub.d
++grubconfdir = $(sysconfdir)/default/grub.d
+ platformdir = $(pkglibdir)/$(target_cpu)-$(platform)
+ starfielddir = $(pkgdatadir)/themes/starfield
+ CFLAGS_GNULIB = -Wno-undef -Wno-sign-compare -Wno-unused -Wno-unused-parameter -Wno-redundant-decls -Wno-unreachable-code -Wno-conversion
+@@ -2440,6 +2441,7 @@
+ grubconf_SCRIPTS = 00_header $(am__append_57) $(am__append_61) \
+ 	$(am__append_65) $(am__append_69) $(am__append_73) \
+ 	$(am__append_77) $(am__append_81) $(am__append_85) \
++	10_sortix \
+ 	30_os-prober 40_custom 41_custom
+ noinst_LIBRARIES = libgrubkern.a libgrubmods.a libgrubgcry.a
+ dist_noinst_DATA = grub-core/kern/disk_common.c \
+@@ -2460,6 +2462,7 @@
+ 	util/grub.d/00_header.in $(am__append_60) $(am__append_64) \
+ 	$(am__append_68) $(am__append_72) $(am__append_76) \
+ 	$(am__append_80) $(am__append_84) $(am__append_88) \
++	util/grub.d/10_sortix.in \
+ 	util/grub.d/30_os-prober.in util/grub.d/40_custom.in \
+ 	util/grub.d/41_custom.in util/grub-mkconfig.in \
+ 	util/grub-set-default.in util/grub-reboot.in \
+@@ -2640,6 +2643,7 @@
+ 	$(am__append_62) $(am__append_66) $(am__append_70) \
+ 	$(am__append_74) $(am__append_78) $(am__append_82) \
+ 	$(am__append_86) 30_os-prober 40_custom 41_custom \
++	10_sortix \
+ 	$(am__append_89) grub-mkconfig $(am__append_90) \
+ 	grub-set-default $(am__append_91) grub-reboot \
+ 	grub-mkconfig_lib $(am__append_92) grub-kbdcomp grub-shell \
+@@ -12086,6 +12090,10 @@
+ @COND_HOST_XNU_TRUE@	(for x in util/grub.d/10_xnu.in ; do cat $(srcdir)/"$$x"; done) | $(top_builddir)/config.status --file=$@:-
+ @COND_HOST_XNU_TRUE@	chmod a+x 10_xnu
+ 
++10_sortix: $(top_builddir)/config.status util/grub.d/10_sortix.in 
++	(for x in util/grub.d/10_sortix.in ; do cat $(srcdir)/"$$x"; done) | $(top_builddir)/config.status --file=$@:-
++	chmod a+x 10_sortix
++
+ @COND_HOST_LINUX_TRUE@20_linux_xen: $(top_builddir)/config.status util/grub.d/20_linux_xen.in 
+ @COND_HOST_LINUX_TRUE@	(for x in util/grub.d/20_linux_xen.in ; do cat $(srcdir)/"$$x"; done) | $(top_builddir)/config.status --file=$@:-
+ @COND_HOST_LINUX_TRUE@	chmod a+x 20_linux_xen
 diff -Paur --no-dereference -- grub.upstream/build-aux/config.sub grub/build-aux/config.sub
 --- grub.upstream/build-aux/config.sub
 +++ grub/build-aux/config.sub
@@ -226,6 +207,18 @@ diff -Paur --no-dereference -- grub.upstream/configure grub/configure
  FREETYPE=$ac_cv_prog_FREETYPE
  if test -n "$FREETYPE"; then
    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $FREETYPE" >&5
+diff -Paur --no-dereference -- grub.upstream/grub-core/Makefile.in grub/grub-core/Makefile.in
+--- grub.upstream/grub-core/Makefile.in
++++ grub/grub-core/Makefile.in
+@@ -13658,7 +13658,7 @@
+ CCASFLAGS_LIBRARY = $(CCASFLAGS_PLATFORM)
+ 
+ # Other variables
+-grubconfdir = $(sysconfdir)/grub.d
++grubconfdir = $(sysconfdir)/default/grub.d
+ platformdir = $(pkglibdir)/$(target_cpu)-$(platform)
+ starfielddir = $(pkgdatadir)/themes/starfield
+ CFLAGS_GNULIB = -Wno-undef -Wno-sign-compare -Wno-unused -Wno-unused-parameter -Wno-redundant-decls -Wno-unreachable-code -Wno-conversion
 diff -Paur --no-dereference -- grub.upstream/grub-core/lib/libgcrypt-grub/cipher/rijndael.c grub/grub-core/lib/libgcrypt-grub/cipher/rijndael.c
 --- grub.upstream/grub-core/lib/libgcrypt-grub/cipher/rijndael.c
 +++ grub/grub-core/lib/libgcrypt-grub/cipher/rijndael.c
@@ -665,6 +658,18 @@ diff -Paur --no-dereference -- grub.upstream/update-grub grub/update-grub
 @@ -0,0 +1,2 @@
 +#!/bin/sh -e
 +exec grub-mkconfig -o /boot/grub/grub.cfg "$@"
+diff -Paur --no-dereference -- grub.upstream/util/bash-completion.d/Makefile.in grub/util/bash-completion.d/Makefile.in
+--- grub.upstream/util/bash-completion.d/Makefile.in
++++ grub/util/bash-completion.d/Makefile.in
+@@ -1022,7 +1022,7 @@
+ bash_completion_script = grub
+ EXTRA_DIST = $(bash_completion_source)
+ CLEANFILES = $(bash_completion_script) config.log
+-bashcompletiondir = $(sysconfdir)/bash_completion.d
++bashcompletiondir = $(sysconfdir)/default/bash_completion.d
+ bashcompletion_DATA = $(bash_completion_script)
+ all: all-am
+ 
 diff -Paur --no-dereference -- grub.upstream/util/getroot.c grub/util/getroot.c
 --- grub.upstream/util/getroot.c
 +++ grub/util/getroot.c
@@ -707,23 +712,6 @@ diff -Paur --no-dereference -- grub.upstream/util/getroot.c grub/util/getroot.c
  #else
  
    /* Linux counts partitions uniformly, whether a BSD partition or a DOS
-diff -Paur --no-dereference -- grub.upstream/util/grub.d/00_header.in grub/util/grub.d/00_header.in
---- grub.upstream/util/grub.d/00_header.in
-+++ grub/util/grub.d/00_header.in
-@@ -27,6 +27,13 @@
- 
- . "$pkgdatadir/grub-mkconfig_lib"
- 
-+if [ -f "/etc/grubpw" ]; then
-+  echo 'insmod password_pbkdf2'
-+  echo 'set superusers="root"'
-+  echo "password_pbkdf2 root $(cat /etc/grubpw)"
-+  echo
-+fi
-+
- # Do this as early as possible, since other commands might depend on it.
- # (e.g. the `loadfont' command might need lvm or raid modules)
- for i in ${GRUB_PRELOAD_MODULES} ; do
 diff -Paur --no-dereference -- grub.upstream/util/grub-fstest.c grub/util/grub-fstest.c
 --- grub.upstream/util/grub-fstest.c
 +++ grub/util/grub-fstest.c
@@ -739,7 +727,15 @@ diff -Paur --no-dereference -- grub.upstream/util/grub-fstest.c grub/util/grub-f
 diff -Paur --no-dereference -- grub.upstream/util/grub-mkconfig.in grub/util/grub-mkconfig.in
 --- grub.upstream/util/grub-mkconfig.in
 +++ grub/util/grub-mkconfig.in
-@@ -102,27 +102,6 @@
+@@ -38,6 +38,7 @@
+ 
+ grub_cfg=""
+ grub_mkconfig_dir="${sysconfdir}"/grub.d
++grub_mkconfig_default_dir="${sysconfdir}"/default/grub.d
+ 
+ self=`basename $0`
+ 
+@@ -102,27 +103,6 @@
      esac
  done
  
@@ -767,6 +763,196 @@ diff -Paur --no-dereference -- grub.upstream/util/grub-mkconfig.in grub/util/gru
  set $grub_probe dummy
  if test -f "$1"; then
      :
+@@ -147,8 +127,8 @@
+     GRUB_FS="$(stat -f --printf=%T / || echo unknown)"
+ fi
+ 
+-if test -f ${sysconfdir}/default/grub ; then
+-  . ${sysconfdir}/default/grub
++if test -f ${sysconfdir}/grub ; then
++  . ${sysconfdir}/grub
+ fi
+ 
+ # XXX: should this be deprecated at some point?
+@@ -211,6 +191,7 @@
+   GRUB_CMDLINE_NETBSD \
+   GRUB_CMDLINE_NETBSD_DEFAULT \
+   GRUB_CMDLINE_GNUMACH \
++  GRUB_CMDLINE_SORTIX \
+   GRUB_TERMINAL_INPUT \
+   GRUB_TERMINAL_OUTPUT \
+   GRUB_SERIAL_COMMAND \
+@@ -243,12 +224,23 @@
+ # DO NOT EDIT THIS FILE
+ #
+ # It is automatically generated by $self using templates
+-# from ${grub_mkconfig_dir} and settings from ${sysconfdir}/default/grub
++# from ${grub_mkconfig_dir} and ${grub_mkconfig_default_dir}
++# and settings from ${sysconfdir}/grub
+ #
+ EOF
+ 
+-
+-for i in "${grub_mkconfig_dir}"/* ; do
++# PATCH: /etc/grub.d overrides /etc/default/grub.d, although it's unsupported to
++# override the 10_sortix file and /etc/grub should be used if possible.
++for n in $({ if [ -d "${grub_mkconfig_dir}" ]; then
++               ls -- "${grub_mkconfig_dir}"
++             fi
++             if [ -d "${grub_mkconfig_default_dir}" ]; then
++               ls -- "${grub_mkconfig_default_dir}"
++             fi; } | LC_ALL=C sort -u); do
++  i="${grub_mkconfig_dir}/$n"
++  if [ ! -f "$i" -a -f "${grub_mkconfig_default_dir}/$n" ]; then
++    i="${grub_mkconfig_default_dir}/$n"
++  fi
+   case "$i" in
+     # emacsen backup files. FIXME: support other editors
+     *~) ;;
+@@ -269,7 +261,7 @@
+   if ! ${grub_script_check} ${grub_cfg}.new; then
+     # TRANSLATORS: %s is replaced by filename
+     gettext_printf "Syntax errors are detected in generated GRUB config file.
+-Ensure that there are no errors in /etc/default/grub
++Ensure that there are no errors in /etc/grub
+ and /etc/grub.d/* files or please file a bug report with
+ %s file attached." "${grub_cfg}.new" >&2
+     echo >&2
+diff -Paur --no-dereference -- grub.upstream/util/grub.d/00_header.in grub/util/grub.d/00_header.in
+--- grub.upstream/util/grub.d/00_header.in
++++ grub/util/grub.d/00_header.in
+@@ -27,6 +27,13 @@
+ 
+ . "$pkgdatadir/grub-mkconfig_lib"
+ 
++if [ -f "/etc/grubpw" ]; then
++  echo 'insmod password_pbkdf2'
++  echo 'set superusers="root"'
++  echo "password_pbkdf2 root $(cat /etc/grubpw)"
++  echo
++fi
++
+ # Do this as early as possible, since other commands might depend on it.
+ # (e.g. the `loadfont' command might need lvm or raid modules)
+ for i in ${GRUB_PRELOAD_MODULES} ; do
+diff -Paur --no-dereference -- grub.upstream/util/grub.d/10_sortix.in grub/util/grub.d/10_sortix.in
+--- grub.upstream/util/grub.d/10_sortix.in
++++ grub/util/grub.d/10_sortix.in
+@@ -0,0 +1,92 @@
++#!/bin/sh
++
++set -e
++
++rm -f "$0.cache.new"
++
++# This script will run on the previous stable release during a sysmerge(8) with
++# a potentially old version of GRUB installed.
++
++# Detect if a system upgrade is ready and emit a bootloader entry using the new
++# script if we're not already it. This script provides a stable interface where
++# the new release helps the old system figure out how to boot the new system.
++PREFIX=
++BOOT_DIR=/boot
++UPGRADE=false
++if [ "$1" = --sysmerge ]; then
++  PREFIX=/sysmerge
++  BOOT_DIR=/boot/sysmerge
++  UPGRADE=true
++elif [ -e /sysmerge/tix/sysmerge.ready ]; then
++  # Write the upgrade menu entry before the old menu entry.
++  /sysmerge/libexec/sysmerge/grub --sysmerge > "$0.cache.new"
++fi
++
++# Allow this script to be run standalone outside of grub-mkconfig.
++if [ -z "$pkgdatadir" -a -f /etc/grub ]; then
++  . /etc/grub
++fi
++
++if [ ! -e "$PREFIX/etc/sortix-release" ]; then
++  exit 0
++fi
++. "$PREFIX/etc/sortix-release"
++
++if $UPGRADE; then
++  PRETTY_NAME="Upgrade to $PRETTY_NAME"
++fi
++
++find_mountpoint() {(
++  FILE="$1"
++  DEVICE=$(grub-probe -t device -- "$FILE")
++  while [ "$FILE" != "/" ]; do
++    PARENT="$(dirname -- "$FILE")"
++    if [ x"$(grub-probe -t device -- "$PARENT")" != x"$DEVICE" ]; then
++      echo "$FILE"
++      exit 0
++    fi
++    FILE="$PARENT"
++  done
++  echo "$FILE"
++  exit 0
++)}
++
++mountpoint_relative() {(
++  REL=""
++  FILE="$1"
++  DEVICE=$(grub-probe -t device -- "$FILE")
++  while [ "$FILE" != "/" ]; do
++    PARENT="$(dirname -- "$FILE")"
++    if [ x"$(grub-probe -t device -- "$PARENT")" != x"$DEVICE" ]; then
++      echo "$REL"
++      exit 0
++    fi
++    REL="/$(basename -- "$FILE")$REL"
++    FILE="$PARENT"
++  done
++  echo "$REL"
++  exit 0
++)}
++
++BOOT_MNT=$(find_mountpoint /boot)
++BOOT_REL=$(mountpoint_relative "$BOOT_DIR")
++OLD_BOOT_REL=$(mountpoint_relative /boot)
++DEVICE=$(grub-probe -t device -- "$BOOT_MNT")
++FS_UUID=$(grub-probe -t fs_uuid -- "$BOOT_MNT")
++HINTS_STRING=$(grub-probe -t hints_string -- "$BOOT_MNT")
++PARTMAP=$(grub-probe -t partmap -- "$BOOT_MNT")
++FS=$(grub-probe -t fs -- "$BOOT_MNT")
++
++echo "Found $PRETTY_NAME on $DEVICE" >&2
++cat >> "$0.cache.new" << EOF
++menuentry "$PRETTY_NAME (on $DEVICE)" --unrestricted {
++  insmod part_$PARTMAP
++  insmod $FS
++  search --no-floppy --fs-uuid --set=root $HINTS_STRING $FS_UUID
++  multiboot $BOOT_REL/sortix.bin $GRUB_CMDLINE_SORTIX
++  module $OLD_BOOT_REL/random.seed --random-seed
++  module $BOOT_REL/sortix.initrd
++}
++EOF
++mv "$0.cache.new" "$0.cache"
++cat "$0.cache"
+diff -Paur --no-dereference -- grub.upstream/util/grub.d/README grub/util/grub.d/README
+--- grub.upstream/util/grub.d/README
++++ grub/util/grub.d/README
+@@ -1,11 +1,15 @@
+-
+-All executable files in this directory are processed in shell expansion order.
++All executable files in /etc/grub.d and /etc/grub.d/default are processed in
++shell expansion order.
+ 
+   00_*: Reserved for 00_header.
+   10_*: Native boot entries.
+   20_*: Third party apps (e.g. memtest86+).
+ 
++Files in /etc/grub.d override files in /etc/grub.d/default if they exist. It is
++unsupported to override the native bootloader file 10_sortix since the
++configuration will be updated across releases
++
+ The number namespace in-between is configurable by system installer and/or
+ administrator.  For example, you can add an entry to boot another OS as
+ 01_otheros, 11_otheros, etc, depending on the position you want it to occupy in
+-the menu; and then adjust the default setting via /etc/default/grub.
++the menu; and then adjust the default setting via /etc/grub.
 diff -Paur --no-dereference -- grub.upstream/util/misc.c grub/util/misc.c
 --- grub.upstream/util/misc.c
 +++ grub/util/misc.c

@@ -86,18 +86,30 @@ static bool is_partition_name(const char* path)
 
 static bool has_pending_upgrade(const char* target)
 {
-	char* kernel = join_paths(target, "boot/sortix.bin.sysmerge.orig");
-	char* initrd = join_paths(target, "boot/sortix.initrd.sysmerge.orig");
 	char* sysmerge = join_paths(target, "sysmerge");
-	if ( !kernel || !initrd || !sysmerge )
+	char* boot_sysmerge = join_paths(target, "boot/sysmerge");
+	if ( !sysmerge || !boot_sysmerge )
 		err(2, "malloc");
-	bool result = access_or_die(kernel, F_OK) == 0 ||
-	              access_or_die(initrd, F_OK) == 0 ||
-	              access_or_die(sysmerge, F_OK) == 0;
-	free(kernel);
-	free(initrd);
+	bool result = access_or_die(sysmerge, F_OK) == 0 ||
+	              access_or_die(boot_sysmerge, F_OK) == 0;
 	free(sysmerge);
+	free(boot_sysmerge);
 	return result;
+}
+
+static void update_grub(struct conf* conf, const char* target)
+{
+	if ( conf->grub )
+	{
+		printf(" - Configuring bootloader...\n");
+		execute((const char*[]) { "update-grub", NULL }, "ceqQ", target);
+	}
+	else if ( access_or_die("/etc/default/grub.d/10_sortix", F_OK) == 0 )
+	{
+		printf(" - Creating bootloader fragment...\n");
+		execute((const char*[]) { "/etc/default/grub.d/10_sortix", NULL },
+		        "ceq", target);
+	}
 }
 
 int main(int argc, char* argv[])
@@ -207,20 +219,24 @@ int main(int argc, char* argv[])
 	if ( !has_system )
 		system = false;
 
+	struct conf conf;
+	conf_init(&conf);
+	char* conf_path = join_paths(target, "etc/upgrade.conf");
+	if ( !conf_path )
+		err(2, "malloc");
+	if ( !conf_load(&conf, conf_path) && errno != ENOENT )
+		err(2, conf_path);
+
 	bool did_cancel = false;
 	if ( !no_cancel && has_pending_upgrade(target) )
 	{
-		char* kernel = join_paths(target, "boot/sortix.bin.sysmerge.orig");
-		char* kernel_real = join_paths(target, "boot/sortix.bin");
-		char* initrd = join_paths(target, "boot/sortix.initrd.sysmerge.orig");
-		char* initrd_real = join_paths(target, "boot/sortix.initrd");
 		char* sysmerge = join_paths(target, "sysmerge");
-		if ( !kernel || !kernel_real || !initrd || !initrd_real || !sysmerge )
+		char* boot_sysmerge = join_paths(target, "boot/sysmerge");
+		if ( !sysmerge || !boot_sysmerge )
 			err(2, "malloc");
-		rename(kernel, kernel_real);
-		rename(initrd, initrd_real);
 		execute((const char*[]) { "rm", "-rf", "--", sysmerge, NULL }, "");
-		execute((const char*[]) { "update-initrd", NULL }, "ce", target);
+		execute((const char*[]) { "rm", "-rf", "--", boot_sysmerge, NULL }, "");
+		update_grub(&conf, target);
 		printf("Cancelled pending system upgrade.\n");
 		did_cancel = true;
 	}
@@ -289,14 +305,6 @@ int main(int argc, char* argv[])
 	}
 
 	// TODO: Check for version (skipping, downgrading).
-
-	struct conf conf;
-	conf_init(&conf);
-	char* conf_path = join_paths(target, "etc/upgrade.conf");
-	if ( !conf_path )
-		err(2, "malloc");
-	if ( !conf_load(&conf, conf_path) && errno != ENOENT )
-		err(2, conf_path);
 
 	bool can_run_new_abi =
 		abi_compatible(new_release.abi_major, new_release.abi_minor,
@@ -416,14 +424,13 @@ int main(int argc, char* argv[])
 		char* system_path = join_paths(target, "sysmerge/tix/sysmerge.system");
 		char* ports_path = join_paths(target, "sysmerge/tix/sysmerge.ports");
 		char* full_path = join_paths(target, "sysmerge/tix/sysmerge.full");
-		char* kernel = join_paths(target, "boot/sortix.bin.sysmerge.orig");
-		char* kernel_real = join_paths(target, "boot/sortix.bin");
-		char* kernel_new = join_paths(target, "sysmerge/boot/sortix.bin");
-		char* initrd = join_paths(target, "boot/sortix.initrd.sysmerge.orig");
-		char* initrd_real = join_paths(target, "boot/sortix.initrd");
-		if ( !system_path || !ports_path || !full_path || !kernel ||
-		     !kernel_real || !kernel_new || !initrd || !initrd_real )
+		char* ready_path = join_paths(target, "sysmerge/tix/sysmerge.ready");
+		char* sysmerge_boot = join_paths(target, "sysmerge/boot");
+		char* boot_sysmerge = join_paths(target, "boot/sysmerge");
+		if ( !system_path || !ports_path || !full_path || !ready_path ||
+		     !sysmerge_boot || !boot_sysmerge )
 			err(2, "malloc");
+
 		if ( full )
 		{
 			int fd = open(full_path, O_WRONLY | O_CREAT);
@@ -445,11 +452,25 @@ int main(int argc, char* argv[])
 				err(2, "%s", ports_path);
 			close(fd);
 		}
-		execute((const char*[]) { "cp", kernel_real, kernel, NULL }, "e");
-		execute((const char*[]) { "cp", initrd_real, initrd, NULL }, "e");
-		execute((const char*[]) { "cp", kernel_new, kernel_real, NULL }, "e");
-		execute((const char*[]) { "/sysmerge/sbin/update-initrd", NULL }, "ce",
-		        target);
+
+		// Generate the new initrd in /sysmerge/boot.
+		execute((const char*[]) { "/sysmerge/libexec/sysmerge/prepare",
+		                          NULL }, "ce", target);
+
+		// Move the kernel and initrd files to the boot partition where the
+		// bootloader is guaranteed to be able to read them.
+		execute((const char*[]) { "rm", "-rf", "--", boot_sysmerge,
+		                           NULL }, "e");
+		execute((const char*[]) { "cp", "-RT", "--", sysmerge_boot,
+		                          boot_sysmerge, NULL }, "e");
+
+		// Signal the sysmerge upgrade is ready and isn't partial.
+		int fd = open(ready_path, O_WRONLY | O_CREAT);
+		if ( fd < 0 )
+			err(2, "%s", ready_path);
+		close(fd);
+
+		update_grub(&conf, target);
 
 		printf("The system will be upgraded to %s on the next boot.\n",
 		       new_release.pretty_name);
@@ -477,21 +498,20 @@ int main(int argc, char* argv[])
 			return 0;
 	}
 
+	// Remove the upgrade readiness marker now that the upgrade has gone through
+	// such that the bootloader configuration and initrds don't try to do the
+	// upgrade again.
 	if ( has_system && booting )
 	{
-		char* kernel = join_paths(target, "boot/sortix.bin.sysmerge.orig");
-		char* initrd = join_paths(target, "boot/sortix.initrd.sysmerge.orig");
-		char* sysmerge = join_paths(target, "sysmerge");
-		if ( !kernel || !initrd || !sysmerge )
+		char* ready_path = join_paths(target, "sysmerge/tix/sysmerge.ready");
+		if ( !ready_path )
 			err(2, "malloc");
-		unlink(kernel);
-		unlink(initrd);
-		execute((const char*[]) { "rm", "-rf", "--", sysmerge, NULL }, "");
-		free(kernel);
-		free(initrd);
-		free(sysmerge);
+		unlink(ready_path);
+		free(ready_path);
 	}
 
+	// Update the initrd and bootloader. The new bootloader config won't refer
+	// to the upgrade as it's complete and the marker is gone.
 	if ( has_system && access_or_die("/etc/fstab", F_OK) == 0 )
 	{
 		printf(" - Creating initrd...\n");
@@ -510,23 +530,40 @@ int main(int argc, char* argv[])
 				err(2, "Failed to find device of filesystem: %s", boot_path);
 			close(boot_fd);
 			free(boot_path);
-			// TODO: A better design for finding the parent block device of a
-			//       partition without scanning every block device.
+			// TODO: A better design for finding the parent block device.
 			if ( is_partition_name(boot_device) )
 				*strrchr(boot_device, 'p') = '\0';
 			printf(" - Installing bootloader...\n");
 			execute((const char*[]) { "grub-install", boot_device,
-			                          NULL }, "ceqQ", target);
+				                      NULL }, "ceqQ", target);
 			free(boot_device);
-			printf(" - Configuring bootloader...\n");
-			execute((const char*[]) { "update-grub", NULL }, "ceqQ", target);
 		}
-		else if ( access_or_die("/etc/grub.d/10_sortix", F_OK) == 0 )
-		{
-			printf(" - Creating bootloader fragment...\n");
-			execute((const char*[]) { "/etc/grub.d/10_sortix", NULL }, "ceq",
-			        target);
-		}
+
+		update_grub(&conf, target);
+	}
+
+	// Finally clean up /sysmerge and /boot/sysmerge. They were left alone so
+	// the system remained bootable with the idempotent upgrade if it failed
+	// midway. Okay there's a bit of race conditions in grub-install, though the
+	// replacement of grub.cfg is atomic. Everything now points into the new
+	// system and nothing refers to the sysmerge directories.
+	if ( has_system && booting )
+	{
+		// TODO: After releasing Sortix 1.1, remove sysmerge.orig compatibility.
+		char* kernel = join_paths(target, "boot/sortix.bin.sysmerge.orig");
+		char* initrd = join_paths(target, "boot/sortix.initrd.sysmerge.orig");
+		char* sysmerge = join_paths(target, "sysmerge");
+		char* boot_sysmerge = join_paths(target, "boot/sysmerge");
+		if ( !kernel || !initrd || !sysmerge || !boot_sysmerge )
+			err(2, "malloc");
+		unlink(kernel);
+		unlink(initrd);
+		execute((const char*[]) { "rm", "-rf", "--", sysmerge, NULL }, "");
+		execute((const char*[]) { "rm", "-rf", "--", boot_sysmerge, NULL }, "");
+		free(kernel);
+		free(initrd);
+		free(sysmerge);
+		free(boot_sysmerge);
 	}
 
 	if ( new_release.pretty_name )

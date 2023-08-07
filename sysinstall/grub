@@ -1,0 +1,29 @@
+#!/bin/sh
+# Copyright (c) 2023 Jonas 'Sortie' Termansen.
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# grub
+# Output the GRUB configuration needed to boot the sysmerge(8) --wait upgrade.
+
+# This script will run on the previous stable release during a sysmerge(8) as a
+# high-level entry point to help the previous system generate the grub config to
+# boot the new system. This script minimizes the interface between the old and
+# new system to allow change. This script is ordinarily invoked by 10_sortix
+# from the grub port.
+
+set -e
+
+# The old system has copied the new kernel and initrd files from /sysmerge/boot
+# to /boot/sysmerge and we need to configure grub to boot them.
+/sysmerge/etc/default/grub.d/10_sortix --sysmerge

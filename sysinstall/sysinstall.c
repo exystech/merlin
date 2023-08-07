@@ -991,12 +991,13 @@ int main(void)
 			execute((const char*[]) { "chroot", "-d", ".", "update-grub", NULL },
 			        "_eqQ");
 		}
-		else if ( access_or_die("/etc/grub.d/10_sortix", F_OK) == 0 )
+		else if ( access_or_die("/etc/default/grub.d/10_sortix", F_OK) == 0 )
 		{
-			// Help dual booters by making /etc/grub.d/10_sortix.cache.
+			// Help dual booters by making /etc/grub.d/default/10_sortix.cache.
 			printf(" - Creating bootloader fragment...\n");
 			execute((const char*[]) { "chroot", "-d", ".",
-			                          "/etc/grub.d/10_sortix", NULL }, "_eq");
+			                          "/etc/grub.d/default/10_sortix",
+			                          NULL }, "_eq");
 		}
 		printf(" - Finishing installation...\n");
 		_exit(0);
@@ -1530,8 +1531,9 @@ int main(void)
 
 	if ( strcasecmp(accept_grub, "no") == 0 )
 		text("You did not accept a bootloader and need to set up bootloading "
-		     "yourself. /etc/grub.d/10_sortix.cache is a GRUB configuration "
-		     "fragment that boots the newly installed system.\n\n");
+		     "yourself. /etc/default/grub.d/10_sortix.cache is a GRUB "
+		     "configuration fragment that boots the newly installed system."
+		     "\n\n");
 
 	text("Upon boot, you'll be greeted with a login screen. Enter your "
 	     "credentials to get a command line. Login as user 'poweroff' as "

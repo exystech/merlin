@@ -46,6 +46,9 @@ install: all
 	install sysinstall $(DESTDIR)$(SBINDIR)
 	install sysmerge $(DESTDIR)$(SBINDIR)
 	install sysupgrade $(DESTDIR)$(SBINDIR)
+	mkdir -p $(DESTDIR)$(LIBEXECDIR)/sysmerge
+	install prepare $(DESTDIR)$(LIBEXECDIR)/sysmerge
+	install grub $(DESTDIR)$(LIBEXECDIR)/sysmerge
 	mkdir -p $(DESTDIR)$(MANDIR)/man8
 	cp sysinstall.8 $(DESTDIR)$(MANDIR)/man8/sysinstall.8
 	cp sysmerge.8 $(DESTDIR)$(MANDIR)/man8/sysmerge.8
@@ -59,6 +62,7 @@ install: all
 	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-passwd
 	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-group
 	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-tix3g
+	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-grub-cache
 
 sysinstall: $(SYSINSTALL_OBJS)
 	$(CC) $(SYSINSTALL_OBJS) -o $@ -lmount -ldisplay

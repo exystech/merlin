@@ -16,9 +16,12 @@
 # update-initrd
 # Generate an initrd(7) that locates and chain boots the real root filesystem.
 
+# This script will run on the previous stable release during a sysmerge(8).
+
 set -e
 
 sysroot=
+sysmerge=false
 
 dashdash=
 previous_option=
@@ -35,6 +38,7 @@ for argument do
   esac
   case $dashdash$argument in
   --) dashdash=yes ;;
+  --sysmerge) sysmerge=true ;;
   --sysroot=*) sysroot=$parameter ;;
   --sysroot) previous_option=sysroot ;;
   -*) echo "$0: unrecognized option $argument" >&2
@@ -49,17 +53,20 @@ if test -n "$previous_option"; then
   exit 1
 fi
 
-sysmerge=false
-exec_prefix="$sysroot"
-if [ -d "$sysroot/sysmerge" ]; then
-  # If an upgrade is pending, invoke the update-initrd of the new system, if
-  # we're not already it.
-  if [ "$(realpath -- "$(which -- "$0")")" != \
-       "$(realpath -- "$sysroot/sysmerge/sbin/update-initrd")" ]; then
-    exec "$sysroot/sysmerge/sbin/update-initrd" "$@"
-  fi
+root="$sysroot"
+output="$sysroot"
+if $sysmerge; then
+  root="$sysroot/sysmerge"
+  output="$root"
+# TODO: After releasing Sortix 1.1, remove the check for /sysmerge as the old
+#       update-initrd will invoke the newer version and expect the new version
+#       to notice that it is the version in /sysmerge. However, write the new
+#       initrd to /boot rather than /sysmerge/boot since 1.0 doesn't implement
+#       the new scheme.
+elif [ -e /sysmerge -a "$0" = /sysmerge/sbin/update-initrd ]; then
   sysmerge=true
-  exec_prefix="$sysroot/sysmerge"
+  root="$sysroot/sysmerge"
+  output="$sysroot"
 fi
 if [ ! -e "$sysroot/etc/fstab" ]; then
   echo "$0: $sysroot/etc/fstab: Need a filesystem table to make an initrd" >&2
@@ -69,10 +76,10 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT HUP INT QUIT TERM
 mkdir "$tmp/bin"
 mkdir "$tmp/sbin"
-cp "$exec_prefix/sbin/init" "$tmp/sbin"
-cp "$exec_prefix/sbin/extfs" "$tmp/sbin"
-test -f "$exec_prefix/sbin/fsck.ext2" &&
-cp "$exec_prefix/sbin/fsck.ext2" "$tmp/sbin"
+cp "$root/sbin/init" "$tmp/sbin"
+cp "$root/sbin/extfs" "$tmp/sbin"
+test -f "$root/sbin/fsck.ext2" &&
+cp "$root/sbin/fsck.ext2" "$tmp/sbin"
 mkdir "$tmp/etc"
 cp "$sysroot/etc/fstab" "$tmp/etc/fstab"
 mkdir "$tmp/etc/init"
@@ -85,7 +92,7 @@ else
 require chain exit-code
 EOF
 fi
-mkdir -p "$sysroot/boot"
+mkdir -p "$output/boot"
 LC_AL=C ls -A "$tmp" |
-tar -C "$tmp" -cf "$sysroot/boot/sortix.initrd" \
+tar -C "$tmp" -cf "$output/boot/sortix.initrd" \
     --numeric-owner --owner=0 --group=0 -T -

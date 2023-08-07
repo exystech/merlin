@@ -1,2 +1,2 @@
-chmod +x -- '10_sortix'
 chmod +x -- 'update-grub'
+chmod +x -- 'util/grub.d/10_sortix.in'

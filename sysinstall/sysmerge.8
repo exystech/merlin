@@ -124,52 +124,50 @@ This option is implied unless
 is passed.
 .It Fl w , Fl \-wait
 Wait until the next boot to complete the upgrade, rather than finishing it now.
-This installs into the
+The upgrade is installed into the
 .Pa /sysmerge
-directory instead and replaces the
+directory instead, with the new kernel and initrd files in
+.Pa /boot/sysmerge .
+The new
 .Xr kernel 7
-with the new kernel
-and
+has a new
 .Xr initrd 7
-with an initrd that runs
+that runs
 .Sy /sysmerge/sbin/sysmerge --booting
 on boot through the
 .Sy chain-merge
 .Xr init 8
-boot target.
-Backups are made of the
-.Xr kernel 7
-and
-.Xr initrd 7
-such that the operation can be rolled back.
+boot target, which performs the operating system upgrade.
+The bootloader configuration is regenerated with a menu option to perform
+the upgrade if grub is enabled in
+.Xr upgrade.conf 5 ,
+otherwise the
+.Pa /etc/default/grub.d/10_sortix.cache
+bootloader fragment can be used to manually bootload the upgrade.
 .El
 .Sh FILES
-.Bl -tag -width "/boot/sortix.initrd.sysmerge.orig" -compact
+.Bl -tag -width "/etc/default/grub.d/10_sortix.cache" -compact
 .It Pa /boot/sortix.bin
-system
-.Xr kernel 7
-.It Pa /boot/sortix.bin.sysmerge.orig
-system
-.Xr kernel 7
-(backup)
+Old system
+.Xr kernel 7 .
 .It Pa /boot/sortix.initrd
-system
-.Xr initrd 7
-.It Pa /boot/sortix.initrd.sysmerge.orig
-system
-.Xr initrd 7
-(backup)
+Old system
+.Xr initrd 7 .
+.It Pa /boot/sysmerge/
+New system kernel and initrd files.
+.It Pa /etc/default/grub.d/10_sortix.cache
+GRUB configuration fragment that boots the new system.
 .It Pa /etc/machine
-processor platform of this installation
+Processor platform of this installation.
 .It Pa /etc/sortix-release
-the current system release
+The current system release.
 .It Pa /etc/upgrade.conf
-controls the bootloader upgrade behavior (see
-.Xr upgrade.conf 5 )
-.It Pa /share/sysinstall/hooks
+Controls the bootloader upgrade behavior (see
+.Xr upgrade.conf 5 ) .
+.It Pa /share/sysinstall/hooks/
 A file per upgrade hook indicating that it doesn't need to be run.
-.It Pa /sysmerge
-pending upgrade is stored here
+.It Pa /sysmerge/
+The pending systen upgrade is stored here.
 .El
 .Sh SEE ALSO
 .Xr development 7 ,

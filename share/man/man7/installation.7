@@ -529,7 +529,7 @@ If the included GRUB bootloader is used, after making the above edit, run
 .Xr update-grub 8
 within the new installation to regenerate the bootloader configuration.
 Note that
-.Pa /etc/grub.d/10_sortix
+.Pa /etc/default/grub.d/10_sortix
 is part of the GRUB package and local changes will be undone when the GRUB
 package is updated or reinstalled, in which case you must make this change again
 and run
@@ -537,12 +537,12 @@ and run
 again.
 .Pp
 If the included GRUB bootloader is not used, but instead the
-.Pa /etc/grub.d/10_sortix.cache
+.Pa /etc/default/grub.d/10_sortix.cache
 fragment is spliced into another GRUB installation, make the above change and
 then run the
-.Pa /etc/grub.d/10_sortix
+.Pa /etc/default/grub.d/10_sortix
 command and use the freshly regenerated
-.Pa /etc/grub.d/10_sortix.cache
+.Pa /etc/default/grub.d/10_sortix.cache
 fragment instead.
 .Sh SEE ALSO
 .Xr chkblayout 1 ,

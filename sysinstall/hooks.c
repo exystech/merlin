@@ -463,6 +463,28 @@ void upgrade_prepare(const struct release* old_release,
 		// Delay deleting installed.list since it's needed for the upgrade.
 		hook_want_finalization(target_prefix, "sortix-1.1-tix3g");
 	}
+
+	// TODO: After releasing Sortix 1.1, remove this compatibility.
+	if ( hook_needs_to_be_run(source_prefix, target_prefix,
+	                          "sortix-1.1-grub-cache") )
+	{
+		char* path = join_paths(target_prefix, "/etc/grub.d/10_sortix.cache");
+		if ( !path )
+		{
+			warn("malloc");
+			_exit(2);
+		}
+		if ( !access_or_die(path, F_OK) )
+		{
+			printf(" - Removing /etc/grub.d/10_sortix.cache...\n");
+			if ( unlink(path) < 0 )
+			{
+				warn("unlink: %s", path);
+				_exit(2);
+			}
+		}
+		free(path);
+	}
 }
 
 void upgrade_finalize(const struct release* old_release,
