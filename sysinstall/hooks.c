@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <sys/utsname.h>
 
+#include <ctype.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -427,7 +428,7 @@ void upgrade_prepare(const struct release* old_release,
 
 	// TODO: After releasing Sortix 1.1, remove this compatibility.
 	if ( hook_needs_to_be_run(source_prefix, target_prefix,
-	                          "sortix-1.1-tix-3g") )
+	                          "sortix-1.1-tix3g") )
 	{
 		char* path = join_paths(target_prefix, "/tix/collection.conf");
 		if ( !path )
@@ -441,6 +442,8 @@ void upgrade_prepare(const struct release* old_release,
 			printf(" - Migrating to tix version 3...\n");
 			struct utsname uts;
 			uname(&uts);
+			for ( size_t i = 0; uts.sysname[i]; i++ )
+				uts.sysname[i] = tolower((unsigned char) uts.sysname[i]);
 			if ( fprintf(fp, "TIX_COLLECTION_VERSION=3\n") < 0 ||
 			     fprintf(fp, "PREFIX=\n") < 0 ||
 			     fprintf(fp, "PLATFORM=%s-%s\n",
@@ -458,7 +461,7 @@ void upgrade_prepare(const struct release* old_release,
 		}
 		free(path);
 		// Delay deleting installed.list since it's needed for the upgrade.
-		hook_want_finalization(target_prefix, "sortix-1.1-tix-3g");
+		hook_want_finalization(target_prefix, "sortix-1.1-tix3g");
 	}
 }
 
@@ -472,7 +475,7 @@ void upgrade_finalize(const struct release* old_release,
 	(void) source_prefix;
 	(void) target_prefix;
 
-	if ( hook_needs_finalization(target_prefix, "sortix-1.1-tix-3g") )
+	if ( hook_needs_finalization(target_prefix, "sortix-1.1-tix3g") )
 	{
 		printf(" - Finishing migration to tix version 3...\n");
 		char* path = join_paths(target_prefix, "/tix/installed.list");
@@ -499,7 +502,7 @@ void upgrade_finalize(const struct release* old_release,
 			_exit(2);
 		}
 		free(path);
-		hook_did_finalization(target_prefix, "sortix-1.1-tix-3g");
+		hook_did_finalization(target_prefix, "sortix-1.1-tix3g");
 	}
 }
 
