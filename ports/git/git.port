@@ -1,6 +1,5 @@
 NAME=git
 BUILD_LIBRARIES='libiconv libz libcurl? libexpat? libintl? libpcre? libssl?'
-RUNTIME_PROGRAMS='perl?'
 VERSION=2.14.3
 DISTNAME=$NAME-$VERSION
 COMPRESSION=tar.xz
@@ -17,4 +16,5 @@ CONFIGURE_VARS='ac_cv_fread_reads_directories=no ac_cv_snprintf_returns_bogus=no
 #       that likes to colorize even when the output device is a pipe, which
 #       causes trouble here. You can safely remove this sortie has learned the
 #       error of his ways.
-MAKE_VARS='V=1 MAKE=make'
+# Perl is disabled because perl features do not cross-compile correctly.
+MAKE_VARS='V=1 MAKE=make NO_PERL=NoThanks'
