@@ -1,5 +1,6 @@
 NAME=git
-BUILD_LIBRARIES='libiconv libz perl libcurl? libexpat? libintl? libpcre? libssl?'
+BUILD_LIBRARIES='libiconv libz libcurl? libexpat? libintl? libpcre? libssl?'
+RUNTIME_PROGRAMS='perl?'
 VERSION=2.14.3
 DISTNAME=$NAME-$VERSION
 COMPRESSION=tar.xz
