@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2015, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2015, 2022, 2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,17 +24,22 @@
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/syscall.h>
 
+#include "kernelinfo.h"
+
 #ifndef VERSIONSTR
 #define VERSIONSTR "unknown"
 #endif
 
 namespace Sortix {
 
+char* kernel_options;
+
 static const char* KernelInfo(const char* req)
 {
 	if ( strcmp(req, "name") == 0 ) { return BRAND_KERNEL_NAME; }
 	if ( strcmp(req, "version") == 0 ) { return VERSIONSTR; }
 	if ( strcmp(req, "tagline") == 0 ) { return BRAND_RELEASE_TAGLINE; }
+	if ( strcmp(req, "options") == 0 ) { return kernel_options; }
 	if ( strcmp(req, "builddate") == 0 ) { return __DATE__; }
 	if ( strcmp(req, "buildtime") == 0 ) { return __TIME__; }
 #if defined(__i386__) || defined(__x86_64__)

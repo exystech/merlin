@@ -80,6 +80,7 @@
 #include "kb/default-kblayout.h"
 #include "kb/kblayout.h"
 #include "kb/ps2.h"
+#include "kernelinfo.h"
 #include "logterminal.h"
 #include "mouse/ps2.h"
 #include "multiboot.h"
@@ -227,6 +228,9 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 		Memory::Flush();
 		FreeKernelAddress(&alloc);
 	}
+
+	if ( !(kernel_options = strdup(cmdline ? cmdline : "")) )
+		Panic("Failed to allocate kernel command line");
 
 	int argmax = 1;
 	argv = new char*[argmax + 1];
