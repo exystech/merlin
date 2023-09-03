@@ -170,8 +170,8 @@ selecting
 .Sy Disable network drivers .
 It can be useful to disable the network drivers if it's undesirable to put the
 system on the network for security reasons.
-You can disable network drivers by default by editing the bootloader
-configuration as described below after completing the installation.
+You will be asked later if you'd like to save this choice in the kernel
+options.
 .Pp
 By default
 .Xr dhclient 8
@@ -271,6 +271,18 @@ The password will be hashed and stored in
 and is inserted into the GRUB configuration when
 .Xr update-grub 8
 is run.
+.Pp
+If the
+.Xr kernel 7
+was booted with explicit options via the advanced bootloader menu, then you
+will be asked if you'd like to make these changes permanent via the
+.Sy GRUB_CMDLINE_SORTIX
+variable in the
+.Pa /etc/grub
+configuration file.
+Run
+.Xr update-grub 8
+to apply the changes if you edit this file.
 .Ss Partitioning
 You will now need to set up a partition for the root filesystem and other
 filesystems you wish to use.
@@ -495,55 +507,6 @@ The
 manual page is a basic overview of the system for new users.
 .Pp
 Congratulations on your new Sortix system.
-.Ss Disabling Networking by Default
-To disable networking drivers by default, edit the bootloader configuration to
-pass the
-.Fl \-disable-network-drivers
-option by default on the
-.Xr kernel 7
-command line.
-.Pp
-If you are at the final stage of installation, you can answer
-.Sy '!'
-to get a shell in the live environment and then run
-.Sy "chroot -d ."
-to enter a shell inside the new installation.
-.Pp
-For instance, if GRUB is used the bootloader, networking can be disabled by
-default by done by editing
-.Pa /etc/grub.d/10_sortix
-of the new installation.
-.Xr editor 1
-or any editor can be used to edit the file.
-Change the line from
-.Bd -literal
-    multiboot $BOOT_REL/sortix.bin
-.Ed
-.Pp
-to instead be
-.Bd -literal
-    multiboot $BOOT_REL/sortix.bin --disable-network-drivers
-.Ed
-.Pp
-If the included GRUB bootloader is used, after making the above edit, run
-.Xr update-grub 8
-within the new installation to regenerate the bootloader configuration.
-Note that
-.Pa /etc/default/grub.d/10_sortix
-is part of the GRUB package and local changes will be undone when the GRUB
-package is updated or reinstalled, in which case you must make this change again
-and run
-.Xr update-grub 8
-again.
-.Pp
-If the included GRUB bootloader is not used, but instead the
-.Pa /etc/default/grub.d/10_sortix.cache
-fragment is spliced into another GRUB installation, make the above change and
-then run the
-.Pa /etc/default/grub.d/10_sortix
-command and use the freshly regenerated
-.Pa /etc/default/grub.d/10_sortix.cache
-fragment instead.
 .Sh SEE ALSO
 .Xr chkblayout 1 ,
 .Xr chvideomode 1 ,

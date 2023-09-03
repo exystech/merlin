@@ -28,6 +28,7 @@
 
 #include <assert.h>
 #include <brand.h>
+#include <ctype.h>
 #include <dirent.h>
 #include <err.h>
 #include <errno.h>
@@ -339,6 +340,84 @@ static void grub_hash_password(char* buffer, size_t buffer_size, const char* pw)
 	waitpid(pid, &exit_code, 0);
 	if ( !WIFEXITED(exit_code) || WEXITSTATUS(exit_code) != 0 )
 		errx(2, "grub password hash failed");
+}
+
+
+static const char* const ignore_kernel_options[] =
+{
+	"--no-random-seed",
+	"--random-seed",
+	NULL,
+};
+
+static char* normalize_kernel_options(void)
+{
+	char* options = akernelinfo("options");
+	if ( !options )
+	{
+		warn("kernelinfo: options");
+		return NULL;
+	}
+	size_t i = 0, o = 0;
+	while ( options[i] )
+	{
+		if ( isspace((unsigned char) options[i]) )
+		{
+			i++;
+			continue;
+		}
+		if ( options[i] != '-' ) // Imperfect since quoting options is allowed.
+			break;
+		if ( !strncmp(options + i, "--", 2) &&
+		     (!options[i + 2] || isspace((unsigned char) options[i + 2])) )
+			break;
+		bool ignored = false;
+		for ( size_t n = 0; ignore_kernel_options[n]; n++ )
+		{
+			const char* opt = ignore_kernel_options[n];
+			size_t len = strlen(opt);
+			if ( !strncmp(options + i, opt, len) &&
+			     (!options[i + len] ||
+			      isspace((unsigned char) options[i + len])) )
+			{
+				i += len;
+				ignored = true;
+				break;
+			}
+		}
+		if ( ignored )
+			continue;
+		bool singly = false;
+		bool doubly = false;
+		bool escaped = false;
+		for ( ; options[i]; i++ )
+		{
+			char c = options[i];
+			options[o++] = c;
+			if ( !escaped && !singly && !doubly && isspace((unsigned char) c) )
+				break;
+			if ( !escaped && !doubly && c == '\'' )
+			{
+				singly = !singly;
+				continue;
+			}
+			if ( !escaped && !singly && c == '"' )
+			{
+				doubly = !doubly;
+				continue;
+			}
+			if ( !singly && !escaped && c == '\\' )
+			{
+				escaped = true;
+				continue;
+			}
+			escaped = false;
+		}
+	}
+	while ( o && isspace((unsigned char) options[o - 1]) )
+		o--;
+	options[o] = '\0';
+	return options;
 }
 
 static pid_t main_pid;
@@ -747,6 +826,36 @@ int main(void)
 		}
 		text("\n");
 	}
+
+	char* kernel_options = normalize_kernel_options();
+	if ( (autoconf_has("kernel_options") ||
+	      (kernel_options && kernel_options[0])) &&
+	     !access_or_die("/tix/tixinfo/grub", F_OK) )
+	{
+		text("The operating system was booted with explicit kernel(7) options. "
+		     "Would you like set them permanently in /etc/grub?\n\n");
+
+		while ( true )
+		{
+			char options[1024];
+			prompt(options, sizeof(options), "kernel_options",
+				   "Kernel options? (OPTIONS/no)", kernel_options);
+			if ( !strcasecmp(options, "no") )
+			{
+				kernel_options = NULL;
+				break;
+			}
+			if ( options[0] )
+			{
+				install_configurationf("grub", "w",
+				                       "GRUB_CMDLINE_SORTIX='%s'\n", options);
+				textf("/etc/grub will be made with the kernel options.\n");
+			}
+			break;
+		}
+		text("\n");
+	}
+	free(kernel_options);
 
 	// TODO: Offer the user an automatic layout of partitions if the disk is
 	//       empty.

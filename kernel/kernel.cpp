@@ -255,6 +255,7 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 	}
 	argv[argc] = NULL;
 
+	// Add new once-only options to sysinstall's normalize_kernel_options.
 	bool no_random_seed = false;
 	for ( int i = 0; i < argc; i++ )
 	{

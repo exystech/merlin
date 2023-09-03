@@ -154,6 +154,15 @@ question could be answered with
 to dynamically hash the bootloader password.
 .It Sy grub_password_empty Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy no )
 Allow an insecure empty bootloader password typed interactively?
+.It Sy kernel_options Ns "=" Ns Ar options
+What
+.Xr kernel 7
+options should be set in
+.Xr grub 5
+with
+.Sy GRUB_CMDLINE_SORTIX ?
+This question is asked only the GRUB port is installed, if the kernel was booted
+with explicit options or this question is set.
 .It Sy disked Ns "=" Ns Ar commands
 Commands to create partitions and filesystems with
 .Xr disked 8 ?

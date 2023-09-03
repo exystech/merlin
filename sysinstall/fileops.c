@@ -17,6 +17,7 @@
  * File operation utility functions.
  */
 
+#include <sys/kernelinfo.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -220,4 +221,23 @@ char** read_lines_file(const char* path, size_t* out_count)
 	fclose(fp);
 	*out_count = count;
 	return lines;
+}
+
+char* akernelinfo(const char* request)
+{
+	char* buffer = NULL;
+	size_t size = 0;
+	while ( true )
+	{
+		errno = 0;
+		ssize_t needed = kernelinfo(request, buffer, size);
+		if ( needed < 0 )
+			return free(buffer), NULL;
+		if ( errno != ERANGE )
+			return buffer;
+		size = (size_t) needed + 1;
+		free(buffer);
+		if ( !(buffer = malloc(size)) )
+			return NULL;
+	}
 }
