@@ -281,7 +281,7 @@ echo "Generating manhtml index"
  ep
  section "Ports manual pages" "ports"
  bp
- cat ports.list | sort |
+ grep -Ev '^system$' ports.list | sort |
  while read port; do
    if [ -s "$port.list" ]; then
      link "$port.html" "$port"
@@ -292,7 +292,7 @@ echo "Generating manhtml index"
  ep
  end_html) | finalize_html index.html
 
-(echo system && cat ports.list) |
+(echo system && grep -Ev '^system$' ports.list) |
 while read port; do
   echo "Generating manhtml index for $port"
   (if [ "$port" = system ]; then prettyport="System"; else prettyport=$port; fi

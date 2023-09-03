@@ -654,6 +654,8 @@ char** read_installed_list(const char* prefix, size_t* out_count)
 	{
 		if ( entry->d_name[0] == '.' )
 			continue;
+		if ( !strcmp(entry->d_name, "system") )
+			continue;
 		if ( !string_array_append(&installed, &count, &length, entry->d_name) )
 		{
 			warn("malloc");

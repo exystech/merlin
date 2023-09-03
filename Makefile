@@ -75,7 +75,7 @@ BUILD_NAME:=sortix-$(RELEASE)-$(MACHINE)
 LIVE_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).live.tar
 OVERLAY_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).overlay.tar
 SRC_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).src.tar
-SYSTEM_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).system.tar
+SYSTEM_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).system.tix.tar
 
 .PHONY: all
 all: sysroot
@@ -246,6 +246,7 @@ sysroot-system: sysroot-fsh sysroot-base-headers
 	  || exit $$?; done)
 	LC_ALL=C sort -u "$(SYSROOT)/tix/manifest/system" > "$(SYSROOT)/tix/manifest/system.new"
 	mv "$(SYSROOT)/tix/manifest/system.new" "$(SYSROOT)/tix/manifest/system"
+	printf 'TIX_VERSION=3\nNAME=system\nPLATFORM=$(HOST)\nPREFIX=\nSYSTEM=true\n' > "$(SYSROOT)/tix/tixinfo/system"
 
 .PHONY: sysroot-source
 sysroot-source: sysroot-fsh
@@ -477,7 +478,7 @@ $(SRC_INITRD): sysroot
 
 $(SYSTEM_INITRD): sysroot
 	sed -E 's,^/,,' "$(SYSROOT)/tix/manifest/system" | \
-	tar -cf $(SYSTEM_INITRD) -C "$(SYSROOT)" --numeric-owner --owner=0 --group=0 --no-recursion -T - tix/manifest/system
+	tar -cf $(SYSTEM_INITRD) -C "$(SYSROOT)" --numeric-owner --owner=0 --group=0 --no-recursion -T - tix/manifest/system tix/tixinfo/system
 
 # Packaging
 
@@ -502,7 +503,7 @@ ifeq ($(SORTIX_ISO_COMPRESSION),xz)
 	test ! -e "$(OVERLAY_INITRD)" || \
 	xz -c $(OVERLAY_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/overlay.tar.xz
 	xz -c $(SRC_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/src.tar.xz
-	xz -c $(SYSTEM_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/system.tar.xz
+	xz -c $(SYSTEM_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/repository/system.tix.tar.xz
 	build-aux/iso-grub-cfg.sh --platform $(HOST) --version $(VERSION) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 	grub-mkrescue --compress=xz -o $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 else ifeq ($(SORTIX_ISO_COMPRESSION),gzip)
@@ -511,7 +512,7 @@ else ifeq ($(SORTIX_ISO_COMPRESSION),gzip)
 	test ! -e "$(OVERLAY_INITRD)" || \
 	gzip -c $(OVERLAY_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/overlay.tar.gz
 	gzip -c $(SRC_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/src.tar.gz
-	gzip -c $(SYSTEM_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/system.tar.gz
+	gzip -c $(SYSTEM_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/repository/system.tix.tar.gz
 	build-aux/iso-grub-cfg.sh --platform $(HOST) --version $(VERSION) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 	grub-mkrescue --compress=gz -o $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 else # none
@@ -520,7 +521,7 @@ else # none
 	test ! -e "$(OVERLAY_INITRD)" || \
 	cp $(OVERLAY_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/overlay.tar
 	cp $(SRC_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/src.tar
-	cp $(SYSTEM_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/system.tar
+	cp $(SYSTEM_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/repository/system.tix.tar
 	build-aux/iso-grub-cfg.sh --platform $(HOST) --version $(VERSION) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 	grub-mkrescue -o $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 endif
@@ -563,16 +564,12 @@ $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/overlay.tar.xz: $(OVERLAY_INITR
 $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/src.tar.xz: $(SRC_INITRD) $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot
 	xz -c $< > $@
 
-$(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/system.tar.xz: $(SYSTEM_INITRD) $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot
-	xz -c $< > $@
-
 .PHONY: release-boot
 release-boot: \
   $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/sortix.bin.xz \
   $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/live.tar.xz \
   $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/overlay.tar.xz \
   $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/src.tar.xz \
-  $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/system.tar.xz \
 
 .PHONY: release-iso
 release-iso: $(SORTIX_RELEASE_DIR)/$(RELEASE)/builds/$(BUILD_NAME).iso
@@ -597,7 +594,7 @@ $(SORTIX_RELEASE_DIR)/$(RELEASE)/man:
 
 $(SORTIX_RELEASE_DIR)/$(RELEASE)/man/ports.list: sysroot $(SORTIX_RELEASE_DIR)/$(RELEASE)/man
 	for section in 1 2 3 4 5 6 7 8 9; do mkdir -p $(SORTIX_RELEASE_DIR)/$(RELEASE)/man/man$$section; done
-	for port in system `LC_ALL=C ls "$(SYSROOT)/tix/tixinfo"`; do \
+	for port in `LC_ALL=C ls "$(SYSROOT)/tix/tixinfo"`; do \
 	  for manpage in `grep -E "^/share/man/man[1-9]/.*\.[1-9]$$" "$(SYSROOT)/tix/manifest/$$port" | \
 	                  LC_ALL=C sort | \
 	                  tee $(SORTIX_RELEASE_DIR)/$(RELEASE)/man/$$port.list | \
@@ -612,8 +609,9 @@ $(SORTIX_RELEASE_DIR)/$(RELEASE)/repository/$(HOST):
 	mkdir -p $@
 
 .PHONY: release-repository
-release-repository: sysroot $(SORTIX_RELEASE_DIR)/$(RELEASE)/repository/$(HOST)
-	for port in `LC_ALL=C ls "$(SYSROOT)/tix/tixinfo"`; do \
+release-repository: sysroot $(SYSTEM_INITRD) $(SORTIX_RELEASE_DIR)/$(RELEASE)/repository/$(HOST)
+	xz -c $(SYSTEM_INITRD) > $(SORTIX_RELEASE_DIR)/$(RELEASE)/repository/$(HOST)/system.tix.tar.xz
+	for port in `LC_ALL=C ls "$(SYSROOT)/tix/tixinfo" | (grep -Ev '^system$$' || true)`; do \
 	  cp $(SORTIX_REPOSITORY_DIR)/$(HOST)/$$port.tix.tar.xz $(SORTIX_RELEASE_DIR)/$(RELEASE)/repository/$(HOST) && \
 	  cp $(SORTIX_REPOSITORY_DIR)/$(HOST)/$$port.version $(SORTIX_RELEASE_DIR)/$(RELEASE)/repository/$(HOST); \
 	done

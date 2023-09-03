@@ -114,10 +114,11 @@ kernel=$(maybe_compressed boot/sortix.bin)
 live_initrd=$(maybe_compressed boot/live.tar)
 overlay_initrd=$(maybe_compressed boot/overlay.tar)
 src_initrd=$(maybe_compressed boot/src.tar)
-system_initrd=$(maybe_compressed boot/system.tar)
+system_initrd=$(maybe_compressed repository/system.tix.tar)
 ports=$(ls repository |
-       grep -E '\.tix\.tar\.xz$' |
-       sed -E 's/\.tix\.tar\.xz$//')
+        grep -E '\.tix\.tar\.xz$' |
+        sed -E 's/\.tix\.tar\.xz$//' |
+        (grep -Ev '^system$' || true))
 
 mkdir -p boot/grub
 mkdir -p boot/grub/init
