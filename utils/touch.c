@@ -46,7 +46,7 @@ static void compact_arguments(int* argc, char*** argv)
 
 static void version(FILE* fp, const char* argv0)
 {
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
+	fprintf(fp, "%s (Merlin) %s\n", argv0, VERSIONSTR);
 }
 
 static void help(FILE* fp, const char* argv0)

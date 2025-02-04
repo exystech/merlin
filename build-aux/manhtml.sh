@@ -4,10 +4,10 @@ set -e
 export LC_ALL=C
 SECTIONS="1 2 3 4 5 6 7 8 9"
 if [ -z ${SORTIX_SITE_OFFICIAL+x} ]; then
-  SORTIX_SITE_OFFICIAL="https://sortix.org/"
+  SORTIX_SITE_OFFICIAL="https://exystech.github.io/merlinkernel/"
 fi
 if [ -z ${SORTIX_RELEASE_SITE+x} ]; then
-  SORTIX_RELEASE_SITE="https://pub.sortix.org/sortix/release"
+  SORTIX_RELEASE_SITE="https://exystech.github.io/merlinkernel/releases"
 fi
 if [ -z ${MANHTML_TO_SITE_ROOT+x} ]; then
   MANHTML_TO_SITE_ROOT=.
@@ -23,9 +23,9 @@ if [ -z ${RELEASE+x} ]; then
 fi
 if [ -z ${RELEASE_STRING+x} ]; then
   if [ "$RELEASE" = current ]; then
-    RELEASE_STRING="Sortix"
+    RELEASE_STRING="Merlin"
   else
-    RELEASE_STRING="Sortix $RELEASE"
+    RELEASE_STRING="Merlin $RELEASE"
   fi
 fi
 
@@ -267,7 +267,7 @@ echo "Generating manhtml index"
    link "man7/porting.7.html" "porting(7)"
  fi
  ep
- section "Sortix manual pages" "system"
+ section "Merlin manual pages" "system"
  bp
  link "system.html" "System manual pages"
  for section in $SECTIONS; do
@@ -382,8 +382,8 @@ while read manpage; do
 done
 
 echo "Generating manhtml index for all"
-(begin_html "All manual pages for Sortix"
- header "All manual pages for Sortix"
+(begin_html "All manual pages for Merlin"
+ header "All manual pages for Merlin"
  see_stable "all.html"
  for section in $SECTIONS; do
    section "Section $section" "$section"

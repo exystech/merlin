@@ -140,7 +140,7 @@ static void help(FILE* fp, const char* argv0)
 
 static void version(FILE* fp, const char* argv0)
 {
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
+	fprintf(fp, "%s (Merlin) %s\n", argv0, VERSIONSTR);
 }
 
 int main(int argc, char* argv[])

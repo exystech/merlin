@@ -183,7 +183,7 @@ fi
 
 set version="$version"
 set machine="$machine"
-set base_menu_title="Sortix \$version for \$machine"
+set base_menu_title="Merlin \$version for \$machine"
 set menu_title="\$base_menu_title"
 set title_single_user='live environment'
 set title_sysinstall='new installation'
@@ -402,7 +402,7 @@ exec > boot/grub/main.cfg
 
 menuentry() {
   echo
-  printf "menuentry \"Sortix (%s)\" {\n" "$1"
+  printf "menuentry \"Merlin (%s)\" {\n" "$1"
   if [ -n "$2" ]; then
     printf "  if \$enable_gui; then\n"
     printf "    load_sortix %s-gui\n" "$2"

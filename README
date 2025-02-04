@@ -1,7 +1,7 @@
-The Sortix Operating System
+The Merlin Operating System
 ===========================
 
-Sortix is a small self-hosting operating-system aiming to be a clean and modern
+Merlin is a small self-hosting operating-system aiming to be a clean and modern
 POSIX implementation.  It is a hobbyist operating system written from scratch
 with its own base system, including kernel and standard library, as well as
 ports of third party software.  It has a straightforward installer and can be
@@ -23,14 +23,14 @@ in the user-guide(7) manual page.
 Links
 -----
 
-For more information, please visit the official website:
+For more information, please join our official discord server:
 
-  https://sortix.org/
+  https://dsc.gg/merlinkernel
 
-Building Sortix
+Building Merlin
 ---------------
 
-Development of Sortix under itself is covered in development(7).
+Development of Merlin under itself is covered in development(7).
 
 Development from another operating system is covered in cross-development(7).
 

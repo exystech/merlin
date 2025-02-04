@@ -55,11 +55,11 @@ SORTIX_RELEASE_DIR?=release
 SORTIX_REPOSITORY_DIR?=repository
 SORTIX_ISO_COMPRESSION?=xz
 
-SORTIX_PORTS_MIRROR?=https://pub.sortix.org/mirror
+SORTIX_PORTS_MIRROR?=https://exystech.github.io/pingu/mirror
 
 SORTIX_INCLUDE_SOURCE_GIT_REPO?=$(shell test -d .git && echo "file://`pwd`")
 SORTIX_INCLUDE_SOURCE_GIT_REPO:=$(SORTIX_INCLUDE_SOURCE_GIT_REPO)
-SORTIX_INCLUDE_SOURCE_GIT_ORIGIN?=https://sortix.org/sortix.git
+SORTIX_INCLUDE_SOURCE_GIT_ORIGIN?=https://github.com/exystech/merlin.git
 SORTIX_INCLUDE_SOURCE_GIT_CLONE_OPTIONS?=--single-branch
 SORTIX_INCLUDE_SOURCE_GIT_BRANCHES?=master
 ifneq ($(and $(shell which git 2>/dev/null),$(SORTIX_INCLUDE_SOURCE_GIT_REPO)),)
@@ -70,7 +70,7 @@ endif
 
 include build-aux/dirs.mak
 
-BUILD_NAME:=sortix-$(RELEASE)-$(MACHINE)
+BUILD_NAME:=merlin-$(RELEASE)-$(MACHINE)
 
 LIVE_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).live.tar
 OVERLAY_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).overlay.tar
@@ -221,11 +221,11 @@ sysroot-system: sysroot-fsh sysroot-base-headers
 	echo /var/run >> "$(SYSROOT)/tix/manifest/system"
 	echo "$(HOST_MACHINE)" > "$(SYSROOT)/etc/machine"
 	echo /etc/machine >> "$(SYSROOT)/tix/manifest/system"
-	(echo 'NAME="Sortix"' && \
+	(echo 'NAME="Merlin"' && \
 	 echo 'VERSION="$(VERSION)"' && \
-	 echo 'ID=sortix' && \
+	 echo 'ID=merlin' && \
 	 echo 'VERSION_ID="$(VERSION)"' && \
-	 echo 'PRETTY_NAME="Sortix $(VERSION)"' && \
+	 echo 'PRETTY_NAME="Merlin $(VERSION)"' && \
 	 echo 'SORTIX_ABI=2.0' && \
 	 true) > "$(SYSROOT)/etc/sortix-release"
 	echo /etc/sortix-release >> "$(SYSROOT)/tix/manifest/system"
